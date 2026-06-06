@@ -1008,6 +1008,14 @@ elif aktif == "kullanici" and st.session_state["rol"] == "admin":
 elif aktif == "rapor":
     df_rapor = db_read("cari_kartlar", filters={"silindi": "neq_1"})
 
+    if df_rapor.empty:
+        st.info("Henüz kayıt yok. Önce müşteri ekleyin veya Excel'den aktar.")
+        st.stop()
+
+    for col in ["beklenen_ciro","gerceklesen_ciro","durum","islem_asamasi","temsilci","il","firma","yetkili","id"]:
+        if col not in df_rapor.columns:
+            df_rapor[col] = 0 if col in ["beklenen_ciro","gerceklesen_ciro","id"] else ""
+
     if "beklenen_ciro" not in df_rapor.columns:
         df_rapor["beklenen_ciro"] = 0
     if "gerceklesen_ciro" not in df_rapor.columns:
