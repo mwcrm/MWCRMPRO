@@ -1778,14 +1778,14 @@ elif aktif == "teklif":
 
     st.markdown("### Islem Kayitlari")
     try:
-        df_islem = db_read("islem_kaydi", extra_sql="ORDER BY tarih DESC LIMIT 30")
+        df_islem = db_read("islem_kaydi", order_col="tarih", limit=30)
         if not df_islem.empty:
-            df_islem.columns = ["Tarih","Musteri","Islem","Gonderim","Kullanici"]
-            st.dataframe(df_islem, use_container_width=True, hide_index=True)
+            goster = [c for c in ["tarih","musteri_adi","islem_turu","gonderim_bilgisi","olusturan"] if c in df_islem.columns]
+            st.dataframe(df_islem[goster], use_container_width=True, hide_index=True)
         else:
             st.info("Henuz islem kaydi yok.")
-    except:
-        st.info("Islem kaydi yok.")
+    except Exception as e:
+        st.error(f"Islem kaydi hatasi: {e}")
 
 # ── EXCEL AKTAR ──────────────────────────────────────────────────────────────
 elif aktif == "excel":
