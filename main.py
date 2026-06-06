@@ -333,6 +333,19 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             surum TEXT, aciklama TEXT, kod TEXT, olusturan TEXT)""",
+        """CREATE TABLE IF NOT EXISTS mesajlar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            gonderen TEXT, alici TEXT, mesaj TEXT,
+            okundu INTEGER DEFAULT 0)""",
+        """CREATE TABLE IF NOT EXISTS duyurular (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            baslik TEXT, icerik TEXT, tip TEXT DEFAULT 'bilgi',
+            olusturan TEXT, aktif INTEGER DEFAULT 1)""",
+        """CREATE TABLE IF NOT EXISTS aktif_kullanicilar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kullanici TEXT UNIQUE, son_gorulme TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""",
         """CREATE TABLE IF NOT EXISTS temsilciler (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -501,7 +514,7 @@ st.markdown("""
 # ── MENÜ FONKSİYONLARI (sidebar'dan önce tanımlanmalı) ───────────────────────
 import json as _menu_json
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "teklif", "kisiler", "rapor", "excel", "arsiv"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "teklif", "kisiler", "rapor", "excel", "arsiv", "mesajlar"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -512,7 +525,8 @@ _TAB_ETIKETLER = {
     "kisiler": "📞 Telefon Kişiler",
     "randevu": "📅 Randevular",
     "kullanici": "👥 Kullanıcı Yönetimi",
-    "koddepo": "💾 Kod Deposu"
+    "koddepo": "💾 Kod Deposu",
+    "mesajlar": "💬 Mesajlar"
 }
 
 def get_menu_tercihi(kullanici):
@@ -551,37 +565,118 @@ def save_menu_tercihi(kullanici, sira):
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("### 📞 Destek")
-    with st.expander("📬 Bize Ulaşın"):
-        st.markdown("**Tel:** [5400344228](tel:05400344228)")
-        st.markdown("**Email:** [osnenufu@gmail.com](mailto:osnenufu@gmail.com)")
-        wa_destek = "https://wa.me/905400344228?text=Merhaba,%20MWCRMPRO%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum."
-        st.link_button("📱 WhatsApp'tan Yaz", wa_destek, use_container_width=True)
+    # Aktif kullanıcıyı kaydet
+    try:
+        db_insert("aktif_kullanicilar", {
+            "kullanici": st.session_state.get("kullanici",""),
+            "son_gorulme": datetime.now().isoformat()
+        })
+    except:
+        try:
+            db_update("aktif_kullanicilar", 
+                {"son_gorulme": datetime.now().isoformat()},
+                "kullanici", st.session_state.get("kullanici",""))
+        except: pass
+
+    # Admin duyuruları - en üstte
+    try:
+        df_duy = db_read("duyurular", filters={"aktif": 1}, order_col="tarih")
+        if not df_duy.empty:
+            for _, duy in df_duy.iterrows():
+                tip = str(duy.get("tip","bilgi"))
+                baslik = str(duy.get("baslik",""))
+                icerik = str(duy.get("icerik",""))
+                if tip == "hata":
+                    st.error(f"🔴 **{baslik}**\n{icerik}")
+                elif tip == "uyari":
+                    st.warning(f"⚠️ **{baslik}**\n{icerik}")
+                else:
+                    st.info(f"💡 **{baslik}**\n{icerik}")
+            st.divider()
+    except: pass
+
+    # Okunmamış mesaj sayısı
+    try:
+        df_okunmamis = db_read("mesajlar", filters={
+            "alici": st.session_state.get("kullanici",""),
+            "okundu": 0
+        })
+        okunmamis_say = len(df_okunmamis)
+    except:
+        okunmamis_say = 0
+
+    if okunmamis_say > 0:
+        st.markdown(f"### 💬 Mesajlar <span style='background:#e74c3c;color:white;border-radius:10px;padding:2px 7px;font-size:12px'>{okunmamis_say}</span>", unsafe_allow_html=True)
+        if st.button("📨 Mesajları Gör", use_container_width=True, type="primary"):
+            st.session_state["aktif_tab"] = "mesajlar"
+            st.rerun()
+        st.divider()
+
+    # Aktif kullanıcılar
+    try:
+        _sinir = (datetime.now().timestamp() - 300)  # 5 dk
+        df_aktif = db_read("aktif_kullanicilar", extra_sql="")
+        if not df_aktif.empty and "son_gorulme" in df_aktif.columns:
+            df_aktif["son_gorulme"] = pd.to_datetime(df_aktif["son_gorulme"], errors="coerce")
+            df_aktif_son = df_aktif[df_aktif["son_gorulme"] > pd.Timestamp.now() - pd.Timedelta(minutes=5)]
+            if len(df_aktif_son) > 0:
+                isimler = ", ".join(df_aktif_son["kullanici"].tolist())
+                st.caption(f"🟢 Çevrimiçi: **{isimler}**")
+    except: pass
 
     st.divider()
-    st.markdown("### 💬 Yardım & Talep")
-    talep_mesaj = st.text_area("Talebinizi yazın:", placeholder="Yeni özellik, hata bildirimi...", height=80, key="sidebar_talep")
-    if st.button("📨 WhatsApp ile Gönder", use_container_width=True, key="sidebar_wa_btn"):
-        if talep_mesaj.strip():
-            wa_talep = f"https://wa.me/905400344228?text=MWCRMPRO%20Talep:%20{talep_mesaj.replace(' ','%20').replace(chr(10),'%0A')}"
-            st.markdown(f"[👉 Tıklayın]({wa_talep})")
-        else:
-            st.warning("Lütfen bir mesaj yazın.")
 
-    st.divider()
-    st.markdown("### ℹ️ Sistem")
-    st.caption(f"👤 **{st.session_state.get('kullanici','')}** ({st.session_state.get('rol','')})")
+    # Yardım - küçük, altta
+    with st.expander("❓ Yardım & Destek"):
+        st.markdown("📞 [5400344228](tel:05400344228)")
+        st.markdown("✉️ [osnenufu@gmail.com](mailto:osnenufu@gmail.com)")
+        wa_destek = "https://wa.me/905400344228?text=Merhaba,%20MWCRMPRO"
+        st.link_button("📱 WhatsApp", wa_destek, use_container_width=True)
+        st.divider()
+        talep_mesaj = st.text_area("Talep:", placeholder="Sorun veya önerinizi yazın...", height=80, key="sidebar_talep")
+        if st.button("📨 Gönder", use_container_width=True, key="sidebar_wa_btn"):
+            if talep_mesaj.strip():
+                wa_talep = f"https://wa.me/905400344228?text=MWCRMPRO%20Talep:%20{talep_mesaj.replace(' ','%20').replace(chr(10),'%0A')}"
+                st.markdown(f"[👉 Gönder]({wa_talep})")
+            else:
+                st.warning("Mesaj yazın.")
+
+    st.caption(f"👤 {st.session_state.get('kullanici','')} ({st.session_state.get('rol','')})")
     try:
         conn_s = get_conn()
         total_cari = conn_s.execute("SELECT COUNT(*) FROM cari_kartlar WHERE silindi=0 OR silindi='0' OR silindi IS NULL").fetchone()[0]
         conn_s.close()
-        st.caption(f"📋 Aktif Cari: **{total_cari}**")
-    except:
-        pass
+        st.caption(f"📋 {total_cari} aktif cari")
+    except: pass
 
-    # Menü sıralama - sadece admin
+    # Admin: Duyuru yönetimi + Menü sırası
     if st.session_state.get("rol") == "admin":
         st.divider()
+        with st.expander("📢 Duyuru Yönet"):
+            with st.form("duyuru_form"):
+                d_baslik = st.text_input("Başlık:")
+                d_icerik = st.text_area("İçerik:", height=60)
+                d_tip = st.selectbox("Tip:", ["bilgi","uyari","hata"])
+                if st.form_submit_button("📢 Yayınla"):
+                    if d_baslik:
+                        db_insert("duyurular", {
+                            "baslik": d_baslik, "icerik": d_icerik,
+                            "tip": d_tip, "olusturan": st.session_state["kullanici"], "aktif": 1
+                        })
+                        st.success("Yayınlandı!")
+                        st.rerun()
+            # Mevcut duyuruları kapat
+            try:
+                df_duy2 = db_read("duyurular", filters={"aktif": 1})
+                if not df_duy2.empty:
+                    for _, d2 in df_duy2.iterrows():
+                        dc1, dc2 = st.columns([3,1])
+                        dc1.caption(str(d2.get("baslik","")))
+                        if dc2.button("✕", key=f"duy_kapat_{d2.get('id')}"):
+                            db_update("duyurular", {"aktif": 0}, "id", d2.get("id"))
+                            st.rerun()
+            except: pass
+
         with st.expander("🎛️ Menü Sırası"):
             mevcut_sira_m = get_menu_tercihi(st.session_state["kullanici"])
             for idx, tab_key in enumerate(mevcut_sira_m):
@@ -3089,6 +3184,108 @@ elif aktif == "randevu":
                 st.dataframe(bu_hafta[bh_cols], use_container_width=True, hide_index=True)
             else:
                 st.info("Bu hafta randevu yok.")
+
+# ── SİSTEM MESAJLAŞMA ────────────────────────────────────────────────────────
+elif aktif == "mesajlar":
+    st.markdown("## 💬 Sistem İçi Mesajlaşma")
+
+    ben = st.session_state.get("kullanici","")
+
+    # Tüm kullanıcı listesi
+    try:
+        df_kullar = db_read("kullanicilar", extra_sql="")
+        kullar_liste = [r["kullanici_adi"] for _, r in df_kullar.iterrows() if r["kullanici_adi"] != ben]
+    except:
+        kullar_liste = []
+
+    # Aktif kullanıcılar
+    try:
+        df_aktif2 = db_read("aktif_kullanicilar", extra_sql="")
+        if not df_aktif2.empty and "son_gorulme" in df_aktif2.columns:
+            df_aktif2["son_gorulme"] = pd.to_datetime(df_aktif2["son_gorulme"], errors="coerce")
+            aktif_isimler = set(df_aktif2[
+                df_aktif2["son_gorulme"] > pd.Timestamp.now() - pd.Timedelta(minutes=5)
+            ]["kullanici"].tolist())
+        else:
+            aktif_isimler = set()
+    except:
+        aktif_isimler = set()
+
+    msg_col1, msg_col2 = st.columns([1, 2])
+
+    with msg_col1:
+        st.markdown("### 👥 Kullanıcılar")
+        if not kullar_liste:
+            st.info("Başka kullanıcı yok.")
+        for kul in kullar_liste:
+            # Okunmamış sayısı
+            try:
+                df_ok = db_read("mesajlar", extra_sql=f"WHERE alici='{ben}' AND gonderen='{kul}' AND okundu=0")
+                ok_say = len(df_ok)
+            except:
+                ok_say = 0
+
+            aktif_dot = "🟢" if kul in aktif_isimler else "⚫"
+            etiket = f"{aktif_dot} {kul}"
+            if ok_say > 0:
+                etiket += f" 🔴{ok_say}"
+
+            if st.button(etiket, key=f"msg_kul_{kul}", use_container_width=True):
+                st.session_state["msg_alici"] = kul
+                # Okundu olarak işaretle
+                try:
+                    sb_m = get_sb()
+                    if sb_m:
+                        sb_m.table("mesajlar").update({"okundu": 1}).eq("alici", ben).eq("gonderen", kul).execute()
+                except: pass
+                st.rerun()
+
+    with msg_col2:
+        alici = st.session_state.get("msg_alici", "")
+        if not alici:
+            st.info("Sol taraftan bir kullanıcı seçin.")
+        else:
+            aktif_dot2 = "🟢 Çevrimiçi" if alici in aktif_isimler else "⚫ Çevrimdışı"
+            st.markdown(f"### 💬 {alici} — {aktif_dot2}")
+
+            # Mesaj geçmişi
+            try:
+                df_mesajlar = db_read("mesajlar", extra_sql=f"WHERE (gonderen='{ben}' AND alici='{alici}') OR (gonderen='{alici}' AND alici='{ben}') ORDER BY tarih ASC")
+            except:
+                df_mesajlar = pd.DataFrame()
+
+            # Mesaj baloncukları
+            mesaj_html = "<div style='height:350px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:10px;background:#fafafa;'>"
+            if df_mesajlar.empty:
+                mesaj_html += "<p style='color:#aaa;text-align:center;margin-top:50px'>Henüz mesaj yok</p>"
+            else:
+                for _, msg in df_mesajlar.iterrows():
+                    gond = str(msg.get("gonderen",""))
+                    metin = str(msg.get("mesaj",""))
+                    zaman = str(msg.get("tarih",""))[:16]
+                    if gond == ben:
+                        mesaj_html += f"<div style='text-align:right;margin:5px 0'><span style='background:#1f6feb;color:white;padding:8px 12px;border-radius:16px 16px 4px 16px;display:inline-block;max-width:80%'>{metin}</span><br><small style='color:#aaa'>{zaman}</small></div>"
+                    else:
+                        mesaj_html += f"<div style='text-align:left;margin:5px 0'><span style='background:#e9ecef;color:#333;padding:8px 12px;border-radius:16px 16px 16px 4px;display:inline-block;max-width:80%'>{metin}</span><br><small style='color:#aaa'>{zaman}</small></div>"
+            mesaj_html += "</div>"
+            st.markdown(mesaj_html, unsafe_allow_html=True)
+
+            # Mesaj gönder
+            with st.form("mesaj_gonder_form", clear_on_submit=True):
+                yeni_mesaj = st.text_input("Mesajınız:", placeholder="Mesaj yazın...", key="yeni_mesaj_input")
+                gc1, gc2 = st.columns([4,1])
+                if gc2.form_submit_button("📤 Gönder", use_container_width=True, type="primary"):
+                    if yeni_mesaj.strip():
+                        db_insert("mesajlar", {
+                            "gonderen": ben,
+                            "alici": alici,
+                            "mesaj": yeni_mesaj.strip(),
+                            "okundu": 0
+                        })
+                        st.rerun()
+
+            if st.button("🔄 Yenile", use_container_width=True):
+                st.rerun()
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
