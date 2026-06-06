@@ -6,20 +6,6 @@ import os
 from datetime import datetime
 
 # ── SUPABASE BAĞLANTISI ───────────────────────────────────────────────────────
-def get_supabase():
-    try:
-        from supabase import create_client
-        url = st.secrets.get("SUPABASE_URL","")
-        key = st.secrets.get("SUPABASE_KEY","")
-        if url and key:
-            return create_client(url, key)
-    except:
-        pass
-    return None
-
-def get_conn():
-    return sqlite3.connect("mw_crm.db", check_same_thread=False)
-
 def sb_or_sqlite():
     """Supabase varsa True, yoksa SQLite kullan"""
     try:
@@ -29,8 +15,9 @@ def sb_or_sqlite():
     except:
         return False
 
-def get_sb():
-    """Supabase client döner"""
+@st.cache_resource
+def get_sb_client():
+    """Supabase client — tek seferlik oluştur, cache'le"""
     try:
         from supabase import create_client
         url = st.secrets.get("SUPABASE_URL","")
@@ -40,6 +27,12 @@ def get_sb():
     except:
         pass
     return None
+
+def get_sb():
+    return get_sb_client()
+
+def get_supabase():
+    return get_sb_client()
 
 @st.cache_data(ttl=30)
 def db_read_cached(table, extra_sql=""):
@@ -535,7 +528,7 @@ st.markdown("""
 # ── MENÜ FONKSİYONLARI (sidebar'dan önce tanımlanmalı) ───────────────────────
 import json as _menu_json
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "teklif", "kisiler", "rapor", "excel", "arsiv", "mesajlar"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "teklif", "kisiler", "rapor", "excel", "arsiv", "mesajlar", "kullanici"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
