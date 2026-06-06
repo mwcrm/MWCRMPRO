@@ -41,6 +41,26 @@ def get_sb():
         pass
     return None
 
+@st.cache_data(ttl=30)
+def db_read_cached(table, extra_sql=""):
+    """Önbellekli okuma — 30 saniye cache"""
+    sb = get_sb()
+    if sb:
+        try:
+            q = sb.table(table).select("*")
+            res = q.execute()
+            return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+        except:
+            pass
+    try:
+        conn = get_conn()
+        sql = f"SELECT * FROM {table} {extra_sql}"
+        df = pd.read_sql(sql, conn)
+        conn.close()
+        return df
+    except:
+        return pd.DataFrame()
+
 def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
     """Supabase veya SQLite'dan DataFrame döner"""
     sb = get_sb()
@@ -61,14 +81,15 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
                 q = q.limit(limit)
             res = q.execute()
             return pd.DataFrame(res.data) if res.data else pd.DataFrame()
-        except Exception as e:
+        except:
             pass
-    # SQLite fallback
     try:
         sql = f"SELECT * FROM {table}"
         if extra_sql:
             sql += f" {extra_sql}"
+        conn = get_conn()
         df = pd.read_sql(sql, conn)
+        conn.close()
         return df
     except:
         return pd.DataFrame()
@@ -601,9 +622,11 @@ with st.sidebar:
             conn_ak.commit(); conn_ak.close()
     except: pass
 
-    # Admin duyuruları - en üstte
+    # Admin duyuruları - cache ile hızlı
     try:
-        df_duy = db_read("duyurular", filters={"aktif": 1}, order_col="tarih")
+        df_duy = db_read_cached("duyurular")
+        if not df_duy.empty and "aktif" in df_duy.columns:
+            df_duy = df_duy[df_duy["aktif"]==1]
         if not df_duy.empty:
             for _, duy in df_duy.iterrows():
                 tip = str(duy.get("tip","bilgi"))
@@ -742,6 +765,12 @@ if st.session_state["rol"] == "admin":
     tab_listesi.append("koddepo")
 
 aktif_tab_listesi = get_menu_tercihi(st.session_state["kullanici"])
+
+# Admin tabları her zaman listede olsun
+if st.session_state["rol"] == "admin":
+    for _t in ["kullanici","koddepo"]:
+        if _t not in aktif_tab_listesi:
+            aktif_tab_listesi.append(_t)
 
 # Yetki filtresi (admin hepsini görür)
 if st.session_state.get("rol") != "admin":
