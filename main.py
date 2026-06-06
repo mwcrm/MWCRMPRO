@@ -496,8 +496,7 @@ def giris_ekrani():
                     st.error("Kullanıcı adı veya şifre hatalı!")
 
 def cikis():
-    for k in ["giris","kullanici","rol","aktif_tab","kayit_mesaj"]:
-        st.session_state.pop(k, None)
+    st.session_state.clear()
     st.rerun()
 
 # ── SESSION STATE ─────────────────────────────────────────────────────────────
@@ -999,8 +998,12 @@ elif aktif == "arsiv":
 
 # ── KULLANICI YÖNETİMİ ───────────────────────────────────────────────────────
 elif aktif == "kullanici":
-    if st.session_state.get("rol") != "admin":
-        st.error("Bu sayfa sadece admin kullanıcılara açıktır.")
+    _kul_rol = st.session_state.get("rol","")
+    if _kul_rol != "admin":
+        st.warning(f"Bu sayfa sadece admin kullanıcılara açıktır. Mevcut rol: '{_kul_rol}'")
+        if st.button("🔄 Yeniden Giriş Yap"):
+            st.session_state.clear()
+            st.rerun()
         st.stop()
     st.markdown("## 👥 Kullanıcı Yönetimi")
 
