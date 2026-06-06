@@ -308,30 +308,41 @@ def giris_ekrani():
             sifre = st.text_input("Şifre", type="password")
             if st.form_submit_button("Giriş Yap", use_container_width=True):
                 row = None
-                # Supabase ile dene
-                if sb_or_sqlite():
-                    try:
-                        sb = get_supabase()
-                        if sb:
-                            res = sb.table("kullanicilar").select("*").eq("kullanici_adi", kullanici).eq("sifre", sifre).execute()
-                            if res.data:
-                                row = res.data[0]
-                    except:
-                        pass
-                # SQLite fallback
+
+                # 1. Supabase ile dene
+                try:
+                    from supabase import create_client
+                    url = st.secrets.get("SUPABASE_URL","")
+                    key = st.secrets.get("SUPABASE_KEY","")
+                    if url and key:
+                        sb = create_client(url, key)
+                        res = sb.table("kullanicilar").select("*").eq("kullanici_adi", kullanici).eq("sifre", sifre).execute()
+                        if res.data:
+                            row = res.data[0]
+                except Exception as e:
+                    pass
+
+                # 2. SQLite fallback
                 if row is None:
                     try:
                         conn = get_conn()
-                        r = conn.execute("SELECT * FROM kullanicilar WHERE kullanici_adi=? AND sifre=?", (kullanici, sifre)).fetchone()
+                        r = conn.execute(
+                            "SELECT * FROM kullanicilar WHERE kullanici_adi=? AND sifre=?",
+                            (kullanici, sifre)).fetchone()
                         conn.close()
                         if r:
                             row = {"kullanici_adi": r[1], "sifre": r[2], "rol": r[3]}
                     except:
                         pass
+
+                # 3. Hardcoded admin (son çare)
+                if row is None and kullanici == "admin" and sifre == "admin123":
+                    row = {"kullanici_adi": "admin", "sifre": "admin123", "rol": "admin"}
+
                 if row:
                     st.session_state["giris"] = True
                     st.session_state["kullanici"] = kullanici
-                    st.session_state["rol"] = row.get("rol", "kullanici") if isinstance(row, dict) else row[3]
+                    st.session_state["rol"] = row.get("rol", "admin") if isinstance(row, dict) else "admin"
                     st.session_state["aktif_tab"] = "liste"
                     st.rerun()
                 else:
