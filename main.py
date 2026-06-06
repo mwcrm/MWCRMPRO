@@ -34,8 +34,27 @@ def get_sb():
 def get_supabase():
     return get_sb_client()
 
-@st.cache_data(ttl=30)
-def db_read_cached(table, extra_sql=""):
+@st.cache_data(ttl=60)
+def get_cari_listesi():
+    """60 sn cache'li cari listesi"""
+    sb = get_sb()
+    if sb:
+        try:
+            res = sb.table("cari_kartlar").select("*").neq("silindi",1).order("firma").execute()
+            return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+        except: pass
+    try:
+        conn = get_conn()
+        df = pd.read_sql("SELECT * FROM cari_kartlar WHERE silindi=0 OR silindi='0' OR silindi IS NULL ORDER BY firma", conn)
+        conn.close()
+        return df
+    except:
+        return pd.DataFrame()
+
+@st.cache_data(ttl=120)
+def get_kullanici_listesi():
+    """2 dk cache'li kullanıcı listesi"""
+    return db_read("kullanicilar", extra_sql="")
     """Önbellekli okuma — 30 saniye cache"""
     sb = get_sb()
     if sb:
@@ -1117,14 +1136,23 @@ elif aktif == "kullanici" and st.session_state["rol"] == "admin":
                     import json as _kj
                     yetki_str = "tam" if tam_yetki else _kj.dumps(secili_menuler)
                     try:
-                        db_insert("kullanicilar", {
-                            "kullanici_adi": yeni_kadi,
-                            "sifre": yeni_sifre,
-                            "rol": yeni_rol,
-                            "yetkiler": yetki_str
-                        })
+                        # Önce yetkisiz insert dene, yetkiler yoksa sonra ekle
+                        try:
+                            db_insert("kullanicilar", {
+                                "kullanici_adi": yeni_kadi,
+                                "sifre": yeni_sifre,
+                                "rol": yeni_rol,
+                                "yetkiler": yetki_str
+                            })
+                        except:
+                            # yetkiler kolonu yoksa onsuz dene
+                            db_insert("kullanicilar", {
+                                "kullanici_adi": yeni_kadi,
+                                "sifre": yeni_sifre,
+                                "rol": yeni_rol
+                            })
                         # Temsilci kartı da ekle
-                        if t_ad:
+                        if t_ad.strip():
                             ad_soyad = t_ad.strip().split(" ")
                             db_insert("temsilciler", {
                                 "ad": ad_soyad[0],
@@ -1135,7 +1163,7 @@ elif aktif == "kullanici" and st.session_state["rol"] == "admin":
                         st.success(f"✅ '{yeni_kadi}' eklendi!")
                         st.rerun()
                     except Exception as e:
-                        st.error(f"Hata: {e} — Bu kullanıcı adı zaten mevcut olabilir.")
+                        st.error(f"Hata: {e}")
                 else:
                     st.warning("Kullanıcı adı ve şifre zorunlu!")
 
