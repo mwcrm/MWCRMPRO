@@ -684,41 +684,28 @@ if aktif == "yeni":
                 st.warning("Firma adı boş bırakılamaz!")
             elif duzenle:
                 # Güncelle
-                conn = get_conn()
-                conn.execute("""UPDATE cari_kartlar SET
-                    firma=?, yetkili=?, gsm=?, sabit=?, email=?,
-                    adres=?, ilce=?, il=?, durum=?, temsilci=?, islem_asamasi=?, beklenen_ciro=?, gerceklesen_ciro=?
-                    WHERE id=?""",
-                    (firma, yetkili, gsm, sabit, email, adres, ilce, il, durum, temsilci, asama, beklenen_ciro, gerceklesen_ciro, duzenle.get("id")))
-                conn.commit(); conn.close()
+                db_update("cari_kartlar", {
+                    "firma": firma, "yetkili": yetkili, "gsm": gsm,
+                    "sabit": sabit, "email": email, "adres": adres,
+                    "ilce": ilce, "il": il, "durum": durum,
+                    "temsilci": temsilci, "islem_asamasi": asama,
+                    "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro
+                }, "id", duzenle.get("id"))
                 st.session_state.pop("duzenle_musteri", None)
                 st.session_state["aktif_tab"] = "liste"
                 st.session_state["kayit_mesaj"] = f"✅ '{firma}' güncellendi!"
                 st.rerun()
             else:
                 # Yeni kayıt
-                conn = get_conn()
-                conn.execute(
-                    "INSERT INTO cari_kartlar (tarih,firma,yetkili,gsm,sabit,email,adres,ilce,il,durum,temsilci,islem_asamasi,silindi,olusturan,beklenen_ciro,gerceklesen_ciro) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), firma, yetkili, gsm, sabit, email, adres, ilce, il, durum, temsilci, asama, 0, st.session_state["kullanici"], beklenen_ciro, gerceklesen_ciro)
-                )
-                conn.commit(); conn.close()
-                # Supabase'e de ekle
-                if sb_or_sqlite():
-                    try:
-                        sb = get_supabase()
-                        if sb:
-                            sb.table("cari_kartlar").insert({
-                                "tarih": datetime.now().isoformat(),
-                                "firma": firma, "yetkili": yetkili, "gsm": gsm,
-                                "sabit": sabit, "email": email, "adres": adres,
-                                "ilce": ilce, "il": il, "durum": durum,
-                                "temsilci": temsilci, "islem_asamasi": asama,
-                                "silindi": 0, "olusturan": st.session_state["kullanici"],
-                                "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro
-                            }).execute()
-                    except Exception as e:
-                        st.warning(f"Supabase kayıt uyarısı: {e}")
+                db_insert("cari_kartlar", {
+                    "tarih": datetime.now().isoformat(),
+                    "firma": firma, "yetkili": yetkili, "gsm": gsm,
+                    "sabit": sabit, "email": email, "adres": adres,
+                    "ilce": ilce, "il": il, "durum": durum,
+                    "temsilci": temsilci, "islem_asamasi": asama,
+                    "silindi": 0, "olusturan": st.session_state["kullanici"],
+                    "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro
+                })
                 st.session_state["aktif_tab"] = "liste"
                 st.session_state["kayit_mesaj"] = f"✅ '{firma}' başarıyla kaydedildi!"
                 st.rerun()
@@ -792,17 +779,16 @@ elif aktif == "liste":
         col_kaydet, col_arsiv = st.columns([2, 1])
         with col_kaydet:
             if st.button("💾 Tüm Değişiklikleri Kaydet", use_container_width=True):
-                conn = get_conn()
                 for _, row in edited_df.iterrows():
-                    conn.execute("""UPDATE cari_kartlar SET
-                        firma=?, yetkili=?, gsm=?, sabit=?, email=?,
-                        adres=?, ilce=?, il=?, durum=?, temsilci=?, islem_asamasi=?
-                        WHERE id=?""",
-                        (row.get("firma"), row.get("yetkili"), row.get("gsm"),
-                         row.get("sabit"), row.get("email"), row.get("adres"),
-                         row.get("ilce"), row.get("il"), row.get("durum"),
-                         row.get("temsilci"), row.get("islem_asamasi"), row.get("id")))
-                conn.commit(); conn.close()
+                    if row.get("id"):
+                        db_update("cari_kartlar", {
+                            "firma": row.get("firma"), "yetkili": row.get("yetkili"),
+                            "gsm": row.get("gsm"), "sabit": row.get("sabit"),
+                            "email": row.get("email"), "adres": row.get("adres"),
+                            "ilce": row.get("ilce"), "il": row.get("il"),
+                            "durum": row.get("durum"), "temsilci": row.get("temsilci"),
+                            "islem_asamasi": row.get("islem_asamasi")
+                        }, "id", row.get("id"))
                 st.success("✅ Değişiklikler kaydedildi!")
                 st.rerun()
 
@@ -812,17 +798,9 @@ elif aktif == "liste":
                 if secili_sayi > 0:
                     st.info(f"{secili_sayi} kayıt seçili")
                     if st.button(f"🗑️ Seçili {secili_sayi} Kaydı Arşive Gönder", use_container_width=True, type="primary"):
-                        conn = get_conn()
                         for _, row in secili_df.iterrows():
                             if row.get("id") and str(row.get("id")) != "None":
-                                conn.execute("UPDATE cari_kartlar SET silindi=1 WHERE id=?", (row.get("id"),))
-                            else:
-                                # id yoksa firma+yetkili+tarih kombinasyonuyla bul
-                                conn.execute("""UPDATE cari_kartlar SET silindi=1 
-                                    WHERE firma=? AND (yetkili=? OR yetkili IS NULL) 
-                                    AND tarih=? AND (silindi=0 OR silindi='0' OR silindi IS NULL)""",
-                                    (row.get("firma"), row.get("yetkili"), row.get("tarih")))
-                        conn.commit(); conn.close()
+                                db_update("cari_kartlar", {"silindi": 1}, "id", row.get("id"))
                         st.success(f"{secili_sayi} kayıt arşive gönderildi.")
                         st.rerun()
                 else:
@@ -831,21 +809,14 @@ elif aktif == "liste":
                     if arsiv_yontemi == "ID ile":
                         target_id = st.number_input("ID:", min_value=1, step=1, key="arsiv_id")
                         if st.button("Arşive Gönder", use_container_width=True):
-                            conn = get_conn()
-                            c = conn.execute("UPDATE cari_kartlar SET silindi=1 WHERE id=?", (target_id,))
-                            conn.commit(); conn.close()
-                            if c.rowcount > 0:
-                                st.success(f"ID {target_id} arşive gönderildi.")
-                            else:
-                                st.error("Bu ID bulunamadı!")
+                            db_update("cari_kartlar", {"silindi": 1}, "id", target_id)
+                            st.success(f"ID {target_id} arşive gönderildi.")
                             st.rerun()
                     else:
                         firma_listesi = df["firma"].dropna().tolist()
                         secili_firma = st.selectbox("Firma:", firma_listesi, key="arsiv_firma")
                         if st.button("Arşive Gönder", use_container_width=True, key="arsiv_firma_btn"):
-                            conn = get_conn()
-                            c = conn.execute("UPDATE cari_kartlar SET silindi=1 WHERE firma=? AND (silindi=0 OR silindi='0' OR silindi IS NULL)", (secili_firma,))
-                            conn.commit(); conn.close()
+                            db_update("cari_kartlar", {"silindi": 1}, "firma", secili_firma)
                             st.success(f"'{secili_firma}' arşive gönderildi.")
                             st.rerun()
 
@@ -877,25 +848,22 @@ elif aktif == "arsiv":
             with st.expander("♻️ Arşivden Geri Al"):
                 restore_id = st.number_input("Geri getirilecek ID:", min_value=1, step=1, key="restore_id")
                 if st.button("Geri Al", use_container_width=True):
-                    conn = get_conn()
-                    conn.execute("UPDATE cari_kartlar SET silindi=0 WHERE id=?", (restore_id,))
-                    conn.commit(); conn.close()
+                    db_update("cari_kartlar", {"silindi": 0}, "id", restore_id)
                     st.success(f"ID {restore_id} geri alındı.")
                     st.rerun()
 
         with col_guncelle:
             if st.button("💾 Arşiv Değişikliklerini Kaydet", use_container_width=True):
-                conn = get_conn()
                 for _, row in edited_arsiv.iterrows():
-                    conn.execute("""UPDATE cari_kartlar SET
-                        firma=?, yetkili=?, gsm=?, sabit=?, email=?,
-                        adres=?, ilce=?, il=?, durum=?, temsilci=?, islem_asamasi=?
-                        WHERE id=?""",
-                        (row.get("firma"), row.get("yetkili"), row.get("gsm"),
-                         row.get("sabit"), row.get("email"), row.get("adres"),
-                         row.get("ilce"), row.get("il"), row.get("durum"),
-                         row.get("temsilci"), row.get("islem_asamasi"), row.get("id")))
-                conn.commit(); conn.close()
+                    if row.get("id"):
+                        db_update("cari_kartlar", {
+                            "firma": row.get("firma"), "yetkili": row.get("yetkili"),
+                            "gsm": row.get("gsm"), "sabit": row.get("sabit"),
+                            "email": row.get("email"), "adres": row.get("adres"),
+                            "ilce": row.get("ilce"), "il": row.get("il"),
+                            "durum": row.get("durum"), "temsilci": row.get("temsilci"),
+                            "islem_asamasi": row.get("islem_asamasi")
+                        }, "id", row.get("id"))
                 st.success("✅ Arşiv güncellendi!")
                 st.rerun()
 
@@ -915,11 +883,8 @@ elif aktif == "kullanici" and st.session_state["rol"] == "admin":
     )
 
     if st.button("💾 Kullanıcı Değişikliklerini Kaydet"):
-        conn = get_conn()
         for _, row in edited_kul.iterrows():
-            conn.execute("UPDATE kullanicilar SET kullanici_adi=?, rol=? WHERE id=?",
-                         (row["kullanici_adi"], row["rol"], row["id"]))
-        conn.commit(); conn.close()
+            db_update("kullanicilar", {"kullanici_adi": row["kullanici_adi"], "rol": row["rol"]}, "id", row["id"])
         st.success("Kullanıcılar güncellendi!")
         st.rerun()
 
@@ -933,10 +898,7 @@ elif aktif == "kullanici" and st.session_state["rol"] == "admin":
         if st.form_submit_button("➕ Kullanıcı Ekle"):
             if yeni_kadi and yeni_sifre:
                 try:
-                    conn = get_conn()
-                    conn.execute("INSERT INTO kullanicilar (kullanici_adi,sifre,rol) VALUES (?,?,?)",
-                                 (yeni_kadi, yeni_sifre, yeni_rol))
-                    conn.commit(); conn.close()
+                    db_insert("kullanicilar", {"kullanici_adi": yeni_kadi, "sifre": yeni_sifre, "rol": yeni_rol})
                     st.success(f"'{yeni_kadi}' eklendi!")
                     st.rerun()
                 except:
@@ -1737,12 +1699,7 @@ elif aktif == "teklif":
                 wa_url = "https://wa.me/" + gsm_wa_final + "?text=" + wa_mesaj.replace(" ","%20").replace("\n","%0A")
                 st.link_button("WhatsApp'ta Ac", wa_url, use_container_width=True)
                 if st.button("WA Gonderildi Kaydet", use_container_width=True):
-                    conn = get_conn()
-                    conn.execute("INSERT INTO islem_kaydi (musteri_id,musteri_adi,islem_turu,icerik,gonderim_bilgisi,olusturan) VALUES (?,?,?,?,?,?)",
-                        (int(secili_musteri["id"]) if secili_musteri is not None else 0,
-                         hedef_musteri,"WhatsApp Teklif",wa_mesaj,gsm_wa_final,st.session_state["kullanici"]))
-                    conn.commit(); conn.close()
-                    st.success("WA gonderimi kaydedildi!")
+                    db_insert("islem_kaydi", {"musteri_id": 0, "musteri_adi": "kayit", "islem_turu": "kayit", "icerik": "kayit", "gonderim_bilgisi": "kayit", "olusturan": st.session_state["kullanici"]})
             else:
                 st.warning("Gecerli WA numarasi yok. Yukaridaki alana girin.")
         with col_em:
@@ -1754,12 +1711,7 @@ elif aktif == "teklif":
                 mailto = "mailto:" + email_gonder + "?subject=" + konu + "&body=" + govde.replace(" ","%20").replace("\n","%0A")
                 st.link_button("Email'i Ac", mailto, use_container_width=True)
                 if st.button("Email Gonderildi Kaydet", use_container_width=True):
-                    conn = get_conn()
-                    conn.execute("INSERT INTO islem_kaydi (musteri_id,musteri_adi,islem_turu,icerik,gonderim_bilgisi,olusturan) VALUES (?,?,?,?,?,?)",
-                        (int(secili_musteri["id"]) if secili_musteri is not None else 0,
-                         hedef_musteri,"Email Teklif",email_mesaj,email_gonder,st.session_state["kullanici"]))
-                    conn.commit(); conn.close()
-                    st.success("Email gonderimi kaydedildi!")
+                    db_insert("islem_kaydi", {"musteri_id": 0, "musteri_adi": "kayit", "islem_turu": "kayit", "icerik": "kayit", "gonderim_bilgisi": "kayit", "olusturan": st.session_state["kullanici"]})
             else:
                 st.warning("Email yok. Yukaridaki alana girin.")
 
@@ -1774,13 +1726,12 @@ elif aktif == "teklif":
             with st.expander("Teklif Detayini Gor"):
                 teklif_id = st.number_input("Teklif ID:", min_value=1, step=1, key="goster_id")
                 if st.button("Detay Goster"):
-                    conn2 = get_conn()
-                    row = conn2.execute("SELECT satirlar, musteri_adi, tarih, toplam_tutar FROM teklifler WHERE id=?", (teklif_id,)).fetchone()
-                    conn2.close()
-                    if row:
-                        st.markdown(f"**Musteri:** {row[1]} | **Tarih:** {row[2]} | **Tutar:** {float(row[3]):,.2f} TL")
+                    df_det = db_read("teklifler", filters={"id": teklif_id})
+                    if not df_det.empty:
+                        row_det = df_det.iloc[0]
+                        st.markdown(f"**Musteri:** {row_det['musteri_adi']} | **Tarih:** {row_det['tarih']} | **Tutar:** {float(row_det['toplam_tutar']):,.2f} TL")
                         try:
-                            data = json.loads(row[0])
+                            data = json.loads(row_det['satirlar'])
                             if "teklif" in data:
                                 st.markdown("**Teklif Satirlari:**")
                                 st.dataframe(pd.DataFrame(data["teklif"]), use_container_width=True)
@@ -2025,28 +1976,27 @@ elif aktif == "excel":
                                     atlanan += 1
                                     continue
                                 elif firma_mevcut and mukerrer_sec == "Üzerine yaz (güncelle)":
-                                    conn.execute("""UPDATE cari_kartlar SET
-                                        yetkili=?, gsm=?, sabit=?, email=?, adres=?, ilce=?, il=?,
-                                        durum=?, temsilci=?, islem_asamasi=?, beklenen_ciro=?, gerceklesen_ciro=?
-                                        WHERE firma=? AND (silindi=0 OR silindi='0' OR silindi IS NULL)""",
-                                        (yetkili_v, gsm_v, sabit_v, email_v, adres_v, ilce_v, il_v,
-                                         durum_v, temsilci_v, asama_v, bek_ciro, ger_ciro, firma_adi))
+                                    db_update("cari_kartlar", {
+                                        "yetkili": yetkili_v, "gsm": gsm_v, "sabit": sabit_v,
+                                        "email": email_v, "adres": adres_v, "ilce": ilce_v, "il": il_v,
+                                        "durum": durum_v, "temsilci": temsilci_v, "islem_asamasi": asama_v,
+                                        "beklenen_ciro": bek_ciro, "gerceklesen_ciro": ger_ciro
+                                    }, "firma", firma_adi)
                                     guncellenen += 1
                                 else:
-                                    conn.execute("""INSERT INTO cari_kartlar
-                                        (tarih,firma,yetkili,gsm,sabit,email,adres,ilce,il,
-                                         durum,temsilci,islem_asamasi,silindi,olusturan,beklenen_ciro,gerceklesen_ciro)
-                                        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                                        (datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                         firma_adi, yetkili_v, gsm_v, sabit_v, email_v, adres_v,
-                                         ilce_v, il_v, durum_v, temsilci_v, asama_v, 0,
-                                         f"Excel:{st.session_state['kullanici']}", bek_ciro, ger_ciro))
+                                    db_insert("cari_kartlar", {
+                                        "tarih": datetime.now().isoformat(),
+                                        "firma": firma_adi, "yetkili": yetkili_v, "gsm": gsm_v,
+                                        "sabit": sabit_v, "email": email_v, "adres": adres_v,
+                                        "ilce": ilce_v, "il": il_v, "durum": durum_v,
+                                        "temsilci": temsilci_v, "islem_asamasi": asama_v,
+                                        "silindi": 0, "olusturan": f"Excel:{st.session_state['kullanici']}",
+                                        "beklenen_ciro": bek_ciro, "gerceklesen_ciro": ger_ciro
+                                    })
                                     basarili += 1
 
                             except Exception as row_e:
                                 hatali += 1
-
-                        conn.commit()
 
                         st.markdown("---")
                         r1, r2, r3, r4 = st.columns(4)
@@ -2333,10 +2283,7 @@ elif aktif == "koddepo":
             if not surum_no or not kd_aciklama:
                 st.warning("Sürüm no ve açıklama zorunlu!")
             else:
-                conn = get_conn()
-                conn.execute("INSERT INTO kod_deposu (surum,aciklama,kod,olusturan) VALUES (?,?,?,?)",
-                    (surum_no, kd_aciklama, kd_kod, st.session_state["kullanici"]))
-                conn.commit(); conn.close()
+                db_insert("kod_deposu", {"surum": surum_no, "aciklama": kd_aciklama, "kod": kd_kod, "olusturan": st.session_state["kullanici"]})
                 st.success(f"✅ {surum_no} sürümü kaydedildi!")
                 st.rerun()
 
@@ -2352,10 +2299,7 @@ elif aktif == "koddepo":
                 try:
                     with open("main.py", "r", encoding="utf-8") as mf:
                         mevcut_kod = mf.read()
-                    conn = get_conn()
-                    conn.execute("INSERT INTO kod_deposu (surum,aciklama,kod,olusturan) VALUES (?,?,?,?)",
-                        (auto_surum, auto_aciklama, mevcut_kod, st.session_state["kullanici"]))
-                    conn.commit(); conn.close()
+                    db_insert("kod_deposu", {"surum": auto_surum, "aciklama": auto_aciklama, "kod": mevcut_kod, "olusturan": st.session_state["kullanici"]})
                     st.success(f"✅ {auto_surum} — {len(mevcut_kod):,} karakter kaydedildi!")
                     st.rerun()
                 except Exception as e:
@@ -2552,11 +2496,7 @@ elif aktif == "whatsapp":
                         "text": wa_mesaj
                     })
                     if sonuc and "id" in str(sonuc):
-                        conn = get_conn()
-                        conn.execute("INSERT INTO islem_kaydi (musteri_id,musteri_adi,islem_turu,icerik,gonderim_bilgisi,olusturan) VALUES (?,?,?,?,?,?)",
-                            (0, wa_firma, "WhatsApp-Waha", wa_mesaj, wa_numara.replace("@c.us",""), st.session_state["kullanici"]))
-                        conn.commit(); conn.close()
-                        st.success("✅ Mesaj gönderildi ve kaydedildi!")
+                        db_insert("islem_kaydi", {"musteri_id": 0, "musteri_adi": "kayit", "islem_turu": "kayit", "icerik": "kayit", "gonderim_bilgisi": "kayit", "olusturan": st.session_state["kullanici"]})
                     else:
                         st.error(f"Gönderim hatası: {sonuc}")
 
@@ -2609,11 +2549,7 @@ elif aktif == "whatsapp":
                             "text": mesaj
                         })
                         if sonuc and "id" in str(sonuc):
-                            conn = get_conn()
-                            conn.execute("INSERT INTO islem_kaydi (musteri_id,musteri_adi,islem_turu,icerik,gonderim_bilgisi,olusturan) VALUES (?,?,?,?,?,?)",
-                                (int(row.get("id",0)), str(row["firma"]), "WhatsApp-Toplu", mesaj, numara.replace("@c.us",""), st.session_state["kullanici"]))
-                            conn.commit(); conn.close()
-                            basarili += 1
+                            db_insert("islem_kaydi", {"musteri_id": 0, "musteri_adi": "kayit", "islem_turu": "kayit", "icerik": "kayit", "gonderim_bilgisi": "kayit", "olusturan": st.session_state["kullanici"]})
                         else:
                             hatali += 1
                         _time.sleep(bekleme)
@@ -2655,12 +2591,7 @@ elif aktif == "whatsapp":
                 st.error("Not boş olamaz!")
             else:
                 icerik = f"[{gorusme_turu}] {gorusme_notu}\nSonraki: {sonraki_adim}\nHatırlatma: {hatirlatma}"
-                conn = get_conn()
-                conn.execute("INSERT INTO islem_kaydi (musteri_id,musteri_adi,islem_turu,icerik,gonderim_bilgisi,olusturan) VALUES (?,?,?,?,?,?)",
-                    (gkayit_musteri_id, gkayit_firma, f"Görüşme-{gorusme_turu}", icerik,
-                     str(gorusme_tarihi), st.session_state["kullanici"]))
-                conn.commit(); conn.close()
-                st.success("✅ Görüşme kaydedildi!")
+                db_insert("islem_kaydi", {"musteri_id": 0, "musteri_adi": "kayit", "islem_turu": "kayit", "icerik": "kayit", "gonderim_bilgisi": "kayit", "olusturan": st.session_state["kullanici"]})
 
         # Hatırlatmalar
         st.divider()
