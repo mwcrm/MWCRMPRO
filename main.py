@@ -704,11 +704,12 @@ if st.session_state.get("rol") != "admin":
 cols = st.columns(len(aktif_tab_listesi))
 for i, tab_key in enumerate(aktif_tab_listesi):
     with cols[i]:
-        aktif = st.session_state["aktif_tab"] == tab_key
+        _is_aktif = st.session_state["aktif_tab"] == tab_key
+        _etiket = _TAB_ETIKETLER.get(tab_key, tab_key)
         if st.button(
-            tab_etiketler[tab_key],
+            _etiket,
             use_container_width=True,
-            type="primary" if aktif else "secondary",
+            type="primary" if _is_aktif else "secondary",
             key=f"tab_btn_{tab_key}"
         ):
             st.session_state["aktif_tab"] = tab_key
