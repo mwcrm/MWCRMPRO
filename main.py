@@ -2936,8 +2936,9 @@ elif aktif == "randevu":
             rand_takip = rc5.selectbox("Takip:", ["Gidildi","Gidilmedi","Devam Ediyor","Ertelendi"])
             rand_adet  = rc6.number_input("Adet:", min_value=0, step=1, key="rand_adet")
 
-            # Temsilci seç
-            rand_temsilci = st.selectbox("Satış Temsilcisi*:", tem_r_opts[1:] if len(tem_r_opts)>1 else ["—"], key="rand_tem")
+            # Temsilci - manuel giriş
+            rand_temsilci = st.text_input("Satış Temsilcisi*:", placeholder="Temsilci adı yazın", key="rand_tem")
+            rand_tem_tel  = st.text_input("Temsilci WhatsApp No (uyarı için):", placeholder="05xxxxxxxxx", key="rand_tem_tel")
             rand_aciklama = st.text_area("Açıklama / Not:", height=80, key="rand_aciklama")
             rand_sonuc    = st.selectbox("Sonuç:", ["—","Bitti","Devam Ediyor","Gidilmedi","İptal"])
 
@@ -2970,21 +2971,28 @@ elif aktif == "randevu":
                     })
                     st.success("✅ Randevu kaydedildi!")
 
-                    # WA uyarı linki oluştur
-                    tem_bilgi2 = df_tem_r[df_tem_r["ad"] == rand_temsilci.split(" ")[0]] if not df_tem_r.empty else pd.DataFrame()
-                    if not tem_bilgi2.empty:
-                        tem_tel2 = str(tem_bilgi2.iloc[0].get("telefon",""))
-                        import re as _re3
-                        tem_tel2_temiz = _re3.sub(r"[\s\-\(\)]","", tem_tel2)
-                        if tem_tel2_temiz.startswith("0"):
-                            tem_wa2 = "90" + tem_tel2_temiz[1:]
+                    # WA uyarı linki - manuel telefon
+                    import re as _re3
+                    tem_tel_gir = rand_tem_tel.strip()
+                    if tem_tel_gir:
+                        tem_tel_temiz = _re3.sub(r"[\s\-\(\)+]","", tem_tel_gir)
+                        if tem_tel_temiz.startswith("0") and len(tem_tel_temiz)==11:
+                            tem_wa2 = "90" + tem_tel_temiz[1:]
+                        elif len(tem_tel_temiz)==10:
+                            tem_wa2 = "90" + tem_tel_temiz
                         else:
-                            tem_wa2 = tem_tel2_temiz
+                            tem_wa2 = tem_tel_temiz
 
-                        mesaj2 = f"🗓️ YENİ RANDEVU\nMüşteri: {musteri_adi}\nTarih: {rand_tarih} {rand_saat}\nBölge: {rand_bolge}\nGörev: {rand_gorev}\nİyi çalışmalar!"
+                        mesaj2 = (f"🗓️ YENİ RANDEVU\n"
+                                  f"Müşteri: {musteri_adi}\n"
+                                  f"Tarih: {rand_tarih} {rand_saat}\n"
+                                  f"Bölge: {rand_bolge}\n"
+                                  f"Görev: {rand_gorev}\n"
+                                  f"İyi çalışmalar!")
                         wa_link2 = f"https://wa.me/{tem_wa2}?text={mesaj2.replace(' ','%20').replace(chr(10),'%0A')}"
-                        st.success("✅ Temsilciye WhatsApp uyarısı hazır:")
-                        st.link_button("📱 Temsilciye WA Gönder", wa_link2, use_container_width=True, type="primary")
+                        st.link_button("📱 Temsilciye WA Uyarısı Gönder", wa_link2, use_container_width=True, type="primary")
+                    else:
+                        st.info("Temsilci telefonu girilmedi, WA uyarısı oluşturulamadı.")
 
                     st.rerun()
 
