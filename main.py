@@ -531,23 +531,37 @@ _TAB_ETIKETLER = {
 
 def get_menu_tercihi(kullanici):
     try:
-        conn = get_conn()
-        conn.execute("CREATE TABLE IF NOT EXISTS kullanici_tercih (id INTEGER PRIMARY KEY AUTOINCREMENT, kullanici TEXT, anahtar TEXT, deger TEXT, UNIQUE(kullanici, anahtar))")
-        conn.commit()
-        row = conn.execute("SELECT deger FROM kullanici_tercih WHERE kullanici=? AND anahtar='menu_sirasi'", (kullanici,)).fetchone()
-        conn.close()
-        if row:
-            kayitli = _menu_json.loads(row[0])
-            tam_liste = _TAB_LISTESI_DEFAULT.copy()
-            if st.session_state.get("rol") == "admin":
-                tam_liste += ["kullanici","koddepo"]
-            for t in tam_liste:
-                if t not in kayitli:
-                    kayitli.append(t)
-            kayitli = [t for t in kayitli if t in tam_liste]
-            return kayitli
-    except:
-        pass
+        # Supabase veya SQLite'dan oku
+        sb_m = get_sb()
+        if sb_m:
+            res = sb_m.table("kullanici_tercih").select("deger").eq("kullanici", kullanici).eq("anahtar","menu_sirasi").execute()
+            if res.data:
+                kayitli = _menu_json.loads(res.data[0]["deger"])
+                tam_liste = _TAB_LISTESI_DEFAULT.copy()
+                if st.session_state.get("rol") == "admin":
+                    tam_liste += ["kullanici","koddepo"]
+                for t in tam_liste:
+                    if t not in kayitli:
+                        kayitli.append(t)
+                kayitli = [t for t in kayitli if t in tam_liste]
+                return kayitli
+        else:
+            conn = get_conn()
+            conn.execute("CREATE TABLE IF NOT EXISTS kullanici_tercih (id INTEGER PRIMARY KEY AUTOINCREMENT, kullanici TEXT, anahtar TEXT, deger TEXT, UNIQUE(kullanici, anahtar))")
+            conn.commit()
+            row = conn.execute("SELECT deger FROM kullanici_tercih WHERE kullanici=? AND anahtar='menu_sirasi'", (kullanici,)).fetchone()
+            conn.close()
+            if row:
+                kayitli = _menu_json.loads(row[0])
+                tam_liste = _TAB_LISTESI_DEFAULT.copy()
+                if st.session_state.get("rol") == "admin":
+                    tam_liste += ["kullanici","koddepo"]
+                for t in tam_liste:
+                    if t not in kayitli:
+                        kayitli.append(t)
+                kayitli = [t for t in kayitli if t in tam_liste]
+                return kayitli
+    except: pass
     tam_liste = _TAB_LISTESI_DEFAULT.copy()
     if st.session_state.get("rol") == "admin":
         tam_liste += ["kullanici","koddepo"]
@@ -555,28 +569,37 @@ def get_menu_tercihi(kullanici):
 
 def save_menu_tercihi(kullanici, sira):
     try:
-        conn = get_conn()
-        conn.execute("CREATE TABLE IF NOT EXISTS kullanici_tercih (id INTEGER PRIMARY KEY AUTOINCREMENT, kullanici TEXT, anahtar TEXT, deger TEXT, UNIQUE(kullanici, anahtar))")
-        conn.execute("INSERT OR REPLACE INTO kullanici_tercih (kullanici, anahtar, deger) VALUES (?,?,?)",
-            (kullanici, "menu_sirasi", _menu_json.dumps(sira)))
-        conn.commit(); conn.close()
-    except:
-        pass
+        sb_m = get_sb()
+        if sb_m:
+            sb_m.table("kullanici_tercih").upsert({
+                "kullanici": kullanici,
+                "anahtar": "menu_sirasi",
+                "deger": _menu_json.dumps(sira)
+            }, on_conflict="kullanici,anahtar").execute()
+        else:
+            conn = get_conn()
+            conn.execute("CREATE TABLE IF NOT EXISTS kullanici_tercih (id INTEGER PRIMARY KEY AUTOINCREMENT, kullanici TEXT, anahtar TEXT, deger TEXT, UNIQUE(kullanici, anahtar))")
+            conn.execute("INSERT OR REPLACE INTO kullanici_tercih (kullanici, anahtar, deger) VALUES (?,?,?)",
+                (kullanici, "menu_sirasi", _menu_json.dumps(sira)))
+            conn.commit(); conn.close()
+    except: pass
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    # Aktif kullanıcıyı kaydet
+    # Aktif kullanıcıyı kaydet - hata olsa sessiz geç
     try:
-        db_insert("aktif_kullanicilar", {
-            "kullanici": st.session_state.get("kullanici",""),
-            "son_gorulme": datetime.now().isoformat()
-        })
-    except:
-        try:
-            db_update("aktif_kullanicilar", 
-                {"son_gorulme": datetime.now().isoformat()},
-                "kullanici", st.session_state.get("kullanici",""))
-        except: pass
+        sb_ak = get_sb()
+        if sb_ak:
+            sb_ak.table("aktif_kullanicilar").upsert({
+                "kullanici": st.session_state.get("kullanici",""),
+                "son_gorulme": datetime.now().isoformat()
+            }, on_conflict="kullanici").execute()
+        else:
+            conn_ak = get_conn()
+            conn_ak.execute("INSERT OR REPLACE INTO aktif_kullanicilar (kullanici, son_gorulme) VALUES (?,?)",
+                (st.session_state.get("kullanici",""), datetime.now().isoformat()))
+            conn_ak.commit(); conn_ak.close()
+    except: pass
 
     # Admin duyuruları - en üstte
     try:
