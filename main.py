@@ -619,69 +619,17 @@ def save_menu_tercihi(kullanici, sira):
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    # Aktif kullanıcı kaydı - sadece 30 saniyede bir yap
-    _ak_key = f"ak_son_{st.session_state.get('kullanici','')}"
-    _ak_son = st.session_state.get(_ak_key, 0)
-    if datetime.now().timestamp() - _ak_son > 30:
-        try:
-            sb_ak = get_sb()
-            if sb_ak:
-                sb_ak.table("aktif_kullanicilar").upsert({
-                    "kullanici": st.session_state.get("kullanici",""),
-                    "son_gorulme": datetime.now().isoformat()
-                }, on_conflict="kullanici").execute()
-            st.session_state[_ak_key] = datetime.now().timestamp()
-        except: pass
+    st.caption(f"👤 {st.session_state.get('kullanici','')} | {st.session_state.get('rol','')}")
 
-    # Okunmamış mesaj - session'da tut, 60 sn'de bir güncelle
-    _msg_key = "msg_unread_count"
-    _msg_son = st.session_state.get("msg_son_check", 0)
-    if datetime.now().timestamp() - _msg_son > 60:
-        try:
-            sb_m = get_sb()
-            if sb_m:
-                res_m = sb_m.table("mesajlar").select("id").eq("alici", st.session_state.get("kullanici","")).eq("okundu", 0).execute()
-                st.session_state[_msg_key] = len(res_m.data) if res_m.data else 0
-            st.session_state["msg_son_check"] = datetime.now().timestamp()
-        except: pass
-    okunmamis_say = st.session_state.get(_msg_key, 0)
-
-    if okunmamis_say > 0:
-        st.markdown(f"### 💬 <span style='background:#e74c3c;color:white;border-radius:10px;padding:2px 8px;font-size:12px'>{okunmamis_say} yeni</span>", unsafe_allow_html=True)
-        if st.button("📨 Mesajları Gör", use_container_width=True, type="primary"):
-            st.session_state["aktif_tab"] = "mesajlar"
-            st.rerun()
-        st.divider()
-
-    st.caption(f"👤 **{st.session_state.get('kullanici','')}** ({st.session_state.get('rol','')})")
-
-    # Yardım
-    with st.expander("❓ Yardım & Destek"):
+    with st.expander("❓ Yardım"):
         st.markdown("📞 [5400344228](tel:05400344228)")
-        st.markdown("✉️ [osnenufu@gmail.com](mailto:osnenufu@gmail.com)")
         st.link_button("📱 WhatsApp", "https://wa.me/905400344228", use_container_width=True)
-        st.divider()
-        talep_mesaj = st.text_area("Talep:", placeholder="Sorun veya önerinizi yazın...", height=70, key="sidebar_talep")
-        if st.button("📨 Gönder", use_container_width=True, key="sidebar_wa_btn"):
-            if talep_mesaj.strip():
-                wa_t = f"https://wa.me/905400344228?text=MWCRMPRO:{talep_mesaj.replace(' ','%20')}"
-                st.markdown(f"[👉 Gönder]({wa_t})")
+        talep = st.text_area("Talep:", height=60, key="sidebar_talep")
+        if st.button("📨 Gönder", key="sidebar_wa_btn"):
+            if talep.strip():
+                st.markdown(f"[👉 Gönder](https://wa.me/905400344228?text={talep.replace(' ','%20')})")
 
-    # Admin ekstraları
     if st.session_state.get("rol") == "admin":
-        st.divider()
-        with st.expander("📢 Duyuru"):
-            with st.form("duyuru_form"):
-                d_baslik = st.text_input("Başlık:")
-                d_icerik = st.text_area("İçerik:", height=60)
-                d_tip = st.selectbox("Tip:", ["bilgi","uyari","hata"])
-                if st.form_submit_button("📢 Yayınla"):
-                    if d_baslik:
-                        db_insert("duyurular", {"baslik": d_baslik, "icerik": d_icerik,
-                            "tip": d_tip, "olusturan": st.session_state["kullanici"], "aktif": 1})
-                        st.success("Yayınlandı!")
-                        st.rerun()
-
         with st.expander("🎛️ Menü Sırası"):
             mevcut_sira_m = get_menu_tercihi(st.session_state["kullanici"])
             for idx_m, tab_key in enumerate(mevcut_sira_m):
@@ -700,6 +648,17 @@ with st.sidebar:
             if st.button("↺ Sıfırla", use_container_width=True):
                 save_menu_tercihi(st.session_state["kullanici"], _TAB_LISTESI_DEFAULT.copy() + ["kullanici","koddepo"])
                 st.rerun()
+
+        with st.expander("📢 Duyuru"):
+            with st.form("duyuru_form"):
+                d_b = st.text_input("Başlık:")
+                d_i = st.text_area("İçerik:", height=50)
+                d_t = st.selectbox("Tip:", ["bilgi","uyari","hata"])
+                if st.form_submit_button("📢 Yayınla") and d_b:
+                    db_insert("duyurular", {"baslik":d_b,"icerik":d_i,"tip":d_t,
+                        "olusturan":st.session_state["kullanici"],"aktif":1})
+                    st.success("Yayınlandı!")
+                    st.rerun()
 # ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
 col_bas, col_kul, col_cik = st.columns([6, 2, 1])
 with col_bas:
