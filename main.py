@@ -74,14 +74,17 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
         return pd.DataFrame()
 
 def db_insert(table, data):
-    """Insert — Supabase veya SQLite"""
+    """Insert — Supabase önce, SQLite fallback"""
     sb = get_sb()
     if sb:
         try:
-            sb.table(table).insert(data).execute()
-            return True
+            res = sb.table(table).insert(data).execute()
+            if res.data:
+                return True
+            else:
+                st.warning(f"Supabase insert boş döndü: {table}")
         except Exception as e:
-            st.warning(f"Supabase insert: {e}")
+            st.warning(f"Supabase insert hatası ({table}): {e}")
     # SQLite fallback
     try:
         conn = get_conn()
@@ -92,7 +95,7 @@ def db_insert(table, data):
         conn.close()
         return True
     except Exception as e:
-        st.error(f"DB insert hatası: {e}")
+        st.error(f"DB insert hatası ({table}): {e}")
     return False
 
 def db_update(table, data, where_col, where_val):
