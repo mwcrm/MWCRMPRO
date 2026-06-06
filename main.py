@@ -655,20 +655,23 @@ elif aktif == "liste":
         st.success(st.session_state["kayit_mesaj"])
         st.session_state["kayit_mesaj"] = ""
 
-    # Supabase veya SQLite'dan veri çek
-    if sb_or_sqlite():
-        try:
-            sb = get_supabase()
+    try:
+        from supabase import create_client
+        url = st.secrets.get("SUPABASE_URL","")
+        key = st.secrets.get("SUPABASE_KEY","")
+        if url and key:
+            sb = create_client(url, key)
             res = sb.table("cari_kartlar").select("*").neq("silindi", 1).order("tarih", desc=True).execute()
-            df = pd.DataFrame(res.data) if res.data else pd.DataFrame()
-        except:
+            df = pd.DataFrame(res.data) if res.data else pd.DataFrame(columns=["id","tarih","firma","yetkili","gsm","sabit","email","adres","ilce","il","durum","temsilci","islem_asamasi","silindi","olusturan","beklenen_ciro","gerceklesen_ciro"])
+        else:
+            raise Exception("no supabase")
+    except:
+        try:
             conn = get_conn()
             df = pd.read_sql("SELECT * FROM cari_kartlar WHERE silindi=0 OR silindi='0' OR silindi IS NULL ORDER BY tarih DESC", conn)
             conn.close()
-    else:
-        conn = get_conn()
-        df = pd.read_sql("SELECT * FROM cari_kartlar WHERE silindi=0 OR silindi='0' OR silindi IS NULL ORDER BY tarih DESC", conn)
-        conn.close()
+        except:
+            df = pd.DataFrame()
 
     st.markdown(f"**Toplam {len(df)} aktif kayıt**")
 
