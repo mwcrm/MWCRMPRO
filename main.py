@@ -501,7 +501,7 @@ st.markdown("""
 # ── MENÜ FONKSİYONLARI (sidebar'dan önce tanımlanmalı) ───────────────────────
 import json as _menu_json
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "arsiv", "rapor", "teklif", "excel", "kisiler", "randevu"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "teklif", "kisiler", "rapor", "excel", "arsiv"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -559,34 +559,6 @@ with st.sidebar:
         st.link_button("📱 WhatsApp'tan Yaz", wa_destek, use_container_width=True)
 
     st.divider()
-    st.markdown("### 🎛️ Menü Düzenle")
-    with st.expander("Sıralamayı Değiştir"):
-        st.caption("▲ ▼ ile taşıyın, anında kaydedilir.")
-        mevcut_sira = get_menu_tercihi(st.session_state["kullanici"])
-        yeni_sira = mevcut_sira.copy()
-        for idx, tab_key in enumerate(mevcut_sira):
-            etiket = _TAB_ETIKETLER.get(tab_key, tab_key)
-            col_a, col_b, col_c = st.columns([4,1,1])
-            col_a.caption(etiket)
-            if idx > 0:
-                if col_b.button("▲", key=f"yukari_{tab_key}"):
-                    yeni_sira[idx], yeni_sira[idx-1] = yeni_sira[idx-1], yeni_sira[idx]
-                    save_menu_tercihi(st.session_state["kullanici"], yeni_sira)
-                    st.rerun()
-            if idx < len(mevcut_sira)-1:
-                if col_c.button("▼", key=f"asagi_{tab_key}"):
-                    yeni_sira[idx], yeni_sira[idx+1] = yeni_sira[idx+1], yeni_sira[idx]
-                    save_menu_tercihi(st.session_state["kullanici"], yeni_sira)
-                    st.rerun()
-        if st.button("↺ Sıfırla", use_container_width=True):
-            save_menu_tercihi(st.session_state["kullanici"], get_menu_tercihi.__defaults__ and _TAB_LISTESI_DEFAULT.copy())
-            tam = _TAB_LISTESI_DEFAULT.copy()
-            if st.session_state.get("rol") == "admin":
-                tam += ["kullanici","koddepo"]
-            save_menu_tercihi(st.session_state["kullanici"], tam)
-            st.rerun()
-
-    st.divider()
     st.markdown("### 💬 Yardım & Talep")
     talep_mesaj = st.text_area("Talebinizi yazın:", placeholder="Yeni özellik, hata bildirimi...", height=100, key="sidebar_talep")
     if st.button("📨 WhatsApp ile Gönder", use_container_width=True, key="sidebar_wa_btn"):
@@ -629,6 +601,35 @@ if st.session_state["rol"] == "admin":
 
 # Kullanıcının kayıtlı sırasını al
 aktif_tab_listesi = get_menu_tercihi(st.session_state["kullanici"])
+
+# Menü sıralama - küçük expander
+with st.expander("🎛️ Menü Sırala", expanded=False):
+    mevcut_sira_m = aktif_tab_listesi.copy()
+    st.caption("▲ ▼ ile sırayı değiştirin, otomatik kaydedilir.")
+    cols_m = st.columns(len(mevcut_sira_m))
+    for idx, tab_key in enumerate(mevcut_sira_m):
+        with cols_m[idx]:
+            etiket_k = _TAB_ETIKETLER.get(tab_key, tab_key).split(" ",1)[-1][:12]
+            st.caption(etiket_k)
+            mc1, mc2 = st.columns(2)
+            if idx > 0:
+                if mc1.button("◀", key=f"sol_{tab_key}", use_container_width=True):
+                    yeni_s = mevcut_sira_m.copy()
+                    yeni_s[idx], yeni_s[idx-1] = yeni_s[idx-1], yeni_s[idx]
+                    save_menu_tercihi(st.session_state["kullanici"], yeni_s)
+                    st.rerun()
+            if idx < len(mevcut_sira_m)-1:
+                if mc2.button("▶", key=f"sag_{tab_key}", use_container_width=True):
+                    yeni_s = mevcut_sira_m.copy()
+                    yeni_s[idx], yeni_s[idx+1] = yeni_s[idx+1], yeni_s[idx]
+                    save_menu_tercihi(st.session_state["kullanici"], yeni_s)
+                    st.rerun()
+    if st.button("↺ Varsayılan Sıraya Dön", use_container_width=True):
+        tam = _TAB_LISTESI_DEFAULT.copy()
+        if st.session_state.get("rol") == "admin":
+            tam += ["kullanici","koddepo"]
+        save_menu_tercihi(st.session_state["kullanici"], tam)
+        st.rerun()
 
 cols = st.columns(len(aktif_tab_listesi))
 for i, tab_key in enumerate(aktif_tab_listesi):
