@@ -600,143 +600,87 @@ def save_menu_tercihi(kullanici, sira):
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    # Aktif kullanıcıyı kaydet - hata olsa sessiz geç
-    try:
-        sb_ak = get_sb()
-        if sb_ak:
-            sb_ak.table("aktif_kullanicilar").upsert({
-                "kullanici": st.session_state.get("kullanici",""),
-                "son_gorulme": datetime.now().isoformat()
-            }, on_conflict="kullanici").execute()
-        else:
-            conn_ak = get_conn()
-            conn_ak.execute("INSERT OR REPLACE INTO aktif_kullanicilar (kullanici, son_gorulme) VALUES (?,?)",
-                (st.session_state.get("kullanici",""), datetime.now().isoformat()))
-            conn_ak.commit(); conn_ak.close()
-    except: pass
+    # Aktif kullanıcı kaydı - sadece 30 saniyede bir yap
+    _ak_key = f"ak_son_{st.session_state.get('kullanici','')}"
+    _ak_son = st.session_state.get(_ak_key, 0)
+    if datetime.now().timestamp() - _ak_son > 30:
+        try:
+            sb_ak = get_sb()
+            if sb_ak:
+                sb_ak.table("aktif_kullanicilar").upsert({
+                    "kullanici": st.session_state.get("kullanici",""),
+                    "son_gorulme": datetime.now().isoformat()
+                }, on_conflict="kullanici").execute()
+            st.session_state[_ak_key] = datetime.now().timestamp()
+        except: pass
 
-    # Admin duyuruları - cache ile hızlı
-    try:
-        df_duy = db_read_cached("duyurular")
-        if not df_duy.empty and "aktif" in df_duy.columns:
-            df_duy = df_duy[df_duy["aktif"]==1]
-        if not df_duy.empty:
-            for _, duy in df_duy.iterrows():
-                tip = str(duy.get("tip","bilgi"))
-                baslik = str(duy.get("baslik",""))
-                icerik = str(duy.get("icerik",""))
-                if tip == "hata":
-                    st.error(f"🔴 **{baslik}**\n{icerik}")
-                elif tip == "uyari":
-                    st.warning(f"⚠️ **{baslik}**\n{icerik}")
-                else:
-                    st.info(f"💡 **{baslik}**\n{icerik}")
-            st.divider()
-    except: pass
-
-    # Okunmamış mesaj sayısı
-    try:
-        df_okunmamis = db_read("mesajlar", filters={
-            "alici": st.session_state.get("kullanici",""),
-            "okundu": 0
-        })
-        okunmamis_say = len(df_okunmamis)
-    except:
-        okunmamis_say = 0
+    # Okunmamış mesaj - session'da tut, 60 sn'de bir güncelle
+    _msg_key = "msg_unread_count"
+    _msg_son = st.session_state.get("msg_son_check", 0)
+    if datetime.now().timestamp() - _msg_son > 60:
+        try:
+            sb_m = get_sb()
+            if sb_m:
+                res_m = sb_m.table("mesajlar").select("id").eq("alici", st.session_state.get("kullanici","")).eq("okundu", 0).execute()
+                st.session_state[_msg_key] = len(res_m.data) if res_m.data else 0
+            st.session_state["msg_son_check"] = datetime.now().timestamp()
+        except: pass
+    okunmamis_say = st.session_state.get(_msg_key, 0)
 
     if okunmamis_say > 0:
-        st.markdown(f"### 💬 Mesajlar <span style='background:#e74c3c;color:white;border-radius:10px;padding:2px 7px;font-size:12px'>{okunmamis_say}</span>", unsafe_allow_html=True)
+        st.markdown(f"### 💬 <span style='background:#e74c3c;color:white;border-radius:10px;padding:2px 8px;font-size:12px'>{okunmamis_say} yeni</span>", unsafe_allow_html=True)
         if st.button("📨 Mesajları Gör", use_container_width=True, type="primary"):
             st.session_state["aktif_tab"] = "mesajlar"
             st.rerun()
         st.divider()
 
-    # Aktif kullanıcılar
-    try:
-        _sinir = (datetime.now().timestamp() - 300)  # 5 dk
-        df_aktif = db_read("aktif_kullanicilar", extra_sql="")
-        if not df_aktif.empty and "son_gorulme" in df_aktif.columns:
-            df_aktif["son_gorulme"] = pd.to_datetime(df_aktif["son_gorulme"], errors="coerce")
-            df_aktif_son = df_aktif[df_aktif["son_gorulme"] > pd.Timestamp.now() - pd.Timedelta(minutes=5)]
-            if len(df_aktif_son) > 0:
-                isimler = ", ".join(df_aktif_son["kullanici"].tolist())
-                st.caption(f"🟢 Çevrimiçi: **{isimler}**")
-    except: pass
+    st.caption(f"👤 **{st.session_state.get('kullanici','')}** ({st.session_state.get('rol','')})")
 
-    st.divider()
-
-    # Yardım - küçük, altta
+    # Yardım
     with st.expander("❓ Yardım & Destek"):
         st.markdown("📞 [5400344228](tel:05400344228)")
         st.markdown("✉️ [osnenufu@gmail.com](mailto:osnenufu@gmail.com)")
-        wa_destek = "https://wa.me/905400344228?text=Merhaba,%20MWCRMPRO"
-        st.link_button("📱 WhatsApp", wa_destek, use_container_width=True)
+        st.link_button("📱 WhatsApp", "https://wa.me/905400344228", use_container_width=True)
         st.divider()
-        talep_mesaj = st.text_area("Talep:", placeholder="Sorun veya önerinizi yazın...", height=80, key="sidebar_talep")
+        talep_mesaj = st.text_area("Talep:", placeholder="Sorun veya önerinizi yazın...", height=70, key="sidebar_talep")
         if st.button("📨 Gönder", use_container_width=True, key="sidebar_wa_btn"):
             if talep_mesaj.strip():
-                wa_talep = f"https://wa.me/905400344228?text=MWCRMPRO%20Talep:%20{talep_mesaj.replace(' ','%20').replace(chr(10),'%0A')}"
-                st.markdown(f"[👉 Gönder]({wa_talep})")
-            else:
-                st.warning("Mesaj yazın.")
+                wa_t = f"https://wa.me/905400344228?text=MWCRMPRO:{talep_mesaj.replace(' ','%20')}"
+                st.markdown(f"[👉 Gönder]({wa_t})")
 
-    st.caption(f"👤 {st.session_state.get('kullanici','')} ({st.session_state.get('rol','')})")
-    try:
-        conn_s = get_conn()
-        total_cari = conn_s.execute("SELECT COUNT(*) FROM cari_kartlar WHERE silindi=0 OR silindi='0' OR silindi IS NULL").fetchone()[0]
-        conn_s.close()
-        st.caption(f"📋 {total_cari} aktif cari")
-    except: pass
-
-    # Admin: Duyuru yönetimi + Menü sırası
+    # Admin ekstraları
     if st.session_state.get("rol") == "admin":
         st.divider()
-        with st.expander("📢 Duyuru Yönet"):
+        with st.expander("📢 Duyuru"):
             with st.form("duyuru_form"):
                 d_baslik = st.text_input("Başlık:")
                 d_icerik = st.text_area("İçerik:", height=60)
                 d_tip = st.selectbox("Tip:", ["bilgi","uyari","hata"])
                 if st.form_submit_button("📢 Yayınla"):
                     if d_baslik:
-                        db_insert("duyurular", {
-                            "baslik": d_baslik, "icerik": d_icerik,
-                            "tip": d_tip, "olusturan": st.session_state["kullanici"], "aktif": 1
-                        })
+                        db_insert("duyurular", {"baslik": d_baslik, "icerik": d_icerik,
+                            "tip": d_tip, "olusturan": st.session_state["kullanici"], "aktif": 1})
                         st.success("Yayınlandı!")
                         st.rerun()
-            # Mevcut duyuruları kapat
-            try:
-                df_duy2 = db_read("duyurular", filters={"aktif": 1})
-                if not df_duy2.empty:
-                    for _, d2 in df_duy2.iterrows():
-                        dc1, dc2 = st.columns([3,1])
-                        dc1.caption(str(d2.get("baslik","")))
-                        if dc2.button("✕", key=f"duy_kapat_{d2.get('id')}"):
-                            db_update("duyurular", {"aktif": 0}, "id", d2.get("id"))
-                            st.rerun()
-            except: pass
 
         with st.expander("🎛️ Menü Sırası"):
             mevcut_sira_m = get_menu_tercihi(st.session_state["kullanici"])
-            for idx, tab_key in enumerate(mevcut_sira_m):
-                etiket_k = _TAB_ETIKETLER.get(tab_key, tab_key)
-                c1, c2, c3 = st.columns([4, 1, 1])
-                c1.caption(etiket_k)
-                if idx > 0 and c2.button("▲", key=f"up_{tab_key}"):
+            for idx_m, tab_key in enumerate(mevcut_sira_m):
+                c1, c2, c3 = st.columns([4,1,1])
+                c1.caption(_TAB_ETIKETLER.get(tab_key, tab_key))
+                if idx_m > 0 and c2.button("▲", key=f"up_{tab_key}"):
                     yeni_s = mevcut_sira_m.copy()
-                    yeni_s[idx], yeni_s[idx-1] = yeni_s[idx-1], yeni_s[idx]
+                    yeni_s[idx_m], yeni_s[idx_m-1] = yeni_s[idx_m-1], yeni_s[idx_m]
                     save_menu_tercihi(st.session_state["kullanici"], yeni_s)
                     st.rerun()
-                if idx < len(mevcut_sira_m)-1 and c3.button("▼", key=f"dn_{tab_key}"):
+                if idx_m < len(mevcut_sira_m)-1 and c3.button("▼", key=f"dn_{tab_key}"):
                     yeni_s = mevcut_sira_m.copy()
-                    yeni_s[idx], yeni_s[idx+1] = yeni_s[idx+1], yeni_s[idx]
+                    yeni_s[idx_m], yeni_s[idx_m+1] = yeni_s[idx_m+1], yeni_s[idx_m]
                     save_menu_tercihi(st.session_state["kullanici"], yeni_s)
                     st.rerun()
             if st.button("↺ Sıfırla", use_container_width=True):
-                tam = _TAB_LISTESI_DEFAULT.copy() + ["kullanici","koddepo"]
-                save_menu_tercihi(st.session_state["kullanici"], tam)
+                save_menu_tercihi(st.session_state["kullanici"], _TAB_LISTESI_DEFAULT.copy() + ["kullanici","koddepo"])
                 st.rerun()
-
 # ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
 col_bas, col_kul, col_cik = st.columns([6, 2, 1])
 with col_bas:
