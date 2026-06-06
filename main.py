@@ -29,6 +29,93 @@ def sb_or_sqlite():
     except:
         return False
 
+def get_sb():
+    """Supabase client döner"""
+    try:
+        from supabase import create_client
+        url = st.secrets.get("SUPABASE_URL","")
+        key = st.secrets.get("SUPABASE_KEY","")
+        if url and key:
+            return create_client(url, key)
+    except:
+        pass
+    return None
+
+def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
+    """Supabase veya SQLite'dan DataFrame döner"""
+    sb = get_sb()
+    if sb:
+        try:
+            q = sb.table(table).select("*")
+            if filters:
+                for k, v in filters.items():
+                    if v == "NOT_NULL":
+                        q = q.not_.is_(k, "null")
+                    elif v == "neq_1":
+                        q = q.neq(k, 1)
+                    else:
+                        q = q.eq(k, v)
+            if order_col:
+                q = q.order(order_col, desc=desc)
+            if limit:
+                q = q.limit(limit)
+            res = q.execute()
+            return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+        except Exception as e:
+            pass
+    # SQLite fallback
+    try:
+        sql = f"SELECT * FROM {table}"
+        if extra_sql:
+            sql += f" {extra_sql}"
+        df = pd.read_sql(sql, conn)
+        return df
+    except:
+        return pd.DataFrame()
+
+def db_insert(table, data):
+    """Insert — Supabase veya SQLite"""
+    sb = get_sb()
+    if sb:
+        try:
+            sb.table(table).insert(data).execute()
+            return True
+        except Exception as e:
+            st.warning(f"Supabase insert: {e}")
+    # SQLite fallback
+    try:
+        conn = get_conn()
+        cols = ", ".join(data.keys())
+        vals = ", ".join(["?" for _ in data])
+        conn.execute(f"INSERT INTO {table} ({cols}) VALUES ({vals})", list(data.values()))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        st.error(f"DB insert hatası: {e}")
+    return False
+
+def db_update(table, data, where_col, where_val):
+    """Update — Supabase veya SQLite"""
+    sb = get_sb()
+    if sb:
+        try:
+            sb.table(table).update(data).eq(where_col, where_val).execute()
+            return True
+        except:
+            pass
+    try:
+        conn = get_conn()
+        sets = ", ".join([f"{k}=?" for k in data.keys()])
+        conn.execute(f"UPDATE {table} SET {sets} WHERE {where_col}=?",
+                    list(data.values()) + [where_val])
+        conn.commit()
+        conn.close()
+        return True
+    except:
+        pass
+    return False
+
 def db_query(sql, params=None):
     """SELECT sorgusu — Supabase veya SQLite"""
     if sb_or_sqlite():
@@ -52,9 +139,7 @@ def db_query(sql, params=None):
         except Exception as e:
             pass
     # SQLite fallback
-    conn = get_conn()
     df = pd.read_sql(sql, conn)
-    conn.close()
     return df
 
 def sb_insert(table, data):
@@ -114,7 +199,6 @@ def sb_select(table, filters=None, order=None, limit=None):
             pass
     # SQLite fallback
     try:
-        conn = get_conn()
         sql = f"SELECT * FROM {table}"
         if filters:
             where = " AND ".join([f"{k}=?" for k in filters.keys()])
@@ -122,7 +206,6 @@ def sb_select(table, filters=None, order=None, limit=None):
             df = pd.read_sql(sql, conn, params=list(filters.values()))
         else:
             df = pd.read_sql(sql, conn)
-        conn.close()
         return df
     except:
         return pd.DataFrame()
@@ -213,7 +296,6 @@ def get_conn():
 
 def init_db():
     # SQLite her zaman yedek
-    conn = get_conn()
     tables = [
         """CREATE TABLE IF NOT EXISTS kullanicilar (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -261,7 +343,6 @@ def init_db():
                      ("admin", "admin123", "admin"))
     except: pass
     conn.commit()
-    conn.close()
 
     # Supabase admin kullanicisi
     if sb_or_sqlite():
@@ -287,9 +368,7 @@ def otomatik_yedek():
             shutil.copy2("mw_crm.db", db_yedek)
         csv_yedek = os.path.join(yedek_klasor, f"cari_kartlar_{bugun}.csv")
         if not os.path.exists(csv_yedek):
-            conn = get_conn()
-            df_yedek = pd.read_sql("SELECT * FROM cari_kartlar", conn)
-            conn.close()
+            df_yedek = db_read("cari_kartlar", extra_sql="")
             df_yedek.to_csv(csv_yedek, index=False, encoding="utf-8-sig")
     except:
         pass
@@ -667,9 +746,7 @@ elif aktif == "liste":
             raise Exception("no supabase")
     except:
         try:
-            conn = get_conn()
-            df = pd.read_sql("SELECT * FROM cari_kartlar WHERE silindi=0 OR silindi='0' OR silindi IS NULL ORDER BY tarih DESC", conn)
-            conn.close()
+            df = db_read("cari_kartlar", extra_sql="WHERE silindi=0 OR silindi='0' OR silindi IS NULL ORDER BY tarih DESC")
         except:
             df = pd.DataFrame()
 
@@ -774,9 +851,7 @@ elif aktif == "liste":
 
 # ── ARŞİV ─────────────────────────────────────────────────────────────────────
 elif aktif == "arsiv":
-    conn = get_conn()
-    df_arsiv = pd.read_sql("SELECT * FROM cari_kartlar WHERE silindi=1 OR silindi='1' ORDER BY tarih DESC", conn)
-    conn.close()
+    df_arsiv = db_read("cari_kartlar", filters={"silindi": 1}, order_col="tarih")
 
     st.markdown(f"**Arşivde {len(df_arsiv)} kayıt**")
 
@@ -827,9 +902,7 @@ elif aktif == "arsiv":
 # ── KULLANICI YÖNETİMİ ───────────────────────────────────────────────────────
 elif aktif == "kullanici" and st.session_state["rol"] == "admin":
     st.subheader("Kullanıcı Listesi")
-    conn = get_conn()
-    df_kul = pd.read_sql("SELECT id, kullanici_adi, rol FROM kullanicilar", conn)
-    conn.close()
+    df_kul = db_read("kullanicilar", extra_sql="")
 
     edited_kul = st.data_editor(
         df_kul,
@@ -885,9 +958,7 @@ elif aktif == "kullanici" and st.session_state["rol"] == "admin":
             # DB
             shutil.copy2("mw_crm.db", os.path.join(yedek_klasor, f"mw_crm_{simdi}.db"))
             # CSV
-            conn = get_conn()
-            df_yedek = pd.read_sql("SELECT * FROM cari_kartlar", conn)
-            conn.close()
+            df_yedek = db_read("cari_kartlar", extra_sql="")
             df_yedek.to_csv(os.path.join(yedek_klasor, f"cari_kartlar_{simdi}.csv"), index=False, encoding="utf-8-sig")
             try:
                 df_yedek.to_excel(os.path.join(yedek_klasor, f"cari_kartlar_{simdi}.xlsx"), index=False)
@@ -935,9 +1006,7 @@ elif aktif == "kullanici" and st.session_state["rol"] == "admin":
 
 # ── RAPORLAR ─────────────────────────────────────────────────────────────────
 elif aktif == "rapor":
-    conn = get_conn()
-    df_rapor = pd.read_sql("SELECT * FROM cari_kartlar WHERE silindi=0 OR silindi='0' OR silindi IS NULL", conn)
-    conn.close()
+    df_rapor = db_read("cari_kartlar", filters={"silindi": "neq_1"})
 
     if "beklenen_ciro" not in df_rapor.columns:
         df_rapor["beklenen_ciro"] = 0
@@ -1098,12 +1167,8 @@ elif aktif == "rapor":
     # ── TEKLİF RAPORU ─────────────────────────────────────────────────────────
     st.divider()
     st.markdown("## 📄 Verilen Teklifler Raporu")
-    conn = get_conn()
     try:
-        df_tek_rapor = pd.read_sql(
-            "SELECT id, tarih, musteri_adi, toplam_tutar, olusturan, notlar, satirlar FROM teklifler ORDER BY tarih DESC",
-            conn)
-        conn.close()
+        df_tek_rapor = db_read("teklifler", order_col="tarih")
 
         if not df_tek_rapor.empty:
             t1, t2, t3, t4 = st.columns(4)
@@ -1181,12 +1246,8 @@ elif aktif == "rapor":
     # ── WHATSAPP / EMAIL RAPORU ────────────────────────────────────────────────
     st.divider()
     st.markdown("## 📱 WhatsApp & Email Gönderim Raporu")
-    conn = get_conn()
     try:
-        df_islem_rapor = pd.read_sql(
-            "SELECT tarih, musteri_adi, islem_turu, icerik, gonderim_bilgisi, olusturan FROM islem_kaydi ORDER BY tarih DESC",
-            conn)
-        conn.close()
+        df_islem_rapor = db_read("islem_kaydi", order_col="tarih")
 
         if not df_islem_rapor.empty:
             wa_say  = len(df_islem_rapor[df_islem_rapor["islem_turu"].str.contains("WhatsApp", na=False)])
@@ -1225,10 +1286,8 @@ elif aktif == "rapor":
     # ── İL / TÜR RAPORU ───────────────────────────────────────────────────────
     st.divider()
     st.markdown("## 🗺️ İl & Ürün Türü Raporu")
-    conn = get_conn()
     try:
-        df_tek2 = pd.read_sql("SELECT satirlar, musteri_adi FROM teklifler", conn)
-        conn.close()
+        df_tek2 = db_read("teklifler", extra_sql="")
 
         il_tur_detay = []
         import json as _json2
@@ -1388,11 +1447,7 @@ elif aktif == "teklif":
         "Mus","Bingol","Tunceli","Siirt","Hakkari","Agri","Igdir","Kars","Ardahan"]
 
     # Musteri listesi - TUM musteriler (durum filtresi dropdown ile)
-    conn = get_conn()
-    df_m = pd.read_sql(
-        "SELECT id, firma, email, gsm, il, durum FROM cari_kartlar WHERE (silindi=0 OR silindi=\'0\' OR silindi IS NULL) ORDER BY firma",
-        conn)
-    conn.close()
+    df_m = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
 
     fil_col, _ = st.columns([2,4])
     df_fil = fil_col.selectbox("Filtre:", ["Tumu","Aktif","Hedef","Pasif"], key="teklif_fil")
@@ -1702,10 +1757,8 @@ elif aktif == "teklif":
 
     st.divider()
     st.markdown("### Kayitli Teklifler")
-    conn = get_conn()
     try:
-        df_tek = pd.read_sql("SELECT id, tarih, musteri_adi, toplam_tutar, olusturan, notlar FROM teklifler ORDER BY tarih DESC LIMIT 30", conn)
-        conn.close()
+        df_tek = db_read("teklifler", extra_sql="ORDER BY tarih DESC LIMIT 30")
         if not df_tek.empty:
             df_tek["toplam_tutar"] = df_tek["toplam_tutar"].apply(lambda x: f"{float(x):,.2f} TL")
             df_tek.columns = ["ID","Tarih","Musteri","Tutar","Olusturan","Notlar"]
@@ -1731,21 +1784,17 @@ elif aktif == "teklif":
                     else:
                         st.error("Bu ID bulunamadi.")
         else:
-            conn.close()
             st.info("Henuz kayitli teklif yok.")
     except Exception as e:
         st.error(f"Hata: {e}")
 
     st.markdown("### Islem Kayitlari")
-    conn = get_conn()
     try:
-        df_islem = pd.read_sql("SELECT tarih, musteri_adi, islem_turu, gonderim_bilgisi, olusturan FROM islem_kaydi ORDER BY tarih DESC LIMIT 30", conn)
-        conn.close()
+        df_islem = db_read("islem_kaydi", extra_sql="ORDER BY tarih DESC LIMIT 30")
         if not df_islem.empty:
             df_islem.columns = ["Tarih","Musteri","Islem","Gonderim","Kullanici"]
             st.dataframe(df_islem, use_container_width=True, hide_index=True)
         else:
-            conn.close()
             st.info("Henuz islem kaydi yok.")
     except:
         st.info("Islem kaydi yok.")
@@ -1913,11 +1962,7 @@ elif aktif == "excel":
                 st.success(f"✅ {len(df_yukle)} satır yüklenmeye hazır")
 
                 # Mükerrer kontrol
-                conn = get_conn()
-                mevcut_firmalar = set(pd.read_sql(
-                    "SELECT firma FROM cari_kartlar WHERE silindi=0 OR silindi='0' OR silindi IS NULL",
-                    conn)["firma"].dropna().str.strip().tolist())
-                conn.close()
+                mevcut_firmalar = set(db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")["firma"].dropna().str.strip().tolist()) if not db_read("cari_kartlar").empty else set()
 
                 mukerrer = df_yukle[df_yukle["firma"].astype(str).str.strip().isin(mevcut_firmalar)]
                 if len(mukerrer) > 0:
@@ -1934,7 +1979,6 @@ elif aktif == "excel":
                 col_yukle_btn, _ = st.columns([2,4])
                 with col_yukle_btn:
                     if st.button("🚀 Sisteme Aktar", use_container_width=True, type="primary"):
-                        conn = get_conn()
                         basarili = 0
                         atlanan = 0
                         guncellenen = 0
@@ -1995,7 +2039,6 @@ elif aktif == "excel":
                                 hatali += 1
 
                         conn.commit()
-                        conn.close()
 
                         st.markdown("---")
                         r1, r2, r3, r4 = st.columns(4)
@@ -2016,11 +2059,7 @@ elif aktif == "excel":
 
     # ── MEVCUT VERİLERİ DIŞA AKTAR ────────────────────────────────────────────
     st.markdown("### 3️⃣ Mevcut Verileri Excel'e Aktar")
-    conn = get_conn()
-    df_disari = pd.read_sql(
-        "SELECT firma,yetkili,gsm,sabit,email,adres,ilce,il,durum,temsilci,islem_asamasi,beklenen_ciro,gerceklesen_ciro,tarih,olusturan FROM cari_kartlar WHERE silindi=0 OR silindi='0' OR silindi IS NULL ORDER BY firma",
-        conn)
-    conn.close()
+    df_disari = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
 
     st.markdown(f"Sistemde **{len(df_disari)}** aktif kayıt var.")
 
@@ -2056,11 +2095,7 @@ elif aktif == "analiz":
     firma_manuel = gir1.text_input("Firma Adı (manuel yazın veya sistemden seçin):",
         placeholder="Örn: Oncu Kargo A.Ş.", key="analiz_firma_manuel")
 
-    conn = get_conn()
-    df_an = pd.read_sql(
-        "SELECT id, firma, il, durum, islem_asamasi, beklenen_ciro, gerceklesen_ciro, temsilci, yetkili, gsm, email FROM cari_kartlar WHERE silindi=0 OR silindi='0' OR silindi IS NULL ORDER BY firma",
-        conn)
-    conn.close()
+    df_an = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
 
     an_opts = ["-- Sistemden Seçin (opsiyonel) --"] + [f"[{int(r['id'])}] {r['firma']} ({r['durum']})" for _, r in df_an.iterrows()]
     an_secim = gir2.selectbox("Sistemdeki Müşteri:", an_opts, key="analiz_musteri")
@@ -2101,18 +2136,12 @@ elif aktif == "analiz":
         m3.metric("Beklenen Ciro", f"₺{bek:,.0f}")
         m4.metric("Gerçekleşen", f"₺{ger:,.0f}", delta=f"₺{ger-bek:,.0f}")
 
-        conn = get_conn()
         try:
-            df_islem_an = pd.read_sql(
-                f"SELECT tarih, islem_turu, gonderim_bilgisi, olusturan FROM islem_kaydi WHERE musteri_id={int(an_musteri['id'])} ORDER BY tarih DESC",
-                conn)
-            df_tek_an = pd.read_sql(
-                f"SELECT tarih, toplam_tutar, notlar FROM teklifler WHERE musteri_id={int(an_musteri['id'])} ORDER BY tarih DESC",
-                conn)
+            df_islem_an = db_read("islem_kaydi", filters={"musteri_id": int(an_musteri["id"])}, order_col="tarih")
+            df_tek_an = db_read("teklifler", filters={"musteri_id": int(an_musteri["id"])}, order_col="tarih")
         except:
             df_islem_an = pd.DataFrame()
             df_tek_an = pd.DataFrame()
-        conn.close()
 
         col_ia, col_ta = st.columns(2)
         with col_ia:
@@ -2327,10 +2356,8 @@ elif aktif == "koddepo":
     st.divider()
 
     # Sürüm listesi
-    conn = get_conn()
     try:
-        df_depo = pd.read_sql("SELECT id, tarih, surum, aciklama, olusturan FROM kod_deposu ORDER BY tarih DESC", conn)
-        conn.close()
+        df_depo = db_read("kod_deposu", extra_sql="ORDER BY tarih DESC")
         if not df_depo.empty:
             st.markdown(f"### 📦 Kayıtlı Sürümler ({len(df_depo)} adet)")
             df_depo_goster = df_depo[["id","tarih","surum","aciklama","olusturan"]].copy()
@@ -2368,7 +2395,6 @@ elif aktif == "koddepo":
                     st.success(f"ID {sil_id} silindi.")
                     st.rerun()
         else:
-            conn.close()
             st.info("Henüz kayıtlı sürüm yok. Yukarıdan ilk sürümü kaydedin.")
     except Exception as e:
         st.error(f"Kod deposu hatası: {e}")
@@ -2459,11 +2485,7 @@ elif aktif == "whatsapp":
     with wa_tab1:
         st.markdown("### 📤 Tek Mesaj Gönder")
 
-        conn = get_conn()
-        df_wa = pd.read_sql(
-            "SELECT id, firma, gsm, il, durum FROM cari_kartlar WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) AND gsm != '' AND gsm IS NOT NULL ORDER BY firma",
-            conn)
-        conn.close()
+        df_wa = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) AND gsm != '' ORDER BY firma")
 
         wa_yontem = st.radio("Alıcı:", ["Sistemden Seç", "Manuel Numara"], horizontal=True, key="wa_yontem")
 
@@ -2542,11 +2564,7 @@ elif aktif == "whatsapp":
         st.warning("⚠️ Spam yapmayın — WhatsApp toplu mesaj için kısıtlama uygulayabilir.")
 
         filtre_durum_wa = st.selectbox("Müşteri Filtresi:", ["Tümü","Aktif","Hedef","Pasif"], key="toplu_filtre")
-        conn = get_conn()
-        df_toplu = pd.read_sql(
-            "SELECT id, firma, gsm, il, durum FROM cari_kartlar WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) AND gsm != '' AND gsm IS NOT NULL ORDER BY firma",
-            conn)
-        conn.close()
+        df_toplu = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
         if filtre_durum_wa != "Tümü":
             df_toplu = df_toplu[df_toplu["durum"] == filtre_durum_wa]
 
@@ -2601,11 +2619,7 @@ elif aktif == "whatsapp":
         st.markdown("### 💬 Görüşme Kaydet")
         st.info("WhatsApp görüşmelerinizi sisteme not olarak kaydedin.")
 
-        conn = get_conn()
-        df_gkayit = pd.read_sql(
-            "SELECT id, firma, gsm FROM cari_kartlar WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma",
-            conn)
-        conn.close()
+        df_gkayit = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
 
         gkayit_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['firma']}" for _, r in df_gkayit.iterrows()]
         gkayit_secim = st.selectbox("Müşteri:", gkayit_opts, key="gkayit_musteri")
@@ -2643,12 +2657,8 @@ elif aktif == "whatsapp":
         # Hatırlatmalar
         st.divider()
         st.markdown("#### ⏰ Yaklaşan Hatırlatmalar")
-        conn = get_conn()
         try:
-            df_hat = pd.read_sql(
-                "SELECT tarih, musteri_adi, islem_turu, icerik FROM islem_kaydi WHERE icerik LIKE '%Hatırlatma%' ORDER BY tarih DESC LIMIT 20",
-                conn)
-            conn.close()
+            df_hat = db_read("islem_kaydi", order_col="tarih", limit=20)
             if not df_hat.empty:
                 st.dataframe(df_hat, use_container_width=True, hide_index=True)
             else:
@@ -2661,12 +2671,8 @@ elif aktif == "whatsapp":
         st.markdown("### 📋 WhatsApp Mesaj Geçmişi")
 
         ara_wa = st.text_input("Müşteri veya mesaj ara:", key="wa_gecmis_ara")
-        conn = get_conn()
         try:
-            df_gecmis = pd.read_sql(
-                "SELECT tarih, musteri_adi, islem_turu, icerik, gonderim_bilgisi, olusturan FROM islem_kaydi WHERE islem_turu LIKE '%WhatsApp%' OR islem_turu LIKE '%Görüşme%' ORDER BY tarih DESC LIMIT 100",
-                conn)
-            conn.close()
+            df_gecmis = db_read("islem_kaydi", order_col="tarih", limit=100)
             if ara_wa:
                 mask = df_gecmis.apply(lambda r: ara_wa.lower() in str(r).lower(), axis=1)
                 df_gecmis = df_gecmis[mask]
