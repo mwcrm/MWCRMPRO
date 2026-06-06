@@ -457,6 +457,19 @@ def cikis():
 # ── SESSION STATE ─────────────────────────────────────────────────────────────
 st.set_page_config(page_title="MWCRMPRO", layout="wide")
 
+st.markdown("""
+<style>
+@media (max-width: 768px) {
+    .block-container { padding: 0.5rem !important; }
+    div[data-testid="column"] { min-width: 100% !important; }
+    .stButton>button { width: 100% !important; font-size: 13px !important; }
+    h1 { font-size: 1.3rem !important; }
+    h2 { font-size: 1.1rem !important; }
+}
+.stButton>button { border-radius: 8px !important; }
+</style>
+""", unsafe_allow_html=True)
+
 if "giris" not in st.session_state:
     st.session_state["giris"] = False
 if "kullanici" not in st.session_state:
@@ -468,9 +481,22 @@ if "aktif_tab" not in st.session_state:
 if "kayit_mesaj" not in st.session_state:
     st.session_state["kayit_mesaj"] = ""
 
-if not st.session_state["giris"]:
-    giris_ekrani()
-    st.stop()
+st.markdown("""
+<style>
+/* Mobil uyumluluk */
+@media (max-width: 768px) {
+    .block-container { padding: 0.5rem !important; }
+    div[data-testid="column"] { min-width: 100% !important; }
+    .stButton>button { width: 100% !important; font-size: 13px !important; }
+    .stDataFrame { font-size: 11px !important; }
+    h1 { font-size: 1.3rem !important; }
+    h2 { font-size: 1.1rem !important; }
+    h3 { font-size: 1rem !important; }
+}
+/* Genel buton iyileştirme */
+.stButton>button { border-radius: 8px !important; }
+</style>
+""", unsafe_allow_html=True)
 
 # ── MENÜ FONKSİYONLARI (sidebar'dan önce tanımlanmalı) ───────────────────────
 import json as _menu_json
@@ -2832,113 +2858,126 @@ elif aktif == "randevu":
     import io as _rio
     st.markdown("## 📅 Randevular & Ziyaret Planı")
 
-    # Temsilci listesi
-    df_tem_r = db_read("temsilciler", extra_sql="WHERE aktif=1 ORDER BY ad")
-    tem_r_opts = ["Tümü"] + [f"{r['ad']} {r['soyad']}" for _, r in df_tem_r.iterrows()] if not df_tem_r.empty else ["Tümü"]
+    # ── HATIRLATMALAR (sayfa açılınca otomatik göster) ────────────────────────
+    df_rand_all = db_read("randevular", extra_sql="ORDER BY randevu_tarihi ASC, randevu_saati ASC")
 
-    r_tab1, r_tab2, r_tab3 = st.tabs(["📋 Randevu Listesi", "➕ Yeni Randevu", "📊 Özet Rapor"])
+    if not df_rand_all.empty and "randevu_tarihi" in df_rand_all.columns:
+        bugun_str = datetime.now().strftime("%Y-%m-%d")
+
+        # Yaklaşan (bugün ve sonraki 3 gün, sonucu bitmemiş)
+        yaklasan = df_rand_all[
+            (df_rand_all["randevu_tarihi"] >= bugun_str) &
+            (df_rand_all["randevu_tarihi"] <= datetime.now().strftime("%Y-%m-") + str(datetime.now().day + 3).zfill(2)) &
+            (~df_rand_all["sonuc"].isin(["Bitti","İptal"]))
+        ] if "sonuc" in df_rand_all.columns else pd.DataFrame()
+
+        # Geçmiş açık (tarihi geçmiş ama sonuç girilmemiş)
+        gecmis_acik = df_rand_all[
+            (df_rand_all["randevu_tarihi"] < bugun_str) &
+            (~df_rand_all["sonuc"].isin(["Bitti","İptal","Gidilmedi"]))
+        ] if "sonuc" in df_rand_all.columns else pd.DataFrame()
+
+        if len(yaklasan) > 0 or len(gecmis_acik) > 0:
+            with st.expander(f"⚠️ Hatırlatmalar ({len(yaklasan)} yaklaşan, {len(gecmis_acik)} açık)", expanded=True):
+                if len(yaklasan) > 0:
+                    st.markdown("**🔔 Yaklaşan Randevular:**")
+                    for _, row in yaklasan.iterrows():
+                        hc1, hc2, hc3, hc4 = st.columns([2,2,2,1])
+                        hc1.markdown(f"📅 **{row.get('randevu_tarihi','')} {row.get('randevu_saati','')}**")
+                        hc2.markdown(f"🏢 {row.get('musteri_adi','')}")
+                        hc3.markdown(f"👤 {row.get('temsilci','')} — {row.get('bolge','')}")
+                        # WA hatırlatma
+                        tem_tel_h = str(row.get("temsilci_tel","") or "")
+                        if tem_tel_h:
+                            import re as _reh
+                            ht = _reh.sub(r"[\s\-\(\)+]","", tem_tel_h)
+                            if ht.startswith("0"): ht = "90" + ht[1:]
+                            msg_h = f"⏰ RANDEVU HATIRLATMA\nMüşteri: {row.get('musteri_adi','')}\nTarih: {row.get('randevu_tarihi','')} {row.get('randevu_saati','')}\nBölge: {row.get('bolge','')}"
+                            hc4.link_button("📱 WA", f"https://wa.me/{ht}?text={msg_h.replace(' ','%20').replace(chr(10),'%0A')}", use_container_width=True)
+
+                if len(gecmis_acik) > 0:
+                    st.markdown("**⚠️ Sonuç Girilmemiş Geçmiş Randevular:**")
+                    for _, row in gecmis_acik.iterrows():
+                        gc1, gc2, gc3 = st.columns([2,2,2])
+                        gc1.markdown(f"📅 {row.get('randevu_tarihi','')} — _{row.get('gorev','')}_")
+                        gc2.markdown(f"🏢 {row.get('musteri_adi','')}")
+                        gc3.warning(f"Sonuç bekleniyor! ID: {row.get('id','')}")
+
+    r_tab1, r_tab2, r_tab3, r_tab4 = st.tabs(["📋 Randevu Listesi", "➕ Yeni Randevu", "✏️ Düzenle / Sil", "📊 Özet Rapor"])
 
     with r_tab1:
-        # Filtreler
-        rf1, rf2, rf3, rf4 = st.columns(4)
-        filtre_tem_r = rf1.selectbox("Temsilci:", tem_r_opts, key="rand_filtre_tem")
-        filtre_tarih_bas = rf2.date_input("Başlangıç:", value=datetime.now().date(), key="rand_bas")
-        filtre_tarih_bit = rf3.date_input("Bitiş:", key="rand_bit")
-        filtre_sonuc = rf4.selectbox("Sonuç:", ["Tümü","Bitti","Devam Ediyor","Gidilmedi","İptal"], key="rand_sonuc")
+        rf1, rf2, rf3 = st.columns(3)
+        filtre_tem_r = rf1.text_input("Temsilci filtrele:", key="rand_filtre_tem")
+        filtre_sonuc = rf2.selectbox("Sonuç:", ["Tümü","Bitti","Devam Ediyor","Gidilmedi","İptal","—"], key="rand_sonuc")
+        filtre_tarih = rf3.date_input("Başlangıç tarihi:", value=datetime.now().date(), key="rand_bas")
 
-        df_rand = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC, randevu_saati DESC")
-        
+        df_rand = df_rand_all.copy() if not df_rand_all.empty else pd.DataFrame()
+
         if not df_rand.empty:
-            if filtre_tem_r != "Tümü":
-                df_rand = df_rand[df_rand["temsilci"] == filtre_tem_r]
+            if filtre_tem_r:
+                df_rand = df_rand[df_rand["temsilci"].str.contains(filtre_tem_r, case=False, na=False)]
             if filtre_sonuc != "Tümü":
                 df_rand = df_rand[df_rand["sonuc"] == filtre_sonuc]
 
         if df_rand.empty:
-            st.info("Randevu bulunamadı. 'Yeni Randevu' sekmesinden ekleyin.")
+            st.info("Randevu bulunamadı.")
         else:
-            # Özet metriker
             rm1, rm2, rm3, rm4 = st.columns(4)
             rm1.metric("Toplam", len(df_rand))
-            rm2.metric("✅ Bitti", len(df_rand[df_rand["sonuc"] == "Bitti"]) if "sonuc" in df_rand.columns else 0)
-            rm3.metric("🔄 Devam", len(df_rand[df_rand["sonuc"] == "Devam Ediyor"]) if "sonuc" in df_rand.columns else 0)
-            rm4.metric("❌ Gidilmedi", len(df_rand[df_rand["sonuc"] == "Gidilmedi"]) if "sonuc" in df_rand.columns else 0)
+            rm2.metric("✅ Bitti", len(df_rand[df_rand["sonuc"]=="Bitti"]) if "sonuc" in df_rand.columns else 0)
+            rm3.metric("🔄 Devam", len(df_rand[df_rand["sonuc"]=="Devam Ediyor"]) if "sonuc" in df_rand.columns else 0)
+            rm4.metric("❌ Gidilmedi", len(df_rand[df_rand["sonuc"]=="Gidilmedi"]) if "sonuc" in df_rand.columns else 0)
 
-            # Tablo - resimdeki gibi
-            st.markdown("### 📋 Randevu Tablosu")
-            goster_cols = [c for c in ["randevu_tarihi","randevu_saati","bolge","gorev","takip","adet","sonuc","musteri_adi","temsilci","aciklama"] if c in df_rand.columns]
-            
-            df_goster = df_rand[goster_cols].copy()
-            df_goster.columns = [{"randevu_tarihi":"Tarih","randevu_saati":"Saat","bolge":"Bölge",
-                                   "gorev":"Görev","takip":"Takip","adet":"Adet","sonuc":"Sonuç",
-                                   "musteri_adi":"Müşteri","temsilci":"Temsilci","aciklama":"Açıklama"}.get(c,c) for c in goster_cols]
-            st.dataframe(df_goster, use_container_width=True, hide_index=True)
+            g_cols = [c for c in ["id","randevu_tarihi","randevu_saati","musteri_adi","bolge","gorev","takip","adet","sonuc","temsilci","aciklama"] if c in df_rand.columns]
+            st.dataframe(df_rand[g_cols], use_container_width=True, hide_index=True)
 
-            # Her randevu için WA uyarı linki
-            st.markdown("### 📱 WhatsApp Uyarı Linkleri")
-            for _, row in df_rand.head(10).iterrows():
-                if row.get("temsilci") and row.get("temsilci") != "":
-                    # Temsilci telefonunu bul
-                    tem_isim = str(row.get("temsilci","")).split(" ")
-                    tem_bilgi = df_tem_r[df_tem_r["ad"] == tem_isim[0]] if not df_tem_r.empty and tem_isim else pd.DataFrame()
-                    
-                    if not tem_bilgi.empty:
-                        tem_tel = str(tem_bilgi.iloc[0].get("telefon",""))
-                        import re as _re2
-                        tem_tel_temiz = _re2.sub(r"[\s\-\(\)]","", tem_tel)
-                        if tem_tel_temiz.startswith("0"):
-                            tem_wa = "90" + tem_tel_temiz[1:]
-                        else:
-                            tem_wa = tem_tel_temiz
-                        
-                        musteri = row.get("musteri_adi","")
-                        tarih = row.get("randevu_tarihi","")
-                        saat = row.get("randevu_saati","")
-                        bolge = row.get("bolge","")
-                        gorev = row.get("gorev","")
-                        
-                        mesaj = f"🗓️ RANDEVU HATIRLATMA\nMüşteri: {musteri}\nTarih: {tarih} {saat}\nBölge: {bolge}\nGörev: {gorev}\nİyi çalışmalar!"
-                        wa_link = f"https://wa.me/{tem_wa}?text={mesaj.replace(' ','%20').replace(chr(10),'%0A')}"
-                        
-                        col_wa1, col_wa2, col_wa3 = st.columns([2,2,1])
-                        col_wa1.markdown(f"**{musteri}** — {tarih} {saat}")
-                        col_wa2.markdown(f"👤 {row.get('temsilci','')}")
-                        col_wa3.link_button("📱 WA Gönder", wa_link, use_container_width=True)
+            # WA uyarı linkleri
+            st.markdown("#### 📱 WhatsApp Uyarı Gönder")
+            for _, row in df_rand.head(20).iterrows():
+                tem_tel_r = str(row.get("temsilci_tel","") or "")
+                musteri_r = row.get("musteri_adi","")
+                tarih_r = f"{row.get('randevu_tarihi','')} {row.get('randevu_saati','')}"
+                bolge_r = row.get("bolge","")
+                gorev_r = row.get("gorev","")
+                temsilci_r = row.get("temsilci","")
 
-            # Excel indir
+                wc1, wc2, wc3 = st.columns([3,2,1])
+                wc1.markdown(f"**{musteri_r}** — {tarih_r} — {temsilci_r}")
+                wc2.markdown(f"📍 {bolge_r} | {gorev_r}")
+                if tem_tel_r:
+                    import re as _rew
+                    twt = _rew.sub(r"[\s\-\(\)+]","", tem_tel_r)
+                    if twt.startswith("0"): twt = "90" + twt[1:]
+                    msg_w = f"📅 RANDEVU: {musteri_r}\n{tarih_r}\nBölge: {bolge_r}\nGörev: {gorev_r}"
+                    wc3.link_button("📱 WA", f"https://wa.me/{twt}?text={msg_w.replace(' ','%20').replace(chr(10),'%0A')}", use_container_width=True)
+                else:
+                    wc3.markdown("📞 Tel yok")
+
             buf_r = _rio.BytesIO()
             df_rand.to_excel(buf_r, index=False)
             buf_r.seek(0)
-            st.download_button("📥 Randevular Excel İndir", data=buf_r,
+            st.download_button("📥 Excel İndir", data=buf_r,
                 file_name=f"randevular_{datetime.now().strftime('%Y%m%d')}.xlsx",
                 mime="application/vnd.ms-excel", use_container_width=True)
 
     with r_tab2:
-        st.markdown("### ➕ Yeni Randevu Oluştur")
-
-        # Müşteri listesi
         df_mrand = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
         musteri_rand_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['firma']} ({r['durum']})" for _, r in df_mrand.iterrows()]
 
         with st.form("randevu_form"):
             rand_musteri = st.selectbox("Müşteri*:", musteri_rand_opts, key="rand_musteri")
-
             rc1, rc2, rc3 = st.columns(3)
-            rand_tarih = rc1.date_input("Randevu Tarihi*:", value=datetime.now().date(), key="rand_tarih")
+            rand_tarih = rc1.date_input("Tarih*:", value=datetime.now().date(), key="rand_tarih")
             rand_saat  = rc2.time_input("Saat*:", key="rand_saat")
             rand_bolge = rc3.text_input("Bölge:", placeholder="İstanbul Beykoz")
 
             rc4, rc5, rc6 = st.columns(3)
-            rand_gorev = rc4.selectbox("Görev*:", [
-                "Ziyaret","Arama","Deperlendirme","Kazanıldı","Kaybedildi",
-                "Devam Ediyor","Whsap Mesaj Gönderildi","E-mail Gönderildi","Yeni Bir Tarihe Ertele"
-            ])
+            rand_gorev = rc4.selectbox("Görev*:", ["Ziyaret","Arama","Değerlendirme","Kazanıldı","Kaybedildi","Devam Ediyor","Whatsapp Mesaj","E-mail","Yeni Tarihe Ertele"])
             rand_takip = rc5.selectbox("Takip:", ["Gidildi","Gidilmedi","Devam Ediyor","Ertelendi"])
             rand_adet  = rc6.number_input("Adet:", min_value=0, step=1, key="rand_adet")
 
-            # Temsilci - manuel giriş
             rand_temsilci = st.text_input("Satış Temsilcisi*:", placeholder="Temsilci adı yazın", key="rand_tem")
-            rand_tem_tel  = st.text_input("Temsilci WhatsApp No (uyarı için):", placeholder="05xxxxxxxxx", key="rand_tem_tel")
+            rand_tem_tel  = st.text_input("Temsilci WhatsApp No:", placeholder="05xxxxxxxxx", key="rand_tem_tel")
             rand_aciklama = st.text_area("Açıklama / Not:", height=80, key="rand_aciklama")
             rand_sonuc    = st.selectbox("Sonuç:", ["—","Bitti","Devam Ediyor","Gidilmedi","İptal"])
 
@@ -2946,89 +2985,115 @@ elif aktif == "randevu":
                 if rand_musteri == "-- Müşteri Seçin --":
                     st.warning("Müşteri seçin!")
                 else:
-                    musteri_id = 0
-                    musteri_adi = rand_musteri
+                    musteri_id = 0; musteri_adi = rand_musteri
                     if "[" in rand_musteri:
                         try:
                             musteri_id = int(rand_musteri.split("]")[0].replace("[","").strip())
                             musteri_adi = rand_musteri.split("] ")[1].split(" (")[0]
-                        except:
-                            pass
+                        except: pass
 
                     db_insert("randevular", {
                         "randevu_tarihi": str(rand_tarih),
                         "randevu_saati": str(rand_saat),
-                        "musteri_id": musteri_id,
-                        "musteri_adi": musteri_adi,
-                        "bolge": rand_bolge,
-                        "gorev": rand_gorev,
-                        "takip": rand_takip,
-                        "adet": int(rand_adet),
-                        "aciklama": rand_aciklama,
+                        "musteri_id": musteri_id, "musteri_adi": musteri_adi,
+                        "bolge": rand_bolge, "gorev": rand_gorev, "takip": rand_takip,
+                        "adet": int(rand_adet), "aciklama": rand_aciklama,
                         "sonuc": rand_sonuc if rand_sonuc != "—" else "",
                         "temsilci": rand_temsilci,
                         "olusturan": st.session_state["kullanici"]
                     })
                     st.success("✅ Randevu kaydedildi!")
 
-                    # WA uyarı linki - manuel telefon
-                    import re as _re3
-                    tem_tel_gir = rand_tem_tel.strip()
-                    if tem_tel_gir:
-                        tem_tel_temiz = _re3.sub(r"[\s\-\(\)+]","", tem_tel_gir)
-                        if tem_tel_temiz.startswith("0") and len(tem_tel_temiz)==11:
-                            tem_wa2 = "90" + tem_tel_temiz[1:]
-                        elif len(tem_tel_temiz)==10:
-                            tem_wa2 = "90" + tem_tel_temiz
-                        else:
-                            tem_wa2 = tem_tel_temiz
-
-                        mesaj2 = (f"🗓️ YENİ RANDEVU\n"
-                                  f"Müşteri: {musteri_adi}\n"
-                                  f"Tarih: {rand_tarih} {rand_saat}\n"
-                                  f"Bölge: {rand_bolge}\n"
-                                  f"Görev: {rand_gorev}\n"
-                                  f"İyi çalışmalar!")
-                        wa_link2 = f"https://wa.me/{tem_wa2}?text={mesaj2.replace(' ','%20').replace(chr(10),'%0A')}"
-                        st.link_button("📱 Temsilciye WA Uyarısı Gönder", wa_link2, use_container_width=True, type="primary")
-                    else:
-                        st.info("Temsilci telefonu girilmedi, WA uyarısı oluşturulamadı.")
-
+                    if rand_tem_tel.strip():
+                        import re as _re3
+                        twt2 = _re3.sub(r"[\s\-\(\)+]","", rand_tem_tel.strip())
+                        if twt2.startswith("0"): twt2 = "90" + twt2[1:]
+                        elif len(twt2)==10: twt2 = "90" + twt2
+                        msg2 = f"🗓️ YENİ RANDEVU\nMüşteri: {musteri_adi}\nTarih: {rand_tarih} {rand_saat}\nBölge: {rand_bolge}\nGörev: {rand_gorev}\nİyi çalışmalar!"
+                        wa2 = f"https://wa.me/{twt2}?text={msg2.replace(' ','%20').replace(chr(10),'%0A')}"
+                        st.link_button("📱 Temsilciye WA Uyarısı Gönder", wa2, use_container_width=True, type="primary")
                     st.rerun()
 
     with r_tab3:
-        st.markdown("### 📊 Randevu Özet Raporu")
-        df_rand2 = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC")
-
-        if df_rand2.empty:
-            st.info("Henüz randevu yok.")
+        st.markdown("### ✏️ Randevu Düzenle / Sil")
+        if df_rand_all.empty:
+            st.info("Randevu yok.")
         else:
-            # Temsilci bazlı
-            st.markdown("#### 👤 Temsilci Bazlı Özet")
-            if "temsilci" in df_rand2.columns:
-                tem_ozet = df_rand2.groupby("temsilci").agg(
+            duzenle_id = st.number_input("Düzenlenecek Randevu ID:", min_value=1, step=1, key="rand_duzenle_id")
+            df_sec = df_rand_all[df_rand_all["id"] == duzenle_id] if duzenle_id else pd.DataFrame()
+
+            if st.button("🔍 Getir", key="rand_getir") and not df_sec.empty:
+                st.session_state["rand_duzenle_row"] = df_sec.iloc[0].to_dict()
+
+            if st.session_state.get("rand_duzenle_row"):
+                row_d = st.session_state["rand_duzenle_row"]
+                st.success(f"ID {row_d.get('id')} — {row_d.get('musteri_adi')} — {row_d.get('randevu_tarihi')}")
+
+                with st.form("rand_duzenle_form"):
+                    dd1, dd2, dd3 = st.columns(3)
+                    d_tarih    = dd1.text_input("Tarih:", value=str(row_d.get("randevu_tarihi","")))
+                    d_saat     = dd2.text_input("Saat:", value=str(row_d.get("randevu_saati","")))
+                    d_bolge    = dd3.text_input("Bölge:", value=str(row_d.get("bolge","")))
+                    dd4, dd5, dd6 = st.columns(3)
+                    d_gorev    = dd4.text_input("Görev:", value=str(row_d.get("gorev","")))
+                    d_takip    = dd5.text_input("Takip:", value=str(row_d.get("takip","")))
+                    d_adet     = dd6.number_input("Adet:", min_value=0, value=int(row_d.get("adet",0) or 0))
+                    d_temsilci = dd1.text_input("Temsilci:", value=str(row_d.get("temsilci","")))
+                    d_sonuc_opts = ["—","Bitti","Devam Ediyor","Gidilmedi","İptal"]
+                    d_sonuc_idx  = d_sonuc_opts.index(row_d.get("sonuc","—")) if row_d.get("sonuc") in d_sonuc_opts else 0
+                    d_sonuc    = dd2.selectbox("Sonuç:", d_sonuc_opts, index=d_sonuc_idx)
+                    d_aciklama = st.text_area("Açıklama:", value=str(row_d.get("aciklama","")), height=80)
+
+                    col_gunc, col_sil = st.columns(2)
+                    gunc_btn = col_gunc.form_submit_button("💾 Güncelle", use_container_width=True, type="primary")
+                    sil_btn  = col_sil.form_submit_button("🗑️ Sil", use_container_width=True)
+
+                    if gunc_btn:
+                        db_update("randevular", {
+                            "randevu_tarihi": d_tarih, "randevu_saati": d_saat,
+                            "bolge": d_bolge, "gorev": d_gorev, "takip": d_takip,
+                            "adet": d_adet, "temsilci": d_temsilci,
+                            "sonuc": d_sonuc if d_sonuc != "—" else "", "aciklama": d_aciklama
+                        }, "id", int(row_d["id"]))
+                        st.success("✅ Güncellendi!")
+                        st.session_state.pop("rand_duzenle_row", None)
+                        st.rerun()
+
+                    if sil_btn:
+                        sb = get_sb()
+                        if sb:
+                            sb.table("randevular").delete().eq("id", int(row_d["id"])).execute()
+                        st.success("🗑️ Silindi!")
+                        st.session_state.pop("rand_duzenle_row", None)
+                        st.rerun()
+
+    with r_tab4:
+        if df_rand_all.empty:
+            st.info("Randevu yok.")
+        else:
+            st.markdown("#### 👤 Temsilci Bazlı")
+            if "temsilci" in df_rand_all.columns:
+                t_oz = df_rand_all.groupby("temsilci").agg(
                     Toplam=("id","count"),
                     Bitti=("sonuc", lambda x: (x=="Bitti").sum()),
                     Devam=("sonuc", lambda x: (x=="Devam Ediyor").sum()),
                     Gidilmedi=("sonuc", lambda x: (x=="Gidilmedi").sum()),
                 ).reset_index()
-                st.dataframe(tem_ozet, use_container_width=True, hide_index=True)
+                st.dataframe(t_oz, use_container_width=True, hide_index=True)
 
-            # Görev bazlı
-            st.markdown("#### 📋 Görev Türü Dağılımı")
-            if "gorev" in df_rand2.columns:
-                gorev_ozet = df_rand2.groupby("gorev").agg(Adet=("id","count")).reset_index().sort_values("Adet",ascending=False)
-                st.dataframe(gorev_ozet, use_container_width=True, hide_index=True)
+            st.markdown("#### 📋 Görev Dağılımı")
+            if "gorev" in df_rand_all.columns:
+                g_oz = df_rand_all.groupby("gorev").agg(Adet=("id","count")).reset_index().sort_values("Adet",ascending=False)
+                st.dataframe(g_oz, use_container_width=True, hide_index=True)
 
-            # Bu haftaki randevular
-            st.markdown("#### 📅 Bu Haftaki Randevular")
-            bugun = datetime.now().strftime("%Y-%m-%d")
-            rand_bu_hafta = df_rand2[df_rand2["randevu_tarihi"] >= bugun] if "randevu_tarihi" in df_rand2.columns else pd.DataFrame()
-            if not rand_bu_hafta.empty:
-                g_cols = [c for c in ["randevu_tarihi","randevu_saati","musteri_adi","bolge","gorev","temsilci","sonuc"] if c in rand_bu_hafta.columns]
-                st.dataframe(rand_bu_hafta[g_cols], use_container_width=True, hide_index=True)
+            st.markdown("#### 📅 Bu Hafta")
+            bugun2 = datetime.now().strftime("%Y-%m-%d")
+            bu_hafta = df_rand_all[df_rand_all["randevu_tarihi"] >= bugun2] if "randevu_tarihi" in df_rand_all.columns else pd.DataFrame()
+            if not bu_hafta.empty:
+                bh_cols = [c for c in ["randevu_tarihi","randevu_saati","musteri_adi","bolge","gorev","temsilci","sonuc"] if c in bu_hafta.columns]
+                st.dataframe(bu_hafta[bh_cols], use_container_width=True, hide_index=True)
             else:
-                st.info("Bu hafta için randevu yok.")
+                st.info("Bu hafta randevu yok.")
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
