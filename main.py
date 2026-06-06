@@ -523,7 +523,7 @@ if "kullanici" not in st.session_state:
 if "rol" not in st.session_state:
     st.session_state["rol"] = ""
 if "aktif_tab" not in st.session_state:
-    st.session_state["aktif_tab"] = "yeni"
+    st.session_state["aktif_tab"] = "liste"
 if "kayit_mesaj" not in st.session_state:
     st.session_state["kayit_mesaj"] = ""
 
@@ -998,7 +998,10 @@ elif aktif == "arsiv":
                 st.rerun()
 
 # ── KULLANICI YÖNETİMİ ───────────────────────────────────────────────────────
-elif aktif == "kullanici" and st.session_state["rol"] == "admin":
+elif aktif == "kullanici":
+    if st.session_state.get("rol") != "admin":
+        st.error("Bu sayfa sadece admin kullanıcılara açıktır.")
+        st.stop()
     st.markdown("## 👥 Kullanıcı Yönetimi")
 
     TUM_MENULER = {
