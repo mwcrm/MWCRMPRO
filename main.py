@@ -641,6 +641,14 @@ if aktif == "yeni":
     mevcut_ilce_listesi = ILLER_ILCELER[mevcut_il]
     mevcut_ilce = duzenle.get("ilce") if duzenle and duzenle.get("ilce") in mevcut_ilce_listesi else mevcut_ilce_listesi[0]
 
+    # İl/İlçe form dışında - dinamik güncelleme için
+    il_col1, il_col2 = st.columns(2)
+    il_idx = il_listesi.index(mevcut_il)
+    secilen_il = il_col1.selectbox("İl", il_listesi, index=il_idx, key="yeni_il_sec")
+    ilce_listesi_sec = ILLER_ILCELER[secilen_il]
+    ilce_idx_sec = ilce_listesi_sec.index(mevcut_ilce) if mevcut_ilce in ilce_listesi_sec else 0
+    secilen_ilce = il_col2.selectbox("İlçe", ilce_listesi_sec, index=ilce_idx_sec, key="yeni_ilce_sec")
+
     with st.form("yeni_kart_form"):
         col1, col2, col3 = st.columns(3)
         firma    = col1.text_input("Firma Adı",  value=duzenle.get("firma","") if duzenle else "")
@@ -649,11 +657,11 @@ if aktif == "yeni":
         sabit    = col2.text_input("Sabit Tel",  value=duzenle.get("sabit","") if duzenle else "")
         email    = col3.text_input("E-Mail",     value=duzenle.get("email","") if duzenle else "")
 
-        il_idx   = il_listesi.index(mevcut_il)
-        il       = col3.selectbox("İl", il_listesi, index=il_idx)
-        ilce_listesi = ILLER_ILCELER[il]
-        ilce_idx = ilce_listesi.index(mevcut_ilce) if mevcut_ilce in ilce_listesi else 0
-        ilce     = col3.selectbox("İlçe", ilce_listesi, index=ilce_idx)
+        il_idx   = il_listesi.index(secilen_il)
+        il       = col3.selectbox("İl", il_listesi, index=il_idx, key="yeni_il_form")
+        ilce_listesi = ILLER_ILCELER[secilen_il]
+        ilce_idx = ilce_listesi.index(secilen_ilce) if secilen_ilce in ilce_listesi else 0
+        ilce     = col3.selectbox("İlçe", ilce_listesi, index=ilce_idx, key="yeni_ilce_form")
 
         durum_opts = ["Aktif","Hedef","Pasif"]
         durum_idx  = durum_opts.index(duzenle.get("durum")) if duzenle and duzenle.get("durum") in durum_opts else 0
@@ -1702,7 +1710,15 @@ elif aktif == "teklif":
                 wa_url = "https://wa.me/" + gsm_wa_final + "?text=" + wa_mesaj.replace(" ","%20").replace("\n","%0A")
                 st.link_button("WhatsApp'ta Ac", wa_url, use_container_width=True)
                 if st.button("WA Gonderildi Kaydet", use_container_width=True):
-                    db_insert("islem_kaydi", {"musteri_id": 0, "musteri_adi": "kayit", "islem_turu": "kayit", "icerik": "kayit", "gonderim_bilgisi": "kayit", "olusturan": st.session_state["kullanici"]})
+                    db_insert("islem_kaydi", {
+                        "musteri_id": int(secili_musteri["id"]) if secili_musteri is not None else 0,
+                        "musteri_adi": hedef_musteri,
+                        "islem_turu": "WhatsApp Teklif",
+                        "icerik": wa_mesaj,
+                        "gonderim_bilgisi": gsm_wa_final,
+                        "olusturan": st.session_state["kullanici"]
+                    })
+                    st.success("WA gonderimi kaydedildi!")
             else:
                 st.warning("Gecerli WA numarasi yok. Yukaridaki alana girin.")
         with col_em:
@@ -1714,18 +1730,28 @@ elif aktif == "teklif":
                 mailto = "mailto:" + email_gonder + "?subject=" + konu + "&body=" + govde.replace(" ","%20").replace("\n","%0A")
                 st.link_button("Email'i Ac", mailto, use_container_width=True)
                 if st.button("Email Gonderildi Kaydet", use_container_width=True):
-                    db_insert("islem_kaydi", {"musteri_id": 0, "musteri_adi": "kayit", "islem_turu": "kayit", "icerik": "kayit", "gonderim_bilgisi": "kayit", "olusturan": st.session_state["kullanici"]})
+                    db_insert("islem_kaydi", {
+                        "musteri_id": int(secili_musteri["id"]) if secili_musteri is not None else 0,
+                        "musteri_adi": hedef_musteri,
+                        "islem_turu": "Email Teklif",
+                        "icerik": email_mesaj,
+                        "gonderim_bilgisi": email_gonder,
+                        "olusturan": st.session_state["kullanici"]
+                    })
+                    st.success("Email gonderimi kaydedildi!")
             else:
                 st.warning("Email yok. Yukaridaki alana girin.")
 
     st.divider()
     st.markdown("### Kayitli Teklifler")
     try:
-        df_tek = db_read("teklifler", extra_sql="ORDER BY tarih DESC LIMIT 30")
+        df_tek = db_read("teklifler", order_col="tarih")
         if not df_tek.empty:
-            df_tek["toplam_tutar"] = df_tek["toplam_tutar"].apply(lambda x: f"{float(x):,.2f} TL")
-            df_tek.columns = ["ID","Tarih","Musteri","Tutar","Olusturan","Notlar"]
-            st.dataframe(df_tek, use_container_width=True, hide_index=True)
+            goster_cols = [c for c in ["id","tarih","musteri_adi","toplam_tutar","olusturan","notlar"] if c in df_tek.columns]
+            df_tek_goster = df_tek[goster_cols].copy()
+            if "toplam_tutar" in df_tek_goster.columns:
+                df_tek_goster["toplam_tutar"] = df_tek_goster["toplam_tutar"].apply(lambda x: f"{float(x):,.2f} TL" if x else "0 TL")
+            st.dataframe(df_tek_goster, use_container_width=True, hide_index=True)
             with st.expander("Teklif Detayini Gor"):
                 teklif_id = st.number_input("Teklif ID:", min_value=1, step=1, key="goster_id")
                 if st.button("Detay Goster"):
