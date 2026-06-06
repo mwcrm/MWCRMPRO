@@ -333,6 +333,25 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             surum TEXT, aciklama TEXT, kod TEXT, olusturan TEXT)""",
+        """CREATE TABLE IF NOT EXISTS temsilciler (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ad TEXT, soyad TEXT, telefon TEXT, email TEXT,
+            bolge TEXT, unvan TEXT, aktif INTEGER DEFAULT 1)""",
+        """CREATE TABLE IF NOT EXISTS kisiler (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ad TEXT, soyad TEXT, telefon TEXT, email TEXT,
+            firma TEXT, gorev TEXT, bolge TEXT,
+            temsilci TEXT, notlar TEXT, kaynak TEXT)""",
+        """CREATE TABLE IF NOT EXISTS randevular (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            randevu_tarihi TEXT, randevu_saati TEXT,
+            musteri_id INTEGER, musteri_adi TEXT,
+            bolge TEXT, gorev TEXT, takip TEXT, adet INTEGER DEFAULT 0,
+            aciklama TEXT, sonuc TEXT, temsilci TEXT,
+            wa_gonderildi INTEGER DEFAULT 0, olusturan TEXT)""",
     ]
     for t in tables:
         conn.execute(t)
@@ -456,7 +475,7 @@ if not st.session_state["giris"]:
 # ── MENÜ FONKSİYONLARI (sidebar'dan önce tanımlanmalı) ───────────────────────
 import json as _menu_json
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "arsiv", "rapor", "teklif", "excel"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "arsiv", "rapor", "teklif", "excel", "kisiler", "randevu"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -464,6 +483,8 @@ _TAB_ETIKETLER = {
     "rapor": "📊 Raporlar",
     "teklif": "📄 Teklif Oluştur",
     "excel": "📥 Excel Aktar",
+    "kisiler": "📞 Telefon Kişiler",
+    "randevu": "📅 Randevular",
     "kullanici": "👥 Kullanıcı Yönetimi",
     "koddepo": "💾 Kod Deposu"
 }
@@ -2663,6 +2684,343 @@ elif aktif == "whatsapp":
                 st.info("Kayıt bulunamadı.")
         except Exception as e:
             st.error(f"Hata: {e}")
+
+# ── TELEFON KİŞİLER ──────────────────────────────────────────────────────────
+elif aktif == "kisiler":
+    st.markdown("## 📞 Telefon Kişiler & Rehber")
+
+    # Temsilci Kartları
+    with st.expander("👤 Satış Temsilcisi Kartları", expanded=False):
+        st.markdown("#### Kayıtlı Temsilciler")
+        df_tem = db_read("temsilciler", extra_sql="WHERE aktif=1 ORDER BY ad")
+        if not df_tem.empty:
+            st.dataframe(df_tem[["id","ad","soyad","telefon","email","bolge","unvan"]], 
+                        use_container_width=True, hide_index=True)
+
+        st.divider()
+        st.markdown("#### ➕ Yeni Temsilci Ekle")
+        with st.form("temsilci_form"):
+            tc1, tc2, tc3 = st.columns(3)
+            t_ad     = tc1.text_input("Ad*")
+            t_soyad  = tc1.text_input("Soyad")
+            t_tel    = tc2.text_input("Telefon*", placeholder="05xxxxxxxxx")
+            t_email  = tc2.text_input("Email")
+            t_bolge  = tc3.text_input("Bölge", placeholder="İstanbul, Ankara...")
+            t_unvan  = tc3.text_input("Ünvan", placeholder="Satış Temsilcisi")
+            if st.form_submit_button("💾 Temsilci Kaydet", use_container_width=True):
+                if t_ad and t_tel:
+                    db_insert("temsilciler", {
+                        "ad": t_ad, "soyad": t_soyad, "telefon": t_tel,
+                        "email": t_email, "bolge": t_bolge, "unvan": t_unvan, "aktif": 1
+                    })
+                    st.success(f"✅ {t_ad} {t_soyad} eklendi!")
+                    st.rerun()
+                else:
+                    st.warning("Ad ve telefon zorunlu!")
+
+    st.divider()
+
+    # Kişi Ekleme
+    tab_rehber1, tab_rehber2, tab_rehber3 = st.tabs(["📋 Kişi Listesi", "➕ Kişi Ekle", "📥 Toplu İçe Aktar"])
+
+    with tab_rehber1:
+        df_kis = db_read("kisiler", extra_sql="ORDER BY ad")
+        
+        ara_kis = st.text_input("🔍 Kişi ara (Ad, Firma, Bölge):", key="kisiler_ara")
+        if ara_kis:
+            mask = df_kis.apply(lambda r: ara_kis.lower() in str(r).lower(), axis=1)
+            df_kis = df_kis[mask]
+
+        st.markdown(f"**{len(df_kis)} kişi**")
+
+        if not df_kis.empty:
+            for _, kisi in df_kis.iterrows():
+                with st.container():
+                    kc1, kc2, kc3, kc4, kc5 = st.columns([2, 2, 2, 1, 1])
+                    kc1.markdown(f"**{kisi.get('ad','')} {kisi.get('soyad','')}**")
+                    kc2.markdown(f"🏢 {kisi.get('firma','')}")
+                    kc3.markdown(f"📍 {kisi.get('bolge','')}")
+                    
+                    tel = str(kisi.get('telefon','') or '').strip()
+                    if tel:
+                        # Telefon formatla
+                        import re as _re
+                        tel_temiz = _re.sub(r"[\s\-\(\)]", "", tel)
+                        if tel_temiz.startswith("0"):
+                            wa_no = "90" + tel_temiz[1:]
+                        elif tel_temiz.startswith("+"):
+                            wa_no = tel_temiz.replace("+","")
+                        else:
+                            wa_no = "90" + tel_temiz if len(tel_temiz) == 10 else tel_temiz
+                        
+                        wa_url_kis = f"https://wa.me/{wa_no}?text=Merhaba%20{kisi.get('ad','')}%20Bey/Hanım,"
+                        kc4.link_button("📱 WA", wa_url_kis, use_container_width=True)
+                        kc5.markdown(f"`{tel}`")
+                    else:
+                        kc4.markdown("—")
+                    st.divider()
+        else:
+            st.info("Kişi bulunamadı. 'Kişi Ekle' sekmesinden ekleyin.")
+
+    with tab_rehber2:
+        with st.form("kisi_ekle_form"):
+            ke1, ke2, ke3 = st.columns(3)
+            k_ad      = ke1.text_input("Ad*")
+            k_soyad   = ke1.text_input("Soyad")
+            k_tel     = ke2.text_input("Telefon*", placeholder="05xxxxxxxxx")
+            k_email   = ke2.text_input("Email")
+            k_firma   = ke3.text_input("Firma")
+            k_gorev   = ke3.text_input("Görev/Ünvan")
+            k_bolge   = ke1.text_input("Bölge")
+
+            # Temsilci listesi
+            df_tem2 = db_read("temsilciler", extra_sql="WHERE aktif=1 ORDER BY ad")
+            tem_opts = ["—"] + [f"{r['ad']} {r['soyad']}" for _, r in df_tem2.iterrows()] if not df_tem2.empty else ["—"]
+            k_temsilci = ke2.selectbox("Sorumlu Temsilci", tem_opts)
+            k_notlar  = ke3.text_area("Notlar", height=80)
+            k_kaynak  = ke1.selectbox("Kaynak", ["Manuel", "Sistem Müşterisi", "Referans", "Soğuk Arama", "Diğer"])
+
+            if st.form_submit_button("💾 Kişiyi Kaydet", use_container_width=True, type="primary"):
+                if k_ad and k_tel:
+                    db_insert("kisiler", {
+                        "ad": k_ad, "soyad": k_soyad, "telefon": k_tel,
+                        "email": k_email, "firma": k_firma, "gorev": k_gorev,
+                        "bolge": k_bolge, "temsilci": k_temsilci if k_temsilci != "—" else "",
+                        "notlar": k_notlar, "kaynak": k_kaynak
+                    })
+                    st.success(f"✅ {k_ad} {k_soyad} eklendi!")
+                    st.rerun()
+                else:
+                    st.warning("Ad ve telefon zorunlu!")
+
+    with tab_rehber3:
+        st.info("Excel şablonunu indirin, doldurun, yükleyin.")
+        import io as _kio
+
+        sablon_kis = pd.DataFrame([{
+            "ad": "Ahmet", "soyad": "Yılmaz", "telefon": "05001234567",
+            "email": "ahmet@firma.com", "firma": "ABC Ltd.",
+            "gorev": "Satın Alma Müdürü", "bolge": "İstanbul", "notlar": ""
+        }])
+        sbuf = _kio.BytesIO()
+        sablon_kis.to_excel(sbuf, index=False)
+        sbuf.seek(0)
+        st.download_button("📥 Şablon İndir", data=sbuf, 
+                          file_name="kisiler_sablonu.xlsx", use_container_width=True)
+
+        yukle_kis = st.file_uploader("Excel Yükle:", type=["xlsx","xls"], key="kisiler_yukle")
+        if yukle_kis:
+            df_yukle_kis = pd.read_excel(yukle_kis)
+            st.dataframe(df_yukle_kis.head(5), use_container_width=True, hide_index=True)
+            if st.button("🚀 İçe Aktar", use_container_width=True, type="primary"):
+                sayac = 0
+                for _, row in df_yukle_kis.iterrows():
+                    if str(row.get("ad","")).strip():
+                        db_insert("kisiler", {
+                            "ad": str(row.get("ad","")), "soyad": str(row.get("soyad","")),
+                            "telefon": str(row.get("telefon","")), "email": str(row.get("email","")),
+                            "firma": str(row.get("firma","")), "gorev": str(row.get("gorev","")),
+                            "bolge": str(row.get("bolge","")), "notlar": str(row.get("notlar","")),
+                            "kaynak": "Excel"
+                        })
+                        sayac += 1
+                st.success(f"✅ {sayac} kişi eklendi!")
+                st.rerun()
+
+# ── RANDEVULAR ────────────────────────────────────────────────────────────────
+elif aktif == "randevu":
+    import io as _rio
+    st.markdown("## 📅 Randevular & Ziyaret Planı")
+
+    # Temsilci listesi
+    df_tem_r = db_read("temsilciler", extra_sql="WHERE aktif=1 ORDER BY ad")
+    tem_r_opts = ["Tümü"] + [f"{r['ad']} {r['soyad']}" for _, r in df_tem_r.iterrows()] if not df_tem_r.empty else ["Tümü"]
+
+    r_tab1, r_tab2, r_tab3 = st.tabs(["📋 Randevu Listesi", "➕ Yeni Randevu", "📊 Özet Rapor"])
+
+    with r_tab1:
+        # Filtreler
+        rf1, rf2, rf3, rf4 = st.columns(4)
+        filtre_tem_r = rf1.selectbox("Temsilci:", tem_r_opts, key="rand_filtre_tem")
+        filtre_tarih_bas = rf2.date_input("Başlangıç:", value=datetime.now().date(), key="rand_bas")
+        filtre_tarih_bit = rf3.date_input("Bitiş:", key="rand_bit")
+        filtre_sonuc = rf4.selectbox("Sonuç:", ["Tümü","Bitti","Devam Ediyor","Gidilmedi","İptal"], key="rand_sonuc")
+
+        df_rand = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC, randevu_saati DESC")
+        
+        if not df_rand.empty:
+            if filtre_tem_r != "Tümü":
+                df_rand = df_rand[df_rand["temsilci"] == filtre_tem_r]
+            if filtre_sonuc != "Tümü":
+                df_rand = df_rand[df_rand["sonuc"] == filtre_sonuc]
+
+        if df_rand.empty:
+            st.info("Randevu bulunamadı. 'Yeni Randevu' sekmesinden ekleyin.")
+        else:
+            # Özet metriker
+            rm1, rm2, rm3, rm4 = st.columns(4)
+            rm1.metric("Toplam", len(df_rand))
+            rm2.metric("✅ Bitti", len(df_rand[df_rand["sonuc"] == "Bitti"]) if "sonuc" in df_rand.columns else 0)
+            rm3.metric("🔄 Devam", len(df_rand[df_rand["sonuc"] == "Devam Ediyor"]) if "sonuc" in df_rand.columns else 0)
+            rm4.metric("❌ Gidilmedi", len(df_rand[df_rand["sonuc"] == "Gidilmedi"]) if "sonuc" in df_rand.columns else 0)
+
+            # Tablo - resimdeki gibi
+            st.markdown("### 📋 Randevu Tablosu")
+            goster_cols = [c for c in ["randevu_tarihi","randevu_saati","bolge","gorev","takip","adet","sonuc","musteri_adi","temsilci","aciklama"] if c in df_rand.columns]
+            
+            df_goster = df_rand[goster_cols].copy()
+            df_goster.columns = [{"randevu_tarihi":"Tarih","randevu_saati":"Saat","bolge":"Bölge",
+                                   "gorev":"Görev","takip":"Takip","adet":"Adet","sonuc":"Sonuç",
+                                   "musteri_adi":"Müşteri","temsilci":"Temsilci","aciklama":"Açıklama"}.get(c,c) for c in goster_cols]
+            st.dataframe(df_goster, use_container_width=True, hide_index=True)
+
+            # Her randevu için WA uyarı linki
+            st.markdown("### 📱 WhatsApp Uyarı Linkleri")
+            for _, row in df_rand.head(10).iterrows():
+                if row.get("temsilci") and row.get("temsilci") != "":
+                    # Temsilci telefonunu bul
+                    tem_isim = str(row.get("temsilci","")).split(" ")
+                    tem_bilgi = df_tem_r[df_tem_r["ad"] == tem_isim[0]] if not df_tem_r.empty and tem_isim else pd.DataFrame()
+                    
+                    if not tem_bilgi.empty:
+                        tem_tel = str(tem_bilgi.iloc[0].get("telefon",""))
+                        import re as _re2
+                        tem_tel_temiz = _re2.sub(r"[\s\-\(\)]","", tem_tel)
+                        if tem_tel_temiz.startswith("0"):
+                            tem_wa = "90" + tem_tel_temiz[1:]
+                        else:
+                            tem_wa = tem_tel_temiz
+                        
+                        musteri = row.get("musteri_adi","")
+                        tarih = row.get("randevu_tarihi","")
+                        saat = row.get("randevu_saati","")
+                        bolge = row.get("bolge","")
+                        gorev = row.get("gorev","")
+                        
+                        mesaj = f"🗓️ RANDEVU HATIRLATMA\nMüşteri: {musteri}\nTarih: {tarih} {saat}\nBölge: {bolge}\nGörev: {gorev}\nİyi çalışmalar!"
+                        wa_link = f"https://wa.me/{tem_wa}?text={mesaj.replace(' ','%20').replace(chr(10),'%0A')}"
+                        
+                        col_wa1, col_wa2, col_wa3 = st.columns([2,2,1])
+                        col_wa1.markdown(f"**{musteri}** — {tarih} {saat}")
+                        col_wa2.markdown(f"👤 {row.get('temsilci','')}")
+                        col_wa3.link_button("📱 WA Gönder", wa_link, use_container_width=True)
+
+            # Excel indir
+            buf_r = _rio.BytesIO()
+            df_rand.to_excel(buf_r, index=False)
+            buf_r.seek(0)
+            st.download_button("📥 Randevular Excel İndir", data=buf_r,
+                file_name=f"randevular_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                mime="application/vnd.ms-excel", use_container_width=True)
+
+    with r_tab2:
+        st.markdown("### ➕ Yeni Randevu Oluştur")
+
+        # Müşteri listesi
+        df_mrand = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
+        musteri_rand_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['firma']} ({r['durum']})" for _, r in df_mrand.iterrows()]
+
+        with st.form("randevu_form"):
+            rand_musteri = st.selectbox("Müşteri*:", musteri_rand_opts, key="rand_musteri")
+
+            rc1, rc2, rc3 = st.columns(3)
+            rand_tarih = rc1.date_input("Randevu Tarihi*:", value=datetime.now().date(), key="rand_tarih")
+            rand_saat  = rc2.time_input("Saat*:", key="rand_saat")
+            rand_bolge = rc3.text_input("Bölge:", placeholder="İstanbul Beykoz")
+
+            rc4, rc5, rc6 = st.columns(3)
+            rand_gorev = rc4.selectbox("Görev*:", [
+                "Ziyaret","Arama","Deperlendirme","Kazanıldı","Kaybedildi",
+                "Devam Ediyor","Whsap Mesaj Gönderildi","E-mail Gönderildi","Yeni Bir Tarihe Ertele"
+            ])
+            rand_takip = rc5.selectbox("Takip:", ["Gidildi","Gidilmedi","Devam Ediyor","Ertelendi"])
+            rand_adet  = rc6.number_input("Adet:", min_value=0, step=1, key="rand_adet")
+
+            # Temsilci seç
+            rand_temsilci = st.selectbox("Satış Temsilcisi*:", tem_r_opts[1:] if len(tem_r_opts)>1 else ["—"], key="rand_tem")
+            rand_aciklama = st.text_area("Açıklama / Not:", height=80, key="rand_aciklama")
+            rand_sonuc    = st.selectbox("Sonuç:", ["—","Bitti","Devam Ediyor","Gidilmedi","İptal"])
+
+            if st.form_submit_button("💾 Randevu Kaydet", use_container_width=True, type="primary"):
+                if rand_musteri == "-- Müşteri Seçin --":
+                    st.warning("Müşteri seçin!")
+                else:
+                    musteri_id = 0
+                    musteri_adi = rand_musteri
+                    if "[" in rand_musteri:
+                        try:
+                            musteri_id = int(rand_musteri.split("]")[0].replace("[","").strip())
+                            musteri_adi = rand_musteri.split("] ")[1].split(" (")[0]
+                        except:
+                            pass
+
+                    db_insert("randevular", {
+                        "randevu_tarihi": str(rand_tarih),
+                        "randevu_saati": str(rand_saat),
+                        "musteri_id": musteri_id,
+                        "musteri_adi": musteri_adi,
+                        "bolge": rand_bolge,
+                        "gorev": rand_gorev,
+                        "takip": rand_takip,
+                        "adet": int(rand_adet),
+                        "aciklama": rand_aciklama,
+                        "sonuc": rand_sonuc if rand_sonuc != "—" else "",
+                        "temsilci": rand_temsilci,
+                        "olusturan": st.session_state["kullanici"]
+                    })
+                    st.success("✅ Randevu kaydedildi!")
+
+                    # WA uyarı linki oluştur
+                    tem_bilgi2 = df_tem_r[df_tem_r["ad"] == rand_temsilci.split(" ")[0]] if not df_tem_r.empty else pd.DataFrame()
+                    if not tem_bilgi2.empty:
+                        tem_tel2 = str(tem_bilgi2.iloc[0].get("telefon",""))
+                        import re as _re3
+                        tem_tel2_temiz = _re3.sub(r"[\s\-\(\)]","", tem_tel2)
+                        if tem_tel2_temiz.startswith("0"):
+                            tem_wa2 = "90" + tem_tel2_temiz[1:]
+                        else:
+                            tem_wa2 = tem_tel2_temiz
+
+                        mesaj2 = f"🗓️ YENİ RANDEVU\nMüşteri: {musteri_adi}\nTarih: {rand_tarih} {rand_saat}\nBölge: {rand_bolge}\nGörev: {rand_gorev}\nİyi çalışmalar!"
+                        wa_link2 = f"https://wa.me/{tem_wa2}?text={mesaj2.replace(' ','%20').replace(chr(10),'%0A')}"
+                        st.success("✅ Temsilciye WhatsApp uyarısı hazır:")
+                        st.link_button("📱 Temsilciye WA Gönder", wa_link2, use_container_width=True, type="primary")
+
+                    st.rerun()
+
+    with r_tab3:
+        st.markdown("### 📊 Randevu Özet Raporu")
+        df_rand2 = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC")
+
+        if df_rand2.empty:
+            st.info("Henüz randevu yok.")
+        else:
+            # Temsilci bazlı
+            st.markdown("#### 👤 Temsilci Bazlı Özet")
+            if "temsilci" in df_rand2.columns:
+                tem_ozet = df_rand2.groupby("temsilci").agg(
+                    Toplam=("id","count"),
+                    Bitti=("sonuc", lambda x: (x=="Bitti").sum()),
+                    Devam=("sonuc", lambda x: (x=="Devam Ediyor").sum()),
+                    Gidilmedi=("sonuc", lambda x: (x=="Gidilmedi").sum()),
+                ).reset_index()
+                st.dataframe(tem_ozet, use_container_width=True, hide_index=True)
+
+            # Görev bazlı
+            st.markdown("#### 📋 Görev Türü Dağılımı")
+            if "gorev" in df_rand2.columns:
+                gorev_ozet = df_rand2.groupby("gorev").agg(Adet=("id","count")).reset_index().sort_values("Adet",ascending=False)
+                st.dataframe(gorev_ozet, use_container_width=True, hide_index=True)
+
+            # Bu haftaki randevular
+            st.markdown("#### 📅 Bu Haftaki Randevular")
+            bugun = datetime.now().strftime("%Y-%m-%d")
+            rand_bu_hafta = df_rand2[df_rand2["randevu_tarihi"] >= bugun] if "randevu_tarihi" in df_rand2.columns else pd.DataFrame()
+            if not rand_bu_hafta.empty:
+                g_cols = [c for c in ["randevu_tarihi","randevu_saati","musteri_adi","bolge","gorev","temsilci","sonuc"] if c in rand_bu_hafta.columns]
+                st.dataframe(rand_bu_hafta[g_cols], use_container_width=True, hide_index=True)
+            else:
+                st.info("Bu hafta için randevu yok.")
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
