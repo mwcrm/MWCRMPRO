@@ -488,8 +488,11 @@ def giris_ekrani():
 
                 if row:
                     st.session_state["giris"] = True
-                    st.session_state["kullanici"] = kullanici
-                    st.session_state["rol"] = row.get("rol", "admin") if isinstance(row, dict) else "admin"
+                    st.session_state["kullanici"] = row.get("kullanici_adi", kullanici) if isinstance(row, dict) else kullanici
+                    rol_val = row.get("rol", "") if isinstance(row, dict) else ""
+                    if not rol_val:
+                        rol_val = "admin" if kullanici == "admin" else "kullanici"
+                    st.session_state["rol"] = rol_val
                     st.session_state["aktif_tab"] = "liste"
                     st.rerun()
                 else:
