@@ -1452,7 +1452,12 @@ elif aktif == "teklif":
     st.markdown("### Teklif Bilgileri")
     ub1, ub2, ub3 = st.columns(3)
     firma_default = str(secili_musteri["firma"]) if secili_musteri is not None else ""
-    hedef_musteri = ub1.text_input("Hedef Musteri", value=firma_default, key="hedef_mus")
+    # Müşteri seçilince session_state'e kaydet, form yenilenince gelsin
+    if secili_musteri is not None and firma_default:
+        st.session_state["teklif_hedef_musteri"] = firma_default
+    hedef_musteri = ub1.text_input("Hedef Musteri",
+        value=st.session_state.get("teklif_hedef_musteri", firma_default),
+        key="hedef_mus")
     vade = ub2.text_input("Vade", placeholder="30 gun, pesin...", key="vade")
     gorus = ub3.text_area("Gorus", placeholder="Gorusme notu...", key="gorus", height=80)
     musteri_talep = ub1.text_area("Musteri Talep", key="musteri_talep", height=80)
@@ -1612,15 +1617,14 @@ elif aktif == "teklif":
         if not hedef_musteri:
             st.warning("Musteri adi bos olamaz!")
         else:
-            conn = get_conn()
-            conn.execute(
-                "INSERT INTO teklifler (musteri_id,musteri_adi,satirlar,toplam_tutar,olusturan,notlar) VALUES (?,?,?,?,?,?)",
-                (int(secili_musteri["id"]) if secili_musteri is not None else 0,
-                 hedef_musteri,
-                 json.dumps({"hesap": hesap_sonuclar, "teklif": teklif_sonuclar}, ensure_ascii=False),
-                 toplam_tutar, st.session_state["kullanici"],
-                 f"Vade:{vade} | Gorus:{gorus} | Talep:{musteri_talep}"))
-            conn.commit(); conn.close()
+            db_insert("teklifler", {
+                "musteri_id": int(secili_musteri["id"]) if secili_musteri is not None else 0,
+                "musteri_adi": hedef_musteri,
+                "satirlar": json.dumps({"hesap": hesap_sonuclar, "teklif": teklif_sonuclar}, ensure_ascii=False),
+                "toplam_tutar": toplam_tutar,
+                "olusturan": st.session_state["kullanici"],
+                "notlar": f"Vade:{vade} | Gorus:{gorus} | Talep:{musteri_talep}"
+            })
             st.success("Teklif kaydedildi!")
 
     st.divider()
