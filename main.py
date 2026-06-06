@@ -743,6 +743,20 @@ if st.session_state["rol"] == "admin":
 
 aktif_tab_listesi = get_menu_tercihi(st.session_state["kullanici"])
 
+# Yetki filtresi (admin hepsini görür)
+if st.session_state.get("rol") != "admin":
+    try:
+        import json as _yj
+        df_kul_yetki = db_read("kullanicilar", extra_sql="")
+        if not df_kul_yetki.empty and "yetkiler" in df_kul_yetki.columns:
+            kul_row = df_kul_yetki[df_kul_yetki["kullanici_adi"] == st.session_state["kullanici"]]
+            if not kul_row.empty:
+                yetki_val = str(kul_row.iloc[0].get("yetkiler","tam") or "tam")
+                if yetki_val != "tam":
+                    izinli = _yj.loads(yetki_val)
+                    aktif_tab_listesi = [t for t in aktif_tab_listesi if t in izinli]
+    except: pass
+
 cols = st.columns(len(aktif_tab_listesi))
 for i, tab_key in enumerate(aktif_tab_listesi):
     with cols[i]:
@@ -1040,42 +1054,168 @@ elif aktif == "arsiv":
 
 # ── KULLANICI YÖNETİMİ ───────────────────────────────────────────────────────
 elif aktif == "kullanici" and st.session_state["rol"] == "admin":
-    st.subheader("Kullanıcı Listesi")
-    df_kul = db_read("kullanicilar", extra_sql="")
+    st.markdown("## 👥 Kullanıcı Yönetimi")
 
-    edited_kul = st.data_editor(
-        df_kul,
-        use_container_width=True,
-        column_config={
-            "id":  st.column_config.NumberColumn("ID", disabled=True),
-            "rol": st.column_config.SelectboxColumn("Rol", options=["admin","kullanici"]),
-        },
-        key="kul_editor"
-    )
+    # Menü yetki seçenekleri
+    TUM_MENULER = {
+        "yeni": "➕ Yeni Kart Ekle",
+        "liste": "📋 Cari Liste",
+        "randevu": "📅 Randevular",
+        "teklif": "📄 Teklif Oluştur",
+        "kisiler": "📞 Telefon Kişiler",
+        "rapor": "📊 Raporlar",
+        "excel": "📥 Excel Aktar",
+        "arsiv": "🗃️ Arşiv",
+        "mesajlar": "💬 Mesajlar",
+    }
 
-    if st.button("💾 Kullanıcı Değişikliklerini Kaydet"):
-        for _, row in edited_kul.iterrows():
-            db_update("kullanicilar", {"kullanici_adi": row["kullanici_adi"], "rol": row["rol"]}, "id", row["id"])
-        st.success("Kullanıcılar güncellendi!")
-        st.rerun()
+    kul_tab1, kul_tab2, kul_tab3 = st.tabs(["📋 Kullanıcı Listesi", "➕ Yeni Kullanıcı", "🔐 Yetki Yönetimi"])
 
-    st.divider()
-    st.subheader("Yeni Kullanıcı Ekle")
-    with st.form("yeni_kullanici_form"):
-        c1, c2, c3 = st.columns(3)
-        yeni_kadi  = c1.text_input("Kullanıcı Adı")
-        yeni_sifre = c2.text_input("Şifre")
-        yeni_rol   = c3.selectbox("Rol", ["kullanici","admin"])
-        if st.form_submit_button("➕ Kullanıcı Ekle"):
-            if yeni_kadi and yeni_sifre:
-                try:
-                    db_insert("kullanicilar", {"kullanici_adi": yeni_kadi, "sifre": yeni_sifre, "rol": yeni_rol})
-                    st.success(f"'{yeni_kadi}' eklendi!")
+    with kul_tab1:
+        df_kul = db_read("kullanicilar", extra_sql="")
+        if not df_kul.empty:
+            # yetkiler kolonu yoksa ekle
+            if "yetkiler" not in df_kul.columns:
+                df_kul["yetkiler"] = "tam"
+
+            st.dataframe(
+                df_kul[["id","kullanici_adi","rol","yetkiler"]] if "yetkiler" in df_kul.columns else df_kul[["id","kullanici_adi","rol"]],
+                use_container_width=True, hide_index=True
+            )
+
+            # Şifre değiştir
+            st.divider()
+            st.markdown("#### 🔑 Şifre Değiştir")
+            sp1, sp2, sp3 = st.columns(3)
+            s_kul_opts = [f"[{int(r['id'])}] {r['kullanici_adi']}" for _, r in df_kul.iterrows()]
+            s_sec = sp1.selectbox("Kullanıcı:", s_kul_opts, key="sifre_kul")
+            yeni_sifre1 = sp2.text_input("Yeni Şifre:", type="password", key="yeni_sif1")
+            yeni_sifre2 = sp3.text_input("Tekrar:", type="password", key="yeni_sif2")
+            if st.button("🔑 Şifreyi Güncelle", use_container_width=True):
+                if yeni_sifre1 and yeni_sifre1 == yeni_sifre2:
+                    s_id = int(s_sec.split("]")[0].replace("[",""))
+                    db_update("kullanicilar", {"sifre": yeni_sifre1}, "id", s_id)
+                    st.success("✅ Şifre güncellendi!")
+                elif yeni_sifre1 != yeni_sifre2:
+                    st.error("Şifreler eşleşmiyor!")
+                else:
+                    st.warning("Şifre boş olamaz!")
+
+            # Kullanıcı sil
+            st.divider()
+            st.markdown("#### 🗑️ Kullanıcı Sil")
+            sil_opts = [f"[{int(r['id'])}] {r['kullanici_adi']}" for _, r in df_kul.iterrows() if r["kullanici_adi"] != "admin"]
+            if sil_opts:
+                sil_sec = st.selectbox("Silinecek:", sil_opts, key="sil_kul")
+                if st.button("🗑️ Sil", type="primary"):
+                    sil_id = int(sil_sec.split("]")[0].replace("[",""))
+                    sb_s = get_sb()
+                    if sb_s:
+                        sb_s.table("kullanicilar").delete().eq("id", sil_id).execute()
+                    st.success("Kullanıcı silindi!")
                     st.rerun()
-                except:
-                    st.error("Bu kullanıcı adı zaten mevcut!")
+        else:
+            st.info("Kullanıcı yok.")
+
+    with kul_tab2:
+        st.markdown("#### ➕ Yeni Kullanıcı Kartı Ekle")
+        with st.form("yeni_kullanici_form"):
+            nc1, nc2 = st.columns(2)
+            yeni_kadi   = nc1.text_input("Kullanıcı Adı*")
+            yeni_sifre  = nc2.text_input("Şifre*", type="password")
+            yeni_rol    = nc1.selectbox("Rol:", ["kullanici","admin"])
+
+            # Menü yetkileri
+            st.markdown("#### 🔐 Menü Yetkileri")
+            st.caption("Kullanıcının erişebileceği menüleri seçin. 'Tam Yetki' seçilirse hepsine erişir.")
+            tam_yetki = st.checkbox("✅ Tam Yetki (Tüm Menüler)", value=True, key="tam_yetki_yeni")
+
+            secili_menuler = []
+            if not tam_yetki:
+                m_cols = st.columns(3)
+                for i, (key, etiket) in enumerate(TUM_MENULER.items()):
+                    if m_cols[i % 3].checkbox(etiket, value=True, key=f"yeni_menu_{key}"):
+                        secili_menuler.append(key)
             else:
-                st.warning("Kullanıcı adı ve şifre boş olamaz!")
+                secili_menuler = list(TUM_MENULER.keys())
+
+            # Temsilci bilgileri (opsiyonel)
+            st.markdown("#### 👤 Temsilci Bilgileri (Opsiyonel)")
+            tc1, tc2, tc3 = st.columns(3)
+            t_ad    = tc1.text_input("Ad Soyad")
+            t_tel   = tc2.text_input("Telefon", placeholder="05xxxxxxxxx")
+            t_bolge = tc3.text_input("Bölge")
+
+            if st.form_submit_button("💾 Kullanıcı Kaydet", use_container_width=True, type="primary"):
+                if yeni_kadi and yeni_sifre:
+                    import json as _kj
+                    yetki_str = "tam" if tam_yetki else _kj.dumps(secili_menuler)
+                    try:
+                        db_insert("kullanicilar", {
+                            "kullanici_adi": yeni_kadi,
+                            "sifre": yeni_sifre,
+                            "rol": yeni_rol,
+                            "yetkiler": yetki_str
+                        })
+                        # Temsilci kartı da ekle
+                        if t_ad:
+                            ad_soyad = t_ad.strip().split(" ")
+                            db_insert("temsilciler", {
+                                "ad": ad_soyad[0],
+                                "soyad": " ".join(ad_soyad[1:]) if len(ad_soyad)>1 else "",
+                                "telefon": t_tel, "bolge": t_bolge,
+                                "email": "", "unvan": "Satış Temsilcisi", "aktif": 1
+                            })
+                        st.success(f"✅ '{yeni_kadi}' eklendi!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Hata: {e} — Bu kullanıcı adı zaten mevcut olabilir.")
+                else:
+                    st.warning("Kullanıcı adı ve şifre zorunlu!")
+
+    with kul_tab3:
+        st.markdown("#### 🔐 Kullanıcı Yetki Düzenle")
+        df_kul2 = db_read("kullanicilar", extra_sql="")
+        if not df_kul2.empty:
+            kul2_opts = [f"[{int(r['id'])}] {r['kullanici_adi']}" for _, r in df_kul2.iterrows()]
+            sec_kul2 = st.selectbox("Kullanıcı Seç:", kul2_opts, key="yetki_kul_sec")
+            kul2_id = int(sec_kul2.split("]")[0].replace("[",""))
+            kul2_row = df_kul2[df_kul2["id"]==kul2_id].iloc[0]
+
+            mevcut_yetki = str(kul2_row.get("yetkiler","tam") or "tam")
+            import json as _kj2
+            if mevcut_yetki == "tam":
+                mevcut_liste = list(TUM_MENULER.keys())
+                tam_check = True
+            else:
+                try:
+                    mevcut_liste = _kj2.loads(mevcut_yetki)
+                    tam_check = False
+                except:
+                    mevcut_liste = list(TUM_MENULER.keys())
+                    tam_check = True
+
+            st.markdown(f"**{kul2_row['kullanici_adi']}** — Mevcut yetki: `{mevcut_yetki[:50]}`")
+
+            tam_yetki2 = st.checkbox("✅ Tam Yetki", value=tam_check, key="tam_yetki2")
+            yeni_liste = []
+            if not tam_yetki2:
+                st.markdown("Erişim verilecek menüler:")
+                m_cols2 = st.columns(3)
+                for i, (key, etiket) in enumerate(TUM_MENULER.items()):
+                    checked = key in mevcut_liste
+                    if m_cols2[i%3].checkbox(etiket, value=checked, key=f"yetki2_{key}"):
+                        yeni_liste.append(key)
+            else:
+                yeni_liste = list(TUM_MENULER.keys())
+
+            if st.button("💾 Yetkileri Kaydet", use_container_width=True, type="primary"):
+                yetki_str2 = "tam" if tam_yetki2 else _kj2.dumps(yeni_liste)
+                db_update("kullanicilar", {"yetkiler": yetki_str2}, "id", kul2_id)
+                st.success(f"✅ {kul2_row['kullanici_adi']} yetkileri güncellendi!")
+                st.rerun()
+        else:
+            st.info("Kullanıcı yok.")
 
     st.divider()
     st.subheader("💾 Yedek Yönetimi")
