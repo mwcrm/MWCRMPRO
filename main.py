@@ -560,7 +560,7 @@ with st.sidebar:
 
     st.divider()
     st.markdown("### 💬 Yardım & Talep")
-    talep_mesaj = st.text_area("Talebinizi yazın:", placeholder="Yeni özellik, hata bildirimi...", height=100, key="sidebar_talep")
+    talep_mesaj = st.text_area("Talebinizi yazın:", placeholder="Yeni özellik, hata bildirimi...", height=80, key="sidebar_talep")
     if st.button("📨 WhatsApp ile Gönder", use_container_width=True, key="sidebar_wa_btn"):
         if talep_mesaj.strip():
             wa_talep = f"https://wa.me/905400344228?text=MWCRMPRO%20Talep:%20{talep_mesaj.replace(' ','%20').replace(chr(10),'%0A')}"
@@ -578,6 +578,30 @@ with st.sidebar:
         st.caption(f"📋 Aktif Cari: **{total_cari}**")
     except:
         pass
+
+    # Menü sıralama - sadece admin
+    if st.session_state.get("rol") == "admin":
+        st.divider()
+        with st.expander("🎛️ Menü Sırası"):
+            mevcut_sira_m = get_menu_tercihi(st.session_state["kullanici"])
+            for idx, tab_key in enumerate(mevcut_sira_m):
+                etiket_k = _TAB_ETIKETLER.get(tab_key, tab_key)
+                c1, c2, c3 = st.columns([4, 1, 1])
+                c1.caption(etiket_k)
+                if idx > 0 and c2.button("▲", key=f"up_{tab_key}"):
+                    yeni_s = mevcut_sira_m.copy()
+                    yeni_s[idx], yeni_s[idx-1] = yeni_s[idx-1], yeni_s[idx]
+                    save_menu_tercihi(st.session_state["kullanici"], yeni_s)
+                    st.rerun()
+                if idx < len(mevcut_sira_m)-1 and c3.button("▼", key=f"dn_{tab_key}"):
+                    yeni_s = mevcut_sira_m.copy()
+                    yeni_s[idx], yeni_s[idx+1] = yeni_s[idx+1], yeni_s[idx]
+                    save_menu_tercihi(st.session_state["kullanici"], yeni_s)
+                    st.rerun()
+            if st.button("↺ Sıfırla", use_container_width=True):
+                tam = _TAB_LISTESI_DEFAULT.copy() + ["kullanici","koddepo"]
+                save_menu_tercihi(st.session_state["kullanici"], tam)
+                st.rerun()
 
 # ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
 col_bas, col_kul, col_cik = st.columns([6, 2, 1])
@@ -599,37 +623,7 @@ if st.session_state["rol"] == "admin":
     tab_listesi.append("kullanici")
     tab_listesi.append("koddepo")
 
-# Kullanıcının kayıtlı sırasını al
 aktif_tab_listesi = get_menu_tercihi(st.session_state["kullanici"])
-
-# Menü sıralama - küçük expander
-with st.expander("🎛️ Menü Sırala", expanded=False):
-    mevcut_sira_m = aktif_tab_listesi.copy()
-    st.caption("▲ ▼ ile sırayı değiştirin, otomatik kaydedilir.")
-    cols_m = st.columns(len(mevcut_sira_m))
-    for idx, tab_key in enumerate(mevcut_sira_m):
-        with cols_m[idx]:
-            etiket_k = _TAB_ETIKETLER.get(tab_key, tab_key).split(" ",1)[-1][:12]
-            st.caption(etiket_k)
-            mc1, mc2 = st.columns(2)
-            if idx > 0:
-                if mc1.button("◀", key=f"sol_{tab_key}", use_container_width=True):
-                    yeni_s = mevcut_sira_m.copy()
-                    yeni_s[idx], yeni_s[idx-1] = yeni_s[idx-1], yeni_s[idx]
-                    save_menu_tercihi(st.session_state["kullanici"], yeni_s)
-                    st.rerun()
-            if idx < len(mevcut_sira_m)-1:
-                if mc2.button("▶", key=f"sag_{tab_key}", use_container_width=True):
-                    yeni_s = mevcut_sira_m.copy()
-                    yeni_s[idx], yeni_s[idx+1] = yeni_s[idx+1], yeni_s[idx]
-                    save_menu_tercihi(st.session_state["kullanici"], yeni_s)
-                    st.rerun()
-    if st.button("↺ Varsayılan Sıraya Dön", use_container_width=True):
-        tam = _TAB_LISTESI_DEFAULT.copy()
-        if st.session_state.get("rol") == "admin":
-            tam += ["kullanici","koddepo"]
-        save_menu_tercihi(st.session_state["kullanici"], tam)
-        st.rerun()
 
 cols = st.columns(len(aktif_tab_listesi))
 for i, tab_key in enumerate(aktif_tab_listesi):
