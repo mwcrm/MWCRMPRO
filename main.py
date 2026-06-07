@@ -332,7 +332,9 @@ def get_conn():
 
 def init_db():
     # SQLite her zaman yedek
-    tables = [
+    try:
+        conn = get_conn()
+        tables = [
         """CREATE TABLE IF NOT EXISTS kullanicilar (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             kullanici_adi TEXT UNIQUE NOT NULL,
@@ -399,18 +401,21 @@ def init_db():
             aciklama TEXT, sonuc TEXT, temsilci TEXT,
             wa_gonderildi INTEGER DEFAULT 0, olusturan TEXT)""",
     ]
-    for t in tables:
-        conn.execute(t)
-    for col in ["olusturan TEXT", "beklenen_ciro REAL DEFAULT 0", "gerceklesen_ciro REAL DEFAULT 0"]:
-        try: conn.execute(f"ALTER TABLE cari_kartlar ADD COLUMN {col}")
+        for t in tables:
+            try: conn.execute(t)
+            except: pass
+        for col in ["olusturan TEXT", "beklenen_ciro REAL DEFAULT 0", "gerceklesen_ciro REAL DEFAULT 0"]:
+            try: conn.execute(f"ALTER TABLE cari_kartlar ADD COLUMN {col}")
+            except: pass
+        conn.execute("UPDATE cari_kartlar SET silindi=0 WHERE silindi IS NULL")
+        conn.execute("UPDATE cari_kartlar SET id=rowid WHERE id IS NULL")
+        try:
+            conn.execute("INSERT INTO kullanicilar (kullanici_adi, sifre, rol) VALUES (?,?,?)",
+                         ("admin", "admin123", "admin"))
         except: pass
-    conn.execute("UPDATE cari_kartlar SET silindi=0 WHERE silindi IS NULL")
-    conn.execute("UPDATE cari_kartlar SET id=rowid WHERE id IS NULL")
-    try:
-        conn.execute("INSERT INTO kullanicilar (kullanici_adi, sifre, rol) VALUES (?,?,?)",
-                     ("admin", "admin123", "admin"))
+        conn.commit()
+        conn.close()
     except: pass
-    conn.commit()
 
     # Supabase admin kullanicisi
     if sb_or_sqlite():
@@ -2115,7 +2120,8 @@ elif aktif == "excel":
                 st.success(f"✅ {len(df_yukle)} satır yüklenmeye hazır")
 
                 # Mükerrer kontrol
-                mevcut_firmalar = set(db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")["firma"].dropna().str.strip().tolist()) if not db_read("cari_kartlar").empty else set()
+                _df_mevcut = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+                mevcut_firmalar = set(_df_mevcut["firma"].dropna().str.strip().tolist()) if not _df_mevcut.empty else set()
 
                 mukerrer = df_yukle[df_yukle["firma"].astype(str).str.strip().isin(mevcut_firmalar)]
                 if len(mukerrer) > 0:
