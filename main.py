@@ -493,9 +493,13 @@ def giris_ekrani():
 
                 if row:
                     st.session_state["giris"] = True
-                    st.session_state["kullanici"] = row.get("kullanici_adi", kullanici) if isinstance(row, dict) else kullanici
-                    rol_val = row.get("rol", "") if isinstance(row, dict) else ""
-                    if not rol_val:
+                    st.session_state["kullanici"] = kullanici
+                    # Rol belirle
+                    if isinstance(row, dict):
+                        rol_val = str(row.get("rol") or "")
+                    else:
+                        rol_val = ""
+                    if not rol_val or rol_val == "None":
                         rol_val = "admin" if kullanici == "admin" else "kullanici"
                     st.session_state["rol"] = rol_val
                     st.session_state["aktif_tab"] = "liste"
@@ -1006,13 +1010,6 @@ elif aktif == "arsiv":
 
 # ── KULLANICI YÖNETİMİ ───────────────────────────────────────────────────────
 elif aktif == "kullanici":
-    _kul_rol = st.session_state.get("rol","")
-    if _kul_rol != "admin":
-        st.warning(f"Bu sayfa sadece admin kullanıcılara açıktır. Mevcut rol: '{_kul_rol}'")
-        if st.button("🔄 Yeniden Giriş Yap"):
-            st.session_state.clear()
-            st.rerun()
-        st.stop()
     st.markdown("## 👥 Kullanıcı Yönetimi")
 
     TUM_MENULER = {
