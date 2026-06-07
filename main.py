@@ -2142,23 +2142,41 @@ elif aktif == "excel":
 
                         for _, row in df_yukle.iterrows():
                             try:
-                                firma_adi = str(row.get("firma","")).strip()
-                                if not firma_adi or firma_adi == "nan":
+                                firma_adi = str(row.get("firma","") or "").strip()
+                                if not firma_adi or firma_adi.lower() == "nan":
                                     hatali += 1
                                     continue
 
-                                yetkili_v   = str(row.get("yetkili","") or "").strip()
-                                gsm_v       = str(row.get("gsm","") or "").strip()
-                                sabit_v     = str(row.get("sabit","") or "").strip()
-                                email_v     = str(row.get("email","") or "").strip()
-                                adres_v     = str(row.get("adres","") or "").strip()
-                                ilce_v      = str(row.get("ilce","") or "").strip()
-                                il_v        = str(row.get("il","") or "").strip()
-                                durum_v     = str(row.get("durum","") or "").strip()
-                                temsilci_v  = str(row.get("temsilci","") or "").strip()
-                                asama_v     = str(row.get("islem_asamasi","") or "").strip()
-                                bek_ciro    = float(row.get("beklenen_ciro",0) or 0)
-                                ger_ciro    = float(row.get("gerceklesen_ciro",0) or 0)
+                                def temiz(val):
+                                    """NaN ve None değerleri temizle"""
+                                    import math
+                                    if val is None: return ""
+                                    try:
+                                        if math.isnan(float(val)): return ""
+                                    except: pass
+                                    s = str(val).strip()
+                                    return "" if s.lower() == "nan" else s
+
+                                def temiz_sayi(val):
+                                    try:
+                                        import math
+                                        f = float(val)
+                                        if math.isnan(f): return 0.0
+                                        return f
+                                    except: return 0.0
+
+                                yetkili_v  = temiz(row.get("yetkili",""))
+                                gsm_v      = temiz(row.get("gsm",""))
+                                sabit_v    = temiz(row.get("sabit",""))
+                                email_v    = temiz(row.get("email",""))
+                                adres_v    = temiz(row.get("adres",""))
+                                ilce_v     = temiz(row.get("ilce",""))
+                                il_v       = temiz(row.get("il",""))
+                                durum_v    = temiz(row.get("durum",""))
+                                temsilci_v = temiz(row.get("temsilci",""))
+                                asama_v    = temiz(row.get("islem_asamasi",""))
+                                bek_ciro   = temiz_sayi(row.get("beklenen_ciro",0))
+                                ger_ciro   = temiz_sayi(row.get("gerceklesen_ciro",0))
 
                                 # Durum düzelt
                                 if durum_v not in ["Aktif","Hedef","Pasif"]:
