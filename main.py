@@ -805,12 +805,20 @@ if aktif == "yeni":
 
         st.markdown("#### 💰 Ciro Bilgileri")
         ciro_col1, ciro_col2, ciro_col3, ciro_col4 = st.columns(4)
-        beklenen_ciro = ciro_col1.number_input(
-            "Beklenen Ciro (₺)", min_value=0.0, step=1000.0, format="%.0f",
-            value=float(duzenle.get("beklenen_ciro") or 0) if duzenle else 0.0)
-        gerceklesen_ciro = ciro_col2.number_input(
-            "Gerçekleşen Ciro (₺)", min_value=0.0, step=1000.0, format="%.0f",
-            value=float(duzenle.get("gerceklesen_ciro") or 0) if duzenle else 0.0)
+        bek_val = duzenle.get("beklenen_ciro","0") if duzenle else "0"
+        ger_val = duzenle.get("gerceklesen_ciro","0") if duzenle else "0"
+        try: bek_val = f"{float(str(bek_val).replace(',','.') or 0):,.0f}".replace(",",".")
+        except: bek_val = "0"
+        try: ger_val = f"{float(str(ger_val).replace(',','.') or 0):,.0f}".replace(",",".")
+        except: ger_val = "0"
+
+        bek_str = ciro_col1.text_input("Beklenen Ciro (₺)", value=bek_val, placeholder="Örn: 10.000", key="bek_ciro_str")
+        ger_str = ciro_col2.text_input("Gerçekleşen Ciro (₺)", value=ger_val, placeholder="Örn: 8.500", key="ger_ciro_str")
+
+        try: beklenen_ciro = float(bek_str.replace(".","").replace(",",".") or 0)
+        except: beklenen_ciro = 0.0
+        try: gerceklesen_ciro = float(ger_str.replace(".","").replace(",",".") or 0)
+        except: gerceklesen_ciro = 0.0
         fark = gerceklesen_ciro - beklenen_ciro
         yuzde = (gerceklesen_ciro / beklenen_ciro * 100) if beklenen_ciro > 0 else 0
         ciro_col3.metric("Fark (₺)", f"₺{fark:,.0f}", delta=f"{fark:,.0f}")
