@@ -743,21 +743,19 @@ if aktif == "yeni":
 
     bulunan = None
     if musteri_ara and ara_btn:
-        conn = get_conn()
-        # Önce ID ile dene
-        if musteri_ara.strip().isdigit():
-            row = conn.execute("SELECT * FROM cari_kartlar WHERE id=? AND (silindi=0 OR silindi='0' OR silindi IS NULL)", (int(musteri_ara),)).fetchone()
-        else:
-            row = conn.execute("SELECT * FROM cari_kartlar WHERE firma LIKE ? AND (silindi=0 OR silindi='0' OR silindi IS NULL)", (f"%{musteri_ara}%",)).fetchone()
-        conn.close()
-        if row:
-            cols_db = ["id","tarih","firma","yetkili","gsm","sabit","email","adres","ilce","il","durum","temsilci","islem_asamasi","silindi","olusturan"]
-            bulunan = dict(zip(cols_db, row))
-            st.session_state["duzenle_musteri"] = bulunan
-            st.success(f"✅ Bulundu: **{bulunan.get('firma')}** (ID: {bulunan.get('id')})")
-        else:
-            st.error("Müşteri bulunamadı.")
-            st.session_state.pop("duzenle_musteri", None)
+        df_ara_s = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
+        if not df_ara_s.empty:
+            if musteri_ara.strip().isdigit():
+                row_s = df_ara_s[df_ara_s["id"]==int(musteri_ara.strip())]
+            else:
+                row_s = df_ara_s[df_ara_s["firma"].str.contains(musteri_ara.strip(), case=False, na=False)]
+            if not row_s.empty:
+                bulunan = row_s.iloc[0].to_dict()
+                st.session_state["duzenle_musteri"] = bulunan
+                st.success(f"✅ Bulundu: **{bulunan.get('firma')}** (ID: {bulunan.get('id')})")
+            else:
+                st.error("Müşteri bulunamadı.")
+                st.session_state.pop("duzenle_musteri", None)
     elif not musteri_ara:
         st.session_state.pop("duzenle_musteri", None)
 
