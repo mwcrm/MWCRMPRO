@@ -1957,6 +1957,9 @@ elif aktif == "teklif":
 
     with right:
         st.markdown("#### TEKLİFİMİZ")
+        th = st.columns([1.2,1.2,0.7,0.9,0.8,0.8,0.7,1.0])
+        for txt, col in zip(["Çıkış İli","Varış İli","KM","Tür","Baş Desi","Bit Desi","KG","Tutar"], th):
+            col.markdown(f"**{txt}**")
         for i in range(n):
             h_desi = hesap_desi[i]
             h_bf   = hesap_bf[i]
@@ -1986,38 +1989,6 @@ elif aktif == "teklif":
 
     if toplam_tutar > 0:
         st.success(f"**Genel Toplam: {fmt_para(toplam_tutar)}**")
-
-    # Sıralanabilir özet tablo
-    if teklif_sonuclar:
-        if "sort_col" not in st.session_state:
-            st.session_state["sort_col"] = None
-            st.session_state["sort_desc"] = True
-        _ozet_cols = [("Çıkış İli","cikis_il"),("Varış İli","varis_il"),("KM","km"),("Tür","tur"),
-                      ("Baş Desi","bas_desi"),("Bit Desi","bit_desi"),("KG","kg"),
-                      ("B.Fiyat","birim_fiyat"),("Tutar","tutar")]
-        hdr = st.columns(len(_ozet_cols))
-        for j,(lbl,sk) in enumerate(_ozet_cols):
-            aktif = st.session_state.get("sort_col") == sk
-            ikon = " ▼" if aktif and st.session_state.get("sort_desc") else (" ▲" if aktif else "")
-            if hdr[j].button(f"{lbl}{ikon}", key=f"osort_{sk}", use_container_width=True):
-                if aktif:
-                    st.session_state["sort_desc"] = not st.session_state["sort_desc"]
-                else:
-                    st.session_state["sort_col"] = sk
-                    st.session_state["sort_desc"] = True
-                st.rerun()
-        sc = st.session_state.get("sort_col")
-        sd = st.session_state.get("sort_desc", True)
-        sirali = sorted(teklif_sonuclar,
-            key=lambda x: str(x.get(sc,"")) if sc in ["cikis_il","varis_il","tur"] else float(x.get(sc,0) or 0),
-            reverse=sd) if sc else teklif_sonuclar
-        for row in sirali:
-            rc = st.columns(len(_ozet_cols))
-            for k,(lbl,sk) in enumerate(_ozet_cols):
-                v = row.get(sk,"")
-                if sk in ["birim_fiyat","tutar"]: v = fmt_para(v)
-                rc[k].caption(str(v) if v else "-")
-
 
     if st.button("Teklifi Kaydet", use_container_width=True, type="primary"):
         if not hedef_musteri:
