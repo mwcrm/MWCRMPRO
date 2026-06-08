@@ -3025,25 +3025,22 @@ elif aktif == "kisiler":
         ben = st.session_state.get("kullanici","")
 
         # ── ŞABLON YÖNETİMİ ──────────────────────────────────────────────────
-        with st.expander("📝 Kayıtlı Şablonlarım", expanded=False):
-            # Kullanıcının kendi şablonlarını yükle
+        with st.expander("📝 Kayıtlı Şablonlar", expanded=False):
             try:
-                df_sab_ben = db_read("sablon_mesajlar", extra_sql=f"WHERE aktif=1 AND olusturan='{ben}' ORDER BY ad")
+                df_sab_ben = db_read("sablon_mesajlar", extra_sql="WHERE aktif=1 ORDER BY ad")
             except:
                 df_sab_ben = pd.DataFrame()
 
-            # Yeni şablon ekle — kes/kopyala/yapıştır
-            st.markdown("#### ➕ Yeni Şablon Kaydet")
-            st.caption("💡 Mesajı istediğiniz yerden kopyalayıp yapıştırın. `{ad}` yazdığınız yere kişi adı otomatik gelir.")
+            st.markdown("#### ➕ Yeni Şablon Ekle")
+            st.caption("💡 `{ad}` yazdığınız yere kişi adı otomatik gelir.")
             with st.form("sablon_kaydet_form", clear_on_submit=True):
                 sab_isim = st.text_input("Şablon Adı*:", placeholder="Örn: Tanışma, Teklif, Teşekkür...")
                 sab_metin = st.text_area("Mesaj Metni*:", height=120,
-                    placeholder="Merhaba {ad} Bey/Hanım,\n\nBuraya mesajınızı yapıştırın veya yazın...")
-                if st.form_submit_button("💾 Şablonu Kaydet", use_container_width=True, type="primary"):
+                    placeholder="Merhaba {ad} Bey/Hanım,\n\nBuraya mesajınızı yapıştırın...")
+                if st.form_submit_button("💾 Kaydet", use_container_width=True, type="primary"):
                     if sab_isim.strip() and sab_metin.strip():
                         db_insert("sablon_mesajlar", {
-                            "ad": sab_isim.strip(),
-                            "metin": sab_metin.strip(),
+                            "ad": sab_isim.strip(), "metin": sab_metin.strip(),
                             "olusturan": ben, "aktif": 1
                         })
                         st.success(f"✅ '{sab_isim}' kaydedildi!")
@@ -3051,26 +3048,27 @@ elif aktif == "kisiler":
                     else:
                         st.warning("Ad ve metin zorunlu!")
 
-            # Kayıtlı şablonları listele
             if not df_sab_ben.empty:
                 st.divider()
-                st.markdown("#### 📋 Kayıtlı Şablonlarım")
+                st.markdown("#### 📋 Mevcut Şablonlar")
                 for _, sab in df_sab_ben.iterrows():
                     s1, s2, s3 = st.columns([2, 5, 1])
                     s1.markdown(f"**{sab['ad']}**")
-                    s2.caption(str(sab['metin'])[:100] + ("..." if len(str(sab['metin']))>100 else ""))
-                    if s3.button("🗑️", key=f"sab_sil_{sab['id']}"):
-                        db_update("sablon_mesajlar", {"aktif": 0}, "id", int(sab["id"]))
-                        st.success("Silindi!"); st.rerun()
+                    s2.caption(str(sab['metin'])[:100])
+                    # Silme: admin veya kendi şablonu
+                    if st.session_state.get("rol")=="admin" or str(sab.get("olusturan",""))==ben:
+                        if s3.button("🗑️", key=f"sab_sil_{sab['id']}"):
+                            db_update("sablon_mesajlar", {"aktif": 0}, "id", int(sab["id"]))
+                            st.rerun()
             else:
-                st.info("Henüz şablon eklemediniz.")
+                st.info("Henüz şablon yok.")
 
         st.divider()
 
         # ── KİŞİ LİSTESİ + HIZLI MESAJ ──────────────────────────────────────
         # Şablonları yükle
         try:
-            df_sab_all = db_read("sablon_mesajlar", extra_sql=f"WHERE aktif=1 AND olusturan='{ben}' ORDER BY ad")
+            df_sab_all = db_read("sablon_mesajlar", extra_sql="WHERE aktif=1 ORDER BY ad")
             sablon_adlari = df_sab_all["ad"].tolist() if not df_sab_all.empty else []
         except:
             df_sab_all = pd.DataFrame()
@@ -3132,21 +3130,23 @@ elif aktif == "kisiler":
 
                         if mesaj_gonder and mesaj_gonder.strip():
                             wa_url = f"https://wa.me/{t}?text={mesaj_gonder.replace(' ','%20').replace(chr(10),'%0A')}"
-                            btn_col1, btn_col2 = st.columns(2)
-                            if btn_col1.link_button("📱 WhatsApp'ta Gönder", wa_url, use_container_width=True, type="primary"):
-                                pass
-                            # Gönderildi olarak kaydet
-                            if btn_col2.button("✅ Gönderildi Olarak Kaydet", key=f"klog_{kisi.get('id','')}_{sec}", use_container_width=True):
-                                db_insert("kisiler_mesaj_log", {
-                                    "kisi_id": int(kisi.get("id",0)),
-                                    "kisi_adi": isim,
-                                    "telefon": tel,
-                                    "sablon_adi": sec if sec not in ["-- Şablon Seçin --","✏️ Manuel Yaz"] else "Manuel",
-                                    "mesaj": mesaj_gonder[:500],
-                                    "gonderen": ben
-                                })
-                                st.success("✅ Kayıt edildi!")
-                                st.rerun()
+                            
+                            # Otomatik kayıt — WA linkine tıklanınca kaydet
+                            log_key = f"logged_{kisi.get('id','')}_{hash(mesaj_gonder[:50])}"
+                            if not st.session_state.get(log_key):
+                                try:
+                                    db_insert("kisiler_mesaj_log", {
+                                        "kisi_id": int(kisi.get("id",0)),
+                                        "kisi_adi": isim,
+                                        "telefon": tel,
+                                        "sablon_adi": sec if sec not in ["-- Şablon Seçin --","✏️ Manuel Yaz"] else "Manuel",
+                                        "mesaj": mesaj_gonder[:500],
+                                        "gonderen": ben
+                                    })
+                                    st.session_state[log_key] = True
+                                except: pass
+
+                            st.link_button("📱 WhatsApp'ta Gönder", wa_url, use_container_width=True, type="primary")
 
                         # Mesaj geçmişi
                         if not df_msg_log.empty:
@@ -3157,7 +3157,7 @@ elif aktif == "kisiler":
                                     mc2.caption(f"📝 **{mlog.get('sablon_adi','')}**: {str(mlog.get('mesaj',''))[:80]}")
                     st.divider()
 
-        ara_kis = st.text_input("🔍 Kişi ara:", key="kisiler_ara", placeholder="Ad, firma, bölge...")
+        ara_kis = st.text_input("🔍 Kişi ara:", key="kisiler_ara2", placeholder="Ad, firma, bölge...")
         if ara_kis:
             mask = df_kis.apply(lambda r: ara_kis.lower() in str(r).lower(), axis=1)
             df_kis = df_kis[mask]
