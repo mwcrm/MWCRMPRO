@@ -888,29 +888,126 @@ elif aktif == "liste":
     if df.empty:
         st.info("Kayıt bulunamadı.")
     else:
-        # Seçim checkbox kolonu ekle
-        df.insert(0, "Seç", False)
+        # ── TABLO GÖRÜNÜMÜ ──
+        df_goster = df.copy()
+        df_goster.insert(0, "Seç", False)
 
         col_tumunu_sec, col_bos = st.columns([1, 5])
         with col_tumunu_sec:
             tumunu_sec = st.checkbox("✅ Tümünü Seç", key="tumunu_sec")
         if tumunu_sec:
-            df["Seç"] = True
+            df_goster["Seç"] = True
 
+        # Her satırın yanına 👁️ butonu için kompakt liste
+        st.markdown("**Firma listesi — görmek istediğiniz satıra tıklayın:**")
+        
+        # Kompakt satır listesi
+        for _, row in df.head(100).iterrows():
+            cc1, cc2, cc3, cc4, cc5, cc6 = st.columns([3, 1.5, 1, 1, 1, 0.8])
+            cc1.markdown(f"**{row.get('firma','')}**")
+            cc2.caption(f"📍 {row.get('il','')} {row.get('ilce','')}")
+            cc3.caption(f"{row.get('durum','')}")
+            cc4.caption(f"📱 {str(row.get('gsm',''))[:11]}")
+            cc5.caption(f"👤 {row.get('yetkili','')}")
+            if cc6.button("👁️", key=f"kart_{int(row.get('id',0))}", use_container_width=True):
+                st.session_state["detay_acik_id"] = int(row.get("id",0))
+                st.rerun()
+
+        # Seçili kart göster
+        if st.session_state.get("detay_acik_id"):
+            detay_id = st.session_state["detay_acik_id"]
+            detay_rows = df[df["id"] == detay_id]
+            if not detay_rows.empty:
+                detay_row = detay_rows.iloc[0]
+                st.divider()
+                
+                kart_col, kapat_col = st.columns([6, 1])
+                kart_col.markdown(f"## 🏢 {detay_row.get('firma','')}")
+                if kapat_col.button("✕ Kapat", key="kart_kapat"):
+                    st.session_state.pop("detay_acik_id", None)
+                    st.rerun()
+
+                kc1, kc2, kc3 = st.columns(3)
+                with kc1:
+                    st.markdown("**📋 İletişim**")
+                    st.write(f"👤 {detay_row.get('yetkili','-')}")
+                    st.write(f"📱 {detay_row.get('gsm','-')}")
+                    st.write(f"✉️ {detay_row.get('email','-')}")
+                with kc2:
+                    st.markdown("**📍 Konum & Durum**")
+                    st.write(f"🏙️ {detay_row.get('il','-')} / {detay_row.get('ilce','-')}")
+                    st.write(f"📊 {detay_row.get('durum','-')} — {detay_row.get('islem_asamasi','-')}")
+                    st.write(f"👔 {detay_row.get('temsilci','-')}")
+                with kc3:
+                    bek = float(detay_row.get('beklenen_ciro',0) or 0)
+                    ger = float(detay_row.get('gerceklesen_ciro',0) or 0)
+                    st.metric("Beklenen", f"₺{bek:,.0f}")
+                    st.metric("Gerçekleşen", f"₺{ger:,.0f}", delta=f"₺{ger-bek:,.0f}")
+
+                # Aksiyon butonları
+                ab1, ab2, ab3, ab4 = st.columns(4)
+                if ab1.button("✏️ Düzenle", key="kab1", use_container_width=True):
+                    st.session_state["duzenle_musteri"] = detay_row.to_dict()
+                    st.session_state["aktif_tab"] = "yeni"
+                    st.rerun()
+                if ab2.button("📄 Teklif Oluştur", key="kab2", use_container_width=True, type="primary"):
+                    st.session_state["aktif_tab"] = "teklif"
+                    st.session_state["hedef_mus"] = str(detay_row.get("firma",""))
+                    st.session_state["son_secili_id"] = None
+                    st.rerun()
+                if ab3.button("📅 Randevu", key="kab3", use_container_width=True, type="primary"):
+                    st.session_state["aktif_tab"] = "randevu"
+                    st.session_state["rand_musteri_onsel"] = detay_id
+                    st.rerun()
+                if ab4.button("📱 WhatsApp", key="kab4", use_container_width=True):
+                    import re as _re_d
+                    gsm_d = _re_d.sub(r'[\s\-\(\)]','', str(detay_row.get('gsm','') or ''))
+                    if gsm_d.startswith('0'): gsm_d = '90'+gsm_d[1:]
+                    elif len(gsm_d)==10: gsm_d = '90'+gsm_d
+                    st.markdown(f"[📱 WhatsApp'ta Aç](https://wa.me/{gsm_d})")
+
+                # Son teklif & randevu
+                st.divider()
+                tc1, tc2 = st.columns(2)
+                with tc1:
+                    st.markdown("**📄 Son Teklif**")
+                    df_tek_d = db_read("teklifler", filters={"musteri_id": detay_id}, order_col="tarih")
+                    if not df_tek_d.empty:
+                        t = df_tek_d.iloc[0]
+                        st.success(f"₺{float(t.get('toplam_tutar',0) or 0):,.2f} | {str(t.get('tarih',''))[:10]}")
+                    else:
+                        st.info("Teklif yok")
+                with tc2:
+                    st.markdown("**📅 Aktif Randevu**")
+                    df_rand_d = db_read("randevular", filters={"musteri_id": detay_id}, order_col="randevu_tarihi", desc=True)
+                    if not df_rand_d.empty:
+                        aktif_r = df_rand_d[~df_rand_d["sonuc"].isin(["Bitti","İptal"])].head(1) if "sonuc" in df_rand_d.columns else df_rand_d.head(1)
+                        if not aktif_r.empty:
+                            r = aktif_r.iloc[0]
+                            st.warning(f"🗓️ {r.get('randevu_tarihi','')} | {r.get('gorev','')} | {r.get('temsilci','')}")
+                        else:
+                            st.success(f"✅ {df_rand_d.iloc[0].get('sonuc','Tamamlandı')}")
+                    else:
+                        st.info("Randevu yok")
+
+        st.divider()
+        # Düzenleme için data editor (gizli ama kaydet için)
+        df_edit = df.copy()
+        df_edit.insert(0, "Seç", False)
         edited_df = st.data_editor(
-            df,
+            df_edit,
             use_container_width=True,
             num_rows="fixed",
             column_config={
-                "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
-                "id":            st.column_config.NumberColumn("🔢 ID", disabled=True),
-                "tarih":         st.column_config.TextColumn("📅 Tarih", disabled=True),
-                "olusturan":     st.column_config.TextColumn("👤 Oluşturan", disabled=True),
-                "silindi":       None,
-                "durum":         st.column_config.SelectboxColumn("Durum", options=["Aktif","Hedef","Pasif"]),
-                "islem_asamasi": st.column_config.SelectboxColumn("İşlem Aşaması", options=["İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"]),
+                "Seç": st.column_config.CheckboxColumn("Seç", default=False),
+                "id": st.column_config.NumberColumn("ID", disabled=True),
+                "tarih": st.column_config.TextColumn("Tarih", disabled=True),
+                "olusturan": st.column_config.TextColumn("Oluşturan", disabled=True),
+                "silindi": None,
+                "durum": st.column_config.SelectboxColumn("Durum", options=["Aktif","Hedef","Pasif"]),
+                "islem_asamasi": st.column_config.SelectboxColumn("Aşama", options=["İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"]),
             },
-            column_order=["Seç","id","tarih","firma","yetkili","gsm","sabit","email","il","ilce","adres","durum","temsilci","islem_asamasi","olusturan"],
+            column_order=["Seç","id","firma","yetkili","gsm","email","il","ilce","durum","temsilci","islem_asamasi"],
             key="cari_editor"
         )
 
