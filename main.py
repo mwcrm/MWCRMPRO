@@ -3023,8 +3023,55 @@ elif aktif == "kisiler":
 
     with tab_rehber1:
         df_kis = db_read("kisiler", extra_sql="ORDER BY ad")
-        
-        ara_kis = st.text_input("🔍 Kişi ara (Ad, Firma, Bölge):", key="kisiler_ara")
+
+        # Şablonları DB'den yükle
+        SABLON_VARSAYILAN = [
+            {"ad": "Tanışma", "metin": "Merhaba {ad} Bey/Hanım, MW Kargo olarak sizinle tanışmak ve hizmetlerimizi sunmak istiyoruz. Uygun bir zamanda görüşebilir miyiz?"},
+            {"ad": "Teklif Hatırlatma", "metin": "Merhaba {ad} Bey/Hanım, ilettiğimiz teklifimiz hakkında görüşünüzü almak istedik."},
+            {"ad": "Randevu Hatırlatma", "metin": "Merhaba {ad} Bey/Hanım, yarınki randevumuzu hatırlatmak istedik. İyi günler."},
+            {"ad": "Teşekkür", "metin": "Merhaba {ad} Bey/Hanım, bizi tercih ettiğiniz için teşekkür ederiz."},
+            {"ad": "Bilgi Güncelleme", "metin": "Merhaba {ad} Bey/Hanım, güncel fiyatlarımız hakkında bilgi vermek isteriz."},
+        ]
+        try:
+            df_sab = db_read("sablon_mesajlar", extra_sql="WHERE aktif=1 ORDER BY id")
+            if not df_sab.empty:
+                SABLON_LISTESI = [{"id": int(r["id"]), "ad": r["ad"], "metin": r["metin"]} for _, r in df_sab.iterrows()]
+            else:
+                SABLON_LISTESI = SABLON_VARSAYILAN
+        except:
+            SABLON_LISTESI = SABLON_VARSAYILAN
+
+        # Admin şablon yönetimi
+        if st.session_state.get("rol") == "admin":
+            with st.expander("⚙️ Şablon Yönet (Kayıtlı)"):
+                st.markdown("**Mevcut Şablonlar:**")
+                for sab in SABLON_LISTESI:
+                    sc1, sc2, sc3 = st.columns([2, 5, 1])
+                    sc1.caption(f"**{sab['ad']}**")
+                    sc2.caption(sab['metin'][:80]+"...")
+                    if "id" in sab and sc3.button("🗑️", key=f"sab_sil_{sab.get('id',0)}"):
+                        db_update("sablon_mesajlar", {"aktif": 0}, "id", sab["id"])
+                        st.success("Silindi!"); st.rerun()
+
+                st.divider()
+                st.markdown("**➕ Yeni Şablon Ekle:**")
+                with st.form("yeni_sablon_form"):
+                    ns1, ns2 = st.columns([2, 5])
+                    yeni_sab_ad = ns1.text_input("Şablon Adı*:", placeholder="Örn: Teşekkür")
+                    yeni_sab_mt = ns2.text_area("Mesaj Metni*:", height=80,
+                        placeholder="Merhaba {ad} Bey/Hanım, ... ({ad} kişi adına dönüşür)")
+                    if st.form_submit_button("💾 Şablonu Kaydet", use_container_width=True, type="primary"):
+                        if yeni_sab_ad and yeni_sab_mt:
+                            db_insert("sablon_mesajlar", {
+                                "ad": yeni_sab_ad, "metin": yeni_sab_mt,
+                                "olusturan": st.session_state.get("kullanici",""), "aktif": 1
+                            })
+                            st.success(f"✅ '{yeni_sab_ad}' kaydedildi!")
+                            st.rerun()
+                        else:
+                            st.warning("Ad ve metin zorunlu!")
+
+        ara_kis = st.text_input("🔍 Kişi ara:", key="kisiler_ara", placeholder="Ad, firma, bölge...")
         if ara_kis:
             mask = df_kis.apply(lambda r: ara_kis.lower() in str(r).lower(), axis=1)
             df_kis = df_kis[mask]
@@ -3034,31 +3081,46 @@ elif aktif == "kisiler":
         if not df_kis.empty:
             for _, kisi in df_kis.iterrows():
                 with st.container():
-                    kc1, kc2, kc3, kc4, kc5 = st.columns([2, 2, 2, 1, 1])
+                    kc1, kc2, kc3 = st.columns([3, 2, 2])
                     kc1.markdown(f"**{kisi.get('ad','')} {kisi.get('soyad','')}**")
-                    kc2.markdown(f"🏢 {kisi.get('firma','')}")
-                    kc3.markdown(f"📍 {kisi.get('bolge','')}")
-                    
+                    kc2.caption(f"🏢 {kisi.get('firma','')} | 📍 {kisi.get('bolge','')}")
                     tel = str(kisi.get('telefon','') or '').strip()
                     if tel:
-                        # Telefon formatla
                         import re as _re
                         tel_temiz = _re.sub(r"[\s\-\(\)]", "", tel)
-                        if tel_temiz.startswith("0"):
+                        if tel_temiz.startswith("0") and len(tel_temiz)==11:
                             wa_no = "90" + tel_temiz[1:]
+                        elif len(tel_temiz)==10:
+                            wa_no = "90" + tel_temiz
                         elif tel_temiz.startswith("+"):
                             wa_no = tel_temiz.replace("+","")
                         else:
-                            wa_no = "90" + tel_temiz if len(tel_temiz) == 10 else tel_temiz
-                        
-                        wa_url_kis = f"https://wa.me/{wa_no}?text=Merhaba%20{kisi.get('ad','')}%20Bey/Hanım,"
-                        kc4.link_button("📱 WA", wa_url_kis, use_container_width=True)
-                        kc5.markdown(f"`{tel}`")
+                            wa_no = tel_temiz
+                        kc3.caption(f"📱 {tel}")
+
+                        # Şablon seçimi
+                        with st.expander(f"💬 {kisi.get('ad','')} {kisi.get('soyad','')} — Mesaj Gönder"):
+                            sablon_adlari = [s["ad"] for s in SABLON_LISTESI] + ["✏️ Manuel Yaz"]
+                            sec_sab = st.selectbox("Şablon seç:", sablon_adlari, key=f"sab_sec_{kisi.get('id','')}")
+
+                            if sec_sab == "✏️ Manuel Yaz":
+                                mesaj_metni = st.text_area("Mesajınız:", height=100, key=f"sab_txt_{kisi.get('id','')}")
+                            else:
+                                bulunan = next((s for s in SABLON_LISTESI if s["ad"]==sec_sab), None)
+                                if bulunan:
+                                    mesaj_raw = bulunan["metin"].replace("{ad}", str(kisi.get("ad","")))
+                                    mesaj_metni = st.text_area("Mesaj (düzenlenebilir):", value=mesaj_raw, height=100, key=f"sab_txt_{kisi.get('id','')}")
+                                else:
+                                    mesaj_metni = ""
+
+                            if mesaj_metni:
+                                wa_url = f"https://wa.me/{wa_no}?text={mesaj_metni.replace(' ','%20').replace(chr(10),'%0A')}"
+                                st.link_button("📱 WhatsApp'ta Gönder", wa_url, use_container_width=True, type="primary")
                     else:
-                        kc4.markdown("—")
+                        kc3.caption("📱 Tel yok")
                     st.divider()
         else:
-            st.info("Kişi bulunamadı. 'Kişi Ekle' sekmesinden ekleyin.")
+            st.info("Kişi bulunamadı.")
 
     with tab_rehber2:
         with st.form("kisi_ekle_form"):
