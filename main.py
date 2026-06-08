@@ -947,8 +947,13 @@ elif aktif == "liste":
                 # Aksiyon butonları
                 ab1, ab2, ab3, ab4 = st.columns(4)
                 if ab1.button("✏️ Düzenle", key="kab1", use_container_width=True):
-                    st.session_state["duzenle_musteri"] = detay_row.to_dict()
+                    # Tüm cari bilgileri session'a aktar
+                    duzenle_dict = {}
+                    for col in detay_row.index:
+                        duzenle_dict[col] = detay_row[col]
+                    st.session_state["duzenle_musteri"] = duzenle_dict
                     st.session_state["aktif_tab"] = "yeni"
+                    st.session_state.pop("detay_acik_id", None)
                     st.rerun()
                 if ab2.button("📄 Teklif Oluştur", key="kab2", use_container_width=True, type="primary"):
                     st.session_state["aktif_tab"] = "teklif"
@@ -959,12 +964,36 @@ elif aktif == "liste":
                     st.session_state["aktif_tab"] = "randevu"
                     st.session_state["rand_musteri_onsel"] = detay_id
                     st.rerun()
-                if ab4.button("📱 WhatsApp", key="kab4", use_container_width=True):
-                    import re as _re_d
-                    gsm_d = _re_d.sub(r'[\s\-\(\)]','', str(detay_row.get('gsm','') or ''))
-                    if gsm_d.startswith('0'): gsm_d = '90'+gsm_d[1:]
-                    elif len(gsm_d)==10: gsm_d = '90'+gsm_d
-                    st.markdown(f"[📱 WhatsApp'ta Aç](https://wa.me/{gsm_d})")
+
+                # WhatsApp - numara kontrolü
+                import re as _re_d
+                gsm_raw = str(detay_row.get('gsm','') or '').strip()
+                gsm_d = _re_d.sub(r'[\s\-\(\)+]','', gsm_raw)
+                if gsm_d.startswith('0') and len(gsm_d)==11:
+                    gsm_d = '90'+gsm_d[1:]
+                elif len(gsm_d)==10:
+                    gsm_d = '90'+gsm_d
+                wa_gecerli = len(gsm_d)==12 and gsm_d.isdigit()
+
+                with st.expander("📱 WhatsApp" + (" ✅" if wa_gecerli else " ⚠️ Numara Gerekli")):
+                    if not wa_gecerli:
+                        st.warning(f"Kayıtlı numara geçersiz: '{gsm_raw}'")
+                        manuel_wa = st.text_input("Manuel numara girin:", placeholder="05xxxxxxxxx", key=f"wa_manuel_{detay_id}")
+                        if manuel_wa:
+                            m = _re_d.sub(r'[\s\-\(\)+]','', manuel_wa)
+                            if m.startswith('0') and len(m)==11: m = '90'+m[1:]
+                            elif len(m)==10: m = '90'+m
+                            if len(m)==12 and m.isdigit():
+                                gsm_d = m
+                                wa_gecerli = True
+                                st.success(f"✅ {gsm_d}")
+                            else:
+                                st.error("Geçersiz numara formatı")
+
+                    if wa_gecerli:
+                        wa_mesaj_d = st.text_area("Mesaj:", value=f"Merhaba {detay_row.get('yetkili','')} Bey/Hanım, MW Kargo olarak sizinle iletişime geçmek istiyoruz.", height=80, key=f"wa_msg_{detay_id}")
+                        wa_url_d = f"https://wa.me/{gsm_d}?text={wa_mesaj_d.replace(' ','%20').replace(chr(10),'%0A')}"
+                        st.link_button("📱 WhatsApp'ta Mesaj Gönder", wa_url_d, use_container_width=True)
 
                 # Son teklif & randevu
                 st.divider()
@@ -3439,6 +3468,17 @@ elif aktif == "randevu":
                             musteri_id = int(rand_musteri.split("]")[0].replace("[","").strip())
                             musteri_adi = rand_musteri.split("] ")[1].split(" (")[0]
                         except: pass
+
+                    # Mükerrer randevu kontrolü
+                    if musteri_id > 0:
+                        df_muk = db_read("randevular", filters={"musteri_id": musteri_id})
+                        if not df_muk.empty and "sonuc" in df_muk.columns:
+                            aktif_muk = df_muk[~df_muk["sonuc"].isin(["Bitti","İptal","Gidilmedi"])]
+                            if not aktif_muk.empty:
+                                st.error(f"⚠️ Bu müşterinin zaten aktif bir randevusu var! "
+                                        f"({aktif_muk.iloc[0].get('randevu_tarihi','')} — {aktif_muk.iloc[0].get('gorev','')}). "
+                                        f"Önce mevcut randevuyu tamamlayın veya iptal edin.")
+                                st.stop()
 
                     db_insert("randevular", {
                         "randevu_tarihi": str(rand_tarih),
