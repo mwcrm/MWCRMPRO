@@ -882,16 +882,11 @@ elif aktif == "liste":
         st.info("Kayıt bulunamadı.")
     else:
         # ── MÜŞTERİ KARTI ──
-        ara_kart = st.text_input("🔍 Müşteri ara:", key="kart_ara", placeholder="Firma adı, il, durum...")
-        df_kart_f = df.copy()
-        if ara_kart:
-            df_kart_f = df[df.apply(lambda r: ara_kart.lower() in str(r).lower(), axis=1)]
-
         kart_opts = ["-- Müşteri Seçin --"] + [
             f"[{int(r['id'])}] {r['firma']} | {r.get('il','')} | {r.get('durum','')}"
-            for _, r in df_kart_f.head(100).iterrows()
+            for _, r in df.head(200).iterrows()
         ]
-        secili_kart = st.selectbox("Müşteri Kartı:", kart_opts, key="kart_sec")
+        secili_kart = st.selectbox("🔍 Müşteri Kartı Seç:", kart_opts, key="kart_sec")
 
         if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
             try:
