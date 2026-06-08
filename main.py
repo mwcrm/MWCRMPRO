@@ -886,139 +886,115 @@ elif aktif == "liste":
     if df.empty:
         st.info("Kayıt bulunamadı.")
     else:
-        # ── TABLO GÖRÜNÜMÜ ──
-        df_goster = df.copy()
-        df_goster.insert(0, "Seç", False)
+        # ── MÜŞTERİ KARTI ──
+        ara_kart = st.text_input("🔍 Müşteri ara:", key="kart_ara", placeholder="Firma adı, il, durum...")
+        df_kart_f = df.copy()
+        if ara_kart:
+            df_kart_f = df[df.apply(lambda r: ara_kart.lower() in str(r).lower(), axis=1)]
 
-        col_tumunu_sec, col_bos = st.columns([1, 5])
-        with col_tumunu_sec:
-            tumunu_sec = st.checkbox("✅ Tümünü Seç", key="tumunu_sec")
-        if tumunu_sec:
-            df_goster["Seç"] = True
+        kart_opts = ["-- Müşteri Seçin --"] + [
+            f"[{int(r['id'])}] {r['firma']} | {r.get('il','')} | {r.get('durum','')}"
+            for _, r in df_kart_f.head(100).iterrows()
+        ]
+        secili_kart = st.selectbox("Müşteri Kartı:", kart_opts, key="kart_sec")
 
-        # Her satırın yanına 👁️ butonu için kompakt liste
-        st.markdown("**Firma listesi — görmek istediğiniz satıra tıklayın:**")
-        
-        # Kompakt satır listesi
-        for _, row in df.head(100).iterrows():
-            cc1, cc2, cc3, cc4, cc5, cc6 = st.columns([3, 1.5, 1, 1, 1, 0.8])
-            cc1.markdown(f"**{row.get('firma','')}**")
-            cc2.caption(f"📍 {row.get('il','')} {row.get('ilce','')}")
-            cc3.caption(f"{row.get('durum','')}")
-            cc4.caption(f"📱 {str(row.get('gsm',''))[:11]}")
-            cc5.caption(f"👤 {row.get('yetkili','')}")
-            if cc6.button("👁️", key=f"kart_{int(row.get('id',0))}", use_container_width=True):
-                st.session_state["detay_acik_id"] = int(row.get("id",0))
-                st.rerun()
+        if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
+            try:
+                kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
+                kart_row = df[df["id"]==kart_id].iloc[0]
 
-        # Seçili kart göster
-        if st.session_state.get("detay_acik_id"):
-            detay_id = st.session_state["detay_acik_id"]
-            detay_rows = df[df["id"] == detay_id]
-            if not detay_rows.empty:
-                detay_row = detay_rows.iloc[0]
-                st.divider()
-                
-                kart_col, kapat_col = st.columns([6, 1])
-                kart_col.markdown(f"## 🏢 {detay_row.get('firma','')}")
-                if kapat_col.button("✕ Kapat", key="kart_kapat"):
-                    st.session_state.pop("detay_acik_id", None)
-                    st.rerun()
+                st.markdown("---")
+                st.markdown(f"## 🏢 {kart_row.get('firma','')}")
 
                 kc1, kc2, kc3 = st.columns(3)
                 with kc1:
                     st.markdown("**📋 İletişim**")
-                    st.write(f"👤 {detay_row.get('yetkili','-')}")
-                    st.write(f"📱 {detay_row.get('gsm','-')}")
-                    st.write(f"✉️ {detay_row.get('email','-')}")
+                    st.write(f"👤 **{kart_row.get('yetkili','-')}**")
+                    st.write(f"📱 **{kart_row.get('gsm','-')}**")
+                    st.write(f"☎️ **{kart_row.get('sabit','-')}**")
+                    st.write(f"✉️ **{kart_row.get('email','-')}**")
                 with kc2:
                     st.markdown("**📍 Konum & Durum**")
-                    st.write(f"🏙️ {detay_row.get('il','-')} / {detay_row.get('ilce','-')}")
-                    st.write(f"📊 {detay_row.get('durum','-')} — {detay_row.get('islem_asamasi','-')}")
-                    st.write(f"👔 {detay_row.get('temsilci','-')}")
+                    st.write(f"🏙️ **{kart_row.get('il','-')} / {kart_row.get('ilce','-')}**")
+                    st.write(f"📊 **{kart_row.get('durum','-')}**")
+                    st.write(f"🔄 **{kart_row.get('islem_asamasi','-')}**")
+                    st.write(f"👔 **{kart_row.get('temsilci','-')}**")
+                    if kart_row.get("adres"): st.write(f"📮 {kart_row.get('adres','')}")
                 with kc3:
-                    bek = float(detay_row.get('beklenen_ciro',0) or 0)
-                    ger = float(detay_row.get('gerceklesen_ciro',0) or 0)
+                    bek = float(kart_row.get("beklenen_ciro",0) or 0)
+                    ger = float(kart_row.get("gerceklesen_ciro",0) or 0)
                     st.metric("Beklenen", f"₺{bek:,.0f}")
                     st.metric("Gerçekleşen", f"₺{ger:,.0f}", delta=f"₺{ger-bek:,.0f}")
 
-                # Aksiyon butonları
-                ab1, ab2, ab3, ab4 = st.columns(4)
-                if ab1.button("✏️ Düzenle", key="kab1", use_container_width=True):
-                    # Tüm cari bilgileri session'a aktar
-                    duzenle_dict = {}
-                    for col in detay_row.index:
-                        duzenle_dict[col] = detay_row[col]
-                    st.session_state["duzenle_musteri"] = duzenle_dict
+                ab1, ab2, ab3 = st.columns(3)
+                if ab1.button("✏️ Düzenle", key=f"kab1_{kart_id}", use_container_width=True):
+                    st.session_state["duzenle_musteri"] = kart_row.to_dict()
                     st.session_state["aktif_tab"] = "yeni"
-                    st.session_state.pop("detay_acik_id", None)
                     st.rerun()
-                if ab2.button("📄 Teklif Oluştur", key="kab2", use_container_width=True, type="primary"):
+                if ab2.button("📄 Teklif Oluştur", key=f"kab2_{kart_id}", use_container_width=True, type="primary"):
                     st.session_state["aktif_tab"] = "teklif"
-                    st.session_state["hedef_mus"] = str(detay_row.get("firma",""))
+                    st.session_state["hedef_mus"] = str(kart_row.get("firma",""))
                     st.session_state["son_secili_id"] = None
                     st.rerun()
-                if ab3.button("📅 Randevu", key="kab3", use_container_width=True, type="primary"):
+                if ab3.button("📅 Randevu Oluştur", key=f"kab3_{kart_id}", use_container_width=True, type="primary"):
                     st.session_state["aktif_tab"] = "randevu"
-                    st.session_state["rand_musteri_onsel"] = detay_id
+                    st.session_state["rand_musteri_onsel"] = kart_id
                     st.rerun()
 
-                # WhatsApp - numara kontrolü
                 import re as _re_d
-                gsm_raw = str(detay_row.get('gsm','') or '').strip()
-                gsm_d = _re_d.sub(r'[\s\-\(\)+]','', gsm_raw)
-                if gsm_d.startswith('0') and len(gsm_d)==11:
-                    gsm_d = '90'+gsm_d[1:]
-                elif len(gsm_d)==10:
-                    gsm_d = '90'+gsm_d
-                wa_gecerli = len(gsm_d)==12 and gsm_d.isdigit()
+                gsm_raw = str(kart_row.get("gsm","") or "").strip()
+                gsm_d = _re_d.sub(r"[\s\-\(\)+]","", gsm_raw)
+                if gsm_d.startswith("0") and len(gsm_d)==11: gsm_d = "90"+gsm_d[1:]
+                elif len(gsm_d)==10: gsm_d = "90"+gsm_d
+                wa_ok = len(gsm_d)==12 and gsm_d.isdigit()
 
-                with st.expander("📱 WhatsApp" + (" ✅" if wa_gecerli else " ⚠️ Numara Gerekli")):
-                    if not wa_gecerli:
-                        st.warning(f"Kayıtlı numara geçersiz: '{gsm_raw}'")
-                        manuel_wa = st.text_input("Manuel numara girin:", placeholder="05xxxxxxxxx", key=f"wa_manuel_{detay_id}")
-                        if manuel_wa:
-                            m = _re_d.sub(r'[\s\-\(\)+]','', manuel_wa)
-                            if m.startswith('0') and len(m)==11: m = '90'+m[1:]
-                            elif len(m)==10: m = '90'+m
-                            if len(m)==12 and m.isdigit():
-                                gsm_d = m
-                                wa_gecerli = True
-                                st.success(f"✅ {gsm_d}")
-                            else:
-                                st.error("Geçersiz numara formatı")
+                with st.expander("📱 WhatsApp" + (" ✅" if wa_ok else " ⚠️ Numara eksik")):
+                    if not wa_ok:
+                        st.warning(f"Geçersiz numara: '{gsm_raw}'")
+                        m_wa = st.text_input("Manuel numara:", placeholder="05xxxxxxxxx", key=f"wa_m_{kart_id}")
+                        if m_wa:
+                            mt = _re_d.sub(r"[\s\-\(\)+]","", m_wa)
+                            if mt.startswith("0") and len(mt)==11: mt = "90"+mt[1:]
+                            elif len(mt)==10: mt = "90"+mt
+                            if len(mt)==12 and mt.isdigit(): gsm_d = mt; wa_ok = True; st.success(f"✅ {gsm_d}")
+                            else: st.error("Geçersiz format")
+                    if wa_ok:
+                        wa_msg = st.text_area("Mesaj:", value=f"Merhaba {kart_row.get('yetkili','')} Bey/Hanım,", height=70, key=f"wa_msg_{kart_id}")
+                        st.link_button("📱 Gönder", f"https://wa.me/{gsm_d}?text={wa_msg.replace(' ','%20').replace(chr(10),'%0A')}", use_container_width=True)
 
-                    if wa_gecerli:
-                        wa_mesaj_d = st.text_area("Mesaj:", value=f"Merhaba {detay_row.get('yetkili','')} Bey/Hanım, MW Kargo olarak sizinle iletişime geçmek istiyoruz.", height=80, key=f"wa_msg_{detay_id}")
-                        wa_url_d = f"https://wa.me/{gsm_d}?text={wa_mesaj_d.replace(' ','%20').replace(chr(10),'%0A')}"
-                        st.link_button("📱 WhatsApp'ta Mesaj Gönder", wa_url_d, use_container_width=True)
-
-                # Son teklif & randevu
                 st.divider()
                 tc1, tc2 = st.columns(2)
                 with tc1:
                     st.markdown("**📄 Son Teklif**")
-                    df_tek_d = db_read("teklifler", filters={"musteri_id": detay_id}, order_col="tarih")
-                    if not df_tek_d.empty:
-                        t = df_tek_d.iloc[0]
+                    df_tek_k = db_read("teklifler", filters={"musteri_id": kart_id}, order_col="tarih")
+                    if not df_tek_k.empty:
+                        t = df_tek_k.iloc[0]
                         st.success(f"₺{float(t.get('toplam_tutar',0) or 0):,.2f} | {str(t.get('tarih',''))[:10]}")
+                        st.caption(f"Toplam {len(df_tek_k)} teklif")
                     else:
                         st.info("Teklif yok")
                 with tc2:
                     st.markdown("**📅 Aktif Randevu**")
-                    df_rand_d = db_read("randevular", filters={"musteri_id": detay_id}, order_col="randevu_tarihi", desc=True)
-                    if not df_rand_d.empty:
-                        aktif_r = df_rand_d[~df_rand_d["sonuc"].isin(["Bitti","İptal"])].head(1) if "sonuc" in df_rand_d.columns else df_rand_d.head(1)
-                        if not aktif_r.empty:
-                            r = aktif_r.iloc[0]
+                    df_rand_k = db_read("randevular", filters={"musteri_id": kart_id}, order_col="randevu_tarihi", desc=True)
+                    if not df_rand_k.empty and "sonuc" in df_rand_k.columns:
+                        aktif_rk = df_rand_k[~df_rand_k["sonuc"].isin(["Bitti","İptal"])].head(1)
+                        if not aktif_rk.empty:
+                            r = aktif_rk.iloc[0]
                             st.warning(f"🗓️ {r.get('randevu_tarihi','')} | {r.get('gorev','')} | {r.get('temsilci','')}")
+                            ys = st.selectbox("Sonuç:", ["—","Bitti","Devam Ediyor","Gidilmedi","İptal"], key=f"rs_{kart_id}")
+                            if ys != "—" and st.button("💾 Güncelle", key=f"rg_{kart_id}"):
+                                db_update("randevular", {"sonuc": ys}, "id", int(r["id"]))
+                                st.success("✅"); st.rerun()
                         else:
-                            st.success(f"✅ {df_rand_d.iloc[0].get('sonuc','Tamamlandı')}")
+                            st.success(f"✅ {df_rand_k.iloc[0].get('sonuc','Tamamlandı')}")
                     else:
                         st.info("Randevu yok")
+            except Exception as e:
+                st.error(f"Kart hatası: {e}")
 
         st.divider()
-        # Düzenleme için data editor (gizli ama kaydet için)
+        # Toplu düzenleme tablosu
+        df_edit = df.copy()
         df_edit = df.copy()
         df_edit.insert(0, "Seç", False)
         edited_df = st.data_editor(
