@@ -1949,16 +1949,15 @@ elif aktif == "teklif":
             # Taşıma butonları
             with hc[6]:
                 if i > 0 and st.button("▲", key=f"row_up_{i}", use_container_width=True):
-                    for _k in ["h_tip","h_en","h_boy","h_yuk","h_bf","t_cil","t_vil","t_bas","t_kg","t_tur"]:
-                        a, b = f"{_k}_{i}", f"{_k}_{i-1}"
-                        va = st.session_state.get(a); vb = st.session_state.get(b)
-                        st.session_state[a] = vb; st.session_state[b] = va
+                    # Satır verilerini session'da tut
+                    sira = st.session_state.get("teklif_satir_sira", list(range(n)))
+                    sira[i], sira[i-1] = sira[i-1], sira[i]
+                    st.session_state["teklif_satir_sira"] = sira
                     st.rerun()
                 if i < n-1 and st.button("▼", key=f"row_dn_{i}", use_container_width=True):
-                    for _k in ["h_tip","h_en","h_boy","h_yuk","h_bf","t_cil","t_vil","t_bas","t_kg","t_tur"]:
-                        a, b = f"{_k}_{i}", f"{_k}_{i+1}"
-                        va = st.session_state.get(a); vb = st.session_state.get(b)
-                        st.session_state[a] = vb; st.session_state[b] = va
+                    sira = st.session_state.get("teklif_satir_sira", list(range(n)))
+                    sira[i], sira[i+1] = sira[i+1], sira[i]
+                    st.session_state["teklif_satir_sira"] = sira
                     st.rerun()
             hesap_sonuclar.append({"urun": urun_adi, "en": en, "boy": boy, "yuk": yuk,
                                    "desi": desi, "birim_fiyat": birim_fiyat})
