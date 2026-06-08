@@ -1771,8 +1771,8 @@ elif aktif == "rapor":
     st.markdown("## 🔍 Arama / Filtreleme Raporu")
     ara_r1, ara_r2, ara_r3 = st.columns(3)
     arama_kelime = ara_r1.text_input("Kelime Ara (Firma/Yetkili/İl)", key="rapor_ara")
-    filtre_durum = ara_r2.selectbox("Durum", ["Tümü","Aktif","Hedef","Pasif"], key="rapor_durum2")
-    filtre_asama = ara_r3.selectbox("Aşama", ["Tümü","İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"], key="rapor_asama2")
+    filtre_durum = ara_r2.selectbox("Durum", ["Tümü","Aktif","Hedef","Pasif"], key="rapor_durum2b")
+    filtre_asama = ara_r3.selectbox("Aşama", ["Tümü","İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"], key="rapor_asama2b")
 
     df_ara = df_rapor.copy()
     if arama_kelime:
