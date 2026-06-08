@@ -2111,36 +2111,80 @@ elif aktif == "teklif":
                 st.warning("Email yok. Yukaridaki alana girin.")
 
     st.divider()
-    st.markdown("### Kayitli Teklifler")
+    st.markdown("### 📋 Kayıtlı Teklifler")
     try:
         df_tek = db_read("teklifler", order_col="tarih")
-        if not df_tek.empty:
-            goster_cols = [c for c in ["id","tarih","musteri_adi","toplam_tutar","olusturan","notlar"] if c in df_tek.columns]
-            df_tek_goster = df_tek[goster_cols].copy()
-            if "toplam_tutar" in df_tek_goster.columns:
-                df_tek_goster["toplam_tutar"] = df_tek_goster["toplam_tutar"].apply(lambda x: f"{float(x):,.2f} TL" if x else "0 TL")
-            st.dataframe(df_tek_goster, use_container_width=True, hide_index=True)
-            with st.expander("Teklif Detayini Gor"):
-                teklif_id = st.number_input("Teklif ID:", min_value=1, step=1, key="goster_id")
-                if st.button("Detay Goster"):
-                    df_det = db_read("teklifler", filters={"id": teklif_id})
-                    if not df_det.empty:
-                        row_det = df_det.iloc[0]
-                        st.markdown(f"**Musteri:** {row_det['musteri_adi']} | **Tarih:** {row_det['tarih']} | **Tutar:** {float(row_det['toplam_tutar']):,.2f} TL")
-                        try:
-                            data = json.loads(row_det['satirlar'])
-                            if "teklif" in data:
-                                st.markdown("**Teklif Satirlari:**")
-                                st.dataframe(pd.DataFrame(data["teklif"]), use_container_width=True)
-                            if "hesap" in data:
-                                st.markdown("**Hesaplama Satirlari:**")
-                                st.dataframe(pd.DataFrame(data["hesap"]), use_container_width=True)
-                        except:
-                            st.text(str(row[0]))
-                    else:
-                        st.error("Bu ID bulunamadi.")
+        if df_tek.empty:
+            st.info("Henüz kayıtlı teklif yok.")
         else:
-            st.info("Henuz kayitli teklif yok.")
+            # Seçim dropdown
+            tek_opts = ["-- Teklif Seçin --"] + [
+                f"[{int(r['id'])}] {r.get('musteri_adi','')} | {str(r.get('tarih',''))[:10]} | {fmt_para(float(r.get('toplam_tutar',0) or 0))}"
+                for _, r in df_tek.iterrows()
+            ]
+            sec_tek = st.selectbox("Teklif Seç:", tek_opts, key="tek_sec")
+
+            if sec_tek != "-- Teklif Seçin --" and "[" in sec_tek:
+                tek_id = int(sec_tek.split("]")[0].replace("[","").strip())
+                tek_row = df_tek[df_tek["id"]==tek_id].iloc[0]
+
+                # Başlık
+                st.markdown(f"## 📄 {tek_row.get('musteri_adi','')} — {fmt_para(float(tek_row.get('toplam_tutar',0) or 0))}")
+                st.caption(f"📅 {str(tek_row.get('tarih',''))[:16]} | 👤 {tek_row.get('olusturan','')}")
+                if tek_row.get('notlar'):
+                    st.info(f"📝 {tek_row.get('notlar','')}")
+
+                # Satırlar
+                try:
+                    data = json.loads(tek_row.get('satirlar','{}'))
+                    if "teklif" in data and data["teklif"]:
+                        st.markdown("**Teklif Satırları:**")
+                        df_t = pd.DataFrame(data["teklif"])
+                        if "tutar" in df_t.columns:
+                            df_t["tutar"] = df_t["tutar"].apply(lambda x: fmt_para(float(x or 0)))
+                        if "birim_fiyat" in df_t.columns:
+                            df_t["birim_fiyat"] = df_t["birim_fiyat"].apply(lambda x: fmt_para(float(x or 0)))
+                        st.dataframe(df_t, use_container_width=True, hide_index=True)
+                    if "hesap" in data and data["hesap"]:
+                        st.markdown("**Hesaplama Satırları:**")
+                        st.dataframe(pd.DataFrame(data["hesap"]), use_container_width=True, hide_index=True)
+                except:
+                    st.text(str(tek_row.get('satirlar','')))
+
+                # Aksiyonlar
+                st.divider()
+                ak1, ak2, ak3 = st.columns(3)
+
+                # Not güncelle
+                with ak1.expander("✏️ Notu Güncelle"):
+                    yeni_not = st.text_area("Not:", value=str(tek_row.get('notlar','')), height=80, key=f"tek_not_{tek_id}")
+                    if st.button("💾 Kaydet", key=f"tek_not_btn_{tek_id}", use_container_width=True):
+                        db_update("teklifler", {"notlar": yeni_not}, "id", tek_id)
+                        st.success("✅ Not güncellendi!")
+                        st.rerun()
+
+                # Arşivle
+                if ak2.button("🗃️ Arşivle", key=f"tek_arsiv_{tek_id}", use_container_width=True):
+                    db_update("teklifler", {"arsivlendi": 1}, "id", tek_id)
+                    st.success("✅ Arşivlendi!")
+                    st.rerun()
+
+                # Sil
+                if ak3.button("🗑️ Sil", key=f"tek_sil_{tek_id}", use_container_width=True, type="primary"):
+                    sb_d = get_sb()
+                    if sb_d:
+                        sb_d.table("teklifler").delete().eq("id", tek_id).execute()
+                    st.success("🗑️ Teklif silindi!")
+                    st.rerun()
+
+            # Özet tablo
+            st.divider()
+            goster_cols = [c for c in ["id","tarih","musteri_adi","toplam_tutar","olusturan"] if c in df_tek.columns]
+            df_ozet = df_tek[goster_cols].copy()
+            if "toplam_tutar" in df_ozet.columns:
+                df_ozet["toplam_tutar"] = df_ozet["toplam_tutar"].apply(lambda x: fmt_para(float(x or 0)))
+            st.dataframe(df_ozet, use_container_width=True, hide_index=True)
+
     except Exception as e:
         st.error(f"Hata: {e}")
 
