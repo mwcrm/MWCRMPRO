@@ -1948,16 +1948,23 @@ elif aktif == "teklif":
                 urun_adi = st.text_input(f"Ürün adı {i+1}:", key=f"h_adi_{i}", placeholder="Ürün adı")
             # Taşıma butonları
             with hc[6]:
+                _sira_key = "t_satir_sirasi"
+                if _sira_key not in st.session_state:
+                    st.session_state[_sira_key] = list(range(n))
                 if i > 0 and st.button("▲", key=f"row_up_{i}", use_container_width=True):
-                    # Satır verilerini session'da tut
-                    sira = st.session_state.get("teklif_satir_sira", list(range(n)))
-                    sira[i], sira[i-1] = sira[i-1], sira[i]
-                    st.session_state["teklif_satir_sira"] = sira
+                    # Satır i ile i-1'in tüm değerlerini değiştir
+                    for _k in ["h_en","h_boy","h_yuk","h_bf","t_bas","t_kg"]:
+                        va = st.session_state.get(f"{_k}_{i}", 0)
+                        vb = st.session_state.get(f"{_k}_{i-1}", 0)
+                        st.session_state[f"{_k}_{i}"] = vb
+                        st.session_state[f"{_k}_{i-1}"] = va
                     st.rerun()
                 if i < n-1 and st.button("▼", key=f"row_dn_{i}", use_container_width=True):
-                    sira = st.session_state.get("teklif_satir_sira", list(range(n)))
-                    sira[i], sira[i+1] = sira[i+1], sira[i]
-                    st.session_state["teklif_satir_sira"] = sira
+                    for _k in ["h_en","h_boy","h_yuk","h_bf","t_bas","t_kg"]:
+                        va = st.session_state.get(f"{_k}_{i}", 0)
+                        vb = st.session_state.get(f"{_k}_{i+1}", 0)
+                        st.session_state[f"{_k}_{i}"] = vb
+                        st.session_state[f"{_k}_{i+1}"] = va
                     st.rerun()
             hesap_sonuclar.append({"urun": urun_adi, "en": en, "boy": boy, "yuk": yuk,
                                    "desi": desi, "birim_fiyat": birim_fiyat})
@@ -1966,17 +1973,34 @@ elif aktif == "teklif":
             hesap_urun[i] = urun_tip
 
     with right:
-        st.markdown("#### TEKLIFIMIZ")
+        st.markdown("#### TEKLİFİMİZ")
+
+        # Sıralama başlıkları — tıklanınca sıralar
+        if "sort_col" not in st.session_state:
+            st.session_state["sort_col"] = None
+            st.session_state["sort_desc"] = True
+
         th = st.columns([1.2,1.2,0.7,0.9,0.8,0.8,0.7,1.0])
-        for txt, col in zip(["Cikis Ili","Varis Ili","KM","Tur","Bas Desi","Bit Desi","KG","Tutar"], th):
-            col.markdown(f"**{txt}**")
+        basliklar = ["Çıkış İli","Varış İli","KM","Tür","Baş Desi","Bit Desi","KG","Tutar"]
+        sort_keys = [None,None,None,None,"bas_desi","bit_desi","kg","tutar"]
+        for j,(txt,sk) in enumerate(zip(basliklar,sort_keys)):
+            if sk:
+                ikon = " ▼" if st.session_state.get("sort_col")==sk and st.session_state.get("sort_desc") else (" ▲" if st.session_state.get("sort_col")==sk else "")
+                if th[j].button(f"{txt}{ikon}", key=f"sort_btn_{sk}", use_container_width=True):
+                    if st.session_state.get("sort_col") == sk:
+                        st.session_state["sort_desc"] = not st.session_state.get("sort_desc", True)
+                    else:
+                        st.session_state["sort_col"] = sk
+                        st.session_state["sort_desc"] = True
+                    st.rerun()
+            else:
+                th[j].markdown(f"**{txt}**")
 
         for i in range(n):
             h_desi = hesap_desi[i]
             h_bf   = hesap_bf[i]
             h_urun = hesap_urun[i]
 
-            # Tur: her render'da hesaplamadaki urunu session_state'e yaz
             tur_key = f"t_tur_{i}"
             if h_urun in URUN_TIPLERI:
                 st.session_state[tur_key] = h_urun
@@ -1986,18 +2010,14 @@ elif aktif == "teklif":
             varis_il = tc[1].selectbox("", IL_LISTESI, key=f"t_vil_{i}", label_visibility="collapsed")
             auto_km  = get_km(cikis_il, varis_il)
             tc[2].markdown(f"**{auto_km if auto_km else '-'}**")
-
             tur = tc[3].selectbox("", URUN_TIPLERI, key=tur_key, label_visibility="collapsed")
             bas_desi = tc[4].number_input("", min_value=0.0, step=0.5, key=f"t_bas_{i}", label_visibility="collapsed")
-
-            # Bit desi: hesaplama desisi direkt goster
             tc[5].markdown(f"**{h_desi}**")
             bit_desi = h_desi
-
             kg = tc[6].number_input("", min_value=0.0, step=0.5, key=f"t_kg_{i}", label_visibility="collapsed")
             buyuk = max(kg, bit_desi)
             tutar = round(buyuk * h_bf, 2)
-            tc[7].markdown(f"**{tutar:,.2f}**")
+            tc[7].markdown(f"**{fmt_para(tutar)}**")
             toplam_tutar += tutar
             teklif_sonuclar.append({
                 "cikis_il": cikis_il, "varis_il": varis_il, "km": auto_km,
@@ -2005,7 +2025,14 @@ elif aktif == "teklif":
                 "kg": kg, "buyuk": buyuk, "birim_fiyat": h_bf, "tutar": tutar
             })
 
-    st.markdown(f"### Genel Toplam: {toplam_tutar:,.2f} TL")
+        # Sıralama uygula — sadece gösterim amaçlı özet
+        sort_col = st.session_state.get("sort_col")
+        if sort_col and teklif_sonuclar:
+            teklif_sonuclar.sort(key=lambda x: x.get(sort_col,0), reverse=st.session_state.get("sort_desc",True))
+
+    # Genel toplam - sadece teklif tarafında, sade
+    if toplam_tutar > 0:
+        st.success(f"**Genel Toplam: {fmt_para(toplam_tutar)}**")
     st.divider()
 
     if st.button("Teklifi Kaydet", use_container_width=True, type="primary"):
