@@ -878,11 +878,6 @@ elif aktif == "liste":
 
     st.markdown(f"**Toplam {len(df)} aktif kayıt**")
 
-    ara = st.text_input("🔍 Firma, yetkili veya il ara...", key="ara")
-    if ara:
-        mask = df.apply(lambda r: ara.lower() in str(r).lower(), axis=1)
-        df = df[mask]
-
     if df.empty:
         st.info("Kayıt bulunamadı.")
     else:
@@ -899,6 +894,8 @@ elif aktif == "liste":
         secili_kart = st.selectbox("Müşteri Kartı:", kart_opts, key="kart_sec")
 
         if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
+            try:
+                kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
                 kart_row = df[df["id"]==kart_id].iloc[0]
 
                 st.markdown("---")
@@ -992,7 +989,6 @@ elif aktif == "liste":
 
         st.divider()
         # Toplu düzenleme tablosu
-        df_edit = df.copy()
         df_edit = df.copy()
         df_edit.insert(0, "Seç", False)
         edited_df = st.data_editor(
