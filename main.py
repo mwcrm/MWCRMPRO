@@ -918,7 +918,12 @@ elif aktif == "liste":
 
                 ab1, ab2, ab3 = st.columns(3)
                 if ab1.button("✏️ Düzenle", key=f"kab1_{kart_id}", use_container_width=True):
-                    st.session_state["duzenle_musteri"] = kart_row.to_dict()
+                    duzenle_dict = {str(k): (None if str(v) in ["nan","None","NaT"] else v) for k,v in kart_row.items()}
+                    # Temel alanları str'e çevir
+                    for _k in ["firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi"]:
+                        if _k in duzenle_dict:
+                            duzenle_dict[_k] = "" if duzenle_dict[_k] is None else str(duzenle_dict[_k])
+                    st.session_state["duzenle_musteri"] = duzenle_dict
                     st.session_state["aktif_tab"] = "yeni"
                     st.rerun()
                 if ab2.button("📄 Teklif Oluştur", key=f"kab2_{kart_id}", use_container_width=True, type="primary"):
