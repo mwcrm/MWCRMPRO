@@ -1466,7 +1466,7 @@ elif aktif == "rapor":
             )
 
         with st.expander("🔍 Arama & Filtre", expanded=False):
-            ara_r = st.text_input("Firma / İl / Temsilci ara:", key="rapor_ara")
+            ara_r = st.text_input("Firma / İl / Temsilci ara:", key="rapor_ara2")
             filtre_durum_r = st.selectbox("Durum:", ["Tümü","Aktif","Hedef","Pasif"], key="rapor_durum")
             filtre_asama_r = st.selectbox("Aşama:", ["Tümü","İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"], key="rapor_asama")
             df_f = df_rapor.copy()
@@ -1690,8 +1690,8 @@ elif aktif == "rapor":
     st.markdown("## 🔍 Arama / Filtreleme Raporu")
     ara_r1, ara_r2, ara_r3 = st.columns(3)
     arama_kelime = ara_r1.text_input("Kelime Ara (Firma/Yetkili/İl)", key="rapor_ara")
-    filtre_durum = ara_r2.selectbox("Durum", ["Tümü","Aktif","Hedef","Pasif"], key="rapor_durum")
-    filtre_asama = ara_r3.selectbox("Aşama", ["Tümü","İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"], key="rapor_asama")
+    filtre_durum = ara_r2.selectbox("Durum", ["Tümü","Aktif","Hedef","Pasif"], key="rapor_durum2")
+    filtre_asama = ara_r3.selectbox("Aşama", ["Tümü","İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"], key="rapor_asama2")
 
     df_ara = df_rapor.copy()
     if arama_kelime:
