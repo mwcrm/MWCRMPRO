@@ -805,20 +805,32 @@ if aktif == "yeni":
 
         st.markdown("#### 💰 Ciro Bilgileri")
         ciro_col1, ciro_col2, ciro_col3, ciro_col4 = st.columns(4)
+        def parse_tr_sayi(s):
+            """10.000 veya 10000 veya 10,000 → float"""
+            try:
+                s = str(s).strip()
+                # Türk formatı: 1.000.000,50
+                if "," in s and "." in s:
+                    s = s.replace(".","").replace(",",".")
+                elif "," in s and "." not in s:
+                    s = s.replace(",",".")
+                else:
+                    s = s.replace(".","")
+                return float(s or 0)
+            except: return 0.0
+
         bek_val = duzenle.get("beklenen_ciro","0") if duzenle else "0"
         ger_val = duzenle.get("gerceklesen_ciro","0") if duzenle else "0"
-        try: bek_val = f"{float(str(bek_val).replace(',','.') or 0):,.0f}".replace(",",".")
-        except: bek_val = "0"
-        try: ger_val = f"{float(str(ger_val).replace(',','.') or 0):,.0f}".replace(",",".")
-        except: ger_val = "0"
+        try: bek_disp = f"{float(str(bek_val) or 0):,.0f}".replace(",",".")
+        except: bek_disp = "0"
+        try: ger_disp = f"{float(str(ger_val) or 0):,.0f}".replace(",",".")
+        except: ger_disp = "0"
 
-        bek_str = ciro_col1.text_input("Beklenen Ciro (₺)", value=bek_val, placeholder="Örn: 10.000", key="bek_ciro_str")
-        ger_str = ciro_col2.text_input("Gerçekleşen Ciro (₺)", value=ger_val, placeholder="Örn: 8.500", key="ger_ciro_str")
+        bek_str = ciro_col1.text_input("Beklenen Ciro (₺)", value=bek_disp, placeholder="Örn: 10.000", key="bek_ciro_str")
+        ger_str = ciro_col2.text_input("Gerçekleşen Ciro (₺)", value=ger_disp, placeholder="Örn: 8.500", key="ger_ciro_str")
 
-        try: beklenen_ciro = float(bek_str.replace(".","").replace(",",".") or 0)
-        except: beklenen_ciro = 0.0
-        try: gerceklesen_ciro = float(ger_str.replace(".","").replace(",",".") or 0)
-        except: gerceklesen_ciro = 0.0
+        beklenen_ciro = parse_tr_sayi(bek_str)
+        gerceklesen_ciro = parse_tr_sayi(ger_str)
         fark = gerceklesen_ciro - beklenen_ciro
         yuzde = (gerceklesen_ciro / beklenen_ciro * 100) if beklenen_ciro > 0 else 0
         ciro_col3.metric("Fark (₺)", f"₺{fark:,.0f}", delta=f"{fark:,.0f}")
