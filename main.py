@@ -1954,9 +1954,6 @@ elif aktif == "teklif":
 
     with right:
         st.markdown("#### TEKLİFİMİZ")
-
-    with right:
-        st.markdown("#### TEKLİFİMİZ")
         th = st.columns([1.2,1.2,0.7,0.9,0.8,0.8,0.7,1.0])
         for txt, col in zip(["Çıkış İli","Varış İli","KM","Tür","Baş Desi","Bit Desi","KG","Tutar"], th):
             col.markdown(f"**{txt}**")
@@ -1967,19 +1964,20 @@ elif aktif == "teklif":
             tur_key = f"t_tur_{i}"
             if h_urun in URUN_TIPLERI:
                 st.session_state[tur_key] = h_urun
-            tc = st.columns([1.2,1.2,0.7,0.9,0.8,0.8,0.7,1.0])
-            cikis_il = tc[0].selectbox("", IL_LISTESI, key=f"t_cil_{i}", label_visibility="collapsed")
-            varis_il = tc[1].selectbox("", IL_LISTESI, key=f"t_vil_{i}", label_visibility="collapsed")
-            auto_km  = get_km(cikis_il, varis_il)
-            tc[2].markdown(f"**{auto_km if auto_km else '-'}**")
-            tur = tc[3].selectbox("", URUN_TIPLERI, key=tur_key, label_visibility="collapsed")
-            bas_desi = tc[4].number_input("", min_value=0.0, step=0.5, key=f"t_bas_{i}", label_visibility="collapsed")
-            tc[5].markdown(f"**{h_desi}**")
-            bit_desi = h_desi
-            kg = tc[6].number_input("", min_value=0.0, step=0.5, key=f"t_kg_{i}", label_visibility="collapsed")
-            buyuk = max(kg, bit_desi)
-            tutar = round(buyuk * h_bf, 2)
-            tc[7].markdown(f"**{fmt_para(tutar)}**")
+            with right:
+                tc = st.columns([1.2,1.2,0.7,0.9,0.8,0.8,0.7,1.0])
+                cikis_il = tc[0].selectbox("", IL_LISTESI, key=f"t_cil_{i}", label_visibility="collapsed")
+                varis_il = tc[1].selectbox("", IL_LISTESI, key=f"t_vil_{i}", label_visibility="collapsed")
+                auto_km  = get_km(cikis_il, varis_il)
+                tc[2].markdown(f"**{auto_km if auto_km else '-'}**")
+                tur = tc[3].selectbox("", URUN_TIPLERI, key=tur_key, label_visibility="collapsed")
+                bas_desi = tc[4].number_input("", min_value=0.0, step=0.5, key=f"t_bas_{i}", label_visibility="collapsed")
+                tc[5].markdown(f"**{h_desi}**")
+                bit_desi = h_desi
+                kg = tc[6].number_input("", min_value=0.0, step=0.5, key=f"t_kg_{i}", label_visibility="collapsed")
+                buyuk = max(kg, bit_desi)
+                tutar = round(buyuk * h_bf, 2)
+                tc[7].markdown(f"**{fmt_para(tutar)}**")
             toplam_tutar += tutar
             teklif_sonuclar.append({
                 "cikis_il": cikis_il, "varis_il": varis_il, "km": auto_km,
