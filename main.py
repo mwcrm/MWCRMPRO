@@ -1957,9 +1957,6 @@ elif aktif == "teklif":
 
     with right:
         st.markdown("#### TEKLİFİMİZ")
-        th = st.columns([1.2,1.2,0.7,0.9,0.8,0.8,0.7,1.0])
-        for txt, col in zip(["Çıkış İli","Varış İli","KM","Tür","Baş Desi","Bit Desi","KG","Tutar"], th):
-            col.markdown(f"**{txt}**")
         for i in range(n):
             h_desi = hesap_desi[i]
             h_bf   = hesap_bf[i]
@@ -1992,11 +1989,10 @@ elif aktif == "teklif":
 
     # Sıralanabilir özet tablo
     if teklif_sonuclar:
-        st.markdown("#### 📊 Sıralı Özet — Başlığa tıkla")
         if "sort_col" not in st.session_state:
             st.session_state["sort_col"] = None
             st.session_state["sort_desc"] = True
-        _ozet_cols = [("Çıkış","cikis_il"),("Varış","varis_il"),("KM","km"),("Tür","tur"),
+        _ozet_cols = [("Çıkış İli","cikis_il"),("Varış İli","varis_il"),("KM","km"),("Tür","tur"),
                       ("Baş Desi","bas_desi"),("Bit Desi","bit_desi"),("KG","kg"),
                       ("B.Fiyat","birim_fiyat"),("Tutar","tutar")]
         hdr = st.columns(len(_ozet_cols))
