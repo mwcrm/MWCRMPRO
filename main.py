@@ -3102,14 +3102,18 @@ elif aktif == "kisiler":
                         elif len(t)==10: t = '90'+t
 
                         # Daha önce gönderilen mesajlar - sadece özet
+                        _kisi_id = int(kisi.get('id',0) or 0)
                         try:
-                            df_msg_log = db_read("kisiler_mesaj_log", extra_sql=f"WHERE kisi_id={int(kisi.get('id',0))} ORDER BY tarih DESC")
+                            if _kisi_id > 0:
+                                df_msg_log = db_read("kisiler_mesaj_log", filters={"kisi_id": _kisi_id}, order_col="tarih", desc=True)
+                            else:
+                                df_msg_log = pd.DataFrame()
                         except:
                             df_msg_log = pd.DataFrame()
 
                         if not df_msg_log.empty:
                             son = df_msg_log.iloc[0]
-                            st.caption(f"📨 {len(df_msg_log)} mesaj gönderildi — son: {str(son.get('tarih',''))[:16]} | **{son.get('sablon_adi','')}**: {str(son.get('mesaj',''))[:60]}")
+                            st.caption(f"📨 {len(df_msg_log)} mesaj — son: {str(son.get('tarih',''))[:16]} | **{son.get('sablon_adi','')}**: {str(son.get('mesaj',''))[:60]}")
 
                         # Şablon seç
                         sec_opts = ["-- Şablon Seçin --"] + sablon_adlari + ["✏️ Manuel Yaz"]
@@ -3132,12 +3136,13 @@ elif aktif == "kisiler":
                         if mesaj_gonder and mesaj_gonder.strip():
                             wa_url = f"https://wa.me/{t}?text={mesaj_gonder.replace(' ','%20').replace(chr(10),'%0A')}"
                             
-                            # Otomatik kayıt — WA linkine tıklanınca kaydet
-                            log_key = f"logged_{kisi.get('id','')}_{hash(mesaj_gonder[:50])}"
-                            if not st.session_state.get(log_key):
+                            # Otomatik kayıt
+                            _log_kisi_id = int(kisi.get("id",0) or 0)
+                            log_key = f"logged_{_log_kisi_id}_{hash(mesaj_gonder[:50])}"
+                            if not st.session_state.get(log_key) and _log_kisi_id > 0:
                                 try:
                                     db_insert("kisiler_mesaj_log", {
-                                        "kisi_id": int(kisi.get("id",0)),
+                                        "kisi_id": _log_kisi_id,
                                         "kisi_adi": isim,
                                         "telefon": tel,
                                         "sablon_adi": sec if sec not in ["-- Şablon Seçin --","✏️ Manuel Yaz"] else "Manuel",
