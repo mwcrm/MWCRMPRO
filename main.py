@@ -3101,14 +3101,15 @@ elif aktif == "kisiler":
                         if t.startswith('0') and len(t)==11: t = '90'+t[1:]
                         elif len(t)==10: t = '90'+t
 
-                        # Daha önce gönderilen mesajlar
+                        # Daha önce gönderilen mesajlar - sadece özet
                         try:
                             df_msg_log = db_read("kisiler_mesaj_log", extra_sql=f"WHERE kisi_id={int(kisi.get('id',0))} ORDER BY tarih DESC")
                         except:
                             df_msg_log = pd.DataFrame()
 
                         if not df_msg_log.empty:
-                            st.caption(f"📨 {len(df_msg_log)} mesaj gönderildi — son: {str(df_msg_log.iloc[0].get('tarih',''))[:16]}")
+                            son = df_msg_log.iloc[0]
+                            st.caption(f"📨 {len(df_msg_log)} mesaj gönderildi — son: {str(son.get('tarih',''))[:16]} | **{son.get('sablon_adi','')}**: {str(son.get('mesaj',''))[:60]}")
 
                         # Şablon seç
                         sec_opts = ["-- Şablon Seçin --"] + sablon_adlari + ["✏️ Manuel Yaz"]
@@ -3148,13 +3149,6 @@ elif aktif == "kisiler":
 
                             st.link_button("📱 WhatsApp'ta Gönder", wa_url, use_container_width=True, type="primary")
 
-                        # Mesaj geçmişi
-                        if not df_msg_log.empty:
-                            with st.expander(f"📨 Mesaj Geçmişi ({len(df_msg_log)})"):
-                                for _, mlog in df_msg_log.iterrows():
-                                    mc1, mc2 = st.columns([2,5])
-                                    mc1.caption(f"🕐 {str(mlog.get('tarih',''))[:16]}")
-                                    mc2.caption(f"📝 **{mlog.get('sablon_adi','')}**: {str(mlog.get('mesaj',''))[:80]}")
                     st.divider()
 
         ara_kis = st.text_input("🔍 Kişi ara:", key="kisiler_ara2", placeholder="Ad, firma, bölge...")
