@@ -806,10 +806,10 @@ if aktif == "yeni":
         st.markdown("#### 💰 Ciro Bilgileri")
         ciro_col1, ciro_col2, ciro_col3, ciro_col4 = st.columns(4)
         beklenen_ciro = ciro_col1.number_input(
-            "Beklenen Ciro (₺)", min_value=0.0, step=1000.0,
+            "Beklenen Ciro (₺)", min_value=0.0, step=1000.0, format="%.0f",
             value=float(duzenle.get("beklenen_ciro") or 0) if duzenle else 0.0)
         gerceklesen_ciro = ciro_col2.number_input(
-            "Gerçekleşen Ciro (₺)", min_value=0.0, step=1000.0,
+            "Gerçekleşen Ciro (₺)", min_value=0.0, step=1000.0, format="%.0f",
             value=float(duzenle.get("gerceklesen_ciro") or 0) if duzenle else 0.0)
         fark = gerceklesen_ciro - beklenen_ciro
         yuzde = (gerceklesen_ciro / beklenen_ciro * 100) if beklenen_ciro > 0 else 0
