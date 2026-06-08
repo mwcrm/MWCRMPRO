@@ -3355,27 +3355,52 @@ elif aktif == "randevu":
             g_cols = [c for c in ["id","randevu_tarihi","randevu_saati","musteri_adi","bolge","gorev","takip","adet","sonuc","temsilci","aciklama"] if c in df_rand.columns]
             st.dataframe(df_rand[g_cols], use_container_width=True, hide_index=True)
 
-            # WA uyarı linkleri
+            # WA uyarı linkleri + yaklaşan otomatik hazır
             st.markdown("#### 📱 WhatsApp Uyarı Gönder")
-            for _, row in df_rand.head(20).iterrows():
-                tem_tel_r = str(row.get("temsilci_tel","") or "")
-                musteri_r = row.get("musteri_adi","")
-                tarih_r = f"{row.get('randevu_tarihi','')} {row.get('randevu_saati','')}"
-                bolge_r = row.get("bolge","")
-                gorev_r = row.get("gorev","")
-                temsilci_r = row.get("temsilci","")
 
-                wc1, wc2, wc3 = st.columns([3,2,1])
-                wc1.markdown(f"**{musteri_r}** — {tarih_r} — {temsilci_r}")
-                wc2.markdown(f"📍 {bolge_r} | {gorev_r}")
-                if tem_tel_r:
-                    import re as _rew
-                    twt = _rew.sub(r"[\s\-\(\)+]","", tem_tel_r)
-                    if twt.startswith("0"): twt = "90" + twt[1:]
-                    msg_w = f"📅 RANDEVU: {musteri_r}\n{tarih_r}\nBölge: {bolge_r}\nGörev: {gorev_r}"
-                    wc3.link_button("📱 WA", f"https://wa.me/{twt}?text={msg_w.replace(' ','%20').replace(chr(10),'%0A')}", use_container_width=True)
-                else:
-                    wc3.markdown("📞 Tel yok")
+            # Yaklaşan randevuları vurgula
+            bugun_str = datetime.now().strftime("%Y-%m-%d")
+            yarin_str = (datetime.now() + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+
+            for _, row in df_rand.head(20).iterrows():
+                musteri_r  = str(row.get("musteri_adi",""))
+                tarih_r    = str(row.get("randevu_tarihi",""))
+                saat_r     = str(row.get("randevu_saati",""))
+                bolge_r    = str(row.get("bolge",""))
+                gorev_r    = str(row.get("gorev",""))
+                temsilci_r = str(row.get("temsilci",""))
+                tem_tel_r  = fmt_tel(str(row.get("temsilci_tel","") or ""))
+
+                # Yaklaşan uyarısı
+                yaklasan = tarih_r in [bugun_str, yarin_str]
+                etiket = f"{'🔴 BUGÜN' if tarih_r==bugun_str else '🟡 YARIN' if tarih_r==yarin_str else tarih_r} — {musteri_r} | {temsilci_r}"
+
+                with st.container():
+                    wc1, wc2, wc3, wc4 = st.columns([3, 1.5, 1.5, 1])
+                    wc1.markdown(f"{'**' if yaklasan else ''}{etiket}{'**' if yaklasan else ''}")
+                    wc2.caption(f"📍 {bolge_r} | {gorev_r}")
+
+                    # Telefon var mı kontrol
+                    if tem_tel_r:
+                        import re as _re_wa
+                        t_wa = _re_wa.sub(r'[^\d]','',tem_tel_r)
+                        if t_wa.startswith('0') and len(t_wa)==11: t_wa = '90'+t_wa[1:]
+                        elif len(t_wa)==10: t_wa = '90'+t_wa
+                        msg_wa = f"📅 RANDEVU HATIRLATMA\nMüşteri: {musteri_r}\nTarih: {tarih_r} {saat_r}\nBölge: {bolge_r}\nGörev: {gorev_r}\nİyi çalışmalar!"
+                        wa_link = f"https://wa.me/{t_wa}?text={msg_wa.replace(' ','%20').replace(chr(10),'%0A')}"
+                        wc3.link_button("📱 WA Gönder", wa_link, use_container_width=True, type="primary" if yaklasan else "secondary")
+                    else:
+                        # Manuel tel girişi
+                        manuel_t = wc3.text_input("Tel:", placeholder="05xx", key=f"wa_tel_{row.get('id','')}", label_visibility="collapsed")
+                        if manuel_t and wc4.button("📱", key=f"wa_gnd_{row.get('id','')}"):
+                            import re as _re_wa2
+                            t_m = _re_wa2.sub(r'[^\d]','',manuel_t)
+                            if t_m.startswith('0') and len(t_m)==11: t_m = '90'+t_m[1:]
+                            elif len(t_m)==10: t_m = '90'+t_m
+                            msg_m = f"📅 RANDEVU\nMüşteri: {musteri_r}\nTarih: {tarih_r} {saat_r}\nGörev: {gorev_r}"
+                            st.markdown(f"[📱 WA Aç](https://wa.me/{t_m}?text={msg_m.replace(' ','%20').replace(chr(10),'%0A')})")
+                        elif not manuel_t:
+                            wc3.caption("📞 Tel yok")
 
             buf_r = _rio.BytesIO()
             df_rand.to_excel(buf_r, index=False)
