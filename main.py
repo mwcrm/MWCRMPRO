@@ -1931,11 +1931,11 @@ elif aktif == "teklif":
 
     with left:
         st.markdown("#### HESAPLAMA")
-        hh = st.columns([1.5, 0.7, 0.7, 0.7, 0.8, 1.2, 0.5])
-        for txt, col in zip(["Ürün","En","Boy","Yük","Desi","Birim Fiyat","↕"], hh):
+        hh = st.columns([1.5, 0.7, 0.7, 0.7, 0.8, 1.2])
+        for txt, col in zip(["Ürün","En","Boy","Yük","Desi","Birim Fiyat"], hh):
             col.markdown(f"**{txt}**")
         for i in range(n):
-            hc = st.columns([1.5, 0.7, 0.7, 0.7, 0.8, 1.2, 0.5])
+            hc = st.columns([1.5, 0.7, 0.7, 0.7, 0.8, 1.2])
             urun_tip = hc[0].selectbox("", URUN_TIPLERI, key=f"h_tip_{i}", label_visibility="collapsed")
             en  = hc[1].number_input("", min_value=0.0, step=1.0, key=f"h_en_{i}", label_visibility="collapsed", format="%.0f")
             boy = hc[2].number_input("", min_value=0.0, step=1.0, key=f"h_boy_{i}", label_visibility="collapsed", format="%.0f")
@@ -1946,26 +1946,6 @@ elif aktif == "teklif":
             urun_adi = urun_tip
             if urun_tip == "Manuel":
                 urun_adi = st.text_input(f"Ürün adı {i+1}:", key=f"h_adi_{i}", placeholder="Ürün adı")
-            # Taşıma butonları
-            with hc[6]:
-                _sira_key = "t_satir_sirasi"
-                if _sira_key not in st.session_state:
-                    st.session_state[_sira_key] = list(range(n))
-                if i > 0 and st.button("▲", key=f"row_up_{i}", use_container_width=True):
-                    # Satır i ile i-1'in tüm değerlerini değiştir
-                    for _k in ["h_en","h_boy","h_yuk","h_bf","t_bas","t_kg"]:
-                        va = st.session_state.get(f"{_k}_{i}", 0)
-                        vb = st.session_state.get(f"{_k}_{i-1}", 0)
-                        st.session_state[f"{_k}_{i}"] = vb
-                        st.session_state[f"{_k}_{i-1}"] = va
-                    st.rerun()
-                if i < n-1 and st.button("▼", key=f"row_dn_{i}", use_container_width=True):
-                    for _k in ["h_en","h_boy","h_yuk","h_bf","t_bas","t_kg"]:
-                        va = st.session_state.get(f"{_k}_{i}", 0)
-                        vb = st.session_state.get(f"{_k}_{i+1}", 0)
-                        st.session_state[f"{_k}_{i}"] = vb
-                        st.session_state[f"{_k}_{i+1}"] = va
-                    st.rerun()
             hesap_sonuclar.append({"urun": urun_adi, "en": en, "boy": boy, "yuk": yuk,
                                    "desi": desi, "birim_fiyat": birim_fiyat})
             hesap_desi[i] = desi
