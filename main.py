@@ -558,6 +558,37 @@ st.markdown("""
 # ── MENÜ FONKSİYONLARI (sidebar'dan önce tanımlanmalı) ───────────────────────
 import json as _menu_json
 
+def fmt_para(n):
+    """Türk muhasebe formatı: 1.000.000,00 ₺"""
+    try:
+        n = float(n or 0)
+        if n == int(n):
+            s = f"{int(n):,}".replace(",",".")
+        else:
+            tam = int(n)
+            kurus = round((n - tam) * 100)
+            s = f"{tam:,}".replace(",",".") + f",{kurus:02d}"
+        return s + " ₺"
+    except:
+        return "0 ₺"
+
+def parse_para(s):
+    """1.000.000,50 → 1000000.50"""
+    try:
+        s = str(s).strip().replace(" ","").replace("₺","").replace("TL","")
+        if not s: return 0.0
+        if "," in s and "." in s:
+            s = s.replace(".","").replace(",",".")
+        elif "," in s:
+            s = s.replace(",",".")
+        else:
+            s = s.replace(".","")
+        return float(s)
+    except:
+        return 0.0
+
+
+
 _TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "teklif", "kisiler", "rapor", "excel", "arsiv", "mesajlar", "kullanici"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
@@ -805,46 +836,17 @@ if aktif == "yeni":
 
         st.markdown("#### 💰 Ciro Bilgileri")
         ciro_col1, ciro_col2, ciro_col3, ciro_col4 = st.columns(4)
-        def parse_tr_sayi(s):
-            """Türk muhasebe formatı: 1.000.000,50 → 1000000.50"""
-            try:
-                s = str(s).strip().replace(" ","").replace("₺","")
-                if not s or s == "0": return 0.0
-                # Virgül varsa ondalık ayraç
-                if "," in s:
-                    # 1.000.000,50 → noktaları kaldır, virgülü noktaya çevir
-                    s = s.replace(".","").replace(",",".")
-                else:
-                    # Sadece nokta var — binlik ayraç olarak kabul et
-                    # 1.000.000 → 1000000
-                    s = s.replace(".","")
-                return float(s)
-            except: return 0.0
-
-        def fmt_tr_sayi(n):
-            """1000000 → 1.000.000,00"""
-            try:
-                n = float(n or 0)
-                # Tam sayıysa virgülsüz göster
-                if n == int(n):
-                    return f"{int(n):,}".replace(",",".")
-                else:
-                    tam = int(n)
-                    kurus = round((n - tam) * 100)
-                    return f"{tam:,}".replace(",",".") + f",{kurus:02d}"
-            except: return "0"
-
         bek_val = duzenle.get("beklenen_ciro", 0) if duzenle else 0
         ger_val = duzenle.get("gerceklesen_ciro", 0) if duzenle else 0
 
-        bek_str = ciro_col1.text_input("Beklenen Ciro (₺)", value=fmt_tr_sayi(bek_val), placeholder="Örn: 10.000", key="bek_ciro_str")
-        ger_str = ciro_col2.text_input("Gerçekleşen Ciro (₺)", value=fmt_tr_sayi(ger_val), placeholder="Örn: 8.500", key="ger_ciro_str")
+        bek_str = ciro_col1.text_input("Beklenen Ciro (₺)", value=fmt_para(bek_val).replace(" ₺",""), placeholder="Örn: 10.000", key="bek_ciro_str")
+        ger_str = ciro_col2.text_input("Gerçekleşen Ciro (₺)", value=fmt_para(ger_val).replace(" ₺",""), placeholder="Örn: 8.500", key="ger_ciro_str")
 
-        beklenen_ciro = parse_tr_sayi(bek_str)
-        gerceklesen_ciro = parse_tr_sayi(ger_str)
+        beklenen_ciro = parse_para(bek_str)
+        gerceklesen_ciro = parse_para(ger_str)
         fark = gerceklesen_ciro - beklenen_ciro
         yuzde = (gerceklesen_ciro / beklenen_ciro * 100) if beklenen_ciro > 0 else 0
-        ciro_col3.metric("Fark (₺)", f"₺{fmt_tr_sayi(fark)}", delta=fmt_tr_sayi(fark))
+        ciro_col3.metric("Fark (₺)", fmt_para(fark))
         ciro_col4.metric("Gerçekleşme %", f"%{yuzde:.1f}".replace(".",","))
 
         btn_label = "💾 Güncelle" if duzenle else "💾 Cari Kartı Kaydet"
@@ -949,8 +951,8 @@ elif aktif == "liste":
                 with kc3:
                     bek = float(kart_row.get("beklenen_ciro",0) or 0)
                     ger = float(kart_row.get("gerceklesen_ciro",0) or 0)
-                    st.metric("Beklenen", f"₺{bek:,.0f}")
-                    st.metric("Gerçekleşen", f"₺{ger:,.0f}", delta=f"₺{ger-bek:,.0f}")
+                    st.metric("Beklenen", fmt_para(bek))
+                    st.metric("Gerçekleşen", fmt_para(ger), delta=fmt_para(ger-bek))
 
                 ab1, ab2, ab3 = st.columns(3)
                 if ab1.button("✏️ Düzenle", key=f"kab1_{kart_id}", use_container_width=True):
@@ -1312,10 +1314,10 @@ elif aktif == "rapor":
     c4.metric("⏸️ Pasif", pasif_say)
 
     c5, c6, c7, c8 = st.columns(4)
-    c5.metric("💰 Toplam Beklenen", f"₺{toplam_beklenen:,.0f}")
-    c6.metric("✅ Toplam Gerçekleşen", f"₺{toplam_gercek:,.0f}", delta=f"₺{toplam_fark:,.0f}")
+    c5.metric("💰 Toplam Beklenen", fmt_para(toplam_beklenen))
+    c6.metric("✅ Toplam Gerçekleşen", fmt_para(toplam_gercek), delta=fmt_para(toplam_fark))
     c7.metric("📈 Gerçekleşme Oranı", f"%{genel_yuzde:.1f}")
-    c8.metric("🏆 Kazanılan Ciro", f"₺{kazanilan_ciro:,.0f}")
+    c8.metric("🏆 Kazanılan Ciro", fmt_para(kazanilan_ciro))
 
     st.divider()
     col_r1, col_r2 = st.columns(2)
@@ -1329,9 +1331,9 @@ elif aktif == "rapor":
         ).reset_index()
         durum_df["Fark"] = durum_df["Gerceklesen"] - durum_df["Beklenen"]
         durum_df["Oran%"] = durum_df.apply(lambda r: f"%{(r['Gerceklesen']/r['Beklenen']*100):.1f}" if r["Beklenen"] > 0 else "%0", axis=1)
-        durum_df["Beklenen"]    = durum_df["Beklenen"].apply(lambda x: f"₺{x:,.0f}")
-        durum_df["Gerceklesen"] = durum_df["Gerceklesen"].apply(lambda x: f"₺{x:,.0f}")
-        durum_df["Fark"]        = durum_df["Fark"].apply(lambda x: f"₺{x:,.0f}")
+        durum_df["Beklenen"]    = durum_df["Beklenen"].apply(lambda x: fmt_para(x))
+        durum_df["Gerceklesen"] = durum_df["Gerceklesen"].apply(lambda x: fmt_para(x))
+        durum_df["Fark"]        = durum_df["Fark"].apply(lambda x: fmt_para(x))
         durum_df.columns = ["Durum","Müşteri","Beklenen Ciro","Gerçekleşen","Fark","Oran %"]
         st.dataframe(durum_df, use_container_width=True, hide_index=True)
 
@@ -1344,9 +1346,9 @@ elif aktif == "rapor":
         ).reset_index()
         asama_df["Fark"] = asama_df["Gerceklesen"] - asama_df["Beklenen"]
         asama_df["Oran%"] = asama_df.apply(lambda r: f"%{(r['Gerceklesen']/r['Beklenen']*100):.1f}" if r["Beklenen"] > 0 else "%0", axis=1)
-        asama_df["Beklenen"]    = asama_df["Beklenen"].apply(lambda x: f"₺{x:,.0f}")
-        asama_df["Gerceklesen"] = asama_df["Gerceklesen"].apply(lambda x: f"₺{x:,.0f}")
-        asama_df["Fark"]        = asama_df["Fark"].apply(lambda x: f"₺{x:,.0f}")
+        asama_df["Beklenen"]    = asama_df["Beklenen"].apply(lambda x: fmt_para(x))
+        asama_df["Gerceklesen"] = asama_df["Gerceklesen"].apply(lambda x: fmt_para(x))
+        asama_df["Fark"]        = asama_df["Fark"].apply(lambda x: fmt_para(x))
         asama_df.columns = ["Aşama","Müşteri","Beklenen Ciro","Gerçekleşen","Fark","Oran %"]
         st.dataframe(asama_df, use_container_width=True, hide_index=True)
 
@@ -1362,9 +1364,9 @@ elif aktif == "rapor":
         ).reset_index().sort_values("Gerceklesen", ascending=False)
         t_df["Fark"]  = t_df["Gerceklesen"] - t_df["Beklenen"]
         t_df["Oran%"] = t_df.apply(lambda r: f"%{(r['Gerceklesen']/r['Beklenen']*100):.1f}" if r["Beklenen"] > 0 else "%0", axis=1)
-        t_df["Beklenen"]    = t_df["Beklenen"].apply(lambda x: f"₺{x:,.0f}")
-        t_df["Gerceklesen"] = t_df["Gerceklesen"].apply(lambda x: f"₺{x:,.0f}")
-        t_df["Fark"]        = t_df["Fark"].apply(lambda x: f"₺{x:,.0f}")
+        t_df["Beklenen"]    = t_df["Beklenen"].apply(lambda x: fmt_para(x))
+        t_df["Gerceklesen"] = t_df["Gerceklesen"].apply(lambda x: fmt_para(x))
+        t_df["Fark"]        = t_df["Fark"].apply(lambda x: fmt_para(x))
         t_df.columns = ["Temsilci","Müşteri","Beklenen","Gerçekleşen","Fark","Oran %"]
         st.dataframe(t_df, use_container_width=True, hide_index=True)
 
@@ -1377,18 +1379,18 @@ elif aktif == "rapor":
         ).reset_index().sort_values("Adet", ascending=False).head(15)
         il_df["Fark"]  = il_df["Gerceklesen"] - il_df["Beklenen"]
         il_df["Oran%"] = il_df.apply(lambda r: f"%{(r['Gerceklesen']/r['Beklenen']*100):.1f}" if r["Beklenen"] > 0 else "%0", axis=1)
-        il_df["Beklenen"]    = il_df["Beklenen"].apply(lambda x: f"₺{x:,.0f}")
-        il_df["Gerceklesen"] = il_df["Gerceklesen"].apply(lambda x: f"₺{x:,.0f}")
-        il_df["Fark"]        = il_df["Fark"].apply(lambda x: f"₺{x:,.0f}")
+        il_df["Beklenen"]    = il_df["Beklenen"].apply(lambda x: fmt_para(x))
+        il_df["Gerceklesen"] = il_df["Gerceklesen"].apply(lambda x: fmt_para(x))
+        il_df["Fark"]        = il_df["Fark"].apply(lambda x: fmt_para(x))
         il_df.columns = ["İl","Müşteri","Beklenen","Gerçekleşen","Fark","Oran %"]
         st.dataframe(il_df, use_container_width=True, hide_index=True)
 
     st.divider()
     st.markdown("### 💰 Müşteri Bazlı Ciro Detayı (Top 20 Beklenen)")
     ciro_df = df_rapor[["firma","yetkili","durum","islem_asamasi","temsilci","beklenen_ciro","gerceklesen_ciro","fark","yuzde"]].sort_values("beklenen_ciro", ascending=False).head(20).copy()
-    ciro_df["beklenen_ciro"]    = ciro_df["beklenen_ciro"].apply(lambda x: f"₺{x:,.0f}")
-    ciro_df["gerceklesen_ciro"] = ciro_df["gerceklesen_ciro"].apply(lambda x: f"₺{x:,.0f}")
-    ciro_df["fark"]             = ciro_df["fark"].apply(lambda x: f"₺{x:,.0f}")
+    ciro_df["beklenen_ciro"]    = ciro_df["beklenen_ciro"].apply(lambda x: fmt_para(x))
+    ciro_df["gerceklesen_ciro"] = ciro_df["gerceklesen_ciro"].apply(lambda x: fmt_para(x))
+    ciro_df["fark"]             = ciro_df["fark"].apply(lambda x: fmt_para(x))
     ciro_df["yuzde"]            = ciro_df["yuzde"].apply(lambda x: f"%{x:.1f}")
     ciro_df.columns = ["Firma","Yetkili","Durum","Aşama","Temsilci","Beklenen Ciro","Gerçekleşen Ciro","Fark","Gerçekleşme %"]
     st.dataframe(ciro_df, use_container_width=True, hide_index=True)
@@ -1448,13 +1450,13 @@ elif aktif == "rapor":
         if not df_tek_rapor.empty:
             t1, t2, t3, t4 = st.columns(4)
             t1.metric("Toplam Teklif", len(df_tek_rapor))
-            t2.metric("Toplam Tutar", f"₺{df_tek_rapor['toplam_tutar'].sum():,.0f}")
-            t3.metric("Ort. Teklif", f"₺{df_tek_rapor['toplam_tutar'].mean():,.0f}")
+            t2.metric("Toplam Tutar", fmt_para(df_tek_rapor['toplam_tutar'].sum()))
+            t3.metric("Ort. Teklif", fmt_para(df_tek_rapor['toplam_tutar'].mean()))
             t4.metric("Bu Ay", len(df_tek_rapor[df_tek_rapor["tarih"].str[:7] == datetime.now().strftime("%Y-%m")]) if "tarih" in df_tek_rapor.columns else 0)
 
             # Teklif listesi
             df_tek_goster = df_tek_rapor[["id","tarih","musteri_adi","toplam_tutar","olusturan","notlar"]].copy()
-            df_tek_goster["toplam_tutar"] = df_tek_goster["toplam_tutar"].apply(lambda x: f"₺{float(x):,.2f}")
+            df_tek_goster["toplam_tutar"] = df_tek_goster["toplam_tutar"].apply(lambda x: fmt_para(float(x)))
             df_tek_goster.columns = ["ID","Tarih","Müşteri","Tutar","Oluşturan","Notlar"]
             st.dataframe(df_tek_goster, use_container_width=True, hide_index=True)
 
@@ -1488,7 +1490,7 @@ elif aktif == "rapor":
                 st.markdown("**Ürün/Tür Dağılımı**")
                 if tur_sayac:
                     tur_df = pd.DataFrame([
-                        {"Tür": k, "Teklif Adedi": v["adet"], "Toplam Tutar": f"₺{v['tutar']:,.2f}"}
+                        {"Tür": k, "Teklif Adedi": v["adet"], "Toplam Tutar": fmt_para(v['tutar'])}
                         for k, v in sorted(tur_sayac.items(), key=lambda x: x[1]["adet"], reverse=True)
                     ])
                     st.dataframe(tur_df, use_container_width=True, hide_index=True)
@@ -1499,7 +1501,7 @@ elif aktif == "rapor":
                 st.markdown("**Hat (Çıkış → Varış) Analizi**")
                 if il_tur_sayac:
                     hat_df = pd.DataFrame([
-                        {"Hat": k, "Teklif Adedi": v["adet"], "Toplam Tutar": f"₺{v['tutar']:,.2f}"}
+                        {"Hat": k, "Teklif Adedi": v["adet"], "Toplam Tutar": fmt_para(v['tutar'])}
                         for k, v in sorted(il_tur_sayac.items(), key=lambda x: x[1]["adet"], reverse=True)
                     ]).head(15)
                     st.dataframe(hat_df, use_container_width=True, hide_index=True)
@@ -1595,7 +1597,7 @@ elif aktif == "rapor":
                     Adet=("Tur","count"),
                     Toplam_Tutar=("Tutar","sum")
                 ).reset_index().sort_values("Adet", ascending=False)
-                cikis_df["Toplam_Tutar"] = cikis_df["Toplam_Tutar"].apply(lambda x: f"₺{x:,.2f}")
+                cikis_df["Toplam_Tutar"] = cikis_df["Toplam_Tutar"].apply(lambda x: fmt_para(x))
                 cikis_df.columns = ["Çıkış İli","Teklif Adedi","Toplam Tutar"]
                 st.dataframe(cikis_df, use_container_width=True, hide_index=True)
 
@@ -1605,7 +1607,7 @@ elif aktif == "rapor":
                     Adet=("Tur","count"),
                     Toplam_Tutar=("Tutar","sum")
                 ).reset_index().sort_values("Adet", ascending=False)
-                varis_df["Toplam_Tutar"] = varis_df["Toplam_Tutar"].apply(lambda x: f"₺{x:,.2f}")
+                varis_df["Toplam_Tutar"] = varis_df["Toplam_Tutar"].apply(lambda x: fmt_para(x))
                 varis_df.columns = ["Varış İli","Teklif Adedi","Toplam Tutar"]
                 st.dataframe(varis_df, use_container_width=True, hide_index=True)
 
@@ -1621,7 +1623,7 @@ elif aktif == "rapor":
                 Toplam_Tutar=("Tutar","sum")
             ).reset_index().sort_values("Toplam_Tutar", ascending=False)
             tur_il_df["Ort_KG"] = tur_il_df["Ort_KG"].apply(lambda x: f"{x:.2f}")
-            tur_il_df["Toplam_Tutar"] = tur_il_df["Toplam_Tutar"].apply(lambda x: f"₺{x:,.2f}")
+            tur_il_df["Toplam_Tutar"] = tur_il_df["Toplam_Tutar"].apply(lambda x: fmt_para(x))
             tur_il_df.columns = ["Tür","Çıkış","Varış","Adet","Ort.KG","Toplam Tutar"]
             st.dataframe(tur_il_df, use_container_width=True, hide_index=True)
 
@@ -2436,8 +2438,8 @@ elif aktif == "analiz":
         m2.metric("Aşama", str(an_musteri['islem_asamasi']))
         bek = float(an_musteri['beklenen_ciro'] or 0)
         ger = float(an_musteri['gerceklesen_ciro'] or 0)
-        m3.metric("Beklenen Ciro", f"₺{bek:,.0f}")
-        m4.metric("Gerçekleşen", f"₺{ger:,.0f}", delta=f"₺{ger-bek:,.0f}")
+        m3.metric("Beklenen Ciro", fmt_para(bek))
+        m4.metric("Gerçekleşen", fmt_para(ger), delta=fmt_para(ger-bek))
 
         try:
             df_islem_an = db_read("islem_kaydi", filters={"musteri_id": int(an_musteri["id"])}, order_col="tarih")
@@ -2456,7 +2458,7 @@ elif aktif == "analiz":
         with col_ta:
             st.markdown("**Teklif Geçmişi**")
             if not df_tek_an.empty:
-                df_tek_an["toplam_tutar"] = df_tek_an["toplam_tutar"].apply(lambda x: f"₺{float(x):,.2f}")
+                df_tek_an["toplam_tutar"] = df_tek_an["toplam_tutar"].apply(lambda x: fmt_para(float(x)))
                 st.dataframe(df_tek_an, use_container_width=True, hide_index=True)
             else:
                 st.info("Teklif kaydı yok.")
