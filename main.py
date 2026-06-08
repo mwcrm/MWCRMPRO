@@ -3058,10 +3058,13 @@ elif aktif == "kisiler":
                     # Düzenle
                     if s3.button("✏️", key=f"sab_edit_{sab['id']}"):
                         st.session_state[f"edit_sab_{sab['id']}"] = True
-                    # Silme
-                    if st.session_state.get("rol")=="admin" or str(sab.get("olusturan",""))==ben:
+                    # Silme: admin veya kendi şablonu
+                    can_delete = st.session_state.get("rol")=="admin" or str(sab.get("olusturan",""))==ben
+                    if can_delete:
                         if s4.button("🗑️", key=f"sab_sil_{sab['id']}"):
-                            db_update("sablon_mesajlar", {"aktif": 0}, "id", int(sab["id"]))
+                            sb_del = get_sb()
+                            if sb_del:
+                                sb_del.table("sablon_mesajlar").delete().eq("id", int(sab["id"])).execute()
                             st.rerun()
                     # Düzenleme formu
                     if st.session_state.get(f"edit_sab_{sab['id']}"):
@@ -3155,10 +3158,16 @@ elif aktif == "kisiler":
                     r4.caption("—")
                     r5.markdown("")
 
-                # Mesaj özeti — varsa hemen altında
+                # Mesaj özeti — varsa tıklanabilir
                 if not df_msg_log.empty:
                     son = df_msg_log.iloc[0]
-                    st.caption(f"📨 {len(df_msg_log)} mesaj — son: {str(son.get('tarih',''))[:16]} | **{son.get('sablon_adi','')}**: {str(son.get('mesaj',''))[:60]}")
+                    with st.expander(f"📨 {len(df_msg_log)} mesaj — son: {str(son.get('tarih',''))[:16]} | {son.get('sablon_adi','')}"):
+                        for _, mlog in df_msg_log.iterrows():
+                            ml1, ml2 = st.columns([2,5])
+                            ml1.caption(f"🕐 {str(mlog.get('tarih',''))[:16]}")
+                            ml1.caption(f"📝 {mlog.get('sablon_adi','')}")
+                            ml2.info(str(mlog.get('mesaj','')))
+                            st.divider()
 
                 st.divider()
 
