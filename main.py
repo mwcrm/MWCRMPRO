@@ -3,6 +3,8 @@ import sqlite3
 import pandas as pd
 import shutil
 import os
+import io
+import json
 from datetime import datetime
 
 # ── SUPABASE BAĞLANTISI ───────────────────────────────────────────────────────
