@@ -979,7 +979,7 @@ elif aktif == "liste":
         ]
         secili_detay = st.selectbox("Müşteri:", detay_opts, key="detay_musteri_sec")
 
-        if secili_detay != "-- Seçin --":
+        if secili_detay != "-- Seçin --" and "[" in secili_detay:
             try:
                 detay_id = int(secili_detay.split("]")[0].replace("[","").strip())
                 detay_row = df[df["id"]==detay_id].iloc[0]
