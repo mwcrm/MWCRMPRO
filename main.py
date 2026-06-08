@@ -3184,24 +3184,7 @@ elif aktif == "kisiler":
                             wa_no = tel_temiz
                         kc3.caption(f"📱 {tel}")
 
-                        # Şablon seçimi
-                        with st.expander(f"💬 {kisi.get('ad','')} {kisi.get('soyad','')} — Mesaj Gönder"):
-                            sablon_adlari = [s["ad"] for s in SABLON_LISTESI] + ["✏️ Manuel Yaz"]
-                            sec_sab = st.selectbox("Şablon seç:", sablon_adlari, key=f"sab_sec_{kisi.get('id','')}")
-
-                            if sec_sab == "✏️ Manuel Yaz":
-                                mesaj_metni = st.text_area("Mesajınız:", height=100, key=f"sab_txt_{kisi.get('id','')}")
-                            else:
-                                bulunan = next((s for s in SABLON_LISTESI if s["ad"]==sec_sab), None)
-                                if bulunan:
-                                    mesaj_raw = bulunan["metin"].replace("{ad}", str(kisi.get("ad","")))
-                                    mesaj_metni = st.text_area("Mesaj (düzenlenebilir):", value=mesaj_raw, height=100, key=f"sab_txt_{kisi.get('id','')}")
-                                else:
-                                    mesaj_metni = ""
-
-                            if mesaj_metni:
-                                wa_url = f"https://wa.me/{wa_no}?text={mesaj_metni.replace(' ','%20').replace(chr(10),'%0A')}"
-                                st.link_button("📱 WhatsApp'ta Gönder", wa_url, use_container_width=True, type="primary")
+                        # Şablon seçimi - yeni kod yukarıda
                     else:
                         kc3.caption("📱 Tel yok")
                     st.divider()
