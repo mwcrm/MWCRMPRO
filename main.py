@@ -1432,43 +1432,109 @@ elif aktif == "rapor":
     # ══════════════════════════════════════════════════════════════════════════
     with ana_tab2:
         # Veri hesapla
-        toplam            = len(df_rapor)
-        aktif_say         = len(df_rapor[df_rapor["durum"]=="Aktif"])
-        hedef_say         = len(df_rapor[df_rapor["durum"]=="Hedef"])
-        pasif_say         = len(df_rapor[df_rapor["durum"]=="Pasif"])
-        toplam_beklenen   = df_rapor["beklenen_ciro"].sum()
-        toplam_gercek     = df_rapor["gerceklesen_ciro"].sum()
-        toplam_fark       = toplam_gercek - toplam_beklenen
-        genel_yuzde       = (toplam_gercek/toplam_beklenen*100) if toplam_beklenen>0 else 0
+        toplam          = len(df_rapor)
+        aktif_say       = len(df_rapor[df_rapor["durum"]=="Aktif"])
+        hedef_say       = len(df_rapor[df_rapor["durum"]=="Hedef"])
+        pasif_say       = len(df_rapor[df_rapor["durum"]=="Pasif"])
+        toplam_beklenen = df_rapor["beklenen_ciro"].sum()
+        toplam_gercek   = df_rapor["gerceklesen_ciro"].sum()
+        toplam_fark     = toplam_gercek - toplam_beklenen
         df_rapor["fark"]  = df_rapor["gerceklesen_ciro"] - df_rapor["beklenen_ciro"]
         df_rapor["yuzde"] = df_rapor.apply(lambda r: (r["gerceklesen_ciro"]/r["beklenen_ciro"]*100) if r["beklenen_ciro"]>0 else 0, axis=1)
 
-        # Genel metrikler
-        m1,m2,m3,m4 = st.columns(4)
-        m1.metric("Toplam Cari", toplam)
+        # Sabit üst metrikler
+        m1,m2,m3,m4,m5,m6 = st.columns(6)
+        m1.metric("Toplam", toplam)
         m2.metric("Aktif", aktif_say)
         m3.metric("Hedef", hedef_say)
         m4.metric("Pasif", pasif_say)
+        m5.metric("Beklenen", fmt_para(toplam_beklenen))
+        m6.metric("Gerçekleşen", fmt_para(toplam_gercek))
 
-        with st.expander("📊 Genel Cari Rapor", expanded=False):
-            c1,c2,c3 = st.columns(3)
-            c1.metric("Beklenen Ciro", fmt_para(toplam_beklenen))
-            c2.metric("Gerçekleşen", fmt_para(toplam_gercek))
-            c3.metric("Fark", fmt_para(toplam_fark))
-            st.dataframe(
-                df_rapor[["id","firma","durum","islem_asamasi","temsilci","il","beklenen_ciro","gerceklesen_ciro","yuzde"]].sort_values("yuzde",ascending=False),
-                use_container_width=True, hide_index=True,
-                column_config={
-                    "beklenen_ciro": st.column_config.NumberColumn("Beklenen ₺", format="%.0f"),
-                    "gerceklesen_ciro": st.column_config.NumberColumn("Gerçekleşen ₺", format="%.0f"),
-                    "yuzde": st.column_config.NumberColumn("Başarı %", format="%.1f"),
-                }
-            )
+        st.divider()
 
-        with st.expander("🔍 Arama & Filtre", expanded=False):
-            ara_r = st.text_input("Firma / İl / Temsilci ara:", key="rapor_ara2")
-            filtre_durum_r = st.selectbox("Durum:", ["Tümü","Aktif","Hedef","Pasif"], key="rapor_durum")
-            filtre_asama_r = st.selectbox("Aşama:", ["Tümü","İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"], key="rapor_asama")
+        # ── DURUM DAĞILIMI ──
+        with st.expander("📊 Durum Dağılımı", expanded=False):
+            durum_df = df_rapor.groupby("durum").agg(
+                Adet=("firma","count"),
+                Beklenen=("beklenen_ciro","sum"),
+                Gerceklesen=("gerceklesen_ciro","sum")
+            ).reset_index().sort_values("Adet",ascending=False)
+            durum_df["Beklenen"] = durum_df["Beklenen"].apply(fmt_para)
+            durum_df["Gerceklesen"] = durum_df["Gerceklesen"].apply(fmt_para)
+            st.dataframe(durum_df, use_container_width=True, hide_index=True)
+
+        # ── İŞLEM AŞAMASI ──
+        with st.expander("🔄 İşlem Aşaması Raporu", expanded=False):
+            if "islem_asamasi" in df_rapor.columns:
+                asama_df = df_rapor.groupby("islem_asamasi").agg(
+                    Adet=("firma","count"),
+                    Beklenen=("beklenen_ciro","sum"),
+                    Gerceklesen=("gerceklesen_ciro","sum")
+                ).reset_index().sort_values("Adet",ascending=False)
+                asama_df["Beklenen"] = asama_df["Beklenen"].apply(fmt_para)
+                asama_df["Gerceklesen"] = asama_df["Gerceklesen"].apply(fmt_para)
+                st.dataframe(asama_df, use_container_width=True, hide_index=True)
+
+        # ── TEMSİLCİ BAZLI ──
+        with st.expander("👤 Temsilci Bazlı Rapor", expanded=False):
+            if "temsilci" in df_rapor.columns:
+                tem_df = df_rapor.groupby("temsilci").agg(
+                    Musteri=("firma","count"),
+                    Aktif=("durum", lambda x: (x=="Aktif").sum()),
+                    Beklenen=("beklenen_ciro","sum"),
+                    Gerceklesen=("gerceklesen_ciro","sum"),
+                    Fark=("fark","sum")
+                ).reset_index().sort_values("Gerceklesen",ascending=False)
+                tem_df["Başarı%"] = tem_df.apply(lambda r: f"{r['Gerceklesen']/r['Beklenen']*100:.1f}%" if r["Beklenen"]>0 else "0%", axis=1)
+                tem_df["Beklenen"] = tem_df["Beklenen"].apply(fmt_para)
+                tem_df["Gerceklesen"] = tem_df["Gerceklesen"].apply(fmt_para)
+                tem_df["Fark"] = tem_df["Fark"].apply(fmt_para)
+                tem_df.columns = ["Temsilci","Müşteri","Aktif","Beklenen","Gerçekleşen","Fark","Başarı%"]
+                st.dataframe(tem_df, use_container_width=True, hide_index=True)
+                # Admin düzenleme
+                if st.session_state.get("rol") == "admin":
+                    st.caption("🔧 Admin: Temsilci bilgilerini Telefon Kişiler > Satış Temsilcisi Kartları bölümünden düzenleyebilirsiniz.")
+
+        # ── İL BAZLI TOP 15 ──
+        with st.expander("🗺️ İl Bazlı Rapor (Top 15)", expanded=False):
+            il_df = df_rapor.groupby("il").agg(
+                Musteri=("firma","count"),
+                Aktif=("durum", lambda x: (x=="Aktif").sum()),
+                Beklenen=("beklenen_ciro","sum"),
+                Gerceklesen=("gerceklesen_ciro","sum")
+            ).reset_index().sort_values("Musteri",ascending=False).head(15)
+            il_df["Beklenen"] = il_df["Beklenen"].apply(fmt_para)
+            il_df["Gerceklesen"] = il_df["Gerceklesen"].apply(fmt_para)
+            il_df.columns = ["İl","Müşteri","Aktif","Beklenen","Gerçekleşen"]
+            st.dataframe(il_df, use_container_width=True, hide_index=True)
+
+        # ── MÜŞTERİ BAZLI CİRO DETAYI TOP 20 ──
+        with st.expander("💰 Müşteri Bazlı Ciro Detayı (Top 20 Beklenen)", expanded=False):
+            ciro_top = df_rapor.sort_values("beklenen_ciro",ascending=False).head(20).copy()
+            ciro_top["beklenen_ciro"] = ciro_top["beklenen_ciro"].apply(fmt_para)
+            ciro_top["gerceklesen_ciro"] = ciro_top["gerceklesen_ciro"].apply(fmt_para)
+            ciro_top["yuzde"] = ciro_top["yuzde"].apply(lambda x: f"{x:.1f}%")
+            goster_c = [c for c in ["firma","temsilci","il","durum","islem_asamasi","beklenen_ciro","gerceklesen_ciro","yuzde"] if c in ciro_top.columns]
+            df_ciro_show = ciro_top[goster_c].copy()
+            # Admin düzenleme
+            if st.session_state.get("rol") == "admin":
+                st.caption("🔧 Admin: Ciro bilgilerini düzenlemek için Cari Liste > Müşteri Kartı > Düzenle butonunu kullanın.")
+                edited_ciro = st.data_editor(
+                    ciro_top[["id","firma","beklenen_ciro","gerceklesen_ciro"]].copy() if "id" in ciro_top.columns else df_ciro_show,
+                    use_container_width=True, hide_index=True, key="ciro_edit"
+                )
+            else:
+                st.dataframe(df_ciro_show, use_container_width=True, hide_index=True)
+            buf_c = io.BytesIO(); ciro_top.to_excel(buf_c, index=False); buf_c.seek(0)
+            st.download_button("📥 Ciro Raporu İndir", data=buf_c, file_name="ciro_raporu.xlsx", use_container_width=True)
+
+        # ── ARAMA / FİLTRELEME ──
+        with st.expander("🔍 Arama / Filtreleme Raporu", expanded=False):
+            fa1, fa2, fa3 = st.columns(3)
+            ara_r = fa1.text_input("Firma / İl / Temsilci:", key="rapor_ara2")
+            filtre_durum_r = fa2.selectbox("Durum:", ["Tümü","Aktif","Hedef","Pasif"], key="rapor_durum2")
+            filtre_asama_r = fa3.selectbox("Aşama:", ["Tümü","İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"], key="rapor_asama2")
             df_f = df_rapor.copy()
             if ara_r:
                 df_f = df_f[df_f.apply(lambda r: ara_r.lower() in str(r).lower(), axis=1)]
@@ -1477,99 +1543,114 @@ elif aktif == "rapor":
             if filtre_asama_r != "Tümü":
                 df_f = df_f[df_f["islem_asamasi"]==filtre_asama_r]
             st.markdown(f"**{len(df_f)} kayıt**")
-            st.dataframe(df_f[["id","firma","yetkili","gsm","durum","islem_asamasi","temsilci","il"]], use_container_width=True, hide_index=True)
+            g_cols_f = [c for c in ["id","firma","yetkili","gsm","email","durum","islem_asamasi","temsilci","il","ilce"] if c in df_f.columns]
+            st.dataframe(df_f[g_cols_f], use_container_width=True, hide_index=True)
+            buf_f = io.BytesIO(); df_f.to_excel(buf_f, index=False); buf_f.seek(0)
+            st.download_button("📥 Filtrelenmiş Rapor İndir", data=buf_f, file_name="filtre_raporu.xlsx", use_container_width=True)
 
-        with st.expander("🗺️ İl Raporu", expanded=False):
-            il_rapor = df_rapor.groupby("il").agg(
-                Musteri=("firma","count"),
-                Aktif=("durum", lambda x: (x=="Aktif").sum()),
-                Beklenen=("beklenen_ciro","sum"),
-                Gerceklesen=("gerceklesen_ciro","sum")
-            ).reset_index().sort_values("Musteri",ascending=False)
-            il_rapor["Beklenen"] = il_rapor["Beklenen"].apply(fmt_para)
-            il_rapor["Gerceklesen"] = il_rapor["Gerceklesen"].apply(fmt_para)
-            st.dataframe(il_rapor, use_container_width=True, hide_index=True)
-
-        with st.expander("👤 Temsilci Raporu", expanded=False):
-            if "temsilci" in df_rapor.columns:
-                tem_rapor = df_rapor.groupby("temsilci").agg(
-                    Musteri=("firma","count"),
-                    Beklenen=("beklenen_ciro","sum"),
-                    Gerceklesen=("gerceklesen_ciro","sum")
-                ).reset_index().sort_values("Gerceklesen",ascending=False)
-                tem_rapor["Beklenen"] = tem_rapor["Beklenen"].apply(fmt_para)
-                tem_rapor["Gerceklesen"] = tem_rapor["Gerceklesen"].apply(fmt_para)
-                st.dataframe(tem_rapor, use_container_width=True, hide_index=True)
-
-        with st.expander("📱 WA & Email Geçmişi", expanded=False):
+        # ── WA & EMAIL GEÇMİŞİ ──
+        with st.expander("📱 WhatsApp & Email Gönderim Raporu", expanded=False):
             try:
-                df_wa = db_read("islem_kaydi", order_col="tarih", limit=200)
+                df_wa = db_read("islem_kaydi", order_col="tarih", limit=500)
                 if not df_wa.empty:
+                    # Filtrele
+                    wa_tur = st.selectbox("Tür:", ["Tümü","WhatsApp","Email"], key="wa_tur_filtre")
+                    if wa_tur != "Tümü" and "tur" in df_wa.columns:
+                        df_wa = df_wa[df_wa["tur"].str.contains(wa_tur, case=False, na=False)]
+                    st.markdown(f"**{len(df_wa)} kayıt**")
                     st.dataframe(df_wa, use_container_width=True, hide_index=True)
+                    # Mesaj detayı
+                    if st.session_state.get("rol") == "admin":
+                        with st.expander("📝 Mesaj Detayları"):
+                            for _, wrow in df_wa.head(20).iterrows():
+                                st.markdown(f"**{wrow.get('musteri','')}** — {str(wrow.get('tarih',''))[:16]}")
+                                st.caption(str(wrow.get('icerik',''))[:200])
+                                st.divider()
                     buf_wa = io.BytesIO(); df_wa.to_excel(buf_wa, index=False); buf_wa.seek(0)
-                    st.download_button("📥 İndir", data=buf_wa, file_name="wa_email_gecmisi.xlsx", use_container_width=True)
+                    st.download_button("📥 WA/Email Raporu İndir", data=buf_wa, file_name="wa_email_raporu.xlsx", use_container_width=True)
                 else:
                     st.info("Kayıt yok.")
             except Exception as e:
                 st.error(f"Hata: {e}")
 
-    # ══════════════════════════════════════════════════════════════════════════
     with ana_tab3:
-        with st.expander("📄 Teklif Özeti", expanded=False):
-            try:
-                df_tek_r = db_read("teklifler", order_col="tarih")
-                if not df_tek_r.empty:
-                    t1,t2,t3 = st.columns(3)
-                    t1.metric("Toplam Teklif", len(df_tek_r))
-                    if "toplam_tutar" in df_tek_r.columns:
-                        df_tek_r["toplam_tutar"] = pd.to_numeric(df_tek_r["toplam_tutar"], errors="coerce").fillna(0)
-                        t2.metric("Toplam Tutar", fmt_para(df_tek_r["toplam_tutar"].sum()))
-                        t3.metric("Ort. Teklif", fmt_para(df_tek_r["toplam_tutar"].mean()))
-                    goster = [c for c in ["id","tarih","musteri_adi","toplam_tutar","olusturan"] if c in df_tek_r.columns]
-                    df_gs = df_tek_r[goster].copy()
-                    if "toplam_tutar" in df_gs.columns:
-                        df_gs["toplam_tutar"] = df_gs["toplam_tutar"].apply(fmt_para)
-                    st.dataframe(df_gs, use_container_width=True, hide_index=True)
-                    buf_t = io.BytesIO(); df_tek_r.to_excel(buf_t, index=False); buf_t.seek(0)
-                    st.download_button("📥 Teklif Raporu İndir", data=buf_t, file_name="teklif_raporu.xlsx", use_container_width=True)
-                else:
-                    st.info("Teklif yok.")
-            except Exception as e:
-                st.error(f"Hata: {e}")
+        try:
+            df_tek_r = db_read("teklifler", order_col="tarih")
+            if not df_tek_r.empty:
+                df_tek_r["toplam_tutar"] = pd.to_numeric(df_tek_r.get("toplam_tutar",0), errors="coerce").fillna(0)
+                t1,t2,t3 = st.columns(3)
+                t1.metric("Toplam Teklif", len(df_tek_r))
+                t2.metric("Toplam Tutar", fmt_para(df_tek_r["toplam_tutar"].sum()))
+                t3.metric("Ort. Teklif", fmt_para(df_tek_r["toplam_tutar"].mean()))
+            else:
+                st.info("Teklif yok.")
+                df_tek_r = pd.DataFrame()
+        except:
+            df_tek_r = pd.DataFrame()
 
-        with st.expander("🗺️ İl/Tür Teklif Analizi", expanded=False):
-            try:
-                df_ilt = db_read("teklifler", order_col="tarih")
-                if not df_ilt.empty:
-                    il_tur_detay = []
-                    for _, row_t in df_ilt.iterrows():
-                        try:
-                            d = json.loads(row_t.get("satirlar","{}"))
-                            for s in d.get("teklif",[]):
-                                il_tur_detay.append({
-                                    "Musteri": row_t.get("musteri_adi",""),
-                                    "Cikis_Il": s.get("cikis_il",""),
-                                    "Varis_Il": s.get("varis_il",""),
-                                    "Tur": s.get("tur",""),
-                                    "KG": float(s.get("kg",0) or 0),
-                                    "Desi": float(s.get("bit_desi",0) or 0),
-                                    "Tutar": float(s.get("tutar",0) or 0),
-                                })
-                        except: pass
-                    if il_tur_detay:
-                        df_ilt2 = pd.DataFrame(il_tur_detay)
-                        oz = df_ilt2.groupby(["Cikis_Il","Varis_Il","Tur"]).agg(
-                            Adet=("KG","count"), Ort_KG=("KG","mean"), Toplam=("Tutar","sum")
-                        ).reset_index().sort_values("Toplam",ascending=False)
-                        oz["Toplam"] = oz["Toplam"].apply(fmt_para)
-                        oz["Ort_KG"] = oz["Ort_KG"].apply(lambda x: f"{x:.2f}")
-                        st.dataframe(oz, use_container_width=True, hide_index=True)
-                    else:
-                        st.info("Teklif içi il/tür verisi yok.")
+        with st.expander("📄 Verilen Teklifler Raporu", expanded=False):
+            if not df_tek_r.empty:
+                goster = [c for c in ["id","tarih","musteri_adi","toplam_tutar","olusturan","notlar"] if c in df_tek_r.columns]
+                df_gs = df_tek_r[goster].copy()
+                df_gs["toplam_tutar"] = df_gs["toplam_tutar"].apply(fmt_para)
+                st.dataframe(df_gs, use_container_width=True, hide_index=True)
+                # Teklif detayı seç
+                tek_opts = ["-- Seçin --"] + [f"[{int(r['id'])}] {r.get('musteri_adi','')} | {fmt_para(r.get('toplam_tutar',0))}" for _, r in df_tek_r.iterrows()]
+                sec_t = st.selectbox("Detay:", tek_opts, key="rapor_tek_sec")
+                if sec_t != "-- Seçin --" and "[" in sec_t:
+                    tid = int(sec_t.split("]")[0].replace("[",""))
+                    trow = df_tek_r[df_tek_r["id"]==tid].iloc[0]
+                    try:
+                        d = json.loads(trow.get("satirlar","{}"))
+                        if "teklif" in d:
+                            st.markdown("**Teklif Satırları:**")
+                            st.dataframe(pd.DataFrame(d["teklif"]), use_container_width=True, hide_index=True)
+                        if "hesap" in d:
+                            st.markdown("**Hesaplama:**")
+                            st.dataframe(pd.DataFrame(d["hesap"]), use_container_width=True, hide_index=True)
+                    except: pass
+                buf_t = io.BytesIO(); df_tek_r.to_excel(buf_t, index=False); buf_t.seek(0)
+                st.download_button("📥 Teklif Raporu İndir", data=buf_t, file_name="teklif_raporu.xlsx", use_container_width=True)
+
+        with st.expander("🗺️ İl & Ürün Türü Raporu", expanded=False):
+            if not df_tek_r.empty:
+                il_tur_detay = []
+                for _, row_t in df_tek_r.iterrows():
+                    try:
+                        d = json.loads(row_t.get("satirlar","{}"))
+                        for s in d.get("teklif",[]):
+                            il_tur_detay.append({
+                                "Müşteri": row_t.get("musteri_adi",""),
+                                "Çıkış İli": s.get("cikis_il",""),
+                                "Varış İli": s.get("varis_il",""),
+                                "Tür": s.get("tur",""),
+                                "KG": float(s.get("kg",0) or 0),
+                                "Desi": float(s.get("bit_desi",0) or 0),
+                                "Tutar": float(s.get("tutar",0) or 0),
+                            })
+                    except: pass
+                if il_tur_detay:
+                    df_it = pd.DataFrame(il_tur_detay)
+                    # İl bazlı
+                    st.markdown("**Çıkış-Varış İl Analizi:**")
+                    il_oz = df_it.groupby(["Çıkış İli","Varış İli"]).agg(
+                        Adet=("KG","count"), Ort_KG=("KG","mean"), Toplam=("Tutar","sum")
+                    ).reset_index().sort_values("Toplam",ascending=False)
+                    il_oz["Toplam"] = il_oz["Toplam"].apply(fmt_para)
+                    il_oz["Ort_KG"] = il_oz["Ort_KG"].apply(lambda x: f"{x:.2f}")
+                    st.dataframe(il_oz, use_container_width=True, hide_index=True)
+                    # Tür bazlı
+                    st.markdown("**Ürün Türü Analizi:**")
+                    tur_oz = df_it.groupby("Tür").agg(
+                        Adet=("KG","count"), Ort_Desi=("Desi","mean"), Toplam=("Tutar","sum")
+                    ).reset_index().sort_values("Toplam",ascending=False)
+                    tur_oz["Toplam"] = tur_oz["Toplam"].apply(fmt_para)
+                    tur_oz["Ort_Desi"] = tur_oz["Ort_Desi"].apply(lambda x: f"{x:.2f}")
+                    st.dataframe(tur_oz, use_container_width=True, hide_index=True)
+                    buf_it = io.BytesIO(); df_it.to_excel(buf_it, index=False); buf_it.seek(0)
+                    st.download_button("📥 İl/Tür Raporu İndir", data=buf_it, file_name="il_tur_raporu.xlsx", use_container_width=True)
                 else:
-                    st.info("Teklif yok.")
-            except Exception as e:
-                st.error(f"İl/Tür hatası: {e}")
+                    st.info("Teklif içi il/tür verisi yok.")
     aktif_say      = len(df_rapor[df_rapor["durum"] == "Aktif"])
     hedef_say      = len(df_rapor[df_rapor["durum"] == "Hedef"])
     pasif_say      = len(df_rapor[df_rapor["durum"] == "Pasif"])
