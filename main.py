@@ -1647,7 +1647,174 @@ elif aktif == "rapor":
             st.info("Teklif içi il/tür verisi bulunamadı.")
     except Exception as e:
         st.error(f"İl/Tür raporu hatası: {e}")
-# -- TEKLIF OLUSTUR --
+
+    # ── RANDEVU RAPORLARI ──────────────────────────────────────────────────────
+    st.divider()
+    st.markdown("## 📅 Randevu & Ziyaret Raporları")
+
+    df_rand_r = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC")
+
+    if df_rand_r.empty:
+        st.info("Henüz randevu kaydı yok.")
+    else:
+        # Sayısal sütunları hazırla
+        for c in ["adet"]:
+            if c in df_rand_r.columns:
+                df_rand_r[c] = pd.to_numeric(df_rand_r[c], errors="coerce").fillna(0)
+
+        rr_tab1, rr_tab2, rr_tab3, rr_tab4 = st.tabs([
+            "📊 Genel Özet",
+            "🗺️ Bölge Raporu",
+            "🎯 Görev Raporu",
+            "📋 Takip & Sonuç"
+        ])
+
+        with rr_tab1:
+            st.markdown("#### 📊 Genel Özet")
+
+            # Filtrele
+            rf1, rf2 = st.columns(2)
+            filtre_tem_r = rf1.text_input("Temsilci filtrele:", key="rr_tem")
+            filtre_tarih_r = rf2.date_input("Başlangıç tarihi:", key="rr_tarih")
+
+            df_rr = df_rand_r.copy()
+            if filtre_tem_r:
+                df_rr = df_rr[df_rr["temsilci"].str.contains(filtre_tem_r, case=False, na=False)]
+            if "randevu_tarihi" in df_rr.columns:
+                df_rr = df_rr[df_rr["randevu_tarihi"] >= str(filtre_tarih_r)]
+
+            # Metrikler
+            m1, m2, m3, m4, m5 = st.columns(5)
+            m1.metric("Toplam Randevu", len(df_rr))
+            m2.metric("✅ Bitti", len(df_rr[df_rr["sonuc"]=="Bitti"]) if "sonuc" in df_rr.columns else 0)
+            m3.metric("🔄 Devam", len(df_rr[df_rr["sonuc"]=="Devam Ediyor"]) if "sonuc" in df_rr.columns else 0)
+            m4.metric("❌ Gidilmedi", len(df_rr[df_rr["sonuc"]=="Gidilmedi"]) if "sonuc" in df_rr.columns else 0)
+            m5.metric("📦 Toplam Adet", int(df_rr["adet"].sum()) if "adet" in df_rr.columns else 0)
+
+            # Müşteri sayısı - randevu tarihine göre
+            st.markdown("#### 📅 Tarihe Göre Randevu Sayısı")
+            if "randevu_tarihi" in df_rr.columns:
+                tarih_ozet = df_rr.groupby("randevu_tarihi").agg(
+                    Musteri_Sayisi=("musteri_adi","nunique"),
+                    Randevu_Sayisi=("id","count"),
+                    Toplam_Adet=("adet","sum")
+                ).reset_index().sort_values("randevu_tarihi", ascending=False)
+                tarih_ozet.columns = ["Tarih","Müşteri Sayısı","Randevu Sayısı","Toplam Adet"]
+                st.dataframe(tarih_ozet, use_container_width=True, hide_index=True)
+
+            # Temsilci bazlı
+            st.markdown("#### 👤 Temsilci Bazlı Özet")
+            if "temsilci" in df_rr.columns:
+                tem_ozet = df_rr.groupby("temsilci").agg(
+                    Toplam=("id","count"),
+                    Bitti=("sonuc", lambda x: (x=="Bitti").sum()),
+                    Devam=("sonuc", lambda x: (x=="Devam Ediyor").sum()),
+                    Gidilmedi=("sonuc", lambda x: (x=="Gidilmedi").sum()),
+                    Toplam_Adet=("adet","sum")
+                ).reset_index().sort_values("Toplam", ascending=False)
+                tem_ozet.columns = ["Temsilci","Toplam","Bitti","Devam","Gidilmedi","Toplam Adet"]
+                st.dataframe(tem_ozet, use_container_width=True, hide_index=True)
+
+            # Ciro bağlantısı
+            st.markdown("#### 💰 Randevu - Ciro İlişkisi")
+            try:
+                df_ciro_r = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+                if not df_ciro_r.empty and "randevu_tarihi" in df_rr.columns:
+                    # Randevu yapılan müşterilerin ciro bilgisi
+                    rand_musteriler = df_rr["musteri_adi"].dropna().unique().tolist()
+                    df_ciro_rand = df_ciro_r[df_ciro_r["firma"].isin(rand_musteriler)].copy()
+                    if not df_ciro_rand.empty:
+                        for c in ["beklenen_ciro","gerceklesen_ciro"]:
+                            df_ciro_rand[c] = pd.to_numeric(df_ciro_rand.get(c, 0), errors="coerce").fillna(0)
+                        bek_top = df_ciro_rand["beklenen_ciro"].sum()
+                        ger_top = df_ciro_rand["gerceklesen_ciro"].sum()
+                        cc1, cc2, cc3 = st.columns(3)
+                        cc1.metric("Randevu Müşterileri", len(df_ciro_rand))
+                        cc2.metric("Hedeflenen Ciro", fmt_para(bek_top))
+                        cc3.metric("Gerçekleşen Ciro", fmt_para(ger_top))
+            except: pass
+
+        with rr_tab2:
+            st.markdown("#### 🗺️ Bölge Raporu")
+            if "bolge" in df_rand_r.columns:
+                bolge_ozet = df_rand_r.groupby("bolge").agg(
+                    Randevu=("id","count"),
+                    Musteri=("musteri_adi","nunique"),
+                    Bitti=("sonuc", lambda x: (x=="Bitti").sum()),
+                    Toplam_Adet=("adet","sum")
+                ).reset_index().sort_values("Randevu", ascending=False)
+                bolge_ozet.columns = ["Bölge","Randevu","Müşteri","Bitti","Toplam Adet"]
+                st.dataframe(bolge_ozet, use_container_width=True, hide_index=True)
+
+                # Excel indir
+                buf_b = io.BytesIO()
+                bolge_ozet.to_excel(buf_b, index=False)
+                buf_b.seek(0)
+                st.download_button("📥 Bölge Raporu İndir", data=buf_b,
+                    file_name=f"bolge_raporu_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                    use_container_width=True)
+            else:
+                st.info("Bölge verisi bulunamadı.")
+
+        with rr_tab3:
+            st.markdown("#### 🎯 Görev Raporu")
+            if "gorev" in df_rand_r.columns:
+                gorev_ozet = df_rand_r.groupby("gorev").agg(
+                    Adet=("id","count"),
+                    Bitti=("sonuc", lambda x: (x=="Bitti").sum()),
+                    Devam=("sonuc", lambda x: (x=="Devam Ediyor").sum()),
+                    Gidilmedi=("sonuc", lambda x: (x=="Gidilmedi").sum()),
+                ).reset_index().sort_values("Adet", ascending=False)
+                gorev_ozet["Başarı %"] = (gorev_ozet["Bitti"] / gorev_ozet["Adet"] * 100).round(1).astype(str) + "%"
+                gorev_ozet.columns = ["Görev","Toplam","Bitti","Devam","Gidilmedi","Başarı %"]
+                st.dataframe(gorev_ozet, use_container_width=True, hide_index=True)
+
+                # Temsilci + Görev çapraz
+                st.markdown("#### 👤 Temsilci × Görev")
+                if "temsilci" in df_rand_r.columns:
+                    cross = pd.crosstab(df_rand_r["temsilci"], df_rand_r["gorev"])
+                    st.dataframe(cross, use_container_width=True)
+            else:
+                st.info("Görev verisi bulunamadı.")
+
+        with rr_tab4:
+            st.markdown("#### 📋 Takip & Sonuç Raporu")
+
+            # Takip durumu
+            if "takip" in df_rand_r.columns:
+                st.markdown("**Takip Durumu:**")
+                takip_ozet = df_rand_r.groupby("takip").agg(
+                    Adet=("id","count")
+                ).reset_index().sort_values("Adet", ascending=False)
+                st.dataframe(takip_ozet, use_container_width=True, hide_index=True)
+
+            # Sonuç dağılımı
+            if "sonuc" in df_rand_r.columns:
+                st.markdown("**Sonuç Dağılımı:**")
+                sonuc_ozet = df_rand_r.groupby("sonuc").agg(
+                    Adet=("id","count"),
+                    Musteri=("musteri_adi","nunique")
+                ).reset_index().sort_values("Adet", ascending=False)
+                sonuc_ozet.columns = ["Sonuç","Adet","Müşteri Sayısı"]
+                st.dataframe(sonuc_ozet, use_container_width=True, hide_index=True)
+
+            # Sonuç girilmemiş / açık randevular
+            st.markdown("**⚠️ Sonuç Bekleyen Randevular:**")
+            acik = df_rand_r[~df_rand_r["sonuc"].isin(["Bitti","İptal","Gidilmedi"])] if "sonuc" in df_rand_r.columns else pd.DataFrame()
+            if not acik.empty:
+                g_cols = [c for c in ["randevu_tarihi","randevu_saati","musteri_adi","bolge","gorev","temsilci","sonuc"] if c in acik.columns]
+                st.dataframe(acik[g_cols], use_container_width=True, hide_index=True)
+                st.warning(f"⚠️ {len(acik)} randevunun sonucu girilmemiş!")
+            else:
+                st.success("✅ Tüm randevuların sonucu girilmiş.")
+
+            # Tüm raporu indir
+            buf_rs = io.BytesIO()
+            df_rand_r.to_excel(buf_rs, index=False)
+            buf_rs.seek(0)
+            st.download_button("📥 Tüm Randevu Raporu İndir", data=buf_rs,
+                file_name=f"randevu_raporu_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                use_container_width=True)
 elif aktif == "teklif":
     import json, re, io
 
