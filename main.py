@@ -963,14 +963,125 @@ elif aktif == "liste":
 
     # ── MÜŞTERİ DETAY PANELİ ─────────────────────────────────────────────────
     st.divider()
-    st.markdown("### 🔍 Müşteri Detay — Teklif & Randevu")
+    st.markdown("### 🔍 Müşteri Kartı — Teklif & Randevu")
 
     if not df.empty:
-        detay_opts = ["-- Müşteri Seçin --"] + [
-            f"[{int(r['id'])}] {r['firma']} ({r.get('durum','')})"
-            for _, r in df.iterrows()
+        # Arama ile hızlı müşteri bul
+        ara_detay = st.text_input("🔍 Müşteri ara:", key="detay_ara", placeholder="Firma adı veya ID yaz...")
+        df_detay_filtre = df.copy()
+        if ara_detay:
+            mask = df_detay_filtre.apply(lambda r: ara_detay.lower() in str(r).lower(), axis=1)
+            df_detay_filtre = df_detay_filtre[mask]
+
+        detay_opts = ["-- Seçin --"] + [
+            f"[{int(r['id'])}] {r['firma']} — {r.get('il','')} {r.get('ilce','')} | {r.get('durum','')}"
+            for _, r in df_detay_filtre.head(50).iterrows()
         ]
         secili_detay = st.selectbox("Müşteri:", detay_opts, key="detay_musteri_sec")
+
+        if secili_detay != "-- Seçin --":
+            try:
+                detay_id = int(secili_detay.split("]")[0].replace("[","").strip())
+                detay_row = df[df["id"]==detay_id].iloc[0]
+
+                # ── CARİ KART BİLGİLERİ ──
+                st.markdown(f"## 🏢 {detay_row.get('firma','')}")
+
+                kc1, kc2, kc3 = st.columns(3)
+                with kc1:
+                    st.markdown("**📋 Genel Bilgiler**")
+                    st.write(f"👤 Yetkili: **{detay_row.get('yetkili','-')}**")
+                    st.write(f"📱 GSM: **{detay_row.get('gsm','-')}**")
+                    st.write(f"☎️ Sabit: **{detay_row.get('sabit','-')}**")
+                    st.write(f"✉️ Email: **{detay_row.get('email','-')}**")
+
+                with kc2:
+                    st.markdown("**📍 Konum & Durum**")
+                    st.write(f"🏙️ İl/İlçe: **{detay_row.get('il','-')} / {detay_row.get('ilce','-')}**")
+                    st.write(f"📊 Durum: **{detay_row.get('durum','-')}**")
+                    st.write(f"🔄 Aşama: **{detay_row.get('islem_asamasi','-')}**")
+                    st.write(f"👔 Temsilci: **{detay_row.get('temsilci','-')}**")
+
+                with kc3:
+                    st.markdown("**💰 Ciro**")
+                    bek = float(detay_row.get('beklenen_ciro',0) or 0)
+                    ger = float(detay_row.get('gerceklesen_ciro',0) or 0)
+                    st.metric("Beklenen", f"₺{bek:,.0f}")
+                    st.metric("Gerçekleşen", f"₺{ger:,.0f}", delta=f"₺{ger-bek:,.0f}")
+
+                if detay_row.get('adres'):
+                    st.write(f"📮 Adres: {detay_row.get('adres','')}")
+
+                st.divider()
+
+                # ── AKSİYON BUTONLARI ──
+                ab1, ab2, ab3, ab4 = st.columns(4)
+                if ab1.button("✏️ Düzenle", key=f"duzenle_{detay_id}", use_container_width=True):
+                    st.session_state["duzenle_musteri"] = detay_row.to_dict()
+                    st.session_state["aktif_tab"] = "yeni"
+                    st.rerun()
+
+                if ab2.button("📄 Teklif Oluştur", key=f"teklif_{detay_id}", use_container_width=True, type="primary"):
+                    st.session_state["aktif_tab"] = "teklif"
+                    st.session_state["son_secili_id"] = None
+                    st.session_state["hedef_mus"] = str(detay_row.get("firma",""))
+                    st.rerun()
+
+                if ab3.button("📅 Randevu Oluştur", key=f"randevu_{detay_id}", use_container_width=True, type="primary"):
+                    st.session_state["aktif_tab"] = "randevu"
+                    st.session_state["rand_musteri_onsel"] = detay_id
+                    st.rerun()
+
+                if ab4.button("📱 WA Gönder", key=f"wa_{detay_id}", use_container_width=True):
+                    gsm_d = str(detay_row.get('gsm','') or '')
+                    import re as _re_d
+                    gsm_d = _re_d.sub(r'[\s\-\(\)]','',gsm_d)
+                    if gsm_d.startswith('0'): gsm_d = '90'+gsm_d[1:]
+                    elif len(gsm_d)==10: gsm_d = '90'+gsm_d
+                    wa_d = f"https://wa.me/{gsm_d}"
+                    st.markdown(f"[📱 WhatsApp'ta Aç]({wa_d})")
+
+                st.divider()
+
+                # ── SON TEKLİF & AKTİF RANDEVU ──
+                col_tek, col_rand = st.columns(2)
+
+                with col_tek:
+                    st.markdown("#### 📄 Son Teklif")
+                    df_tek_d = db_read("teklifler", filters={"musteri_id": detay_id}, order_col="tarih")
+                    if not df_tek_d.empty:
+                        son_tek = df_tek_d.iloc[0]
+                        st.success(f"💰 **₺{float(son_tek.get('toplam_tutar',0) or 0):,.2f}**\n\n"
+                                  f"📅 {str(son_tek.get('tarih',''))[:16]}\n\n"
+                                  f"📝 {str(son_tek.get('notlar',''))[:80]}")
+                        st.caption(f"Toplam {len(df_tek_d)} teklif verildi")
+                    else:
+                        st.info("Henüz teklif verilmemiş.")
+
+                with col_rand:
+                    st.markdown("#### 📅 Aktif Randevu")
+                    df_rand_d = db_read("randevular", filters={"musteri_id": detay_id}, order_col="randevu_tarihi", desc=True)
+                    if not df_rand_d.empty:
+                        aktif_r = df_rand_d[~df_rand_d["sonuc"].isin(["Bitti","İptal"])].head(1) if "sonuc" in df_rand_d.columns else df_rand_d.head(1)
+                        if not aktif_r.empty:
+                            r = aktif_r.iloc[0]
+                            st.warning(f"🗓️ **{r.get('randevu_tarihi','')} {r.get('randevu_saati','')}**\n\n"
+                                      f"📍 {r.get('bolge','')}\n\n"
+                                      f"🎯 {r.get('gorev','')}\n\n"
+                                      f"👤 {r.get('temsilci','')}")
+                            yeni_s = st.selectbox("Sonuç:", ["—","Bitti","Devam Ediyor","Gidilmedi","İptal"], key=f"rs_{detay_id}")
+                            if yeni_s != "—" and st.button("💾 Güncelle", key=f"rg_{detay_id}", use_container_width=True):
+                                db_update("randevular", {"sonuc": yeni_s}, "id", int(r["id"]))
+                                st.success("✅ Güncellendi!")
+                                st.rerun()
+                        else:
+                            son_r = df_rand_d.iloc[0]
+                            st.success(f"✅ Tamamlandı: {son_r.get('randevu_tarihi','')} — {son_r.get('sonuc','')}")
+                    else:
+                        st.info("Henüz randevu yok.")
+
+            except Exception as e:
+                st.error(f"Detay hatası: {e}")
 
         if secili_detay != "-- Müşteri Seçin --":
             try:
