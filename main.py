@@ -1317,24 +1317,24 @@ elif aktif == "rapor":
     # ══════════════════════════════════════════════════════════════════════════
     with ana_tab1:
         df_rand_r = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC")
+        if "adet" in (df_rand_r.columns if not df_rand_r.empty else []):
+            df_rand_r["adet"] = pd.to_numeric(df_rand_r["adet"], errors="coerce").fillna(0)
 
         if df_rand_r.empty:
             st.info("Henüz randevu kaydı yok.")
         else:
-            if "adet" in df_rand_r.columns:
-                df_rand_r["adet"] = pd.to_numeric(df_rand_r["adet"], errors="coerce").fillna(0)
-
-            # Genel metrikler her zaman görünsün
             m1,m2,m3,m4,m5 = st.columns(5)
             m1.metric("Toplam", len(df_rand_r))
             m2.metric("✅ Bitti", len(df_rand_r[df_rand_r["sonuc"]=="Bitti"]) if "sonuc" in df_rand_r.columns else 0)
             m3.metric("🔄 Devam", len(df_rand_r[df_rand_r["sonuc"]=="Devam Ediyor"]) if "sonuc" in df_rand_r.columns else 0)
             m4.metric("❌ Gidilmedi", len(df_rand_r[df_rand_r["sonuc"]=="Gidilmedi"]) if "sonuc" in df_rand_r.columns else 0)
             m5.metric("📦 Adet", int(df_rand_r["adet"].sum()) if "adet" in df_rand_r.columns else 0)
-
             st.divider()
 
-            with st.expander("📊 Genel Özet — Tarih & Temsilci", expanded=False):
+        with st.expander("📊 Genel Özet — Tarih & Temsilci"):
+            if df_rand_r.empty:
+                st.info("Veri yok.")
+            else:
                 rf1, rf2 = st.columns(2)
                 fil_tem = rf1.text_input("Temsilci:", key="rr_tem2")
                 fil_tar = rf2.date_input("Başlangıç:", key="rr_tar2")
@@ -1343,43 +1343,41 @@ elif aktif == "rapor":
                     df_rr = df_rr[df_rr["temsilci"].str.contains(fil_tem, case=False, na=False)]
                 if "randevu_tarihi" in df_rr.columns:
                     df_rr = df_rr[df_rr["randevu_tarihi"] >= str(fil_tar)]
-
                 if "randevu_tarihi" in df_rr.columns:
                     t_oz = df_rr.groupby("randevu_tarihi").agg(
                         Musteri=("musteri_adi","nunique"), Randevu=("id","count"), Adet=("adet","sum")
                     ).reset_index().sort_values("randevu_tarihi", ascending=False)
                     t_oz.columns = ["Tarih","Müşteri","Randevu","Adet"]
                     st.dataframe(t_oz, use_container_width=True, hide_index=True)
-
                 if "temsilci" in df_rr.columns:
                     st.markdown("**Temsilci Bazlı:**")
                     tem_oz = df_rr.groupby("temsilci").agg(
                         Toplam=("id","count"),
                         Bitti=("sonuc", lambda x: (x=="Bitti").sum()),
                         Devam=("sonuc", lambda x: (x=="Devam Ediyor").sum()),
-                        Gidilmedi=("sonuc", lambda x: (x=="Gidilmedi").sum()),
                         Adet=("adet","sum")
                     ).reset_index().sort_values("Toplam", ascending=False)
-                    tem_oz.columns = ["Temsilci","Toplam","Bitti","Devam","Gidilmedi","Adet"]
+                    tem_oz.columns = ["Temsilci","Toplam","Bitti","Devam","Adet"]
                     st.dataframe(tem_oz, use_container_width=True, hide_index=True)
-
-                # Ciro ilişkisi
                 try:
-                    df_ciro_r = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
-                    if not df_ciro_r.empty:
+                    df_ciro_r2 = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi=\'0\' OR silindi IS NULL)")
+                    if not df_ciro_r2.empty:
                         rand_mus = df_rr["musteri_adi"].dropna().unique().tolist()
-                        df_cr = df_ciro_r[df_ciro_r["firma"].isin(rand_mus)].copy()
+                        df_cr = df_ciro_r2[df_ciro_r2["firma"].isin(rand_mus)].copy()
                         if not df_cr.empty:
                             for c in ["beklenen_ciro","gerceklesen_ciro"]:
                                 df_cr[c] = pd.to_numeric(df_cr.get(c,0), errors="coerce").fillna(0)
-                            st.markdown("**💰 Randevu Müşterileri Ciro:**")
+                            st.markdown("**💰 Ciro:**")
                             cc1,cc2,cc3 = st.columns(3)
                             cc1.metric("Müşteri", len(df_cr))
                             cc2.metric("Hedeflenen", fmt_para(df_cr["beklenen_ciro"].sum()))
                             cc3.metric("Gerçekleşen", fmt_para(df_cr["gerceklesen_ciro"].sum()))
                 except: pass
 
-            with st.expander("🗺️ Bölge Raporu", expanded=False):
+        with st.expander("🗺️ Bölge Raporu"):
+            if df_rand_r.empty:
+                st.info("Veri yok.")
+            else:
                 if "bolge" in df_rand_r.columns:
                     b_oz = df_rand_r.groupby("bolge").agg(
                         Randevu=("id","count"), Musteri=("musteri_adi","nunique"),
@@ -1389,10 +1387,11 @@ elif aktif == "rapor":
                     st.dataframe(b_oz, use_container_width=True, hide_index=True)
                     buf_b = io.BytesIO(); b_oz.to_excel(buf_b, index=False); buf_b.seek(0)
                     st.download_button("📥 İndir", data=buf_b, file_name="bolge_raporu.xlsx", use_container_width=True)
-                else:
-                    st.info("Bölge verisi yok.")
 
-            with st.expander("🎯 Görev Raporu", expanded=False):
+        with st.expander("🎯 Görev Raporu"):
+            if df_rand_r.empty:
+                st.info("Veri yok.")
+            else:
                 if "gorev" in df_rand_r.columns:
                     g_oz = df_rand_r.groupby("gorev").agg(
                         Adet=("id","count"),
@@ -1407,29 +1406,31 @@ elif aktif == "rapor":
                         st.markdown("**Temsilci × Görev:**")
                         st.dataframe(pd.crosstab(df_rand_r["temsilci"], df_rand_r["gorev"]), use_container_width=True)
 
-            with st.expander("📋 Takip & Sonuç Raporu", expanded=False):
+        with st.expander("📋 Takip & Sonuç Raporu"):
+            if df_rand_r.empty:
+                st.info("Veri yok.")
+            else:
                 if "takip" in df_rand_r.columns:
-                    t_oz2 = df_rand_r.groupby("takip").agg(Adet=("id","count")).reset_index().sort_values("Adet",ascending=False)
-                    st.markdown("**Takip Durumu:**")
+                    t_oz2 = df_rand_r.groupby("takip").agg(Adet=("id","count")).reset_index()
+                    st.markdown("**Takip:**")
                     st.dataframe(t_oz2, use_container_width=True, hide_index=True)
                 if "sonuc" in df_rand_r.columns:
                     s_oz = df_rand_r.groupby("sonuc").agg(
                         Adet=("id","count"), Musteri=("musteri_adi","nunique")
                     ).reset_index().sort_values("Adet",ascending=False)
                     s_oz.columns = ["Sonuç","Adet","Müşteri"]
-                    st.markdown("**Sonuç Dağılımı:**")
+                    st.markdown("**Sonuç:**")
                     st.dataframe(s_oz, use_container_width=True, hide_index=True)
                 acik = df_rand_r[~df_rand_r["sonuc"].isin(["Bitti","İptal","Gidilmedi"])] if "sonuc" in df_rand_r.columns else pd.DataFrame()
                 if not acik.empty:
                     st.warning(f"⚠️ {len(acik)} açık randevu!")
-                    g_cols = [c for c in ["randevu_tarihi","musteri_adi","bolge","gorev","temsilci","sonuc"] if c in acik.columns]
-                    st.dataframe(acik[g_cols], use_container_width=True, hide_index=True)
+                    g_cols2 = [c for c in ["randevu_tarihi","musteri_adi","bolge","gorev","temsilci","sonuc"] if c in acik.columns]
+                    st.dataframe(acik[g_cols2], use_container_width=True, hide_index=True)
                 else:
-                    st.success("✅ Tüm randevuların sonucu girilmiş.")
+                    st.success("✅ Tüm sonuçlar girilmiş.")
                 buf_rs = io.BytesIO(); df_rand_r.to_excel(buf_rs, index=False); buf_rs.seek(0)
-                st.download_button("📥 Tüm Randevu Raporu", data=buf_rs, file_name="randevu_raporu.xlsx", use_container_width=True)
+                st.download_button("📥 Randevu Raporu", data=buf_rs, file_name="randevu_raporu.xlsx", use_container_width=True)
 
-    # ══════════════════════════════════════════════════════════════════════════
     with ana_tab2:
         # Veri hesapla
         toplam          = len(df_rapor)
