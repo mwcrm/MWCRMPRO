@@ -806,35 +806,46 @@ if aktif == "yeni":
         st.markdown("#### 💰 Ciro Bilgileri")
         ciro_col1, ciro_col2, ciro_col3, ciro_col4 = st.columns(4)
         def parse_tr_sayi(s):
-            """10.000 veya 10000 veya 10,000 → float"""
+            """Türk muhasebe formatı: 1.000.000,50 → 1000000.50"""
             try:
-                s = str(s).strip()
-                # Türk formatı: 1.000.000,50
-                if "," in s and "." in s:
+                s = str(s).strip().replace(" ","").replace("₺","")
+                if not s or s == "0": return 0.0
+                # Virgül varsa ondalık ayraç
+                if "," in s:
+                    # 1.000.000,50 → noktaları kaldır, virgülü noktaya çevir
                     s = s.replace(".","").replace(",",".")
-                elif "," in s and "." not in s:
-                    s = s.replace(",",".")
                 else:
+                    # Sadece nokta var — binlik ayraç olarak kabul et
+                    # 1.000.000 → 1000000
                     s = s.replace(".","")
-                return float(s or 0)
+                return float(s)
             except: return 0.0
 
-        bek_val = duzenle.get("beklenen_ciro","0") if duzenle else "0"
-        ger_val = duzenle.get("gerceklesen_ciro","0") if duzenle else "0"
-        try: bek_disp = f"{float(str(bek_val) or 0):,.0f}".replace(",",".")
-        except: bek_disp = "0"
-        try: ger_disp = f"{float(str(ger_val) or 0):,.0f}".replace(",",".")
-        except: ger_disp = "0"
+        def fmt_tr_sayi(n):
+            """1000000 → 1.000.000,00"""
+            try:
+                n = float(n or 0)
+                # Tam sayıysa virgülsüz göster
+                if n == int(n):
+                    return f"{int(n):,}".replace(",",".")
+                else:
+                    tam = int(n)
+                    kurus = round((n - tam) * 100)
+                    return f"{tam:,}".replace(",",".") + f",{kurus:02d}"
+            except: return "0"
 
-        bek_str = ciro_col1.text_input("Beklenen Ciro (₺)", value=bek_disp, placeholder="Örn: 10.000", key="bek_ciro_str")
-        ger_str = ciro_col2.text_input("Gerçekleşen Ciro (₺)", value=ger_disp, placeholder="Örn: 8.500", key="ger_ciro_str")
+        bek_val = duzenle.get("beklenen_ciro", 0) if duzenle else 0
+        ger_val = duzenle.get("gerceklesen_ciro", 0) if duzenle else 0
+
+        bek_str = ciro_col1.text_input("Beklenen Ciro (₺)", value=fmt_tr_sayi(bek_val), placeholder="Örn: 10.000", key="bek_ciro_str")
+        ger_str = ciro_col2.text_input("Gerçekleşen Ciro (₺)", value=fmt_tr_sayi(ger_val), placeholder="Örn: 8.500", key="ger_ciro_str")
 
         beklenen_ciro = parse_tr_sayi(bek_str)
         gerceklesen_ciro = parse_tr_sayi(ger_str)
         fark = gerceklesen_ciro - beklenen_ciro
         yuzde = (gerceklesen_ciro / beklenen_ciro * 100) if beklenen_ciro > 0 else 0
-        ciro_col3.metric("Fark (₺)", f"₺{fark:,.0f}", delta=f"{fark:,.0f}")
-        ciro_col4.metric("Gerçekleşme %", f"%{yuzde:.1f}")
+        ciro_col3.metric("Fark (₺)", f"₺{fmt_tr_sayi(fark)}", delta=fmt_tr_sayi(fark))
+        ciro_col4.metric("Gerçekleşme %", f"%{yuzde:.1f}".replace(".",","))
 
         btn_label = "💾 Güncelle" if duzenle else "💾 Cari Kartı Kaydet"
         if st.form_submit_button(btn_label):
