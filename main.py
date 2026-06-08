@@ -899,8 +899,6 @@ elif aktif == "liste":
         secili_kart = st.selectbox("Müşteri Kartı:", kart_opts, key="kart_sec")
 
         if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
-            try:
-                kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
                 kart_row = df[df["id"]==kart_id].iloc[0]
 
                 st.markdown("---")
