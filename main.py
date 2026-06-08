@@ -750,14 +750,13 @@ if aktif == "yeni":
             else:
                 row_s = df_ara_s[df_ara_s["firma"].str.contains(musteri_ara.strip(), case=False, na=False)]
             if not row_s.empty:
-                bulunan = row_s.iloc[0].to_dict()
+                r_d = row_s.iloc[0]
+                bulunan = {str(k): ("" if str(v) in ["nan","None","NaT"] else str(v)) for k,v in r_d.items()}
                 st.session_state["duzenle_musteri"] = bulunan
-                st.success(f"✅ Bulundu: **{bulunan.get('firma')}** (ID: {bulunan.get('id')})")
+                st.success(f"✅ **{bulunan.get('firma')}** (ID: {bulunan.get('id')})")
             else:
                 st.error("Müşteri bulunamadı.")
                 st.session_state.pop("duzenle_musteri", None)
-    elif not musteri_ara:
-        st.session_state.pop("duzenle_musteri", None)
 
     duzenle = st.session_state.get("duzenle_musteri")
 
@@ -882,11 +881,17 @@ elif aktif == "liste":
         st.info("Kayıt bulunamadı.")
     else:
         # ── MÜŞTERİ KARTI ──
+        sc1, sc2 = st.columns([2, 3])
+        ara_kart = sc1.text_input("🔍 Ara:", key="kart_ara", placeholder="Firma, il, durum...")
+        df_kart_f = df.copy()
+        if ara_kart:
+            df_kart_f = df[df.apply(lambda r: ara_kart.lower() in str(r).lower(), axis=1)]
+
         kart_opts = ["-- Müşteri Seçin --"] + [
             f"[{int(r['id'])}] {r['firma']} | {r.get('il','')} | {r.get('durum','')}"
-            for _, r in df.head(200).iterrows()
+            for _, r in df_kart_f.head(200).iterrows()
         ]
-        secili_kart = st.selectbox("🔍 Müşteri Kartı Seç:", kart_opts, key="kart_sec")
+        secili_kart = sc2.selectbox("📋 Müşteri Kartı Seç:", kart_opts, key="kart_sec")
 
         if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
             try:
