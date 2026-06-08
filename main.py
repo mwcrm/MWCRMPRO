@@ -572,6 +572,20 @@ def fmt_para(n):
     except:
         return "0 ₺"
 
+
+def fmt_tel(n):
+    """5544929309.0 → 5544929309"""
+    try:
+        if not n or str(n).strip() in ["", "None", "nan", "-"]: return ""
+        s = str(n).strip()
+        if s.endswith(".0"): s = s[:-2]
+        # Sadece rakam bırak
+        import re
+        import re as _re_tel
+        s = _re_tel.sub(r"[^0-9]", "", s)
+        return s
+    except: return ""
+
 def parse_para(s):
     """1.000.000,50 → 1000000.50"""
     try:
@@ -814,8 +828,8 @@ if aktif == "yeni":
         col1, col2, col3 = st.columns(3)
         firma    = col1.text_input("Firma Adı",  value=duzenle.get("firma","") if duzenle else "")
         yetkili  = col1.text_input("Yetkili",    value=duzenle.get("yetkili","") if duzenle else "")
-        gsm      = col2.text_input("GSM",        value=duzenle.get("gsm","") if duzenle else "")
-        sabit    = col2.text_input("Sabit Tel",  value=duzenle.get("sabit","") if duzenle else "")
+        gsm      = col2.text_input("GSM",        value=fmt_tel(duzenle.get("gsm","")) if duzenle else "")
+        sabit    = col2.text_input("Sabit Tel",  value=fmt_tel(duzenle.get("sabit","")) if duzenle else "")
         email    = col3.text_input("E-Mail",     value=duzenle.get("email","") if duzenle else "")
 
         il_idx   = il_listesi.index(secilen_il)
@@ -933,8 +947,8 @@ elif aktif == "liste":
                 with kc1:
                     st.markdown("**📋 İletişim**")
                     st.write(f"👤 **{kart_row.get('yetkili','-')}**")
-                    st.write(f"📱 **{kart_row.get('gsm','-')}**")
-                    st.write(f"☎️ **{kart_row.get('sabit','-')}**")
+                    st.write(f"📱 **{fmt_tel(kart_row.get('gsm','')) or '-'}**")
+                    st.write(f"☎️ **{fmt_tel(kart_row.get('sabit','')) or '-'}**")
                     st.write(f"✉️ **{kart_row.get('email','-')}**")
                 with kc2:
                     st.markdown("**📍 Konum & Durum**")
@@ -2293,8 +2307,8 @@ elif aktif == "excel":
                                     except: return 0.0
 
                                 yetkili_v  = temiz(row.get("yetkili",""))
-                                gsm_v      = temiz(row.get("gsm",""))
-                                sabit_v    = temiz(row.get("sabit",""))
+                                gsm_v      = fmt_tel(temiz(row.get("gsm","")))
+                                sabit_v    = fmt_tel(temiz(row.get("sabit","")))
                                 email_v    = temiz(row.get("email",""))
                                 adres_v    = temiz(row.get("adres",""))
                                 ilce_v     = temiz(row.get("ilce",""))
