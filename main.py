@@ -1431,6 +1431,18 @@ elif aktif == "rapor":
 
     # ══════════════════════════════════════════════════════════════════════════
     with ana_tab2:
+        # Veri hesapla
+        toplam            = len(df_rapor)
+        aktif_say         = len(df_rapor[df_rapor["durum"]=="Aktif"])
+        hedef_say         = len(df_rapor[df_rapor["durum"]=="Hedef"])
+        pasif_say         = len(df_rapor[df_rapor["durum"]=="Pasif"])
+        toplam_beklenen   = df_rapor["beklenen_ciro"].sum()
+        toplam_gercek     = df_rapor["gerceklesen_ciro"].sum()
+        toplam_fark       = toplam_gercek - toplam_beklenen
+        genel_yuzde       = (toplam_gercek/toplam_beklenen*100) if toplam_beklenen>0 else 0
+        df_rapor["fark"]  = df_rapor["gerceklesen_ciro"] - df_rapor["beklenen_ciro"]
+        df_rapor["yuzde"] = df_rapor.apply(lambda r: (r["gerceklesen_ciro"]/r["beklenen_ciro"]*100) if r["beklenen_ciro"]>0 else 0, axis=1)
+
         # Genel metrikler
         m1,m2,m3,m4 = st.columns(4)
         m1.metric("Toplam Cari", toplam)
