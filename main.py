@@ -1720,17 +1720,83 @@ elif aktif == "teklif":
         if key2 in IL_KM: return str(IL_KM[key2])
         return "?"
 
-    URUN_TIPLERI = ["Koli","Sandik","Top","Cuval","Kasa","Palet","Diger","Manuel"]
-    IL_LISTESI = ["","Istanbul","Ankara","Izmir","Bursa","Antalya","Adana","Konya",
-        "Gaziantep","Mersin","Kayseri","Eskisehir","Diyarbakir","Samsun","Trabzon",
-        "Erzurum","Sanliurfa","Manisa","Balikesir","Tekirdag","Kocaeli","Sakarya",
-        "Denizli","Mugla","Hatay","Malatya","Kahramanmaras","Van","Elazig","Aydin",
-        "Edirne","Canakkale","Afyonkarahisar","Isparta","Kutahya","Usak","Nevsehir",
-        "Nigde","Aksaray","Yozgat","Sivas","Erzincan","Ordu","Amasya","Tokat","Corum",
-        "Sinop","Kastamonu","Karabuk","Zonguldak","Bolu","Duzce","Yalova","Bilecik",
-        "Kirklareli","Kirikkale","Cankiri","Karaman","Osmaniye","Kilis","Adiyaman",
-        "Burdur","Rize","Giresun","Artvin","Mardin","Sirnak","Batman","Bitlis",
-        "Mus","Bingol","Tunceli","Siirt","Hakkari","Agri","Igdir","Kars","Ardahan"]
+    URUN_TIPLERI = ["Koli","Sandık","Top","Çuval","Kasa","Palet","Diğer","Manuel"]
+    IL_LISTESI = ["","İstanbul","Ankara","İzmir","Bursa","Antalya","Adana","Konya",
+        "Gaziantep","Mersin","Kayseri","Eskişehir","Diyarbakır","Samsun","Trabzon",
+        "Erzurum","Şanlıurfa","Manisa","Balıkesir","Tekirdağ","Kocaeli","Sakarya",
+        "Denizli","Muğla","Hatay","Malatya","Kahramanmaraş","Van","Elazığ","Aydın",
+        "Edirne","Çanakkale","Afyonkarahisar","Isparta","Kütahya","Uşak","Nevşehir",
+        "Niğde","Aksaray","Yozgat","Sivas","Erzincan","Ordu","Amasya","Tokat","Çorum",
+        "Sinop","Kastamonu","Karabük","Zonguldak","Bolu","Düzce","Yalova","Bilecik",
+        "Kırklareli","Kırıkkale","Çankırı","Karaman","Osmaniye","Kilis","Adıyaman",
+        "Burdur","Rize","Giresun","Artvin","Mardin","Şırnak","Batman","Bitlis",
+        "Muş","Bingöl","Tunceli","Siirt","Hakkari","Ağrı","Iğdır","Kars","Ardahan"]
+
+    # IL_KM anahtarlarını da Türkçe'ye çevir
+    IL_KM_TR = {
+        ("İstanbul","Ankara"):454,("Ankara","İstanbul"):454,
+        ("İstanbul","İzmir"):479,("İzmir","İstanbul"):479,
+        ("İstanbul","Bursa"):154,("Bursa","İstanbul"):154,
+        ("İstanbul","Antalya"):725,("Antalya","İstanbul"):725,
+        ("İstanbul","Konya"):664,("Konya","İstanbul"):664,
+        ("İstanbul","Adana"):939,("Adana","İstanbul"):939,
+        ("İstanbul","Gaziantep"):1130,("Gaziantep","İstanbul"):1130,
+        ("İstanbul","Kayseri"):770,("Kayseri","İstanbul"):770,
+        ("İstanbul","Mersin"):930,("Mersin","İstanbul"):930,
+        ("İstanbul","Diyarbakır"):1360,("Diyarbakır","İstanbul"):1360,
+        ("İstanbul","Samsun"):730,("Samsun","İstanbul"):730,
+        ("İstanbul","Trabzon"):1100,("Trabzon","İstanbul"):1100,
+        ("İstanbul","Erzurum"):1270,("Erzurum","İstanbul"):1270,
+        ("İstanbul","Eskişehir"):330,("Eskişehir","İstanbul"):330,
+        ("İstanbul","Balıkesir"):310,("Balıkesir","İstanbul"):310,
+        ("İstanbul","Tekirdağ"):135,("Tekirdağ","İstanbul"):135,
+        ("İstanbul","Edirne"):230,("Edirne","İstanbul"):230,
+        ("İstanbul","Kocaeli"):100,("Kocaeli","İstanbul"):100,
+        ("İstanbul","Sakarya"):160,("Sakarya","İstanbul"):160,
+        ("İstanbul","Düzce"):200,("Düzce","İstanbul"):200,
+        ("İstanbul","Yalova"):80,("Yalova","İstanbul"):80,
+        ("İstanbul","Çanakkale"):325,("Çanakkale","İstanbul"):325,
+        ("Ankara","İzmir"):590,("İzmir","Ankara"):590,
+        ("Ankara","Antalya"):480,("Antalya","Ankara"):480,
+        ("Ankara","Konya"):260,("Konya","Ankara"):260,
+        ("Ankara","Adana"):490,("Adana","Ankara"):490,
+        ("Ankara","Samsun"):420,("Samsun","Ankara"):420,
+        ("Ankara","Trabzon"):790,("Trabzon","Ankara"):790,
+        ("Ankara","Bursa"):390,("Bursa","Ankara"):390,
+        ("Ankara","Eskişehir"):235,("Eskişehir","Ankara"):235,
+        ("Ankara","Kayseri"):320,("Kayseri","Ankara"):320,
+        ("İzmir","Antalya"):490,("Antalya","İzmir"):490,
+        ("İzmir","Bursa"):330,("Bursa","İzmir"):330,
+        ("İzmir","Manisa"):40,("Manisa","İzmir"):40,
+        ("İzmir","Denizli"):250,("Denizli","İzmir"):250,
+        ("İzmir","Aydın"):100,("Aydın","İzmir"):100,
+        ("Konya","Antalya"):220,("Antalya","Konya"):220,
+        ("Konya","Adana"):330,("Adana","Konya"):330,
+        ("Konya","Kayseri"):260,("Kayseri","Konya"):260,
+        ("Adana","Gaziantep"):220,("Gaziantep","Adana"):220,
+        ("Adana","Mersin"):70,("Mersin","Adana"):70,
+        ("Adana","Hatay"):195,("Hatay","Adana"):195,
+        ("Adana","Kahramanmaraş"):175,("Kahramanmaraş","Adana"):175,
+        ("Adana","Kayseri"):340,("Kayseri","Adana"):340,
+        ("Gaziantep","Diyarbakır"):300,("Diyarbakır","Gaziantep"):300,
+        ("Samsun","Trabzon"):355,("Trabzon","Samsun"):355,
+        ("Samsun","Ordu"):115,("Ordu","Samsun"):115,
+        ("Samsun","Sinop"):170,("Sinop","Samsun"):170,
+        ("Trabzon","Erzurum"):215,("Erzurum","Trabzon"):215,
+        ("Trabzon","Giresun"):170,("Giresun","Trabzon"):170,
+        ("Trabzon","Rize"):75,("Rize","Trabzon"):75,
+        ("Elazığ","Diyarbakır"):155,("Diyarbakır","Elazığ"):155,
+        ("Elazığ","Malatya"):100,("Malatya","Elazığ"):100,
+        ("Diyarbakır","Mardin"):95,("Mardin","Diyarbakır"):95,
+        ("Antalya","Isparta"):135,("Isparta","Antalya"):135,
+    }
+
+    def get_km(cikis, varis):
+        if not cikis or not varis or cikis == varis: return ""
+        key = (cikis.strip(), varis.strip())
+        if key in IL_KM_TR: return str(IL_KM_TR[key])
+        if key in IL_KM: return str(IL_KM[key])
+        return "?"
 
     # Musteri listesi - TUM musteriler (durum filtresi dropdown ile)
     df_m = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
@@ -1808,15 +1874,17 @@ elif aktif == "teklif":
     if "teklif_satir_n" not in st.session_state:
         st.session_state["teklif_satir_n"] = 1
 
-    col_ekle, col_sil = st.columns([1,1])
+    col_ekle, col_sil, col_sort = st.columns([1,1,2])
     with col_ekle:
-        if st.button("+ Satir Ekle", use_container_width=True, type="primary"):
+        if st.button("+ Satır Ekle", use_container_width=True, type="primary"):
             st.session_state["teklif_satir_n"] += 1
             st.rerun()
     with col_sil:
-        if st.button("- Son Satiri Sil", use_container_width=True) and st.session_state["teklif_satir_n"] > 1:
+        if st.button("- Son Satırı Sil", use_container_width=True) and st.session_state["teklif_satir_n"] > 1:
             st.session_state["teklif_satir_n"] -= 1
             st.rerun()
+    with col_sort:
+        sort_yonu = st.selectbox("Desi/KG Sırala:", ["—","Büyükten Küçüğe","Küçükten Büyüğe"], key="sort_yonu")
 
     n = st.session_state["teklif_satir_n"]
 
@@ -1863,11 +1931,11 @@ elif aktif == "teklif":
 
     with left:
         st.markdown("#### HESAPLAMA")
-        hh = st.columns([1.5, 0.7, 0.7, 0.7, 0.8, 1.2])
-        for txt, col in zip(["Urun","En","Boy","Yuk","Desi","Birim Fiyat"], hh):
+        hh = st.columns([1.5, 0.7, 0.7, 0.7, 0.8, 1.2, 0.5])
+        for txt, col in zip(["Ürün","En","Boy","Yük","Desi","Birim Fiyat","↕"], hh):
             col.markdown(f"**{txt}**")
         for i in range(n):
-            hc = st.columns([1.5, 0.7, 0.7, 0.7, 0.8, 1.2])
+            hc = st.columns([1.5, 0.7, 0.7, 0.7, 0.8, 1.2, 0.5])
             urun_tip = hc[0].selectbox("", URUN_TIPLERI, key=f"h_tip_{i}", label_visibility="collapsed")
             en  = hc[1].number_input("", min_value=0.0, step=1.0, key=f"h_en_{i}", label_visibility="collapsed", format="%.0f")
             boy = hc[2].number_input("", min_value=0.0, step=1.0, key=f"h_boy_{i}", label_visibility="collapsed", format="%.0f")
@@ -1877,10 +1945,23 @@ elif aktif == "teklif":
             birim_fiyat = hc[5].number_input("", min_value=0.0, step=0.5, key=f"h_bf_{i}", label_visibility="collapsed")
             urun_adi = urun_tip
             if urun_tip == "Manuel":
-                urun_adi = st.text_input(f"Urun adi {i+1}:", key=f"h_adi_{i}", placeholder="Urun adi")
+                urun_adi = st.text_input(f"Ürün adı {i+1}:", key=f"h_adi_{i}", placeholder="Ürün adı")
+            # Taşıma butonları
+            with hc[6]:
+                if i > 0 and st.button("▲", key=f"row_up_{i}", use_container_width=True):
+                    for _k in ["h_tip","h_en","h_boy","h_yuk","h_bf","t_cil","t_vil","t_bas","t_kg","t_tur"]:
+                        a, b = f"{_k}_{i}", f"{_k}_{i-1}"
+                        va = st.session_state.get(a); vb = st.session_state.get(b)
+                        st.session_state[a] = vb; st.session_state[b] = va
+                    st.rerun()
+                if i < n-1 and st.button("▼", key=f"row_dn_{i}", use_container_width=True):
+                    for _k in ["h_tip","h_en","h_boy","h_yuk","h_bf","t_cil","t_vil","t_bas","t_kg","t_tur"]:
+                        a, b = f"{_k}_{i}", f"{_k}_{i+1}"
+                        va = st.session_state.get(a); vb = st.session_state.get(b)
+                        st.session_state[a] = vb; st.session_state[b] = va
+                    st.rerun()
             hesap_sonuclar.append({"urun": urun_adi, "en": en, "boy": boy, "yuk": yuk,
                                    "desi": desi, "birim_fiyat": birim_fiyat})
-            # Canli guncelle
             hesap_desi[i] = desi
             hesap_bf[i]   = birim_fiyat
             hesap_urun[i] = urun_tip
