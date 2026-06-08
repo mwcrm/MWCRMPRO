@@ -961,6 +961,101 @@ elif aktif == "liste":
                             st.success(f"'{secili_firma}' arşive gönderildi.")
                             st.rerun()
 
+    # ── MÜŞTERİ DETAY PANELİ ─────────────────────────────────────────────────
+    st.divider()
+    st.markdown("### 🔍 Müşteri Detay — Teklif & Randevu")
+
+    if not df.empty:
+        detay_opts = ["-- Müşteri Seçin --"] + [
+            f"[{int(r['id'])}] {r['firma']} ({r.get('durum','')})"
+            for _, r in df.iterrows()
+        ]
+        secili_detay = st.selectbox("Müşteri:", detay_opts, key="detay_musteri_sec")
+
+        if secili_detay != "-- Müşteri Seçin --":
+            try:
+                detay_id = int(secili_detay.split("]")[0].replace("[","").strip())
+                detay_row = df[df["id"]==detay_id].iloc[0]
+
+                # Müşteri bilgileri
+                dc1, dc2, dc3, dc4 = st.columns(4)
+                dc1.metric("Durum", str(detay_row.get("durum","")))
+                dc2.metric("Aşama", str(detay_row.get("islem_asamasi","")))
+                dc3.metric("Beklenen", f"₺{float(detay_row.get('beklenen_ciro',0) or 0):,.0f}")
+                dc4.metric("Gerçekleşen", f"₺{float(detay_row.get('gerceklesen_ciro',0) or 0):,.0f}")
+
+                col_tek, col_rand = st.columns(2)
+
+                # Son teklif
+                with col_tek:
+                    st.markdown("#### 📄 Son Teklif")
+                    df_tek_d = db_read("teklifler", filters={"musteri_id": detay_id}, order_col="tarih")
+                    if not df_tek_d.empty:
+                        son_tek = df_tek_d.iloc[0]
+                        st.info(f"**{son_tek.get('musteri_adi','')}**\n\n"
+                               f"💰 ₺{float(son_tek.get('toplam_tutar',0) or 0):,.2f}\n\n"
+                               f"📅 {str(son_tek.get('tarih',''))[:16]}\n\n"
+                               f"📝 {str(son_tek.get('notlar',''))[:100]}")
+                        if st.button("📄 Teklif Detayı", key=f"tek_det_{detay_id}", use_container_width=True):
+                            st.session_state["aktif_tab"] = "teklif"
+                            st.session_state["teklif_hedef_musteri"] = str(detay_row.get("firma",""))
+                            st.rerun()
+                        if len(df_tek_d) > 1:
+                            st.caption(f"Toplam {len(df_tek_d)} teklif var")
+                    else:
+                        st.info("Henüz teklif yok.")
+                        if st.button("➕ Teklif Oluştur", key=f"tek_yeni_{detay_id}", use_container_width=True, type="primary"):
+                            st.session_state["aktif_tab"] = "teklif"
+                            st.session_state["teklif_hedef_musteri"] = str(detay_row.get("firma",""))
+                            st.rerun()
+
+                # Aktif randevu (tek randevu — mükerrer olmasın)
+                with col_rand:
+                    st.markdown("#### 📅 Aktif Randevu")
+                    df_rand_d = db_read("randevular", filters={"musteri_id": detay_id}, order_col="randevu_tarihi", desc=True)
+
+                    # Bitmemiş tek randevu göster
+                    aktif_rand = pd.DataFrame()
+                    if not df_rand_d.empty and "sonuc" in df_rand_d.columns:
+                        aktif_rand = df_rand_d[~df_rand_d["sonuc"].isin(["Bitti","İptal"])].head(1)
+
+                    if not aktif_rand.empty:
+                        r = aktif_rand.iloc[0]
+                        durum_renk = "🟡" if str(r.get("sonuc","")) == "Devam Ediyor" else "🔵"
+                        st.info(f"{durum_renk} **{r.get('randevu_tarihi','')} {r.get('randevu_saati','')}**\n\n"
+                               f"📍 {r.get('bolge','')}\n\n"
+                               f"🎯 {r.get('gorev','')}\n\n"
+                               f"👤 {r.get('temsilci','')}\n\n"
+                               f"📋 {r.get('takip','')}")
+
+                        # Sonuç güncelle
+                        yeni_sonuc = st.selectbox("Sonuç Güncelle:",
+                            ["—","Bitti","Devam Ediyor","Gidilmedi","İptal"],
+                            key=f"rand_sonuc_{detay_id}")
+                        if yeni_sonuc != "—":
+                            if st.button("💾 Güncelle", key=f"rand_gunc_{detay_id}", use_container_width=True):
+                                db_update("randevular", {"sonuc": yeni_sonuc}, "id", int(r["id"]))
+                                st.success("✅ Güncellendi!")
+                                st.rerun()
+
+                        if st.button("📅 Randevu Detayı", key=f"rand_det_{detay_id}", use_container_width=True):
+                            st.session_state["aktif_tab"] = "randevu"
+                            st.rerun()
+                    else:
+                        if not df_rand_d.empty:
+                            son_r = df_rand_d.iloc[0]
+                            st.success(f"✅ Son randevu tamamlandı: {son_r.get('randevu_tarihi','')} — {son_r.get('sonuc','')}")
+                        else:
+                            st.info("Henüz randevu yok.")
+
+                        if st.button("➕ Randevu Oluştur", key=f"rand_yeni_{detay_id}", use_container_width=True, type="primary"):
+                            st.session_state["aktif_tab"] = "randevu"
+                            st.session_state["rand_musteri_onsel"] = detay_id
+                            st.rerun()
+
+            except Exception as e:
+                st.error(f"Detay hatası: {e}")
+
 # ── ARŞİV ─────────────────────────────────────────────────────────────────────
 elif aktif == "arsiv":
     df_arsiv = db_read("cari_kartlar", filters={"silindi": 1}, order_col="tarih")
@@ -3100,8 +3195,17 @@ elif aktif == "randevu":
         df_mrand = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
         musteri_rand_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['firma']} ({r['durum']})" for _, r in df_mrand.iterrows()]
 
+        # Cari listeden geldiyse otomatik seç
+        _onsel_id = st.session_state.pop("rand_musteri_onsel", None)
+        _onsel_idx = 0
+        if _onsel_id:
+            for i, opt in enumerate(musteri_rand_opts):
+                if f"[{_onsel_id}]" in opt:
+                    _onsel_idx = i
+                    break
+
         with st.form("randevu_form"):
-            rand_musteri = st.selectbox("Müşteri*:", musteri_rand_opts, key="rand_musteri")
+            rand_musteri = st.selectbox("Müşteri*:", musteri_rand_opts, index=_onsel_idx, key="rand_musteri")
             rc1, rc2, rc3 = st.columns(3)
             rand_tarih = rc1.date_input("Tarih*:", value=datetime.now().date(), key="rand_tarih")
             rand_saat  = rc2.time_input("Saat*:", key="rand_saat")
