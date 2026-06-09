@@ -696,75 +696,15 @@ with st.sidebar:
                         "olusturan":st.session_state["kullanici"],"aktif":1})
                     st.success("Yayınlandı!")
                     st.rerun()
-# ── STICKY HEADER + MENU — KESİN ÇÖZÜM ───────────────────────────────────────
-st.markdown("""
-<style>
-/* 1) Streamlit'in kendi üst header'ını gizle */
-header[data-testid="stHeader"] { display:none !important; }
-#stDecoration { display:none !important; }
-
-/* 2) Tüm sayfa içeriğini aşağı it (sticky alanlar için yer aç) */
-.block-container {
-    padding-top: 7rem !important;
-    padding-bottom: 4rem !important;
-}
-
-/* 3) Ana dikey blokların ilk 3 çocuğunu sabitle:
-      [0] = başlık satırı (MWCRMPRO + user + çıkış)
-      [1] = yatay çizgi (divider)
-      [2] = menü butonları satırı                    */
-div[data-testid="stVerticalBlock"]
-  > div:nth-child(1) {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 1000 !important;
-    background: #fff !important;
-    padding: 6px 1rem 4px 1rem !important;
-    box-shadow: 0 1px 6px rgba(0,0,0,.12) !important;
-}
-
-div[data-testid="stVerticalBlock"]
-  > div:nth-child(2) {
-    position: fixed !important;
-    top: 56px !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 999 !important;
-    background: #fff !important;
-    margin: 0 !important;
-    padding: 0 !important;
-}
-
-div[data-testid="stVerticalBlock"]
-  > div:nth-child(3) {
-    position: fixed !important;
-    top: 62px !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 998 !important;
-    background: #f8f9fa !important;
-    padding: 4px 1rem 6px 1rem !important;
-    border-bottom: 2px solid #dee2e6 !important;
-    box-shadow: 0 2px 8px rgba(0,0,0,.08) !important;
-}
-
-/* 4) Sol sidebar olduğu gibi kalsın */
-section[data-testid="stSidebar"] {
-    z-index: 997 !important;
-}
-</style>
-""", unsafe_allow_html=True)
-
 # ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
 col_bas, col_kul, col_cik = st.columns([6, 2, 1])
 with col_bas:
-    st.markdown("### 🏢 MWCRMPRO &nbsp;<small style='font-size:0.75rem;color:#888;font-weight:400;'>Cari Yönetim Sistemi</small>", unsafe_allow_html=True)
+    st.title("🏢 MWCRMPRO - Cari Yönetim Sistemi")
 with col_kul:
-    st.markdown(f"<div style='padding-top:4px;font-size:0.85rem;'>👤 <b>{st.session_state['kullanici']}</b> ({st.session_state['rol']})</div>", unsafe_allow_html=True)
+    st.markdown(f"<br>👤 **{st.session_state['kullanici']}** ({st.session_state['rol']})", unsafe_allow_html=True)
 with col_cik:
-    if st.button("🚪 Çıkış", use_container_width=True):
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("🚪 Çıkış"):
         cikis()
 
 st.divider()
