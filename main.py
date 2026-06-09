@@ -3146,7 +3146,7 @@ elif aktif == "kisiler":
 
     with tab_rehber4:
         st.markdown("#### 📝 Kayıtlı Şablonlar")
-        st.caption("💡 `{ad}` → kişi adı, `{firma}` → firma adı, `{yetkili}` → görevi. Firma ve yetkili bilgisi mesajın onune otomatik eklenir.")
+        st.caption("💡 `{ad}` → kişi adı, `{firma}` → firma adı, `{yetkili}` → görevi. Firma ve yetkili bilgisi mesaj onune otomatik eklenir.")
         with st.form("sablon_kaydet_form"):
             s1, s2 = st.columns([2,5])
             sab_isim = s1.text_input("Şablon Adı*:", placeholder="Örn: Tanışma")
