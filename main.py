@@ -77,7 +77,7 @@ def get_kullanici_listesi():
 
 def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
     """Supabase veya SQLite'dan DataFrame döner"""
-    sb = get_sb()
+    sb = get_sb_client()
     if sb:
         try:
             q = sb.table(table).select("*")
@@ -110,7 +110,7 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
 
 def db_insert(table, data):
     """Insert — Supabase önce, SQLite fallback"""
-    sb = get_sb()
+    sb = get_sb_client()
     if sb:
         try:
             res = sb.table(table).insert(data).execute()
@@ -435,16 +435,14 @@ def otomatik_yedek():
     if sb_or_sqlite():
         return  # Supabase modunda yedek gerekmez
     try:
+        if not os.path.exists("mw_crm.db"):
+            return
         bugun = datetime.now().strftime("%Y-%m-%d")
         yedek_klasor = "backups"
         os.makedirs(yedek_klasor, exist_ok=True)
         db_yedek = os.path.join(yedek_klasor, f"mw_crm_{bugun}.db")
-        if not os.path.exists(db_yedek) and os.path.exists("mw_crm.db"):
+        if not os.path.exists(db_yedek):
             shutil.copy2("mw_crm.db", db_yedek)
-        csv_yedek = os.path.join(yedek_klasor, f"cari_kartlar_{bugun}.csv")
-        if not os.path.exists(csv_yedek):
-            df_yedek = db_read("cari_kartlar", extra_sql="")
-            df_yedek.to_csv(csv_yedek, index=False, encoding="utf-8-sig")
     except:
         pass
 
@@ -745,18 +743,21 @@ if st.session_state["rol"] == "admin":
         if _t not in aktif_tab_listesi:
             aktif_tab_listesi.append(_t)
 
-# Yetki filtresi (admin hepsini görür)
+# Yetki filtresi (admin hepsini görür) - session cache ile
 if st.session_state.get("rol") != "admin":
     try:
         import json as _yj
-        df_kul_yetki = db_read("kullanicilar", extra_sql="")
-        if not df_kul_yetki.empty and "yetkiler" in df_kul_yetki.columns:
-            kul_row = df_kul_yetki[df_kul_yetki["kullanici_adi"] == st.session_state["kullanici"]]
-            if not kul_row.empty:
-                yetki_val = str(kul_row.iloc[0].get("yetkiler","tam") or "tam")
-                if yetki_val != "tam":
-                    izinli = _yj.loads(yetki_val)
-                    aktif_tab_listesi = [t for t in aktif_tab_listesi if t in izinli]
+        _yetki_cache_key = f"yetki_{st.session_state['kullanici']}"
+        if _yetki_cache_key not in st.session_state:
+            df_kul_yetki = db_read("kullanicilar", extra_sql="")
+            if not df_kul_yetki.empty and "yetkiler" in df_kul_yetki.columns:
+                kul_row = df_kul_yetki[df_kul_yetki["kullanici_adi"] == st.session_state["kullanici"]]
+                if not kul_row.empty:
+                    st.session_state[_yetki_cache_key] = str(kul_row.iloc[0].get("yetkiler","tam") or "tam")
+        yetki_val = st.session_state.get(_yetki_cache_key, "tam")
+        if yetki_val != "tam":
+            izinli = _yj.loads(yetki_val)
+            aktif_tab_listesi = [t for t in aktif_tab_listesi if t in izinli]
     except: pass
 
 cols = st.columns(len(aktif_tab_listesi))
