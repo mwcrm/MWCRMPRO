@@ -4,7 +4,6 @@ import pandas as pd
 import shutil
 import os
 import io
-import re
 import json
 from datetime import datetime
 
@@ -40,7 +39,7 @@ def get_supabase():
 @st.cache_data(ttl=60)
 def get_cari_listesi():
     """60 sn cache'li cari listesi"""
-    sb = get_sb_client()
+    sb = get_sb()
     if sb:
         try:
             res = sb.table("cari_kartlar").select("*").neq("silindi",1).order("firma").execute()
@@ -58,8 +57,25 @@ def get_cari_listesi():
 def get_kullanici_listesi():
     """2 dk cache'li kullanıcı listesi"""
     return db_read("kullanicilar", extra_sql="")
+    """Önbellekli okuma — 30 saniye cache"""
+    sb = get_sb()
+    if sb:
+        try:
+            q = sb.table(table).select("*")
+            res = q.execute()
+            return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+        except:
+            pass
+    try:
+        conn = get_conn()
+        sql = f"SELECT * FROM {table} {extra_sql}"
+        df = pd.read_sql(sql, conn)
+        conn.close()
+        return df
+    except:
+        return pd.DataFrame()
 
-@st.cache_data(ttl=120)
+@st.cache_data(ttl=60)
 def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
     """Supabase veya SQLite'dan DataFrame döner — 60sn cache"""
     sb = get_sb_client()
@@ -120,7 +136,7 @@ def db_insert(table, data):
 
 def db_update(table, data, where_col, where_val):
     """Update — Supabase veya SQLite"""
-    sb = get_sb_client()
+    sb = get_sb()
     if sb:
         try:
             sb.table(table).update(data).eq(where_col, where_val).execute()
@@ -150,6 +166,7 @@ def db_query(sql, params=None):
             sb = get_supabase()
             if sb:
                 # Tabloyu sql'den çıkar
+                import re
                 tbl = re.search(r'FROM\s+(\w+)', sql, re.IGNORECASE)
                 if tbl:
                     table_name = tbl.group(1)
@@ -378,15 +395,6 @@ def init_db():
             ad TEXT, soyad TEXT, telefon TEXT, email TEXT,
             firma TEXT, gorev TEXT, bolge TEXT,
             temsilci TEXT, notlar TEXT, kaynak TEXT)""",
-        """CREATE TABLE IF NOT EXISTS sablon_mesajlar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            ad TEXT, metin TEXT, olusturan TEXT, aktif INTEGER DEFAULT 1)""",
-        """CREATE TABLE IF NOT EXISTS kisiler_mesaj_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            kisi_id INTEGER, kisi_adi TEXT, telefon TEXT,
-            sablon_adi TEXT, mesaj TEXT, gonderen TEXT)""",
         """CREATE TABLE IF NOT EXISTS randevular (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -549,6 +557,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── MENÜ FONKSİYONLARI (sidebar'dan önce tanımlanmalı) ───────────────────────
+import json as _menu_json
 
 def fmt_para(n):
     """Türk muhasebe formatı: 1.000.000,00 ₺"""
@@ -572,6 +581,8 @@ def fmt_tel(n):
         s = str(n).strip()
         if s.endswith(".0"): s = s[:-2]
         # Sadece rakam bırak
+        import re
+        import re as _re_tel
         s = _re_tel.sub(r"[^0-9]", "", s)
         return s
     except: return ""
@@ -611,7 +622,7 @@ _TAB_ETIKETLER = {
 def get_menu_tercihi(kullanici):
     try:
         # Supabase veya SQLite'dan oku
-        sb_m = get_sb_client()
+        sb_m = get_sb()
         if sb_m:
             res = sb_m.table("kullanici_tercih").select("deger").eq("kullanici", kullanici).eq("anahtar","menu_sirasi").execute()
             if res.data:
@@ -648,7 +659,7 @@ def get_menu_tercihi(kullanici):
 
 def save_menu_tercihi(kullanici, sira):
     try:
-        sb_m = get_sb_client()
+        sb_m = get_sb()
         if sb_m:
             sb_m.table("kullanici_tercih").upsert({
                 "kullanici": kullanici,
@@ -665,46 +676,7 @@ def save_menu_tercihi(kullanici, sira):
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## 🏢 MWCRMPRO")
     st.caption(f"👤 {st.session_state.get('kullanici','')} | {st.session_state.get('rol','')}")
-    if st.button("🚪 Çıkış", use_container_width=True, key="sidebar_cikis"):
-        cikis()
-
-    st.divider()
-    st.markdown("**📌 Menü**")
-
-    # ── MENÜ LİSTESİ ──────────────────────────────────────────────────────────
-    _sb_liste = get_menu_tercihi(st.session_state["kullanici"])
-    if st.session_state.get("rol") == "admin":
-        for _t in ["kullanici","koddepo"]:
-            if _t not in _sb_liste:
-                _sb_liste.append(_t)
-    # Yetki filtresi
-    if st.session_state.get("rol") != "admin":
-        try:
-            import json as _yj
-            _yk = f"yetki_{st.session_state['kullanici']}"
-            if _yk not in st.session_state:
-                _dfk = db_read("kullanicilar", extra_sql="")
-                if not _dfk.empty and "yetkiler" in _dfk.columns:
-                    _kr = _dfk[_dfk["kullanici_adi"] == st.session_state["kullanici"]]
-                    if not _kr.empty:
-                        st.session_state[_yk] = str(_kr.iloc[0].get("yetkiler","tam") or "tam")
-            _yv = st.session_state.get(_yk, "tam")
-            if _yv != "tam":
-                _sb_liste = [t for t in _sb_liste if t in _yj.loads(_yv)]
-        except: pass
-
-    for _tab_key in _sb_liste:
-        _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
-        _aktif_mi = st.session_state["aktif_tab"] == _tab_key
-        if st.button(_etiket, use_container_width=True,
-                     type="primary" if _aktif_mi else "secondary",
-                     key=f"sb_{_tab_key}"):
-            st.session_state["aktif_tab"] = _tab_key
-            st.rerun()
-
-    st.divider()
 
     with st.expander("❓ Yardım"):
         st.markdown("📞 [5400344228](tel:05400344228)")
@@ -744,7 +716,6 @@ with st.sidebar:
                         "olusturan":st.session_state["kullanici"],"aktif":1})
                     st.success("Yayınlandı!")
                     st.rerun()
-
 # ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
 col_bas, col_kul, col_cik = st.columns([6, 2, 1])
 with col_bas:
@@ -755,6 +726,54 @@ with col_cik:
     st.markdown("<br>", unsafe_allow_html=True)
     if st.button("🚪 Çıkış"):
         cikis()
+
+st.divider()
+
+# ── MANUEL TAB MENÜSÜ ─────────────────────────────────────────────────────────
+tab_listesi = _TAB_LISTESI_DEFAULT.copy()
+tab_etiketler = _TAB_ETIKETLER
+if st.session_state["rol"] == "admin":
+    tab_listesi.append("kullanici")
+    tab_listesi.append("koddepo")
+
+aktif_tab_listesi = get_menu_tercihi(st.session_state["kullanici"])
+
+# Admin tabları her zaman listede olsun
+if st.session_state["rol"] == "admin":
+    for _t in ["kullanici","koddepo"]:
+        if _t not in aktif_tab_listesi:
+            aktif_tab_listesi.append(_t)
+
+# Yetki filtresi (admin hepsini görür) - session cache ile
+if st.session_state.get("rol") != "admin":
+    try:
+        import json as _yj
+        _yetki_cache_key = f"yetki_{st.session_state['kullanici']}"
+        if _yetki_cache_key not in st.session_state:
+            df_kul_yetki = db_read("kullanicilar", extra_sql="")
+            if not df_kul_yetki.empty and "yetkiler" in df_kul_yetki.columns:
+                kul_row = df_kul_yetki[df_kul_yetki["kullanici_adi"] == st.session_state["kullanici"]]
+                if not kul_row.empty:
+                    st.session_state[_yetki_cache_key] = str(kul_row.iloc[0].get("yetkiler","tam") or "tam")
+        yetki_val = st.session_state.get(_yetki_cache_key, "tam")
+        if yetki_val != "tam":
+            izinli = _yj.loads(yetki_val)
+            aktif_tab_listesi = [t for t in aktif_tab_listesi if t in izinli]
+    except: pass
+
+cols = st.columns(len(aktif_tab_listesi))
+for i, tab_key in enumerate(aktif_tab_listesi):
+    with cols[i]:
+        _is_aktif = st.session_state["aktif_tab"] == tab_key
+        _etiket = _TAB_ETIKETLER.get(tab_key, tab_key)
+        if st.button(
+            _etiket,
+            use_container_width=True,
+            type="primary" if _is_aktif else "secondary",
+            key=f"tab_btn_{tab_key}"
+        ):
+            st.session_state["aktif_tab"] = tab_key
+            st.rerun()
 
 st.divider()
 aktif = st.session_state["aktif_tab"]
@@ -967,8 +986,10 @@ elif aktif == "liste":
                     st.session_state["aktif_tab"] = "randevu"
                     st.session_state["rand_musteri_onsel"] = kart_id
                     st.rerun()
+
+                import re as _re_d
                 gsm_raw = str(kart_row.get("gsm","") or "").strip()
-                gsm_d = re.sub(r"[\s\-\(\)+]","", gsm_raw)
+                gsm_d = _re_d.sub(r"[\s\-\(\)+]","", gsm_raw)
                 if gsm_d.startswith("0") and len(gsm_d)==11: gsm_d = "90"+gsm_d[1:]
                 elif len(gsm_d)==10: gsm_d = "90"+gsm_d
                 wa_ok = len(gsm_d)==12 and gsm_d.isdigit()
@@ -978,7 +999,7 @@ elif aktif == "liste":
                         st.warning(f"Geçersiz numara: '{gsm_raw}'")
                         m_wa = st.text_input("Manuel numara:", placeholder="05xxxxxxxxx", key=f"wa_m_{kart_id}")
                         if m_wa:
-                            mt = re.sub(r"[\s\-\(\)+]","", m_wa)
+                            mt = _re_d.sub(r"[\s\-\(\)+]","", m_wa)
                             if mt.startswith("0") and len(mt)==11: mt = "90"+mt[1:]
                             elif len(mt)==10: mt = "90"+mt
                             if len(mt)==12 and mt.isdigit(): gsm_d = mt; wa_ok = True; st.success(f"✅ {gsm_d}")
@@ -1171,7 +1192,7 @@ elif aktif == "kullanici":
                 sil_sec = st.selectbox("Silinecek:",sil_opts,key="sil_kul")
                 if st.button("🗑️ Sil",type="primary"):
                     sil_id = int(sil_sec.split("]")[0].replace("[",""))
-                    sb_s = get_sb_client()
+                    sb_s = get_sb()
                     if sb_s:
                         sb_s.table("kullanicilar").delete().eq("id",sil_id).execute()
                     st.success("Silindi!"); st.rerun()
@@ -1199,11 +1220,12 @@ elif aktif == "kullanici":
 
             if st.form_submit_button("💾 Kaydet", use_container_width=True, type="primary"):
                 if yk_kadi and yk_sifre:
+                    import json as _kj
                     yetki = "tam" if tam else _kj.dumps(secili_m)
                     # Önce temel kolonlarla dene
                     veri = {"kullanici_adi": yk_kadi, "sifre": yk_sifre, "rol": yk_rol}
                     # Ek kolonları tek tek ekle
-                    sb_k = get_sb_client()
+                    sb_k = get_sb()
                     if sb_k:
                         try:
                             # Tam veri ile dene
@@ -1243,6 +1265,7 @@ elif aktif == "kullanici":
             k3_id   = int(k3_sec.split("]")[0].replace("[",""))
             k3_row  = df_kul3[df_kul3["id"]==k3_id].iloc[0]
 
+            import json as _kj2
             mv = str(k3_row.get("yetkiler","tam") or "tam")
             try:
                 mv_liste = _kj2.loads(mv) if mv!="tam" else list(TUM_MENULER.keys())
@@ -2041,7 +2064,7 @@ elif aktif == "teklif":
 
                 # Sil
                 if ak3.button("🗑️ Sil", key=f"tek_sil_{tek_id}", use_container_width=True, type="primary"):
-                    sb_d = get_sb_client()
+                    sb_d = get_sb()
                     if sb_d:
                         sb_d.table("teklifler").delete().eq("id", tek_id).execute()
                     st.success("🗑️ Teklif silindi!")
@@ -2072,6 +2095,7 @@ elif aktif == "teklif":
 # ── EXCEL AKTAR ──────────────────────────────────────────────────────────────
 elif aktif == "excel":
     import io
+    import re
 
     st.markdown("## 📥 Excel ile Toplu Veri Aktarımı")
 
@@ -2363,6 +2387,7 @@ elif aktif == "excel":
 
 # ── MUSTERİ ANALİZ ────────────────────────────────────────────────────────────
 elif aktif == "analiz":
+    import json as _aj
 
     st.markdown("## 🧠 Müşteri Analiz")
 
@@ -2507,6 +2532,7 @@ elif aktif == "analiz":
                     st.session_state["analiz_firma"] = firma_adi
 
                     # JSON önerisi parse et
+                    import re as _re
                     json_match = _re.search(r'```json\s*(\{.*?\})\s*```', ai_text, _re.DOTALL)
                     if json_match:
                         try:
@@ -2681,6 +2707,7 @@ elif aktif == "koddepo":
 # ── WHATSAPP ──────────────────────────────────────────────────────────────────
 elif aktif == "whatsapp":
     import requests as _wa_req
+    import json as _wa_json
 
     st.markdown("## 💬 WhatsApp Entegrasyonu")
 
@@ -2713,6 +2740,7 @@ elif aktif == "whatsapp":
             return {"error": str(e)}
 
     def wa_numara_formatla(numara):
+        import re
         n = re.sub(r"[\s\-\(\)\+]", "", str(numara or ""))
         if n.startswith("0") and len(n) == 11:
             n = "90" + n[1:]
@@ -2959,7 +2987,6 @@ elif aktif == "whatsapp":
 
 # ── TELEFON KİŞİLER ──────────────────────────────────────────────────────────
 elif aktif == "kisiler":
-    import re as _re_kis
     st.markdown("## 📞 Telefon Kişiler & Rehber")
 
     with st.expander("👤 Satış Temsilcisi Kartları", expanded=False):
@@ -2979,8 +3006,6 @@ elif aktif == "kisiler":
             if st.form_submit_button("💾 Kaydet", use_container_width=True):
                 if t_ad and t_tel:
                     db_insert("temsilciler", {"ad":t_ad,"soyad":t_soyad,"telefon":t_tel,"email":t_email,"bolge":t_bolge,"unvan":t_unvan,"aktif":1})
-                    try: db_read.clear()
-                    except: pass
                     st.success(f"✅ {t_ad} eklendi!"); st.rerun()
                 else:
                     st.warning("Ad ve telefon zorunlu!")
@@ -2993,7 +3018,7 @@ elif aktif == "kisiler":
         "📝 Kayıtlı Şablonlar", "📊 Mesaj Raporu"
     ])
 
-    # Şablonları yükle (tüm tablar için)
+    # ── ŞABLONLARı YÜKLE ──────────────────────────────────────────────────────
     try:
         df_sab_all = db_read("sablon_mesajlar", extra_sql="WHERE aktif=1 ORDER BY ad")
         sablon_adlari = df_sab_all["ad"].tolist() if not df_sab_all.empty else []
@@ -3001,10 +3026,9 @@ elif aktif == "kisiler":
         df_sab_all = pd.DataFrame()
         sablon_adlari = []
 
-    # ── KİŞİ LİSTESİ ──────────────────────────────────────────────────────────
     with tab_rehber1:
         df_kis = db_read("kisiler", extra_sql="ORDER BY firma, ad")
-        ara_kis = st.text_input("🔍 Ara:", key="kisiler_ara", placeholder="Ad, firma, tel, bölge...")
+        ara_kis = st.text_input("🔍 Ara:", key="kisiler_ara", placeholder="Ad, firma, bölge...")
         if ara_kis:
             df_kis = df_kis[df_kis.apply(lambda r: ara_kis.lower() in str(r).lower(), axis=1)]
         st.caption(f"{len(df_kis)} kişi")
@@ -3016,29 +3040,20 @@ elif aktif == "kisiler":
             for hdr,txt in zip([h1,h2,h3,h4,h5,h6,h7],["Ad","Firma","Tel","Mesaj","Şablon","📱","⚙️"]):
                 hdr.caption(f"**{txt}**")
 
-            # Mesaj loglarını tek seferde çek
-            try:
-                df_ml_all = db_read("kisiler_mesaj_log", extra_sql="ORDER BY tarih DESC")
-            except:
-                df_ml_all = pd.DataFrame()
-
             for _, kisi in df_kis.iterrows():
                 tel = fmt_tel(str(kisi.get("telefon","") or ""))
                 isim = f"{kisi.get('ad','')} {kisi.get('soyad','')}".strip()
                 _kisi_id = int(kisi.get("id",0) or 0)
-
-                # Mesaj geçmişi bellekten filtrele
-                if not df_ml_all.empty and "kisi_id" in df_ml_all.columns:
-                    df_ml = df_ml_all[df_ml_all["kisi_id"]==_kisi_id]
-                else:
+                try:
+                    df_ml = db_read("kisiler_mesaj_log", filters={"kisi_id": _kisi_id}, order_col="tarih", desc=True) if _kisi_id > 0 else pd.DataFrame()
+                except:
                     df_ml = pd.DataFrame()
 
                 c1,c2,c3,c4,c5,c6,c7 = st.columns([2,1.5,1.3,1.5,2,0.8,0.8])
                 c1.caption(f"**{isim}**")
-                c2.caption(str(kisi.get("firma",""))[:15] or "—")
+                c2.caption(str(kisi.get("firma",""))[:15])
                 c3.caption(tel[:12] if tel else "—")
 
-                # Mesaj butonu
                 if not df_ml.empty:
                     son = df_ml.iloc[0]
                     lbl = f"📨{len(df_ml)} {son.get('sablon_adi','')[:8]}"
@@ -3047,9 +3062,9 @@ elif aktif == "kisiler":
                 else:
                     c4.caption("—")
 
-                # Şablon + WA
                 if tel:
-                    t = _re_kis.sub(r"[^\d]","",tel)
+                    import re as _re_k
+                    t = _re_k.sub(r"[^\d]","",tel)
                     if t.startswith("0") and len(t)==11: t = "90"+t[1:]
                     elif len(t)==10: t = "90"+t
                     sec_opts = ["—"] + sablon_adlari + ["✏️"]
@@ -3057,47 +3072,38 @@ elif aktif == "kisiler":
                     mesaj_gonder = ""
                     if sec == "✏️":
                         mesaj_gonder = st.text_area("", height=50, key=f"km_{_kisi_id}", label_visibility="collapsed")
-                    elif sec != "—" and not df_sab_all.empty:
-                        sab_row = df_sab_all[df_sab_all["ad"]==sec]
-                        if not sab_row.empty:
-                            sablon_txt = str(sab_row.iloc[0]["metin"])
-                            firma_h = str(kisi.get("firma","") or "").strip()
-                            gorev_h = str(kisi.get("gorev","") or "").strip()
-                            if firma_h:
-                                header = f"*{firma_h}*" + (f" | {gorev_h}" if gorev_h else "") + "\n\n"
-                                sablon_txt = header + sablon_txt
-                            sablon_txt = sablon_txt.replace("{ad}", str(kisi.get("ad","") or ""))
-                            sablon_txt = sablon_txt.replace("{firma}", firma_h)
-                            sablon_txt = sablon_txt.replace("{yetkili}", gorev_h)
-                            mesaj_gonder = st.text_area("", value=sablon_txt, height=50, key=f"km_{_kisi_id}", label_visibility="collapsed")
-
+                    elif sec != "—":
+                        sab_row = df_sab_all[df_sab_all["ad"]==sec].iloc[0] if not df_sab_all.empty else None
+                        if sab_row is not None:
+                            sablon_txt = sab_row["metin"]
+                            sablon_txt = sablon_txt.replace("{ad}", str(kisi.get("ad","")))
+                            sablon_txt = sablon_txt.replace("{firma}", str(kisi.get("firma","")))
+                            sablon_txt = sablon_txt.replace("{yetkili}", str(kisi.get("gorev","")))
+                            # Firma + yetkili otomatik footer
+                            if str(kisi.get("firma","")).strip():
+                                sablon_txt += f"\n\n🏢 {kisi.get('firma','')}"
+                            if str(kisi.get("gorev","")).strip():
+                                sablon_txt += f" | {kisi.get('gorev','')}"
+                        else:
+                            sablon_txt = ""
+                        mesaj_gonder = st.text_area("", value=sablon_txt, height=50, key=f"km_{_kisi_id}", label_visibility="collapsed")
                     if mesaj_gonder and mesaj_gonder.strip():
-                        from urllib.parse import quote
-                        wa_url = f"https://wa.me/{t}?text={quote(mesaj_gonder, safe='')}"
+                        wa_url = f"https://wa.me/{t}?text={mesaj_gonder.replace(' ','%20').replace(chr(10),'%0A')}"
                         c6.link_button("📱", wa_url, use_container_width=True, type="primary")
-                        lk = f"logged_{_kisi_id}_{abs(hash(mesaj_gonder[:30]))}"
+                        lk = f"logged_{_kisi_id}_{hash(mesaj_gonder[:50])}"
                         if not st.session_state.get(lk) and _kisi_id > 0:
-                            st.session_state[lk] = True
                             try:
-                                sb_log = get_sb_client()
-                                if sb_log:
-                                    sb_log.table("kisiler_mesaj_log").insert({
-                                        "kisi_id":_kisi_id,"kisi_adi":isim,"telefon":tel,
-                                        "sablon_adi": sec if sec not in ["—","✏️"] else "Manuel",
-                                        "mesaj":mesaj_gonder[:500],"gonderen":ben
-                                    }).execute()
-                                    try: db_read.clear()
-                                    except: pass
+                                db_insert("kisiler_mesaj_log", {"kisi_id":_kisi_id,"kisi_adi":isim,"telefon":tel,
+                                    "sablon_adi": sec if sec not in ["—","✏️"] else "Manuel",
+                                    "mesaj":mesaj_gonder[:500],"gonderen":ben})
+                                st.session_state[lk] = True
                             except: pass
-                else:
-                    c5.caption("—"); c6.caption("—")
 
                 if c7.button("✏️", key=f"kis_menu_{_kisi_id}", use_container_width=True):
                     st.session_state[f"kis_edit_{_kisi_id}"] = not st.session_state.get(f"kis_edit_{_kisi_id}", False)
 
-                # Mesaj geçmişi göster
                 if st.session_state.get(f"show_msg_{_kisi_id}") and not df_ml.empty:
-                    with st.expander(f"📨 {isim} — {len(df_ml)} mesaj", expanded=True):
+                    with st.expander(f"📨 {isim} mesajları", expanded=True):
                         for _, mlog in df_ml.iterrows():
                             m1,m2,m3 = st.columns([2,5,1])
                             m1.caption(f"🕐 {str(mlog.get('tarih',''))[:16]}\n**{mlog.get('sablon_adi','')}**")
@@ -3107,12 +3113,17 @@ elif aktif == "kisiler":
                                     sb_ms = get_sb_client()
                                     if sb_ms:
                                         sb_ms.table("kisiler_mesaj_log").delete().eq("id", int(mlog.get("id",0))).execute()
+                                    else:
+                                        conn_ms = get_conn()
+                                        conn_ms.execute("DELETE FROM kisiler_mesaj_log WHERE id=?", (int(mlog.get("id",0)),))
+                                        conn_ms.commit(); conn_ms.close()
                                     try: db_read.clear()
                                     except: pass
-                                except: pass
+                                    st.success("Silindi!")
+                                except Exception as e:
+                                    st.error(f"Silinemedi: {e}")
                                 st.rerun()
 
-                # Düzenle formu
                 if st.session_state.get(f"kis_edit_{_kisi_id}"):
                     with st.form(f"kis_duzenle_{_kisi_id}"):
                         ed1,ed2,ed3 = st.columns(3)
@@ -3124,21 +3135,113 @@ elif aktif == "kisiler":
                         e_email = ed3.text_input("Email:", value=str(kisi.get("email","")))
                         b1,b2,b3 = st.columns(3)
                         if b1.form_submit_button("💾 Kaydet", use_container_width=True, type="primary"):
-                            db_update("kisiler",{"ad":e_ad,"soyad":e_soyad,"telefon":e_tel,
-                                "firma":e_firma,"bolge":e_bolge,"email":e_email},"id",_kisi_id)
-                            try: db_read.clear()
-                            except: pass
+                            db_update("kisiler",{"ad":e_ad,"soyad":e_soyad,"telefon":e_tel,"firma":e_firma,"bolge":e_bolge,"email":e_email},"id",_kisi_id)
                             st.session_state.pop(f"kis_edit_{_kisi_id}",None); st.rerun()
                         if b2.form_submit_button("🗑️ Sil", use_container_width=True):
-                            sb_ks = get_sb_client()
+                            sb_ks = get_sb()
                             if sb_ks: sb_ks.table("kisiler").delete().eq("id",_kisi_id).execute()
-                            try: db_read.clear()
-                            except: pass
                             st.session_state.pop(f"kis_edit_{_kisi_id}",None); st.rerun()
                         if b3.form_submit_button("İptal", use_container_width=True):
                             st.session_state.pop(f"kis_edit_{_kisi_id}",None); st.rerun()
 
-    # ── KİŞİ EKLE ─────────────────────────────────────────────────────────────
+    with tab_rehber4:
+        st.markdown("#### 📝 Kayıtlı Şablonlar")
+        st.caption("💡 `{ad}` → kişi adı, `{firma}` → firma adı, `{yetkili}` → görevi. Firma ve yetkili bilgisi mesaj sonuna otomatik eklenir.")
+        with st.form("sablon_kaydet_form"):
+            s1, s2 = st.columns([2,5])
+            sab_isim = s1.text_input("Şablon Adı*:", placeholder="Örn: Tanışma")
+            sab_metin = s2.text_area("Mesaj Metni*:", height=100, placeholder="Merhaba {ad} Bey/Hanım,")
+            kaydet_btn = st.form_submit_button("💾 Kaydet", use_container_width=True, type="primary")
+        if kaydet_btn:
+            if sab_isim and sab_isim.strip() and sab_metin and sab_metin.strip():
+                db_insert("sablon_mesajlar", {"ad": sab_isim.strip(), "metin": sab_metin.strip(), "olusturan": ben, "aktif": 1})
+                st.success("✅ Kaydedildi!")
+                st.rerun()
+            else:
+                st.error("Şablon adı ve mesaj metni dolu olmalı!")
+
+        try:
+            df_sab_list = db_read("sablon_mesajlar", extra_sql="WHERE aktif=1 ORDER BY ad")
+        except:
+            df_sab_list = pd.DataFrame()
+
+        if not df_sab_list.empty:
+            st.divider()
+            st.markdown(f"**{len(df_sab_list)} şablon**")
+            for _, sab in df_sab_list.iterrows():
+                sa1, sa2, sa3, sa4 = st.columns([2, 5, 1, 1])
+                sa1.markdown(f"**{sab['ad']}**")
+                sa2.caption(str(sab['metin'])[:100])
+                if sa3.button("✏️", key=f"sab_edit_{sab['id']}"):
+                    st.session_state[f"edit_sab_{sab['id']}"] = not st.session_state.get(f"edit_sab_{sab['id']}", False)
+                can_del = st.session_state.get("rol")=="admin" or str(sab.get("olusturan",""))==ben
+                if can_del and sa4.button("🗑️", key=f"sab_sil_{sab['id']}"):
+                    sb_d = get_sb()
+                    if sb_d:
+                        sb_d.table("sablon_mesajlar").delete().eq("id", int(sab["id"])).execute()
+                    st.rerun()
+                if st.session_state.get(f"edit_sab_{sab['id']}"):
+                    with st.form(f"sab_duzenle_{sab['id']}"):
+                        yeni_ad = st.text_input("Ad:", value=sab["ad"])
+                        yeni_mt = st.text_area("Metin:", value=sab["metin"], height=100)
+                        c1, c2 = st.columns(2)
+                        if c1.form_submit_button("💾 Güncelle", use_container_width=True, type="primary"):
+                            db_update("sablon_mesajlar", {"ad": yeni_ad, "metin": yeni_mt}, "id", int(sab["id"]))
+                            st.session_state.pop(f"edit_sab_{sab['id']}", None)
+                            st.rerun()
+                        if c2.form_submit_button("İptal", use_container_width=True):
+                            st.session_state.pop(f"edit_sab_{sab['id']}", None); st.rerun()
+        else:
+            st.info("Henüz şablon yok.")
+
+    with tab_rehber5:
+        st.markdown("#### 📊 Mesaj Raporu")
+        try:
+            df_mlog_all = db_read("kisiler_mesaj_log", extra_sql="ORDER BY tarih DESC")
+        except:
+            df_mlog_all = pd.DataFrame()
+
+        if df_mlog_all.empty:
+            st.info("Henüz mesaj kaydı yok.")
+        else:
+            # Üst metrikler
+            mr1, mr2, mr3 = st.columns(3)
+            mr1.metric("Toplam Gönderim", len(df_mlog_all))
+            mr2.metric("Farklı Kişi", df_mlog_all["kisi_id"].nunique() if "kisi_id" in df_mlog_all.columns else 0)
+            mr3.metric("Farklı Şablon", df_mlog_all["sablon_adi"].nunique() if "sablon_adi" in df_mlog_all.columns else 0)
+
+            st.divider()
+
+            # Gün gün rapor
+            st.markdown("**📅 Gün Gün Gönderim:**")
+            if "tarih" in df_mlog_all.columns:
+                df_mlog_all["gun"] = pd.to_datetime(df_mlog_all["tarih"], errors="coerce").dt.strftime("%Y-%m-%d")
+                gun_oz = df_mlog_all.groupby("gun").agg(
+                    Gonderim=("id","count"),
+                    Kisi=("kisi_adi","nunique"),
+                    Sablon=("sablon_adi", lambda x: ", ".join(x.unique()[:3]))
+                ).reset_index().sort_values("gun", ascending=False)
+                gun_oz.columns = ["Tarih","Gönderim","Kişi","Şablonlar"]
+                st.dataframe(gun_oz, use_container_width=True, hide_index=True)
+
+            # Şablon başlığı bazlı
+            st.markdown("**📝 Şablon Başlığı Bazlı Rapor:**")
+            if "sablon_adi" in df_mlog_all.columns:
+                sab_oz = df_mlog_all.groupby("sablon_adi").agg(
+                    Kullanim=("id","count"),
+                    Kisi=("kisi_adi","nunique"),
+                    SonTarih=("tarih", "max")
+                ).reset_index().sort_values("Kullanim", ascending=False)
+                sab_oz.columns = ["Şablon Adı","Kullanım","Farklı Kişi","Son Gönderim"]
+                sab_oz["Son Gönderim"] = sab_oz["Son Gönderim"].astype(str).str[:16]
+                st.dataframe(sab_oz, use_container_width=True, hide_index=True)
+
+            # Detay
+            with st.expander("📋 Tüm Gönderimler"):
+                st.dataframe(df_mlog_all[[c for c in ["tarih","kisi_adi","sablon_adi","mesaj","gonderen"] if c in df_mlog_all.columns]], use_container_width=True, hide_index=True)
+            buf_ml = io.BytesIO(); df_mlog_all.to_excel(buf_ml, index=False); buf_ml.seek(0)
+            st.download_button("📥 Mesaj Raporu İndir", data=buf_ml, file_name="mesaj_raporu.xlsx", use_container_width=True)
+
     with tab_rehber2:
         with st.form("kisi_ekle_form"):
             ke1, ke2, ke3 = st.columns(3)
@@ -3149,161 +3252,103 @@ elif aktif == "kisiler":
             k_firma   = ke3.text_input("Firma")
             k_gorev   = ke3.text_input("Görev/Ünvan")
             k_bolge   = ke1.text_input("Bölge")
+
+            # Temsilci listesi
             df_tem2 = db_read("temsilciler", extra_sql="WHERE aktif=1 ORDER BY ad")
             tem_opts = ["—"] + [f"{r['ad']} {r['soyad']}" for _, r in df_tem2.iterrows()] if not df_tem2.empty else ["—"]
             k_temsilci = ke2.selectbox("Sorumlu Temsilci", tem_opts)
             k_notlar  = ke3.text_area("Notlar", height=80)
-            k_kaynak  = ke1.selectbox("Kaynak", ["Manuel","Sistem Müşterisi","Referans","Soğuk Arama","Diğer"])
+            k_kaynak  = ke1.selectbox("Kaynak", ["Manuel", "Sistem Müşterisi", "Referans", "Soğuk Arama", "Diğer"])
+
             if st.form_submit_button("💾 Kişiyi Kaydet", use_container_width=True, type="primary"):
                 if k_ad and k_tel:
                     db_insert("kisiler", {
-                        "ad":k_ad,"soyad":k_soyad,"telefon":k_tel,"email":k_email,
-                        "firma":k_firma,"gorev":k_gorev,"bolge":k_bolge,
-                        "temsilci":k_temsilci if k_temsilci!="—" else "",
-                        "notlar":k_notlar,"kaynak":k_kaynak
+                        "ad": k_ad, "soyad": k_soyad, "telefon": k_tel,
+                        "email": k_email, "firma": k_firma, "gorev": k_gorev,
+                        "bolge": k_bolge, "temsilci": k_temsilci if k_temsilci != "—" else "",
+                        "notlar": k_notlar, "kaynak": k_kaynak
                     })
-                    try: db_read.clear()
-                    except: pass
-                    st.success(f"✅ {k_ad} eklendi!"); st.rerun()
+                    st.success(f"✅ {k_ad} {k_soyad} eklendi!")
+                    st.rerun()
                 else:
                     st.warning("Ad ve telefon zorunlu!")
 
-    # ── TOPLU İÇE AKTAR ───────────────────────────────────────────────────────
     with tab_rehber3:
         st.info("Excel şablonunu indirin, doldurun, yükleyin.")
+
         sablon_kis = pd.DataFrame([{
-            "firma":"ABC Ltd.","ad":"Ahmet","soyad":"Yılmaz",
-            "telefon":"05001234567","email":"ahmet@firma.com",
-            "gorev":"Satın Alma Müdürü","bolge":"İstanbul","notlar":""
+            "firma": "ABC Ltd.", "ad": "Ahmet", "soyad": "Yılmaz",
+            "telefon": "05001234567", "email": "ahmet@firma.com",
+            "gorev": "Satın Alma Müdürü", "bolge": "İstanbul", "notlar": ""
         }])
-        sbuf = io.BytesIO(); sablon_kis.to_excel(sbuf, index=False); sbuf.seek(0)
-        st.download_button("📥 Şablon İndir", data=sbuf, file_name="kisiler_sablonu.xlsx", use_container_width=True)
+        sbuf = io.BytesIO()
+        sablon_kis.to_excel(sbuf, index=False)
+        sbuf.seek(0)
+        st.download_button("📥 Şablon İndir", data=sbuf,
+            file_name="kisiler_sablonu.xlsx", use_container_width=True)
+
         yukle_kis = st.file_uploader("Excel Yükle:", type=["xlsx","xls"], key="kisiler_yukle")
         if yukle_kis:
-            df_yukle_kis = pd.read_excel(yukle_kis).fillna("").astype(str)
+            df_yukle_kis = pd.read_excel(yukle_kis)
+            # NaN temizle
+            df_yukle_kis = df_yukle_kis.fillna("")
+            df_yukle_kis = df_yukle_kis.astype(str)
             df_yukle_kis = df_yukle_kis.replace("nan","").replace("None","")
             st.caption(f"{len(df_yukle_kis)} satır — önizleme:")
             st.dataframe(df_yukle_kis.head(5), use_container_width=True, hide_index=True)
+
             if st.button("🚀 İçe Aktar", use_container_width=True, type="primary"):
                 pb = st.progress(0, text="Aktarılıyor...")
-                batch = []; hatali = 0
+                # Batch olarak Supabase'e toplu insert
+                batch = []
+                hatali = 0
                 for _, row in df_yukle_kis.iterrows():
                     firma_v = str(row.get("firma","")).strip()
-                    ad_v = str(row.get("ad","")).strip()
-                    if not firma_v and not ad_v: hatali += 1; continue
-                    batch.append({"firma":firma_v,"ad":ad_v,
-                        "soyad":str(row.get("soyad","")).strip(),
-                        "telefon":fmt_tel(str(row.get("telefon",""))),
-                        "email":str(row.get("email","")).strip(),
-                        "gorev":str(row.get("gorev","")).strip(),
-                        "bolge":str(row.get("bolge","")).strip(),
-                        "notlar":str(row.get("notlar","")).strip(),"kaynak":"Excel"})
-                basarili = 0; sb_b = get_sb_client()
-                for start in range(0, len(batch), 50):
-                    chunk = batch[start:start+50]
+                    ad_v    = str(row.get("ad","")).strip()
+                    if not firma_v and not ad_v:
+                        hatali += 1
+                        continue
+                    batch.append({
+                        "firma": firma_v,
+                        "ad": ad_v,
+                        "soyad": str(row.get("soyad","")).strip(),
+                        "telefon": fmt_tel(str(row.get("telefon",""))),
+                        "email": str(row.get("email","")).strip(),
+                        "gorev": str(row.get("gorev","")).strip(),
+                        "bolge": str(row.get("bolge","")).strip(),
+                        "notlar": str(row.get("notlar","")).strip(),
+                        "kaynak": "Excel"
+                    })
+
+                # 50'lik batch'ler halinde insert
+                basarili = 0
+                sb_b = get_sb()
+                batch_size = 50
+                for start in range(0, len(batch), batch_size):
+                    chunk = batch[start:start+batch_size]
                     try:
-                        if sb_b: sb_b.table("kisiler").insert(chunk).execute(); basarili += len(chunk)
+                        if sb_b:
+                            sb_b.table("kisiler").insert(chunk).execute()
+                            basarili += len(chunk)
                         else:
                             for item in chunk:
-                                db_insert("kisiler", item); basarili += 1
-                    except:
+                                db_insert("kisiler", item)
+                                basarili += 1
+                    except Exception as e:
+                        # Tek tek dene
                         for item in chunk:
-                            try: db_insert("kisiler", item); basarili += 1
-                            except: hatali += 1
-                    pb.progress(min((start+50)/len(batch),1.0), text=f"{basarili} eklendi...")
+                            try:
+                                db_insert("kisiler", item)
+                                basarili += 1
+                            except:
+                                hatali += 1
+                    pb.progress(min((start+batch_size)/len(batch), 1.0), text=f"{basarili} eklendi...")
+
                 pb.empty()
-                try: db_read.clear()
-                except: pass
-                st.success(f"✅ {basarili} kişi eklendi! {hatali} atlandı."); st.rerun()
+                st.success(f"✅ {basarili} kişi eklendi! {hatali} satır atlandı.")
+                st.rerun()
 
-    # ── KAYITLI ŞABLONLAR ─────────────────────────────────────────────────────
-    with tab_rehber4:
-        st.markdown("#### 📝 Kayıtlı Şablonlar")
-        st.caption("💡 `{ad}` → kişi adı  `{firma}` → firma  `{yetkili}` → görevi")
-        with st.form("sablon_kaydet_form"):
-            s1, s2 = st.columns([2,5])
-            sab_isim = s1.text_input("Şablon Adı*:", placeholder="Örn: Tanışma")
-            sab_metin = s2.text_area("Mesaj Metni*:", height=100, placeholder="Merhaba {ad} Bey/Hanım,")
-            if st.form_submit_button("💾 Kaydet", use_container_width=True, type="primary"):
-                if sab_isim and sab_isim.strip() and sab_metin and sab_metin.strip():
-                    db_insert("sablon_mesajlar", {"ad":sab_isim.strip(),"metin":sab_metin.strip(),"olusturan":ben,"aktif":1})
-                    try: db_read.clear()
-                    except: pass
-                    st.success("✅ Kaydedildi!"); st.rerun()
-                else:
-                    st.error("Şablon adı ve mesaj metni dolu olmalı!")
-        try:
-            df_sab_list = db_read("sablon_mesajlar", extra_sql="WHERE aktif=1 ORDER BY ad")
-        except:
-            df_sab_list = pd.DataFrame()
-        if not df_sab_list.empty:
-            st.divider()
-            st.markdown(f"**{len(df_sab_list)} şablon**")
-            for _, sab in df_sab_list.iterrows():
-                sa1,sa2,sa3,sa4 = st.columns([2,5,1,1])
-                sa1.markdown(f"**{sab['ad']}**")
-                sa2.caption(str(sab['metin'])[:100])
-                if sa3.button("✏️", key=f"sab_edit_{sab['id']}"):
-                    st.session_state[f"edit_sab_{sab['id']}"] = not st.session_state.get(f"edit_sab_{sab['id']}", False)
-                can_del = st.session_state.get("rol")=="admin" or str(sab.get("olusturan",""))==ben
-                if can_del and sa4.button("🗑️", key=f"sab_sil_{sab['id']}"):
-                    sb_d = get_sb_client()
-                    if sb_d: sb_d.table("sablon_mesajlar").delete().eq("id", int(sab["id"])).execute()
-                    try: db_read.clear()
-                    except: pass
-                    st.rerun()
-                if st.session_state.get(f"edit_sab_{sab['id']}"):
-                    with st.form(f"sab_duzenle_{sab['id']}"):
-                        yeni_ad = st.text_input("Ad:", value=sab["ad"])
-                        yeni_mt = st.text_area("Metin:", value=sab["metin"], height=100)
-                        c1,c2 = st.columns(2)
-                        if c1.form_submit_button("💾 Güncelle", use_container_width=True, type="primary"):
-                            db_update("sablon_mesajlar",{"ad":yeni_ad,"metin":yeni_mt},"id",int(sab["id"]))
-                            try: db_read.clear()
-                            except: pass
-                            st.session_state.pop(f"edit_sab_{sab['id']}", None); st.rerun()
-                        if c2.form_submit_button("İptal", use_container_width=True):
-                            st.session_state.pop(f"edit_sab_{sab['id']}", None); st.rerun()
-        else:
-            st.info("Henüz şablon yok. Yukarıdan ekleyin.")
-
-    # ── MESAJ RAPORU ──────────────────────────────────────────────────────────
-    with tab_rehber5:
-        st.markdown("#### 📊 Mesaj Raporu")
-        try:
-            df_mlog_all = db_read("kisiler_mesaj_log", extra_sql="ORDER BY tarih DESC")
-        except:
-            df_mlog_all = pd.DataFrame()
-        if df_mlog_all.empty:
-            st.info("Henüz mesaj kaydı yok.")
-        else:
-            mr1,mr2,mr3 = st.columns(3)
-            mr1.metric("Toplam Gönderim", len(df_mlog_all))
-            mr2.metric("Farklı Kişi", df_mlog_all["kisi_id"].nunique() if "kisi_id" in df_mlog_all.columns else 0)
-            mr3.metric("Farklı Şablon", df_mlog_all["sablon_adi"].nunique() if "sablon_adi" in df_mlog_all.columns else 0)
-            st.divider()
-            if "tarih" in df_mlog_all.columns:
-                df_mlog_all["gun"] = pd.to_datetime(df_mlog_all["tarih"], errors="coerce").dt.strftime("%Y-%m-%d")
-                gun_oz = df_mlog_all.groupby("gun").agg(
-                    Gonderim=("id","count"),Kisi=("kisi_adi","nunique"),
-                    Sablon=("sablon_adi", lambda x:", ".join(x.unique()[:3]))
-                ).reset_index().sort_values("gun",ascending=False)
-                gun_oz.columns=["Tarih","Gönderim","Kişi","Şablonlar"]
-                st.markdown("**📅 Gün Gün:**")
-                st.dataframe(gun_oz, use_container_width=True, hide_index=True)
-            if "sablon_adi" in df_mlog_all.columns:
-                sab_oz = df_mlog_all.groupby("sablon_adi").agg(
-                    Kullanim=("id","count"),Kisi=("kisi_adi","nunique"),Son=("tarih","max")
-                ).reset_index().sort_values("Kullanim",ascending=False)
-                sab_oz["Son"] = sab_oz["Son"].astype(str).str[:16]
-                st.markdown("**📝 Şablon Bazlı:**")
-                st.dataframe(sab_oz, use_container_width=True, hide_index=True)
-            with st.expander("📋 Tüm Gönderimler"):
-                st.dataframe(df_mlog_all[[c for c in ["tarih","kisi_adi","sablon_adi","mesaj","gonderen"] if c in df_mlog_all.columns]], use_container_width=True, hide_index=True)
-            buf_ml = io.BytesIO(); df_mlog_all.to_excel(buf_ml, index=False); buf_ml.seek(0)
-            st.download_button("📥 İndir", data=buf_ml, file_name="mesaj_raporu.xlsx", use_container_width=True)
-
-
+# ── RANDEVULAR ────────────────────────────────────────────────────────────────
 elif aktif == "randevu":
     import io as _rio
     st.markdown("## 📅 Randevular & Ziyaret Planı")
@@ -3339,7 +3384,8 @@ elif aktif == "randevu":
                         # WA hatırlatma
                         tem_tel_h = str(row.get("temsilci_tel","") or "")
                         if tem_tel_h:
-                            ht = re.sub(r"[\s\-\(\)+]","", tem_tel_h)
+                            import re as _reh
+                            ht = _reh.sub(r"[\s\-\(\)+]","", tem_tel_h)
                             if ht.startswith("0"): ht = "90" + ht[1:]
                             msg_h = f"⏰ RANDEVU HATIRLATMA\nMüşteri: {row.get('musteri_adi','')}\nTarih: {row.get('randevu_tarihi','')} {row.get('randevu_saati','')}\nBölge: {row.get('bolge','')}"
                             hc4.link_button("📱 WA", f"https://wa.me/{ht}?text={msg_h.replace(' ','%20').replace(chr(10),'%0A')}", use_container_width=True)
@@ -3407,7 +3453,8 @@ elif aktif == "randevu":
 
                     # Telefon var mı kontrol
                     if tem_tel_r:
-                        t_wa = re.sub(r'[^\d]','',tem_tel_r)
+                        import re as _re_wa
+                        t_wa = _re_wa.sub(r'[^\d]','',tem_tel_r)
                         if t_wa.startswith('0') and len(t_wa)==11: t_wa = '90'+t_wa[1:]
                         elif len(t_wa)==10: t_wa = '90'+t_wa
                         msg_wa = f"📅 RANDEVU HATIRLATMA\nMüşteri: {musteri_r}\nTarih: {tarih_r} {saat_r}\nBölge: {bolge_r}\nGörev: {gorev_r}\nİyi çalışmalar!"
@@ -3417,7 +3464,8 @@ elif aktif == "randevu":
                         # Manuel tel girişi
                         manuel_t = wc3.text_input("Tel:", placeholder="05xx", key=f"wa_tel_{row.get('id','')}", label_visibility="collapsed")
                         if manuel_t and wc4.button("📱", key=f"wa_gnd_{row.get('id','')}"):
-                            t_m = re.sub(r'[^\d]','',manuel_t)
+                            import re as _re_wa2
+                            t_m = _re_wa2.sub(r'[^\d]','',manuel_t)
                             if t_m.startswith('0') and len(t_m)==11: t_m = '90'+t_m[1:]
                             elif len(t_m)==10: t_m = '90'+t_m
                             msg_m = f"📅 RANDEVU\nMüşteri: {musteri_r}\nTarih: {tarih_r} {saat_r}\nGörev: {gorev_r}"
@@ -3497,7 +3545,8 @@ elif aktif == "randevu":
                     st.success("✅ Randevu kaydedildi!")
 
                     if rand_tem_tel.strip():
-                        twt2 = re.sub(r"[\s\-\(\)+]","", rand_tem_tel.strip())
+                        import re as _re3
+                        twt2 = _re3.sub(r"[\s\-\(\)+]","", rand_tem_tel.strip())
                         if twt2.startswith("0"): twt2 = "90" + twt2[1:]
                         elif len(twt2)==10: twt2 = "90" + twt2
                         msg2 = f"🗓️ YENİ RANDEVU\nMüşteri: {musteri_adi}\nTarih: {rand_tarih} {rand_saat}\nBölge: {rand_bolge}\nGörev: {rand_gorev}\nİyi çalışmalar!"
@@ -3551,7 +3600,7 @@ elif aktif == "randevu":
                         st.rerun()
 
                     if sil_btn:
-                        sb = get_sb_client()
+                        sb = get_sb()
                         if sb:
                             sb.table("randevular").delete().eq("id", int(row_d["id"])).execute()
                         st.success("🗑️ Silindi!")
@@ -3635,7 +3684,7 @@ elif aktif == "mesajlar":
                 st.session_state["msg_alici"] = kul
                 # Okundu olarak işaretle
                 try:
-                    sb_m = get_sb_client()
+                    sb_m = get_sb()
                     if sb_m:
                         sb_m.table("mesajlar").update({"okundu": 1}).eq("alici", ben).eq("gonderen", kul).execute()
                 except: pass
