@@ -656,7 +656,58 @@ def save_menu_tercihi(kullanici, sira):
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 with st.sidebar:
+    st.markdown(f"## 🏢 MWCRMPRO")
     st.caption(f"👤 {st.session_state.get('kullanici','')} | {st.session_state.get('rol','')}")
+    if st.button("🚪 Çıkış", use_container_width=True, key="sidebar_cikis"):
+        cikis()
+
+    st.divider()
+
+    # ── MENÜ BUTONLARI SOL SIDEBAR ────────────────────────────────────────────
+    # Tab listesi hazırla
+    _sidebar_tab_listesi = _TAB_LISTESI_DEFAULT.copy()
+    if st.session_state.get("rol") == "admin":
+        for _t in ["kullanici", "koddepo"]:
+            if _t not in _sidebar_tab_listesi:
+                _sidebar_tab_listesi.append(_t)
+
+    _sidebar_aktif_liste = get_menu_tercihi(st.session_state["kullanici"])
+    if st.session_state.get("rol") == "admin":
+        for _t in ["kullanici", "koddepo"]:
+            if _t not in _sidebar_aktif_liste:
+                _sidebar_aktif_liste.append(_t)
+
+    # Yetki filtresi
+    if st.session_state.get("rol") != "admin":
+        try:
+            import json as _yj2
+            _yk = f"yetki_{st.session_state['kullanici']}"
+            if _yk not in st.session_state:
+                _df_kul_y = db_read("kullanicilar", extra_sql="")
+                if not _df_kul_y.empty and "yetkiler" in _df_kul_y.columns:
+                    _kul_r = _df_kul_y[_df_kul_y["kullanici_adi"] == st.session_state["kullanici"]]
+                    if not _kul_r.empty:
+                        st.session_state[_yk] = str(_kul_r.iloc[0].get("yetkiler","tam") or "tam")
+            _yv = st.session_state.get(_yk, "tam")
+            if _yv != "tam":
+                _izinli = _yj2.loads(_yv)
+                _sidebar_aktif_liste = [t for t in _sidebar_aktif_liste if t in _izinli]
+        except: pass
+
+    st.markdown("### 📌 Menü")
+    for _tab_key in _sidebar_aktif_liste:
+        _is_aktif = st.session_state["aktif_tab"] == _tab_key
+        _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
+        if st.button(
+            _etiket,
+            use_container_width=True,
+            type="primary" if _is_aktif else "secondary",
+            key=f"sb_btn_{_tab_key}"
+        ):
+            st.session_state["aktif_tab"] = _tab_key
+            st.rerun()
+
+    st.divider()
 
     with st.expander("❓ Yardım"):
         st.markdown("📞 [5400344228](tel:05400344228)")
@@ -696,37 +747,19 @@ with st.sidebar:
                         "olusturan":st.session_state["kullanici"],"aktif":1})
                     st.success("Yayınlandı!")
                     st.rerun()
-# ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
-col_bas, col_kul, col_cik = st.columns([6, 2, 1])
-with col_bas:
-    st.title("🏢 MWCRMPRO - Cari Yönetim Sistemi")
-with col_kul:
-    st.markdown(f"<br>👤 **{st.session_state['kullanici']}** ({st.session_state['rol']})", unsafe_allow_html=True)
-with col_cik:
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🚪 Çıkış"):
-        cikis()
 
+# ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
+st.title("🏢 MWCRMPRO - Cari Yönetim Sistemi")
 st.divider()
 
-# ── MANUEL TAB MENÜSÜ ─────────────────────────────────────────────────────────
-tab_listesi = _TAB_LISTESI_DEFAULT.copy()
-tab_etiketler = _TAB_ETIKETLER
-if st.session_state["rol"] == "admin":
-    tab_listesi.append("kullanici")
-    tab_listesi.append("koddepo")
+# ── MANUEL TAB MENÜSÜ (üstteki yatay butonlar kaldırıldı, sol sidebar'a taşındı) ──
+# Aktif tab session_state'ten okunur
+aktif_tab_listesi = _sidebar_aktif_liste  # sidebar'da zaten hesaplandı
 
-aktif_tab_listesi = get_menu_tercihi(st.session_state["kullanici"])
-
-# Admin tabları her zaman listede olsun
-if st.session_state["rol"] == "admin":
-    for _t in ["kullanici","koddepo"]:
-        if _t not in aktif_tab_listesi:
-            aktif_tab_listesi.append(_t)
-
-# Yetki filtresi (admin hepsini görür) - session cache ile
+# Yetki filtresi tekrar (aktif için)
 if st.session_state.get("rol") != "admin":
     try:
+        import json as _yj
         _yetki_cache_key = f"yetki_{st.session_state['kullanici']}"
         if _yetki_cache_key not in st.session_state:
             df_kul_yetki = db_read("kullanicilar", extra_sql="")
@@ -740,21 +773,6 @@ if st.session_state.get("rol") != "admin":
             aktif_tab_listesi = [t for t in aktif_tab_listesi if t in izinli]
     except: pass
 
-cols = st.columns(len(aktif_tab_listesi))
-for i, tab_key in enumerate(aktif_tab_listesi):
-    with cols[i]:
-        _is_aktif = st.session_state["aktif_tab"] == tab_key
-        _etiket = _TAB_ETIKETLER.get(tab_key, tab_key)
-        if st.button(
-            _etiket,
-            use_container_width=True,
-            type="primary" if _is_aktif else "secondary",
-            key=f"tab_btn_{tab_key}"
-        ):
-            st.session_state["aktif_tab"] = tab_key
-            st.rerun()
-
-st.divider()
 aktif = st.session_state["aktif_tab"]
 
 # ── YENİ KART EKLE / DÜZENLE ─────────────────────────────────────────────────
