@@ -3109,9 +3109,19 @@ elif aktif == "kisiler":
                             m1.caption(f"🕐 {str(mlog.get('tarih',''))[:16]}\n**{mlog.get('sablon_adi','')}**")
                             m2.info(str(mlog.get('mesaj','')))
                             if m3.button("🗑️", key=f"msg_sil_{mlog.get('id','')}_{_kisi_id}"):
-                                sb_ms = get_sb_client()
-                                if sb_ms:
-                                    sb_ms.table("kisiler_mesaj_log").delete().eq("id", int(mlog.get("id",0))).execute()
+                                try:
+                                    sb_ms = get_sb_client()
+                                    if sb_ms:
+                                        sb_ms.table("kisiler_mesaj_log").delete().eq("id", int(mlog.get("id",0))).execute()
+                                    else:
+                                        conn_ms = get_conn()
+                                        conn_ms.execute("DELETE FROM kisiler_mesaj_log WHERE id=?", (int(mlog.get("id",0)),))
+                                        conn_ms.commit(); conn_ms.close()
+                                    try: db_read.clear()
+                                    except: pass
+                                    st.success("Silindi!")
+                                except Exception as e:
+                                    st.error(f"Silinemedi: {e}")
                                 st.rerun()
 
                 if st.session_state.get(f"kis_edit_{_kisi_id}"):
