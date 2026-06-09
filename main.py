@@ -696,72 +696,57 @@ with st.sidebar:
                         "olusturan":st.session_state["kullanici"],"aktif":1})
                     st.success("Yayınlandı!")
                     st.rerun()
-# ── STICKY HEADER CSS + JS ────────────────────────────────────────────────────
+# ── STICKY HEADER + MENU CSS ──────────────────────────────────────────────────
 st.markdown("""
 <style>
-/* Streamlit default header gizle */
-#stDecoration { display: none !important; }
+/* Streamlit kendi header'ını gizle */
+header[data-testid="stHeader"] { display: none !important; }
 
-/* Sticky bar container */
-#sticky-topbar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 9999;
-    background: #ffffff;
-    border-bottom: 2px solid #e0e0e0;
-    padding: 6px 16px 4px 16px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.10);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-    min-height: 48px;
-}
-.sticky-title {
-    font-weight: 700;
-    font-size: 1rem;
-    color: #1f6feb;
-    white-space: nowrap;
-    margin-right: 8px;
-}
-.sticky-user {
-    font-size: 0.8rem;
-    color: #555;
-    margin-left: auto;
-    white-space: nowrap;
-}
-
-/* Sayfa içeriğini sticky bar'ın altına it */
+/* Tüm içeriği aşağı it (sticky bar için yer aç) */
 .block-container {
-    padding-top: 4rem !important;
-    margin-top: 0 !important;
+    padding-top: 7.5rem !important;
 }
 
-/* Streamlit header arkada kalsın */
-header[data-testid="stHeader"] {
-    z-index: 100 !important;
-    background: transparent !important;
+/* ── SABİT ÜSTBAR: Başlık + Kullanıcı ── */
+div[data-testid="stAppViewBlockContainer"] > div > div[data-testid="stVerticalBlock"] > div:nth-child(1),
+div[data-testid="stAppViewBlockContainer"] > div > div[data-testid="stVerticalBlock"] > div:nth-child(2) {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 1001 !important;
+    background: #ffffff !important;
+    padding: 0.3rem 1rem 0 1rem !important;
+}
+
+/* ── SABİT MENÜ BUTONLARI ── */
+div[data-testid="stAppViewBlockContainer"] > div > div[data-testid="stVerticalBlock"] > div:nth-child(3) {
+    position: fixed !important;
+    top: 4.2rem !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 1000 !important;
+    background: #f8f9fa !important;
+    border-bottom: 2px solid #dee2e6 !important;
+    padding: 0.2rem 1rem 0.3rem 1rem !important;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.08) !important;
+}
+
+/* Sol sidebar'a dokunma */
+section[data-testid="stSidebar"] {
+    z-index: 999 !important;
 }
 </style>
-
-<div id="sticky-topbar">
-    <span class="sticky-title">🏢 MWCRMPRO</span>
-    <span style="font-size:0.75rem;color:#888;">Cari Yönetim Sistemi</span>
-    <span class="sticky-user">👤 __KULLANICI__ | <a href="?_cikis=1" style="color:#e53e3e;text-decoration:none;font-size:0.78rem;">🚪 Çıkış</a></span>
-</div>
-""".replace("__KULLANICI__", f"{st.session_state.get('kullanici','')} ({st.session_state.get('rol','')})"), unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
 col_bas, col_kul, col_cik = st.columns([6, 2, 1])
 with col_bas:
-    st.title("🏢 MWCRMPRO - Cari Yönetim Sistemi")
+    st.markdown(f"### 🏢 MWCRMPRO &nbsp;<small style='font-size:0.75rem;color:#888;font-weight:400;'>Cari Yönetim Sistemi</small>", unsafe_allow_html=True)
 with col_kul:
-    st.markdown(f"<br>👤 **{st.session_state['kullanici']}** ({st.session_state['rol']})", unsafe_allow_html=True)
+    st.markdown(f"<div style='padding-top:6px;font-size:0.85rem;'>👤 <b>{st.session_state['kullanici']}</b> ({st.session_state['rol']})</div>", unsafe_allow_html=True)
 with col_cik:
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🚪 Çıkış"):
+    if st.button("🚪 Çıkış", use_container_width=True):
         cikis()
 
 st.divider()
@@ -810,26 +795,6 @@ for i, tab_key in enumerate(aktif_tab_listesi):
         ):
             st.session_state["aktif_tab"] = tab_key
             st.rerun()
-
-# Menü butonlarını sticky yap
-st.markdown("""
-<style>
-/* Menü butonları satırını sabitle */
-div[data-testid="stHorizontalBlock"]:has(button[kind="secondary"], button[kind="primary"]) {
-    position: sticky !important;
-    top: 3.2rem !important;
-    z-index: 998 !important;
-    background: #ffffff !important;
-    padding: 4px 0 6px 0 !important;
-    border-bottom: 1px solid #f0f0f0 !important;
-}
-@media (prefers-color-scheme: dark) {
-    div[data-testid="stHorizontalBlock"]:has(button[kind="secondary"], button[kind="primary"]) {
-        background: #0e1117 !important;
-    }
-}
-</style>
-""", unsafe_allow_html=True)
 
 st.divider()
 aktif = st.session_state["aktif_tab"]
