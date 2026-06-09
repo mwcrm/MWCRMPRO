@@ -31,7 +31,7 @@ def get_sb_client():
         pass
     return None
 
-def get_sb_client():
+def get_sb():
     return get_sb_client()
 
 def get_supabase():
