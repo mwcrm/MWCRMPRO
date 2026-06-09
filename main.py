@@ -3025,7 +3025,7 @@ elif aktif == "kisiler":
         sablon_adlari = []
 
     with tab_rehber1:
-        df_kis = db_read("kisiler", extra_sql="ORDER BY ad")
+        df_kis = db_read("kisiler", extra_sql="ORDER BY firma, ad")
         ara_kis = st.text_input("🔍 Ara:", key="kisiler_ara", placeholder="Ad, firma, bölge...")
         if ara_kis:
             df_kis = df_kis[df_kis.apply(lambda r: ara_kis.lower() in str(r).lower(), axis=1)]
@@ -3245,36 +3245,77 @@ elif aktif == "kisiler":
 
     with tab_rehber3:
         st.info("Excel şablonunu indirin, doldurun, yükleyin.")
-        import io as _kio
 
         sablon_kis = pd.DataFrame([{
-            "ad": "Ahmet", "soyad": "Yılmaz", "telefon": "05001234567",
-            "email": "ahmet@firma.com", "firma": "ABC Ltd.",
+            "firma": "ABC Ltd.", "ad": "Ahmet", "soyad": "Yılmaz",
+            "telefon": "05001234567", "email": "ahmet@firma.com",
             "gorev": "Satın Alma Müdürü", "bolge": "İstanbul", "notlar": ""
         }])
-        sbuf = _kio.BytesIO()
+        sbuf = io.BytesIO()
         sablon_kis.to_excel(sbuf, index=False)
         sbuf.seek(0)
-        st.download_button("📥 Şablon İndir", data=sbuf, 
-                          file_name="kisiler_sablonu.xlsx", use_container_width=True)
+        st.download_button("📥 Şablon İndir", data=sbuf,
+            file_name="kisiler_sablonu.xlsx", use_container_width=True)
 
         yukle_kis = st.file_uploader("Excel Yükle:", type=["xlsx","xls"], key="kisiler_yukle")
         if yukle_kis:
             df_yukle_kis = pd.read_excel(yukle_kis)
+            # NaN temizle
+            df_yukle_kis = df_yukle_kis.fillna("")
+            df_yukle_kis = df_yukle_kis.astype(str)
+            df_yukle_kis = df_yukle_kis.replace("nan","").replace("None","")
+            st.caption(f"{len(df_yukle_kis)} satır — önizleme:")
             st.dataframe(df_yukle_kis.head(5), use_container_width=True, hide_index=True)
+
             if st.button("🚀 İçe Aktar", use_container_width=True, type="primary"):
-                sayac = 0
+                pb = st.progress(0, text="Aktarılıyor...")
+                # Batch olarak Supabase'e toplu insert
+                batch = []
+                hatali = 0
                 for _, row in df_yukle_kis.iterrows():
-                    if str(row.get("ad","")).strip():
-                        db_insert("kisiler", {
-                            "ad": str(row.get("ad","")), "soyad": str(row.get("soyad","")),
-                            "telefon": str(row.get("telefon","")), "email": str(row.get("email","")),
-                            "firma": str(row.get("firma","")), "gorev": str(row.get("gorev","")),
-                            "bolge": str(row.get("bolge","")), "notlar": str(row.get("notlar","")),
-                            "kaynak": "Excel"
-                        })
-                        sayac += 1
-                st.success(f"✅ {sayac} kişi eklendi!")
+                    firma_v = str(row.get("firma","")).strip()
+                    ad_v    = str(row.get("ad","")).strip()
+                    if not firma_v and not ad_v:
+                        hatali += 1
+                        continue
+                    batch.append({
+                        "firma": firma_v,
+                        "ad": ad_v,
+                        "soyad": str(row.get("soyad","")).strip(),
+                        "telefon": fmt_tel(str(row.get("telefon",""))),
+                        "email": str(row.get("email","")).strip(),
+                        "gorev": str(row.get("gorev","")).strip(),
+                        "bolge": str(row.get("bolge","")).strip(),
+                        "notlar": str(row.get("notlar","")).strip(),
+                        "kaynak": "Excel"
+                    })
+
+                # 50'lik batch'ler halinde insert
+                basarili = 0
+                sb_b = get_sb()
+                batch_size = 50
+                for start in range(0, len(batch), batch_size):
+                    chunk = batch[start:start+batch_size]
+                    try:
+                        if sb_b:
+                            sb_b.table("kisiler").insert(chunk).execute()
+                            basarili += len(chunk)
+                        else:
+                            for item in chunk:
+                                db_insert("kisiler", item)
+                                basarili += 1
+                    except Exception as e:
+                        # Tek tek dene
+                        for item in chunk:
+                            try:
+                                db_insert("kisiler", item)
+                                basarili += 1
+                            except:
+                                hatali += 1
+                    pb.progress(min((start+batch_size)/len(batch), 1.0), text=f"{basarili} eklendi...")
+
+                pb.empty()
+                st.success(f"✅ {basarili} kişi eklendi! {hatali} satır atlandı.")
                 st.rerun()
 
 # ── RANDEVULAR ────────────────────────────────────────────────────────────────
