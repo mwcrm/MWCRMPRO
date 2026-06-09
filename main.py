@@ -673,12 +673,12 @@ with st.sidebar:
             for idx_m, tab_key in enumerate(mevcut_sira_m):
                 c1, c2, c3 = st.columns([4,1,1])
                 c1.caption(_TAB_ETIKETLER.get(tab_key, tab_key))
-                if idx_m > 0 and c2.button("▲", key=f"up_{tab_key}"):
+                if idx_m > 0 and c2.button("▲", key=f"sira_up_{idx_m}_{tab_key}"):
                     yeni_s = mevcut_sira_m.copy()
                     yeni_s[idx_m], yeni_s[idx_m-1] = yeni_s[idx_m-1], yeni_s[idx_m]
                     save_menu_tercihi(st.session_state["kullanici"], yeni_s)
                     st.rerun()
-                if idx_m < len(mevcut_sira_m)-1 and c3.button("▼", key=f"dn_{tab_key}"):
+                if idx_m < len(mevcut_sira_m)-1 and c3.button("▼", key=f"sira_dn_{idx_m}_{tab_key}"):
                     yeni_s = mevcut_sira_m.copy()
                     yeni_s[idx_m], yeni_s[idx_m+1] = yeni_s[idx_m+1], yeni_s[idx_m]
                     save_menu_tercihi(st.session_state["kullanici"], yeni_s)
