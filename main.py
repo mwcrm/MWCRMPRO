@@ -75,8 +75,9 @@ def get_kullanici_listesi():
     except:
         return pd.DataFrame()
 
+@st.cache_data(ttl=60)
 def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
-    """Supabase veya SQLite'dan DataFrame döner"""
+    """Supabase veya SQLite'dan DataFrame döner — 60sn cache"""
     sb = get_sb_client()
     if sb:
         try:
@@ -3104,9 +3105,14 @@ elif aktif == "kisiler":
                 if st.session_state.get(f"show_msg_{_kisi_id}") and not df_ml.empty:
                     with st.expander(f"📨 {isim} mesajları", expanded=True):
                         for _, mlog in df_ml.iterrows():
-                            m1,m2 = st.columns([2,5])
+                            m1,m2,m3 = st.columns([2,5,1])
                             m1.caption(f"🕐 {str(mlog.get('tarih',''))[:16]}\n**{mlog.get('sablon_adi','')}**")
                             m2.info(str(mlog.get('mesaj','')))
+                            if m3.button("🗑️", key=f"msg_sil_{mlog.get('id','')}_{_kisi_id}"):
+                                sb_ms = get_sb_client()
+                                if sb_ms:
+                                    sb_ms.table("kisiler_mesaj_log").delete().eq("id", int(mlog.get("id",0))).execute()
+                                st.rerun()
 
                 if st.session_state.get(f"kis_edit_{_kisi_id}"):
                     with st.form(f"kis_duzenle_{_kisi_id}"):
