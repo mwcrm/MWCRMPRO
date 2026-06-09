@@ -3106,7 +3106,7 @@ elif aktif == "kisiler":
                         for _, mlog in df_ml.iterrows():
                             m1,m2 = st.columns([2,5])
                             m1.caption(f"🕐 {str(mlog.get('tarih',''))[:16]}\n**{mlog.get('sablon_adi','')}**")
-                            m2.info(str(mlog.get('mesaj',''))[:200])
+                            m2.info(str(mlog.get('mesaj','')))
 
                 if st.session_state.get(f"kis_edit_{_kisi_id}"):
                     with st.form(f"kis_duzenle_{_kisi_id}"):
