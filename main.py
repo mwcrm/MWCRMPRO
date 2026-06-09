@@ -3137,6 +3137,8 @@ elif aktif == "kisiler":
                         "bolge": k_bolge, "temsilci": k_temsilci if k_temsilci != "—" else "",
                         "notlar": k_notlar, "kaynak": k_kaynak
                     })
+                    try: db_read.clear()
+                    except: pass
                     st.success(f"✅ {k_ad} {k_soyad} eklendi!")
                     st.rerun()
                 else:
@@ -3216,6 +3218,99 @@ elif aktif == "kisiler":
                 pb.empty()
                 st.success(f"✅ {basarili} kişi eklendi! {hatali} satır atlandı.")
                 st.rerun()
+
+    with tab_rehber4:
+        st.markdown("#### 📝 Kayıtlı Şablonlar")
+        st.caption("💡 `{ad}` → kişi adı, `{firma}` → firma adı, `{yetkili}` → görevi.")
+        with st.form("sablon_kaydet_form"):
+            s1, s2 = st.columns([2,5])
+            sab_isim = s1.text_input("Şablon Adı*:", placeholder="Örn: Tanışma")
+            sab_metin = s2.text_area("Mesaj Metni*:", height=100, placeholder="Merhaba {ad} Bey/Hanım,")
+            kaydet_btn = st.form_submit_button("💾 Kaydet", use_container_width=True, type="primary")
+        if kaydet_btn:
+            if sab_isim and sab_isim.strip() and sab_metin and sab_metin.strip():
+                db_insert("sablon_mesajlar", {"ad": sab_isim.strip(), "metin": sab_metin.strip(), "olusturan": ben, "aktif": 1})
+                try: db_read.clear()
+                except: pass
+                st.success("✅ Kaydedildi!")
+                st.rerun()
+            else:
+                st.error("Şablon adı ve mesaj metni dolu olmalı!")
+
+        try:
+            df_sab_list = db_read("sablon_mesajlar", extra_sql="WHERE aktif=1 ORDER BY ad")
+        except:
+            df_sab_list = pd.DataFrame()
+
+        if not df_sab_list.empty:
+            st.divider()
+            st.markdown(f"**{len(df_sab_list)} şablon**")
+            for _, sab in df_sab_list.iterrows():
+                sa1, sa2, sa3, sa4 = st.columns([2, 5, 1, 1])
+                sa1.markdown(f"**{sab['ad']}**")
+                sa2.caption(str(sab['metin'])[:100])
+                if sa3.button("✏️", key=f"sab_edit_{sab['id']}"):
+                    st.session_state[f"edit_sab_{sab['id']}"] = not st.session_state.get(f"edit_sab_{sab['id']}", False)
+                can_del = st.session_state.get("rol")=="admin" or str(sab.get("olusturan",""))==ben
+                if can_del and sa4.button("🗑️", key=f"sab_sil_{sab['id']}"):
+                    sb_d = get_sb_client()
+                    if sb_d:
+                        sb_d.table("sablon_mesajlar").delete().eq("id", int(sab["id"])).execute()
+                    try: db_read.clear()
+                    except: pass
+                    st.rerun()
+                if st.session_state.get(f"edit_sab_{sab['id']}"):
+                    with st.form(f"sab_duzenle_{sab['id']}"):
+                        yeni_ad = st.text_input("Ad:", value=sab["ad"])
+                        yeni_mt = st.text_area("Metin:", value=sab["metin"], height=100)
+                        c1, c2 = st.columns(2)
+                        if c1.form_submit_button("💾 Güncelle", use_container_width=True, type="primary"):
+                            db_update("sablon_mesajlar", {"ad": yeni_ad, "metin": yeni_mt}, "id", int(sab["id"]))
+                            try: db_read.clear()
+                            except: pass
+                            st.session_state.pop(f"edit_sab_{sab['id']}", None)
+                            st.rerun()
+                        if c2.form_submit_button("İptal", use_container_width=True):
+                            st.session_state.pop(f"edit_sab_{sab['id']}", None); st.rerun()
+        else:
+            st.info("Henüz şablon yok. Yukarıdan ekleyin.")
+
+    with tab_rehber5:
+        st.markdown("#### 📊 Mesaj Raporu")
+        try:
+            df_mlog_all = db_read("kisiler_mesaj_log", extra_sql="ORDER BY tarih DESC")
+        except:
+            df_mlog_all = pd.DataFrame()
+
+        if df_mlog_all.empty:
+            st.info("Henüz mesaj kaydı yok.")
+        else:
+            mr1, mr2, mr3 = st.columns(3)
+            mr1.metric("Toplam Gönderim", len(df_mlog_all))
+            mr2.metric("Farklı Kişi", df_mlog_all["kisi_id"].nunique() if "kisi_id" in df_mlog_all.columns else 0)
+            mr3.metric("Farklı Şablon", df_mlog_all["sablon_adi"].nunique() if "sablon_adi" in df_mlog_all.columns else 0)
+            st.divider()
+            if "tarih" in df_mlog_all.columns:
+                df_mlog_all["gun"] = pd.to_datetime(df_mlog_all["tarih"], errors="coerce").dt.strftime("%Y-%m-%d")
+                gun_oz = df_mlog_all.groupby("gun").agg(
+                    Gonderim=("id","count"), Kisi=("kisi_adi","nunique"),
+                    Sablon=("sablon_adi", lambda x: ", ".join(x.unique()[:3]))
+                ).reset_index().sort_values("gun", ascending=False)
+                gun_oz.columns = ["Tarih","Gönderim","Kişi","Şablonlar"]
+                st.markdown("**📅 Gün Gün:**")
+                st.dataframe(gun_oz, use_container_width=True, hide_index=True)
+            if "sablon_adi" in df_mlog_all.columns:
+                sab_oz = df_mlog_all.groupby("sablon_adi").agg(
+                    Kullanim=("id","count"), Kisi=("kisi_adi","nunique"), SonTarih=("tarih","max")
+                ).reset_index().sort_values("Kullanim", ascending=False)
+                sab_oz.columns = ["Şablon","Kullanım","Kişi","Son"]
+                sab_oz["Son"] = sab_oz["Son"].astype(str).str[:16]
+                st.markdown("**📝 Şablon Bazlı:**")
+                st.dataframe(sab_oz, use_container_width=True, hide_index=True)
+            with st.expander("📋 Tüm Gönderimler"):
+                st.dataframe(df_mlog_all[[c for c in ["tarih","kisi_adi","sablon_adi","mesaj","gonderen"] if c in df_mlog_all.columns]], use_container_width=True, hide_index=True)
+            buf_ml = io.BytesIO(); df_mlog_all.to_excel(buf_ml, index=False); buf_ml.seek(0)
+            st.download_button("📥 Mesaj Raporu İndir", data=buf_ml, file_name="mesaj_raporu.xlsx", use_container_width=True)
 
 # ── RANDEVULAR ────────────────────────────────────────────────────────────────
 elif aktif == "randevu":
