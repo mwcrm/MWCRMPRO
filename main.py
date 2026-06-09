@@ -3015,154 +3015,126 @@ elif aktif == "kisiler":
         sablon_adlari = []
 
     with tab_rehber1:
-        # Şablonları yükle
-        try:
-            df_sab_all = db_read("sablon_mesajlar", extra_sql="WHERE aktif=1 ORDER BY ad")
-            sablon_adlari = df_sab_all["ad"].tolist() if not df_sab_all.empty else []
-        except:
-            df_sab_all = pd.DataFrame()
-            sablon_adlari = []
-
         df_kis = db_read("kisiler", extra_sql="ORDER BY firma, ad")
-        ara_kis = st.text_input("🔍 Kişi ara:", key="kisiler_ara", placeholder="Ad, firma, tel...")
+        ara_kis = st.text_input("🔍 Ara:", key="kisiler_ara", placeholder="Ad, firma, bölge...")
         if ara_kis:
             df_kis = df_kis[df_kis.apply(lambda r: ara_kis.lower() in str(r).lower(), axis=1)]
-        st.caption(f"**{len(df_kis)} kişi**")
+        st.caption(f"{len(df_kis)} kişi")
 
         if df_kis.empty:
             st.info("Kişi bulunamadı.")
         else:
-            # Mesaj loglarını tek seferde çek
-            try:
-                df_ml_all = db_read("kisiler_mesaj_log", extra_sql="ORDER BY tarih DESC")
-            except:
-                df_ml_all = pd.DataFrame()
+            # Başlık satırı
+            h1,h2,h3,h4,h5,h6,h7 = st.columns([2,1.5,1.3,1.5,2,0.8,0.8])
+            for hdr,txt in zip([h1,h2,h3,h4,h5,h6,h7],["Ad","Firma","Tel","Mesaj","Şablon","📱","⚙️"]):
+                hdr.caption(f"**{txt}**")
 
             for _, kisi in df_kis.iterrows():
                 tel = fmt_tel(str(kisi.get("telefon","") or ""))
                 isim = f"{kisi.get('ad','')} {kisi.get('soyad','')}".strip()
-                firma_k = str(kisi.get("firma","") or "")
                 _kisi_id = int(kisi.get("id",0) or 0)
-
-                # Bu kişinin mesajları
-                if not df_ml_all.empty and "kisi_id" in df_ml_all.columns:
-                    df_ml = df_ml_all[df_ml_all["kisi_id"]==_kisi_id]
-                else:
+                try:
+                    df_ml = db_read("kisiler_mesaj_log", filters={"kisi_id": _kisi_id}, order_col="tarih", desc=True) if _kisi_id > 0 else pd.DataFrame()
+                except:
                     df_ml = pd.DataFrame()
 
-                with st.container():
-                    kc1,kc2,kc3,kc4,kc5,kc6 = st.columns([2,2,1.5,2,1,1])
-                    kc1.markdown(f"**{isim}**")
-                    kc2.caption(firma_k[:18] if firma_k else "—")
-                    kc3.caption(tel[:12] if tel else "—")
+                c1,c2,c3,c4,c5,c6,c7 = st.columns([2,1.5,1.3,1.5,2,0.8,0.8])
+                c1.caption(f"**{isim}**")
+                c2.caption(str(kisi.get("firma",""))[:15])
+                c3.caption(tel[:12] if tel else "—")
 
-                    # Şablon seç
-                    if sablon_adlari:
-                        opts = ["— Şablon —"] + sablon_adlari + ["✏️ Manuel"]
-                        sec = kc4.selectbox("", opts, key=f"ks_{_kisi_id}", label_visibility="collapsed")
-                    else:
-                        sec = "✏️ Manuel"
-                        kc4.caption("Şablon yok")
+                if not df_ml.empty:
+                    son = df_ml.iloc[0]
+                    lbl = f"📨{len(df_ml)} {son.get('sablon_adi','')[:8]}"
+                    if c4.button(lbl, key=f"msg_btn_{_kisi_id}", use_container_width=True):
+                        st.session_state[f"show_msg_{_kisi_id}"] = not st.session_state.get(f"show_msg_{_kisi_id}", False)
+                else:
+                    c4.caption("—")
 
-                    # Mesaj hazırla
+                if tel:
+                    import re as _re_k
+                    t = _re_k.sub(r"[^\d]","",tel)
+                    if t.startswith("0") and len(t)==11: t = "90"+t[1:]
+                    elif len(t)==10: t = "90"+t
+                    sec_opts = ["—"] + sablon_adlari + ["✏️"]
+                    sec = c5.selectbox("", sec_opts, key=f"ks_{_kisi_id}", label_visibility="collapsed")
                     mesaj_gonder = ""
-                    if sec == "✏️ Manuel":
-                        mesaj_gonder = st.text_area("", height=60, key=f"km_{_kisi_id}",
-                            placeholder=f"Merhaba {isim} Bey/Hanım,", label_visibility="collapsed")
-                    elif sec != "— Şablon —" and not df_sab_all.empty:
-                        match = df_sab_all[df_sab_all["ad"]==sec]
-                        if not match.empty:
-                            sab_metin = str(match.iloc[0]["metin"])
-                            gorev_v = str(kisi.get("gorev","") or "")
-                            header = f"*{firma_k}*" + (f" | {gorev_v}" if gorev_v else "") + "\n\n" if firma_k else ""
-                            sab_metin = header + sab_metin
-                            sab_metin = sab_metin.replace("{ad}", str(kisi.get("ad","") or ""))
-                            sab_metin = sab_metin.replace("{firma}", firma_k)
-                            sab_metin = sab_metin.replace("{yetkili}", gorev_v)
-                            mesaj_gonder = st.text_area("", value=sab_metin, height=60,
-                                key=f"km_{_kisi_id}", label_visibility="collapsed")
-
-                    # WA butonu
-                    if tel:
-                        t = re.sub(r"[^\d]","",tel)
-                        if t.startswith("0") and len(t)==11: t = "90"+t[1:]
-                        elif len(t)==10: t = "90"+t
-                        if mesaj_gonder and mesaj_gonder.strip():
-                            from urllib.parse import quote
-                            wa_url = f"https://wa.me/{t}?text={quote(mesaj_gonder, safe='')}"
-                            kc5.link_button("📱", wa_url, use_container_width=True, type="primary")
-                            # Log kaydet
-                            lk = f"lg_{_kisi_id}_{abs(hash(mesaj_gonder[:30]))}"
-                            if not st.session_state.get(lk) and _kisi_id > 0:
-                                st.session_state[lk] = True
-                                try:
-                                    sb_log = get_sb_client()
-                                    if sb_log:
-                                        sb_log.table("kisiler_mesaj_log").insert({
-                                            "kisi_id":_kisi_id,"kisi_adi":isim,"telefon":tel,
-                                            "sablon_adi": sec if sec not in ["— Şablon —","✏️ Manuel"] else "Manuel",
-                                            "mesaj":mesaj_gonder,"gonderen":ben
-                                        }).execute()
-                                        try: db_read.clear()
-                                        except: pass
-                                except: pass
+                    if sec == "✏️":
+                        mesaj_gonder = st.text_area("", height=50, key=f"km_{_kisi_id}", label_visibility="collapsed")
+                    elif sec != "—":
+                        sab_row = df_sab_all[df_sab_all["ad"]==sec].iloc[0] if not df_sab_all.empty else None
+                        if sab_row is not None:
+                            sablon_txt = sab_row["metin"]
+                            sablon_txt = sablon_txt.replace("{ad}", str(kisi.get("ad","")))
+                            sablon_txt = sablon_txt.replace("{firma}", str(kisi.get("firma","")))
+                            sablon_txt = sablon_txt.replace("{yetkili}", str(kisi.get("gorev","")))
+                            firma_h = str(kisi.get("firma","")).strip()
+                            gorev_h = str(kisi.get("gorev","")).strip()
+                            if firma_h:
+                                header_h = f"*{firma_h}*"
+                                if gorev_h:
+                                    header_h += f" | {gorev_h}"
+                                sablon_txt = header_h + "\n\n" + sablon_txt
                         else:
-                            if sec not in ["— Şablon —"]:
-                                kc5.caption("📱")
-                    else:
-                        kc5.caption("—")
+                            sablon_txt = ""
+                        mesaj_gonder = st.text_area("", value=sablon_txt, height=50, key=f"km_{_kisi_id}", label_visibility="collapsed")
+                    if mesaj_gonder and mesaj_gonder.strip():
+                        from urllib.parse import quote
+                        wa_url = f"https://wa.me/{t}?text={quote(mesaj_gonder, safe='')}"
+                        c6.link_button("📱", wa_url, use_container_width=True, type="primary")
+                        lk = f"logged_{_kisi_id}_{hash(mesaj_gonder[:50])}"
+                        if not st.session_state.get(lk) and _kisi_id > 0:
+                            try:
+                                db_insert("kisiler_mesaj_log", {"kisi_id":_kisi_id,"kisi_adi":isim,"telefon":tel,
+                                    "sablon_adi": sec if sec not in ["—","✏️"] else "Manuel",
+                                    "mesaj":mesaj_gonder[:500],"gonderen":ben})
+                                st.session_state[lk] = True
+                            except: pass
 
-                    # Düzenle butonu
-                    if kc6.button("✏️", key=f"km_edit_{_kisi_id}", use_container_width=True):
-                        st.session_state[f"kis_edit_{_kisi_id}"] = not st.session_state.get(f"kis_edit_{_kisi_id}", False)
+                if c7.button("✏️", key=f"kis_menu_{_kisi_id}", use_container_width=True):
+                    st.session_state[f"kis_edit_{_kisi_id}"] = not st.session_state.get(f"kis_edit_{_kisi_id}", False)
 
-                    # Mesaj geçmişi
-                    if not df_ml.empty:
-                        son = df_ml.iloc[0]
-                        if st.button(f"📨 {len(df_ml)} mesaj — {son.get('sablon_adi','')} — {str(son.get('tarih',''))[:10]}", 
-                                    key=f"msg_btn_{_kisi_id}", use_container_width=True):
-                            st.session_state[f"show_msg_{_kisi_id}"] = not st.session_state.get(f"show_msg_{_kisi_id}", False)
-                        if st.session_state.get(f"show_msg_{_kisi_id}"):
-                            for _, mlog in df_ml.iterrows():
-                                mx1,mx2,mx3 = st.columns([2,5,1])
-                                mx1.caption(f"🕐 {str(mlog.get('tarih',''))[:16]}\n**{mlog.get('sablon_adi','')}**")
-                                mx2.info(str(mlog.get('mesaj','')))
-                                if mx3.button("🗑️", key=f"ms_{mlog.get('id',0)}_{_kisi_id}"):
-                                    try:
-                                        sb_ms = get_sb_client()
-                                        if sb_ms:
-                                            sb_ms.table("kisiler_mesaj_log").delete().eq("id", int(mlog.get("id",0))).execute()
-                                        try: db_read.clear()
-                                        except: pass
+                if st.session_state.get(f"show_msg_{_kisi_id}") and not df_ml.empty:
+                    with st.expander(f"📨 {isim} mesajları", expanded=True):
+                        for _, mlog in df_ml.iterrows():
+                            m1,m2,m3 = st.columns([2,5,1])
+                            m1.caption(f"🕐 {str(mlog.get('tarih',''))[:16]}\n**{mlog.get('sablon_adi','')}**")
+                            m2.info(str(mlog.get('mesaj','')))
+                            if m3.button("🗑️", key=f"msg_sil_{mlog.get('id','')}_{_kisi_id}"):
+                                try:
+                                    sb_ms = get_sb_client()
+                                    if sb_ms:
+                                        sb_ms.table("kisiler_mesaj_log").delete().eq("id", int(mlog.get("id",0))).execute()
+                                    else:
+                                        conn_ms = get_conn()
+                                        conn_ms.execute("DELETE FROM kisiler_mesaj_log WHERE id=?", (int(mlog.get("id",0)),))
+                                        conn_ms.commit(); conn_ms.close()
+                                    try: db_read.clear()
                                     except: pass
-                                    st.rerun()
+                                    st.success("Silindi!")
+                                except Exception as e:
+                                    st.error(f"Silinemedi: {e}")
+                                st.rerun()
 
-                # Düzenleme formu
                 if st.session_state.get(f"kis_edit_{_kisi_id}"):
-                    with st.form(f"kd_{_kisi_id}"):
+                    with st.form(f"kis_duzenle_{_kisi_id}"):
                         ed1,ed2,ed3 = st.columns(3)
                         e_ad    = ed1.text_input("Ad:", value=str(kisi.get("ad","")))
                         e_soyad = ed1.text_input("Soyad:", value=str(kisi.get("soyad","")))
                         e_tel   = ed2.text_input("Tel:", value=tel)
-                        e_firma = ed2.text_input("Firma:", value=firma_k)
+                        e_firma = ed2.text_input("Firma:", value=str(kisi.get("firma","")))
                         e_bolge = ed3.text_input("Bölge:", value=str(kisi.get("bolge","")))
                         e_email = ed3.text_input("Email:", value=str(kisi.get("email","")))
                         b1,b2,b3 = st.columns(3)
                         if b1.form_submit_button("💾 Kaydet", use_container_width=True, type="primary"):
-                            db_update("kisiler",{"ad":e_ad,"soyad":e_soyad,"telefon":e_tel,
-                                "firma":e_firma,"bolge":e_bolge,"email":e_email},"id",_kisi_id)
-                            try: db_read.clear()
-                            except: pass
+                            db_update("kisiler",{"ad":e_ad,"soyad":e_soyad,"telefon":e_tel,"firma":e_firma,"bolge":e_bolge,"email":e_email},"id",_kisi_id)
                             st.session_state.pop(f"kis_edit_{_kisi_id}",None); st.rerun()
                         if b2.form_submit_button("🗑️ Sil", use_container_width=True):
                             sb_ks = get_sb_client()
                             if sb_ks: sb_ks.table("kisiler").delete().eq("id",_kisi_id).execute()
-                            try: db_read.clear()
-                            except: pass
                             st.session_state.pop(f"kis_edit_{_kisi_id}",None); st.rerun()
                         if b3.form_submit_button("İptal", use_container_width=True):
                             st.session_state.pop(f"kis_edit_{_kisi_id}",None); st.rerun()
-                st.divider()
 
     with tab_rehber2:
         with st.form("kisi_ekle_form"):
