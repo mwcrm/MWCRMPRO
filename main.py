@@ -3072,7 +3072,18 @@ elif aktif == "kisiler":
                         mesaj_gonder = st.text_area("", height=50, key=f"km_{_kisi_id}", label_visibility="collapsed")
                     elif sec != "—":
                         sab_row = df_sab_all[df_sab_all["ad"]==sec].iloc[0] if not df_sab_all.empty else None
-                        sablon_txt = sab_row["metin"].replace("{ad}", kisi.get("ad","")) if sab_row is not None else ""
+                        if sab_row is not None:
+                            sablon_txt = sab_row["metin"]
+                            sablon_txt = sablon_txt.replace("{ad}", str(kisi.get("ad","")))
+                            sablon_txt = sablon_txt.replace("{firma}", str(kisi.get("firma","")))
+                            sablon_txt = sablon_txt.replace("{yetkili}", str(kisi.get("gorev","")))
+                            # Firma + yetkili otomatik footer
+                            if str(kisi.get("firma","")).strip():
+                                sablon_txt += f"\n\n🏢 {kisi.get('firma','')}"
+                            if str(kisi.get("gorev","")).strip():
+                                sablon_txt += f" | {kisi.get('gorev','')}"
+                        else:
+                            sablon_txt = ""
                         mesaj_gonder = st.text_area("", value=sablon_txt, height=50, key=f"km_{_kisi_id}", label_visibility="collapsed")
                     if mesaj_gonder and mesaj_gonder.strip():
                         wa_url = f"https://wa.me/{t}?text={mesaj_gonder.replace(' ','%20').replace(chr(10),'%0A')}"
@@ -3118,17 +3129,19 @@ elif aktif == "kisiler":
 
     with tab_rehber4:
         st.markdown("#### 📝 Kayıtlı Şablonlar")
-        st.caption("💡 `{ad}` yazdığınız yere kişi adı otomatik gelir. Metni kopyala/yapıştır.")
-        with st.form("sablon_kaydet_form", clear_on_submit=True):
+        st.caption("💡 `{ad}` → kişi adı, `{firma}` → firma adı, `{yetkili}` → görevi. Firma ve yetkili bilgisi mesaj sonuna otomatik eklenir.")
+        with st.form("sablon_kaydet_form"):
             s1, s2 = st.columns([2,5])
             sab_isim = s1.text_input("Şablon Adı*:", placeholder="Örn: Tanışma")
-            sab_metin = s2.text_area("Mesaj Metni*:", height=100, placeholder="Merhaba {ad} Bey/Hanım,\n\nMetni yapıştırın...")
-            if st.form_submit_button("💾 Kaydet", use_container_width=True, type="primary"):
-                if sab_isim.strip() and sab_metin.strip():
-                    db_insert("sablon_mesajlar", {"ad": sab_isim.strip(), "metin": sab_metin.strip(), "olusturan": ben, "aktif": 1})
-                    st.success(f"✅ \'{sab_isim}\' kaydedildi!"); st.rerun()
-                else:
-                    st.warning("Ad ve metin zorunlu!")
+            sab_metin = s2.text_area("Mesaj Metni*:", height=100, placeholder="Merhaba {ad} Bey/Hanım,")
+            kaydet_btn = st.form_submit_button("💾 Kaydet", use_container_width=True, type="primary")
+        if kaydet_btn:
+            if sab_isim and sab_isim.strip() and sab_metin and sab_metin.strip():
+                db_insert("sablon_mesajlar", {"ad": sab_isim.strip(), "metin": sab_metin.strip(), "olusturan": ben, "aktif": 1})
+                st.success("✅ Kaydedildi!")
+                st.rerun()
+            else:
+                st.error("Şablon adı ve mesaj metni dolu olmalı!")
 
         try:
             df_sab_list = db_read("sablon_mesajlar", extra_sql="WHERE aktif=1 ORDER BY ad")
