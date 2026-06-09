@@ -702,47 +702,52 @@ st.markdown("""
 /* Streamlit kendi header'ını gizle */
 header[data-testid="stHeader"] { display: none !important; }
 
-/* Tüm içeriği aşağı it (sticky bar için yer aç) */
-.block-container {
-    padding-top: 7.5rem !important;
-}
+/* İçeriğe üstten boşluk bırak */
+.block-container { padding-top: 8rem !important; }
 
-/* ── SABİT ÜSTBAR: Başlık + Kullanıcı ── */
-div[data-testid="stAppViewBlockContainer"] > div > div[data-testid="stVerticalBlock"] > div:nth-child(1),
-div[data-testid="stAppViewBlockContainer"] > div > div[data-testid="stVerticalBlock"] > div:nth-child(2) {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 1001 !important;
-    background: #ffffff !important;
-    padding: 0.3rem 1rem 0 1rem !important;
-}
-
-/* ── SABİT MENÜ BUTONLARI ── */
-div[data-testid="stAppViewBlockContainer"] > div > div[data-testid="stVerticalBlock"] > div:nth-child(3) {
-    position: fixed !important;
-    top: 4.2rem !important;
-    left: 0 !important;
-    right: 0 !important;
-    z-index: 1000 !important;
-    background: #f8f9fa !important;
-    border-bottom: 2px solid #dee2e6 !important;
-    padding: 0.2rem 1rem 0.3rem 1rem !important;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.08) !important;
-}
-
-/* Sol sidebar'a dokunma */
-section[data-testid="stSidebar"] {
-    z-index: 999 !important;
-}
+/* Sol sidebar koru */
+section[data-testid="stSidebar"] { z-index: 999 !important; }
 </style>
 """, unsafe_allow_html=True)
+
+import streamlit.components.v1 as _components
+_components.html("""
+<script>
+function makeSticky() {
+    try {
+        var doc = window.parent.document;
+        var blocks = doc.querySelectorAll('[data-testid="stAppViewBlockContainer"] > div > div[data-testid="stVerticalBlock"] > div');
+        if (blocks.length < 3) return false;
+
+        // Başlık satırı
+        blocks[0].style.cssText += 'position:fixed!important;top:0!important;left:0!important;right:0!important;z-index:1002!important;background:#ffffff!important;padding:4px 16px 2px 16px!important;box-shadow:0 1px 4px rgba(0,0,0,0.12)!important;';
+
+        // Divider
+        blocks[1].style.cssText += 'position:fixed!important;top:54px!important;left:0!important;right:0!important;z-index:1001!important;background:#ffffff!important;padding:0!important;margin:0!important;';
+
+        // Menü butonları
+        blocks[2].style.cssText += 'position:fixed!important;top:60px!important;left:0!important;right:0!important;z-index:1000!important;background:#f8f9fa!important;padding:4px 16px 6px 16px!important;border-bottom:2px solid #dee2e6!important;box-shadow:0 2px 6px rgba(0,0,0,0.08)!important;';
+
+        return true;
+    } catch(e) { return false; }
+}
+
+// Streamlit yüklenince çalıştır
+var attempts = 0;
+var timer = setInterval(function() {
+    if (makeSticky() || attempts > 20) clearInterval(timer);
+    attempts++;
+}, 300);
+
+// Rerun'larda tekrar uygula
+setInterval(makeSticky, 2000);
+</script>
+""", height=0)
 
 # ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
 col_bas, col_kul, col_cik = st.columns([6, 2, 1])
 with col_bas:
-    st.markdown(f"### 🏢 MWCRMPRO &nbsp;<small style='font-size:0.75rem;color:#888;font-weight:400;'>Cari Yönetim Sistemi</small>", unsafe_allow_html=True)
+    st.markdown("### 🏢 MWCRMPRO &nbsp;<small style='font-size:0.75rem;color:#888;font-weight:400;'>Cari Yönetim Sistemi</small>", unsafe_allow_html=True)
 with col_kul:
     st.markdown(f"<div style='padding-top:6px;font-size:0.85rem;'>👤 <b>{st.session_state['kullanici']}</b> ({st.session_state['rol']})</div>", unsafe_allow_html=True)
 with col_cik:
