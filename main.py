@@ -3144,21 +3144,32 @@ elif aktif == "kisiler":
                         if b3.form_submit_button("İptal", use_container_width=True):
                             st.session_state.pop(f"kis_edit_{_kisi_id}",None); st.rerun()
 
-    with tab_rehber4:
-        st.markdown("#### 📝 Kayıtlı Şablonlar")
-        st.caption("💡 `{ad}` → kişi adı, `{firma}` → firma adı, `{yetkili}` → görevi. Firma ve yetkili bilgisi mesaj onune otomatik eklenir.")
-        with st.form("sablon_kaydet_form"):
-            s1, s2 = st.columns([2,5])
-            sab_isim = s1.text_input("Şablon Adı*:", placeholder="Örn: Tanışma")
-            sab_metin = s2.text_area("Mesaj Metni*:", height=100, placeholder="Merhaba {ad} Bey/Hanım,")
-            kaydet_btn = st.form_submit_button("💾 Kaydet", use_container_width=True, type="primary")
-        if kaydet_btn:
-            if sab_isim and sab_isim.strip() and sab_metin and sab_metin.strip():
-                db_insert("sablon_mesajlar", {"ad": sab_isim.strip(), "metin": sab_metin.strip(), "olusturan": ben, "aktif": 1})
-                st.success("✅ Kaydedildi!")
-                st.rerun()
-            else:
-                st.error("Şablon adı ve mesaj metni dolu olmalı!")
+with tab_rehber4:
+            st.markdown("#### 📝 Kayıtlı Şablonlar")
+            # Açıklama metni güncellendi
+            st.caption("💡 `{ad}` → kişi adı, `{firma}` → firma adı, `{yetkili}` → görevi. Firma ve yetkili bilgisi mesaj başına otomatik eklenir.")
+            
+            with st.form("sablon_kaydet_form"):
+                s1, s2 = st.columns([2,5])
+                sab_isim = s1.text_input("Şablon Adı*:", placeholder="Örn: Tanışma")
+                sab_metin = s2.text_area("Mesaj Metni*:", height=100, placeholder="Merhaba {ad} Bey/Hanım,")
+                kaydet_btn = st.form_submit_button("💾 Kaydet", use_container_width=True, type="primary")
+            
+            if kaydet_btn:
+                if sab_isim and sab_isim.strip() and sab_metin and sab_metin.strip():
+                    # Firma ve yetkili bilgisini mesajın en başına ekliyoruz
+                    yeni_metin = f"{{firma}} - {{yetkili}}\n\n{sab_metin.strip()}"
+                    
+                    db_insert("sablon_mesajlar", {
+                        "ad": sab_isim.strip(), 
+                        "metin": yeni_metin, 
+                        "olusturan": ben, 
+                        "aktif": 1
+                    })
+                    st.success("✅ Kaydedildi!")
+                    st.rerun()
+                else:
+                    st.error("Şablon adı ve mesaj metni dolu olmalı!")
 
         try:
             df_sab_list = db_read("sablon_mesajlar", extra_sql="WHERE aktif=1 ORDER BY ad")
