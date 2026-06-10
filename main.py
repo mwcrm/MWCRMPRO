@@ -399,7 +399,7 @@ def init_db():
         for t in tables:
             try: conn.execute(t)
             except: pass
-        for col in ["olusturan TEXT", "beklenen_ciro REAL DEFAULT 0", "gerceklesen_ciro REAL DEFAULT 0", "notlar TEXT DEFAULT ''"]:
+        for col in ["olusturan TEXT", "beklenen_ciro REAL DEFAULT 0", "gerceklesen_ciro REAL DEFAULT 0", "aciklama TEXT DEFAULT ''"]:
             try: conn.execute(f"ALTER TABLE cari_kartlar ADD COLUMN {col}")
             except: pass
         conn.execute("UPDATE cari_kartlar SET silindi=0 WHERE silindi IS NULL")
@@ -844,7 +844,7 @@ if aktif == "yeni":
         asama_idx  = asama_opts.index(_asama_default) if _asama_default and _asama_default in asama_opts else 0
         asama      = col3.selectbox("İşlem Aşaması", asama_opts, index=asama_idx)
         adres      = st.text_area("Adres", value=duzenle.get("adres","") if duzenle else "")
-        notlar_v   = st.text_area("📝 Açıklama / Not", value=str(duzenle.get("notlar","") or "") if duzenle else "", height=70, key="yeni_notlar")
+        notlar_v   = st.text_area("📝 Açıklama", value=str(duzenle.get("aciklama","") or "") if duzenle else "", height=70, key="yeni_notlar")
 
         st.markdown("#### 💰 Ciro Bilgileri")
         ciro_col1, ciro_col2, ciro_col3, ciro_col4 = st.columns(4)
@@ -872,7 +872,7 @@ if aktif == "yeni":
                     "sabit": sabit, "email": email, "adres": adres,
                     "ilce": ilce, "il": il, "durum": durum,
                     "temsilci": temsilci, "islem_asamasi": asama,
-                    "notlar": notlar_v,
+                    "aciklama": notlar_v,
                     "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro
                 }, "id", duzenle.get("id"))
                 st.session_state.pop("duzenle_musteri", None)
@@ -887,7 +887,7 @@ if aktif == "yeni":
                     "sabit": sabit, "email": email, "adres": adres,
                     "ilce": ilce, "il": il, "durum": durum,
                     "temsilci": temsilci, "islem_asamasi": asama,
-                    "notlar": notlar_v,
+                    "aciklama": notlar_v,
                     "silindi": 0, "olusturan": st.session_state["kullanici"],
                     "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro
                 })
@@ -917,15 +917,15 @@ elif aktif == "liste":
     except:
         df = db_read("cari_kartlar", extra_sql="WHERE silindi=0 OR silindi='0' OR silindi IS NULL ORDER BY tarih DESC")
 
-    for _kol in ["notlar","adres","aciklama"]:
+    for _kol in ["aciklama","adres","notlar"]:
         if _kol not in df.columns: df[_kol] = ""
-    df["notlar"] = df["notlar"].fillna("").astype(str)
-    df["notlar"] = df["notlar"].replace("nan","")
+    df["aciklama"] = df["aciklama"].fillna("").astype(str)
+    df["aciklama"] = df["aciklama"].replace("nan","")
 
     # Supabase'de notlar kolonu yoksa ekle
     if sb_liste:
         try:
-            _test = sb_liste.table("cari_kartlar").select("notlar").limit(1).execute()
+            _test = sb_liste.table("cari_kartlar").select("aciklama").limit(1).execute()
         except:
             pass  # Kolon yoksa update sırasında hata alırız, onu da yakalayacağız
 
@@ -987,7 +987,7 @@ elif aktif == "liste":
                 st.write(f"📊 {kart_row.get('durum','-')}")
                 st.write(f"🔄 {kart_row.get('islem_asamasi','-')}")
                 st.write(f"👔 {kart_row.get('temsilci','-')}")
-                _not = str(kart_row.get("notlar","") or "")
+                _not = str(kart_row.get("aciklama","") or "")
                 if _not and _not != "nan":
                     st.info(f"📝 {_not}")
             with kc3:
@@ -998,7 +998,7 @@ elif aktif == "liste":
             ab1,ab2,ab3,ab4 = st.columns(4)
             if ab1.button("✏️ Düzenle", key=f"kd_{kart_id}", use_container_width=True):
                 d2 = {str(k):(None if str(v) in ["nan","None","NaT"] else v) for k,v in kart_row.items()}
-                for _k in ["firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","notlar"]:
+                for _k in ["firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","aciklama"]:
                     if _k in d2: d2[_k] = "" if d2[_k] is None else str(d2[_k])
                 st.session_state["duzenle_musteri"] = d2
                 st.session_state["aktif_tab"] = "yeni"; st.rerun()
@@ -1038,12 +1038,16 @@ elif aktif == "liste":
         "durum":         st.column_config.SelectboxColumn("Durum", options=["Aktif","Hedef","Pasif"]),
         "temsilci":      st.column_config.TextColumn("Temsilci"),
         "islem_asamasi": st.column_config.SelectboxColumn("Aşama", options=tum_asama_opts),
-        "notlar":        st.column_config.TextColumn("Açıklama", width="large"),
+        "aciklama":      st.column_config.TextColumn("Açıklama", width="large"),
     }
-    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi","notlar"]
+    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi","aciklama"]
 
     # ── DATA EDITOR ─────────────────────────────────────────────────────────────
     df_edit = df_f.copy()
+    # aciklama kolonu kesinlikle olsun
+    if "aciklama" not in df_edit.columns:
+        df_edit["aciklama"] = ""
+    df_edit["aciklama"] = df_edit["aciklama"].fillna("").astype(str).replace("nan","")
     df_edit.insert(0, "Seç", False)
 
     # KEY YAKLAŞIMI: her render'da edited_df'i yakala, session_state'e yaz
@@ -1057,12 +1061,16 @@ elif aktif == "liste":
         key="cari_editor"
     )
     # HER render'da tüm tabloyu session_state'e kaydet
-    # Buton basılınca Streamlit rerun yapar — edited_df orijinale döner
-    # Ama biz bir önceki render'dan kaydettiğimiz veriyi kullanırız
     import json as _json_ls
     try:
-        _kayit_verisi = edited_df[col_order[1:]].copy()  # Seç hariç
-        st.session_state["_ls_tablo"] = _kayit_verisi.to_json(orient="records", force_ascii=False)
+        _kv = edited_df.copy()
+        # aciklama kolonu yoksa boş ekle
+        if "aciklama" not in _kv.columns:
+            _kv["aciklama"] = ""
+        _kv["aciklama"] = _kv["aciklama"].fillna("").astype(str).replace("nan","")
+        _kayit_kolonlar = ["id","firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi","aciklama"]
+        _mevcut = [c for c in _kayit_kolonlar if c in _kv.columns]
+        st.session_state["_ls_tablo"] = _kv[_mevcut].to_json(orient="records", force_ascii=False)
     except:
         pass
 
@@ -1101,7 +1109,7 @@ elif aktif == "liste":
                             "durum":         str(row.get("durum","") or ""),
                             "temsilci":      str(row.get("temsilci","") or ""),
                             "islem_asamasi": str(row.get("islem_asamasi","") or ""),
-                            "notlar":        str(row.get("notlar","") or ""),
+                            "aciklama":      str(row.get("aciklama","") or ""),
                         }
                         # notlar olmayan Supabase için 2 deneme
                         ok = False
@@ -1111,7 +1119,7 @@ elif aktif == "liste":
                                 ok = True
                             except Exception as e1:
                                 # notlar kolonu yoksa onsuz dene
-                                g2 = {k:v for k,v in guncelle.items() if k != "notlar"}
+                                g2 = {k:v for k,v in guncelle.items() if k != "aciklama"}
                                 try:
                                     sb_liste.table("cari_kartlar").update(g2).eq("id", rid).execute()
                                     ok = True
@@ -1125,7 +1133,7 @@ elif aktif == "liste":
                                     list(guncelle.values()) + [rid])
                                 conn_u.commit(); ok = True
                             except:
-                                g2 = {k:v for k,v in guncelle.items() if k != "notlar"}
+                                g2 = {k:v for k,v in guncelle.items() if k != "aciklama"}
                                 sets = ", ".join([f"{k}=?" for k in g2])
                                 conn_u.execute(f"UPDATE cari_kartlar SET {sets} WHERE id=?",
                                     list(g2.values()) + [rid])
@@ -1270,12 +1278,12 @@ elif aktif == "liste":
                                 "durum":str(row.get("durum","") or ""),
                                 "temsilci":str(row.get("temsilci","") or ""),
                                 "islem_asamasi":str(row.get("islem_asamasi","") or ""),
-                                "notlar":str(row.get("notlar","") or ""),
+                                "aciklama":str(row.get("aciklama","") or ""),
                             }
                             if sb_liste:
                                 try: sb_liste.table("cari_kartlar").update(gd).eq("id",rid).execute()
                                 except:
-                                    g2={k:v for k,v in gd.items() if k!="notlar"}
+                                    g2={k:v for k,v in gd.items() if k!="aciklama"}
                                     sb_liste.table("cari_kartlar").update(g2).eq("id",rid).execute()
                             else:
                                 conn_a=get_conn()
@@ -1335,11 +1343,11 @@ elif aktif == "liste":
             _idf = df.groupby("il").agg(Adet=("firma","count")).reset_index().sort_values("Adet",ascending=False).head(10)
             st.dataframe(_idf.rename(columns={"il":"İl"}), use_container_width=True, hide_index=True)
         st.markdown("**📝 Açıklamalı Kayıtlar:**")
-        if "notlar" in df.columns:
-            _ndf = df[df["notlar"].notna() & (df["notlar"] != "") & (df["notlar"] != "nan")]
+        if "aciklama" in df.columns:
+            _ndf = df[df["aciklama"].notna() & (df["aciklama"] != "") & (df["aciklama"] != "nan")]
             st.caption(f"{len(_ndf)} kayıtta açıklama var")
             if not _ndf.empty:
-                _gcols = [c for c in ["firma","yetkili","islem_asamasi","temsilci","notlar"] if c in _ndf.columns]
+                _gcols = [c for c in ["firma","yetkili","islem_asamasi","temsilci","aciklama"] if c in _ndf.columns]
                 st.dataframe(_ndf[_gcols].head(30), use_container_width=True, hide_index=True)
         buf_rp = __import__("io").BytesIO()
         df.to_excel(buf_rp, index=False); buf_rp.seek(0)
@@ -1686,7 +1694,7 @@ elif aktif == "rapor":
                         rm4.metric("Gerçekleşen", fmt_para(df_asama_r["gerceklesen_ciro"].sum()))
                         
                         # Liste
-                        goster_cols = [c for c in ["id","firma","yetkili","gsm","il","durum","temsilci","notlar","beklenen_ciro","gerceklesen_ciro"] if c in df_asama_r.columns]
+                        goster_cols = [c for c in ["id","firma","yetkili","gsm","il","durum","temsilci","aciklama","beklenen_ciro","gerceklesen_ciro"] if c in df_asama_r.columns]
                         df_show = df_asama_r[goster_cols].copy()
                         if "beklenen_ciro" in df_show.columns:
                             df_show["beklenen_ciro"] = df_show["beklenen_ciro"].apply(fmt_para)
