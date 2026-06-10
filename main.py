@@ -448,6 +448,31 @@ def otomatik_yedek():
 otomatik_yedek()
 
 
+# ── KULLANICI LOG FONKSİYONU ──────────────────────────────────────────────────
+def kullanici_log_kaydet(islem, sayfa="", detay=""):
+    """Her işlemi logla — Supabase'e yaz"""
+    try:
+        _sb_log = get_sb_client()
+        if not _sb_log: return
+        if not st.session_state.get("giris", False): return
+        _sb_log.table("kullanici_log").insert({
+            "kullanici": st.session_state.get("kullanici", "?"),
+            "rol":       st.session_state.get("rol", "?"),
+            "sayfa":     sayfa or st.session_state.get("aktif_tab", ""),
+            "islem":     islem,
+            "detay":     str(detay)[:500],
+        }).execute()
+    except:
+        pass
+
+def sayfa_log(sayfa):
+    """Sayfa ziyaretini logla — aynı sayfayı tekrar loglamaktan kaçın"""
+    _log_key = f"_logged_{sayfa}"
+    if not st.session_state.get(_log_key):
+        st.session_state[_log_key] = True
+        kullanici_log_kaydet("SAYFA_ZİYARET", sayfa, f"{sayfa} sayfası açıldı")
+
+
 def giris_ekrani():
     st.markdown("<h1 style='text-align:center;color:#1f6feb;'>🏢 MWCRMPRO</h1>", unsafe_allow_html=True)
     st.markdown("<h4 style='text-align:center;color:#888;'>Cari Yönetim Sistemi</h4><br>", unsafe_allow_html=True)
@@ -502,11 +527,34 @@ def giris_ekrani():
                         rol_val = "admin" if kullanici == "admin" else "kullanici"
                     st.session_state["rol"] = rol_val
                     st.session_state["aktif_tab"] = "liste"
+                    # Giriş logla
+                    try:
+                        _sb_logi = get_sb_client()
+                        if _sb_logi:
+                            _sb_logi.table("kullanici_log").insert({
+                                "kullanici": kullanici,
+                                "rol": rol_val,
+                                "sayfa": "giris",
+                                "islem": "GİRİŞ_YAPILDI",
+                                "detay": f"{kullanici} sisteme giriş yaptı",
+                            }).execute()
+                    except: pass
                     st.rerun()
                 else:
                     st.error("Kullanıcı adı veya şifre hatalı!")
 
 def cikis():
+    try:
+        _sb_logc = get_sb_client()
+        if _sb_logc and st.session_state.get("kullanici"):
+            _sb_logc.table("kullanici_log").insert({
+                "kullanici": st.session_state.get("kullanici","?"),
+                "rol":       st.session_state.get("rol","?"),
+                "sayfa":     "cikis",
+                "islem":     "ÇIKIŞ_YAPILDI",
+                "detay":     f"{st.session_state.get('kullanici','?')} sistemden çıkış yaptı",
+            }).execute()
+    except: pass
     st.session_state.clear()
     st.rerun()
 
@@ -831,6 +879,7 @@ aktif = st.session_state["aktif_tab"]
 
 # ── YENİ KART EKLE / DÜZENLE ─────────────────────────────────────────────────
 if aktif == "yeni":
+    sayfa_log("yeni")
 
     # Müşteri ara ve düzenle
     st.markdown("### 🔍 Mevcut Müşteri Ara & Düzenle")
@@ -974,6 +1023,7 @@ if aktif == "yeni":
 
 # ── CARİ LİSTE ───────────────────────────────────────────────────────────────
 elif aktif == "liste":
+    sayfa_log("liste")
     if st.session_state.get("kayit_mesaj"):
         st.success(st.session_state["kayit_mesaj"])
         st.session_state["kayit_mesaj"] = ""
@@ -1586,6 +1636,7 @@ elif aktif == "liste":
 
 # ── ARŞİV ─────────────────────────────────────────────────────────────────────
 elif aktif == "arsiv":
+    sayfa_log("arsiv")
     df_arsiv = db_read("cari_kartlar", filters={"silindi": 1}, order_col="tarih")
 
     st.markdown(f"**Arşivde {len(df_arsiv)} kayıt**")
@@ -1635,6 +1686,7 @@ elif aktif == "arsiv":
 
 # ── KULLANICI YÖNETİMİ ───────────────────────────────────────────────────────
 elif aktif == "kullanici":
+    sayfa_log("kullanici")
     st.markdown("## 👥 Kullanıcı Yönetimi")
 
     TUM_MENULER = {
@@ -1643,7 +1695,7 @@ elif aktif == "kullanici":
         "excel":"📥 Excel","arsiv":"🗃️ Arşiv","mesajlar":"💬 Mesajlar"
     }
 
-    kul_tab1, kul_tab2, kul_tab3 = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle"])
+    kul_tab1, kul_tab2, kul_tab3, kul_tab4 = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log"])
 
     with kul_tab1:
         df_kul = db_read("kullanicilar", extra_sql="")
@@ -1768,8 +1820,116 @@ elif aktif == "kullanici":
                 except: pass
                 st.success("✅ Yetkiler güncellendi!"); st.rerun()
 
+    with kul_tab4:
+        st.markdown("### 📊 Kullanıcı Aktivite Logu")
+        st.caption("Kim giriş yaptı, hangi sayfaya girdi, ne yaptı — tarih saat ile")
+
+        _sb_log = get_sb_client()
+        _df_log = pd.DataFrame()
+
+        try:
+            if _sb_log:
+                _r_log = _sb_log.table("kullanici_log").select("*").order("tarih", desc=True).limit(500).execute()
+                _df_log = pd.DataFrame(_r_log.data) if _r_log.data else pd.DataFrame()
+        except Exception as _e_log:
+            st.error(f"Log yüklenemedi: {_e_log}")
+
+        if _df_log.empty:
+            st.info("Henüz log kaydı yok.")
+        else:
+            # Filtreler
+            lf1, lf2, lf3, lf4 = st.columns(4)
+            _log_kullar = ["Tümü"] + sorted(_df_log["kullanici"].dropna().unique().tolist())
+            _log_islemler = ["Tümü"] + sorted(_df_log["islem"].dropna().unique().tolist())
+            _fil_kul  = lf1.selectbox("Kullanıcı:", _log_kullar, key="log_fil_kul")
+            _fil_isl  = lf2.selectbox("İşlem:", _log_islemler, key="log_fil_isl")
+            _fil_gun  = lf3.date_input("Tarihten:", key="log_fil_gun", value=None)
+            _fil_ara  = lf4.text_input("🔍 Ara:", key="log_fil_ara", placeholder="Detay ara...")
+
+            _df_fil = _df_log.copy()
+            if _fil_kul  != "Tümü": _df_fil = _df_fil[_df_fil["kullanici"] == _fil_kul]
+            if _fil_isl  != "Tümü": _df_fil = _df_fil[_df_fil["islem"] == _fil_isl]
+            if _fil_gun: _df_fil = _df_fil[pd.to_datetime(_df_fil["tarih"], errors="coerce").dt.date >= _fil_gun]
+            if _fil_ara: _df_fil = _df_fil[_df_fil.apply(lambda r: _fil_ara.lower() in str(r).lower(), axis=1)]
+
+            st.caption(f"**{len(_df_fil)} kayıt**")
+
+            # Özet metrikler
+            lm1,lm2,lm3,lm4,lm5 = st.columns(5)
+            lm1.metric("Toplam İşlem", len(_df_log))
+            lm2.metric("Aktif Kullanıcı", _df_log["kullanici"].nunique())
+            _bugun = pd.Timestamp.now().date()
+            _bugun_log = _df_log[pd.to_datetime(_df_log["tarih"],errors="coerce").dt.date == _bugun]
+            lm3.metric("Bugün", len(_bugun_log))
+            _giris_say = len(_df_log[_df_log["islem"]=="GİRİŞ_YAPILDI"])
+            lm4.metric("Toplam Giriş", _giris_say)
+            lm5.metric("Filtrede", len(_df_fil))
+
+            st.divider()
+
+            # Kullanıcı bazlı özet
+            with st.expander("👤 Kullanıcı Bazlı Özet"):
+                _kul_oz = _df_log.groupby("kullanici").agg(
+                    İşlem=("id","count"),
+                    SonGiriş=("tarih","max"),
+                    Sayfalar=("sayfa", lambda x: ", ".join(x.dropna().unique()[:5]))
+                ).reset_index().sort_values("İşlem", ascending=False)
+                _kul_oz["SonGiriş"] = _kul_oz["SonGiriş"].astype(str).str[:16]
+                st.dataframe(_kul_oz, use_container_width=True, hide_index=True)
+
+            # Sayfa bazlı özet
+            with st.expander("📄 Sayfa Bazlı Ziyaret"):
+                _sayfa_oz = _df_log.groupby("sayfa").agg(
+                    Ziyaret=("id","count"),
+                    Kullanıcı=("kullanici","nunique")
+                ).reset_index().sort_values("Ziyaret", ascending=False)
+                st.dataframe(_sayfa_oz, use_container_width=True, hide_index=True)
+
+            # İşlem bazlı özet
+            with st.expander("⚡ İşlem Bazlı Özet"):
+                _isl_oz = _df_log.groupby("islem").agg(
+                    Adet=("id","count"),
+                    Kullanıcı=("kullanici","nunique")
+                ).reset_index().sort_values("Adet", ascending=False)
+                st.dataframe(_isl_oz, use_container_width=True, hide_index=True)
+
+            st.divider()
+
+            # Detay tablo
+            st.markdown("**📋 Detaylı Log:**")
+            _gos_kol = [c for c in ["tarih","kullanici","rol","sayfa","islem","detay"] if c in _df_fil.columns]
+            _df_gos = _df_fil[_gos_kol].copy()
+            _df_gos["tarih"] = _df_gos["tarih"].astype(str).str[:16]
+            st.dataframe(_df_gos, use_container_width=True, hide_index=True)
+
+            # Excel indir
+            import io as _log_io
+            _buf_log = _log_io.BytesIO()
+            _df_fil.to_excel(_buf_log, index=False); _buf_log.seek(0)
+            st.download_button(
+                "📥 Log Excel İndir",
+                data=_buf_log,
+                file_name=f"kullanici_log_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                use_container_width=True
+            )
+
+            # Log temizle (sadece admin)
+            with st.expander("🗑️ Log Temizle"):
+                st.warning("Dikkat: Bu işlem geri alınamaz!")
+                _sil_gun = st.number_input("Kaç günden eski logları sil:", min_value=7, value=30, step=1)
+                if st.button("🗑️ Eski Logları Sil", type="primary"):
+                    try:
+                        from datetime import timedelta
+                        _esik = (pd.Timestamp.now() - timedelta(days=int(_sil_gun))).isoformat()
+                        _sb_log.table("kullanici_log").delete().lt("tarih", _esik).execute()
+                        st.success(f"✅ {_sil_gun} günden eski loglar silindi!")
+                        st.rerun()
+                    except Exception as _e_del:
+                        st.error(f"Silinemedi: {_e_del}")
+
 # ── RAPORLAR ─────────────────────────────────────────────────────────────────
 elif aktif == "rapor":
+    sayfa_log("rapor")
     import io as _rio2
 
     st.markdown("## 📊 Raporlar")
@@ -2063,6 +2223,7 @@ elif aktif == "rapor":
                 st.info("İl/tür verisi yok.")
 
 elif aktif == "teklif":
+    sayfa_log("teklif")
     import json, re, io
 
     st.markdown("## Teklif Olustur")
@@ -2406,6 +2567,7 @@ elif aktif == "teklif":
         if not hedef_musteri:
             st.warning("Musteri adi bos olamaz!")
         else:
+            kullanici_log_kaydet("TEKLİF_KAYDET", "teklif", f"Müşteri: {hedef_musteri}, Tutar: {fmt_para(toplam_tutar)}")
             db_insert("teklifler", {
                 "musteri_id": int(secili_musteri["id"]) if secili_musteri is not None else 0,
                 "musteri_adi": hedef_musteri,
@@ -2615,6 +2777,7 @@ elif aktif == "teklif":
 
 # ── EXCEL AKTAR ──────────────────────────────────────────────────────────────
 elif aktif == "excel":
+    sayfa_log("excel")
     import io
 
     st.markdown("## 📥 Excel ile Toplu Veri Aktarımı")
@@ -3125,6 +3288,7 @@ elif aktif == "analiz":
 
 # ── KOD DEPOSU (sadece admin) ─────────────────────────────────────────────────
 elif aktif == "koddepo":
+    sayfa_log("koddepo")
     if st.session_state.get("rol") != "admin":
         st.error("Bu sayfa sadece adminlere özeldir.")
         st.stop()
@@ -3501,6 +3665,7 @@ elif aktif == "whatsapp":
 
 # ── TELEFON KİŞİLER ──────────────────────────────────────────────────────────
 elif aktif == "kisiler":
+    sayfa_log("kisiler")
     import re as _re_kis
     st.markdown("## 📞 Telefon Kişiler & Rehber")
 
@@ -3727,6 +3892,7 @@ elif aktif == "kisiler":
             k_kaynak  = ke1.selectbox("Kaynak", ["Manuel","Sistem Müşterisi","Referans","Soğuk Arama","Diğer"])
             if st.form_submit_button("💾 Kişiyi Kaydet", use_container_width=True, type="primary"):
                 if k_ad and k_tel:
+                    kullanici_log_kaydet("KİŞİ_EKLE", "kisiler", f"Kişi: {k_ad}, Firma: {k_firma}")
                     db_insert("kisiler", {
                         "ad":k_ad,"soyad":k_soyad,"telefon":k_tel,"email":k_email,
                         "firma":k_firma,"gorev":k_gorev,"bolge":k_bolge,
@@ -3876,6 +4042,7 @@ elif aktif == "kisiler":
 
 
 elif aktif == "randevu":
+    sayfa_log("randevu")
     import io as _rio
     st.markdown("## 📅 Randevular & Ziyaret Planı")
 
@@ -4055,6 +4222,7 @@ elif aktif == "randevu":
                                         f"Önce mevcut randevuyu tamamlayın veya iptal edin.")
                                 st.stop()
 
+                    kullanici_log_kaydet("RANDEVU_EKLE", "randevu", f"Müşteri: {musteri_adi}, Tarih: {rand_tarih}")
                     db_insert("randevular", {
                         "randevu_tarihi": str(rand_tarih),
                         "randevu_saati": str(rand_saat),
@@ -4163,6 +4331,7 @@ elif aktif == "randevu":
 
 # ── SİSTEM MESAJLAŞMA ────────────────────────────────────────────────────────
 elif aktif == "mesajlar":
+    sayfa_log("mesajlar")
     st.markdown("## 💬 Sistem İçi Mesajlaşma")
 
     ben = st.session_state.get("kullanici","")
@@ -4265,6 +4434,7 @@ elif aktif == "mesajlar":
 
 # ── ADMİN RAPOR TASARIM ──────────────────────────────────────────────────────
 elif aktif == "admin_rapor":
+    sayfa_log("admin_rapor")
 
     import json as _arj
     import io as _ario
@@ -4613,7 +4783,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v4.4 &nbsp;|&nbsp; "
+    "MWCRMPRO v4.5 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
