@@ -1135,7 +1135,6 @@ elif aktif == "liste":
     import json as _json_ls
     try:
         _kv = edited_df.copy()
-        # aciklama kolonu yoksa boş ekle
         if "aciklama" not in _kv.columns:
             _kv["aciklama"] = ""
         _kv["aciklama"] = _kv["aciklama"].fillna("").astype(str).replace("nan","")
@@ -1283,6 +1282,67 @@ elif aktif == "liste":
                 try: db_read.clear()
                 except: pass
                 st.success("✅ Silindi!"); st.rerun()
+
+    st.divider()
+
+    # ── 📨 NOT ARŞİVİ — tıkla aç ─────────────────────────────────────────────
+    st.markdown("#### 📨 Firma Not Arşivi")
+    st.caption("Açıklama sütununa yaz → Kaydet → not arşivlenir. Aşağıdan firmayı seç → notlarını gör.")
+
+    # Not olan firmaları getir
+    _df_notlu = pd.DataFrame()
+    if sb_liste:
+        try:
+            _rn = sb_liste.table("cari_aciklamalar").select("cari_id, cari_adi").execute()
+            if _rn.data:
+                import collections as _col
+                _sayac = _col.Counter([(r["cari_id"], r["cari_adi"]) for r in _rn.data])
+                _df_notlu = pd.DataFrame([
+                    {"cari_id": k[0], "firma": k[1], "not_sayi": v}
+                    for k, v in _sayac.items()
+                ]).sort_values("not_sayi", ascending=False)
+        except:
+            pass
+
+    if _df_notlu.empty:
+        st.info("Henüz arşivlenmiş not yok. Açıklama sütununa yaz ve kaydet.")
+    else:
+        # Firma seç
+        _firma_opts = [f"📨{r['not_sayi']}  {r['firma']}" for _, r in _df_notlu.iterrows()]
+        _sec = st.selectbox("Firma seç:", _firma_opts, key="not_arsiv_sec")
+        _sec_idx = _firma_opts.index(_sec)
+        _sec_cari_id = int(_df_notlu.iloc[_sec_idx]["cari_id"])
+        _sec_firma = str(_df_notlu.iloc[_sec_idx]["firma"])
+
+        # Seçili firmanın notlarını çek
+        try:
+            _rnotlar = sb_liste.table("cari_aciklamalar").select("*").eq("cari_id", _sec_cari_id).order("tarih", desc=True).execute()
+            _df_notlar = pd.DataFrame(_rnotlar.data) if _rnotlar.data else pd.DataFrame()
+        except:
+            _df_notlar = pd.DataFrame()
+
+        st.markdown(f"**{_sec_firma} — {len(_df_notlar)} not:**")
+
+        if not _df_notlar.empty:
+            for _, _nr in _df_notlar.iterrows():
+                _nid   = _nr.get("id", 0)
+                _ntarih = str(_nr.get("tarih",""))[:16]
+                _nkim  = str(_nr.get("olusturan",""))
+                _nmetin = str(_nr.get("aciklama",""))
+                _nozet = _nmetin[:60] + ("..." if len(_nmetin)>60 else "")
+                with st.expander(f"📅 {_ntarih}  👤 {_nkim}  —  {_nozet}"):
+                    st.markdown(
+                        f"<div style='background:#f0f4ff;border-left:4px solid #1f6feb;"
+                        f"padding:12px 16px;border-radius:6px;line-height:1.7'>"
+                        f"{_nmetin.replace(chr(10),'<br>')}"
+                        f"</div>",
+                        unsafe_allow_html=True
+                    )
+                    if st.button("🗑️ Sil", key=f"narsil_{_nid}"):
+                        try:
+                            sb_liste.table("cari_aciklamalar").delete().eq("id", int(_nid)).execute()
+                            st.rerun()
+                        except: pass
 
     st.divider()
 
