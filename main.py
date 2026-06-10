@@ -387,6 +387,11 @@ def init_db():
             tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             kisi_id INTEGER, kisi_adi TEXT, telefon TEXT,
             sablon_adi TEXT, mesaj TEXT, gonderen TEXT)""",
+        """CREATE TABLE IF NOT EXISTS cari_aciklamalar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            cari_id INTEGER, cari_adi TEXT,
+            aciklama TEXT, olusturan TEXT)""",
         """CREATE TABLE IF NOT EXISTS randevular (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -1015,6 +1020,92 @@ elif aktif == "liste":
                 try: db_read.clear()
                 except: pass
                 st.success("Arşive gönderildi!"); st.rerun()
+
+            # ── AÇIKLAMA GEÇMİŞİ ──────────────────────────────────────────────
+            st.markdown("---")
+            st.markdown("#### 📝 Açıklamalar")
+
+            # Mevcut açıklamaları yükle
+            try:
+                df_ac = db_read("cari_aciklamalar",
+                    extra_sql=f"WHERE cari_id={kart_id} ORDER BY tarih DESC")
+            except:
+                df_ac = pd.DataFrame()
+
+            # Yeni açıklama ekle
+            with st.form(key=f"ac_form_{kart_id}"):
+                yeni_ac = st.text_area("✍️ Yeni Açıklama:", height=80,
+                    placeholder="Bugün görüştük, teklif istediler...")
+                if st.form_submit_button("💾 Açıklama Kaydet", use_container_width=True, type="primary"):
+                    if yeni_ac.strip():
+                        _ac_data = {
+                            "cari_id": kart_id,
+                            "cari_adi": str(kart_row.get("firma","")),
+                            "aciklama": yeni_ac.strip(),
+                            "olusturan": st.session_state.get("kullanici",""),
+                        }
+                        ok_ac = False
+                        if sb_liste:
+                            try:
+                                sb_liste.table("cari_aciklamalar").insert(_ac_data).execute()
+                                ok_ac = True
+                            except:
+                                pass
+                        if not ok_ac:
+                            try:
+                                conn_ac = get_conn()
+                                conn_ac.execute(
+                                    "CREATE TABLE IF NOT EXISTS cari_aciklamalar "
+                                    "(id INTEGER PRIMARY KEY AUTOINCREMENT, "
+                                    "tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
+                                    "cari_id INTEGER, cari_adi TEXT, aciklama TEXT, olusturan TEXT)")
+                                conn_ac.execute(
+                                    "INSERT INTO cari_aciklamalar (cari_id,cari_adi,aciklama,olusturan) VALUES (?,?,?,?)",
+                                    (kart_id, str(kart_row.get("firma","")), yeni_ac.strip(), st.session_state.get("kullanici","")))
+                                conn_ac.commit(); conn_ac.close()
+                                ok_ac = True
+                            except: pass
+                        try: db_read.clear()
+                        except: pass
+                        if ok_ac:
+                            st.success("✅ Açıklama kaydedildi!"); st.rerun()
+                        else:
+                            st.error("Kaydedilemedi!")
+                    else:
+                        st.warning("Açıklama boş olamaz!")
+
+            # Geçmiş açıklamalar listesi
+            if df_ac.empty:
+                st.info("Henüz açıklama yok.")
+            else:
+                st.caption(f"**{len(df_ac)} açıklama**")
+                for _, ac_row in df_ac.iterrows():
+                    ac1, ac2 = st.columns([5, 1])
+                    tarih_str = str(ac_row.get("tarih",""))[:16]
+                    kullanici_str = str(ac_row.get("olusturan",""))
+                    with ac1:
+                        st.markdown(
+                            f"<div style='background:#f8f9fa;border-left:3px solid #1f6feb;"
+                            f"padding:8px 12px;border-radius:4px;margin:4px 0'>"
+                            f"<small style='color:#888'>📅 {tarih_str} &nbsp;|&nbsp; 👤 {kullanici_str}</small><br>"
+                            f"{ac_row.get('aciklama','')}"
+                            f"</div>",
+                            unsafe_allow_html=True
+                        )
+                    with ac2:
+                        if st.button("🗑️", key=f"acsil_{ac_row.get('id',0)}_{kart_id}",
+                                     help="Sil"):
+                            try:
+                                if sb_liste:
+                                    sb_liste.table("cari_aciklamalar").delete().eq("id", int(ac_row.get("id",0))).execute()
+                                else:
+                                    conn_acd = get_conn()
+                                    conn_acd.execute("DELETE FROM cari_aciklamalar WHERE id=?", (int(ac_row.get("id",0)),))
+                                    conn_acd.commit(); conn_acd.close()
+                                try: db_read.clear()
+                                except: pass
+                                st.rerun()
+                            except: pass
         except Exception as e:
             st.error(f"Kart hatası: {e}")
 
