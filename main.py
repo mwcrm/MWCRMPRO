@@ -1216,7 +1216,7 @@ elif aktif == "liste":
         "email":         st.column_config.TextColumn("Email"),
         "il":            st.column_config.TextColumn("İl"),
         "ilce":          st.column_config.TextColumn("İlçe"),
-        "durum":         st.column_config.SelectboxColumn("Durum", options=["Aktif","Hedef","Pasif"]),
+        "durum":         st.column_config.SelectboxColumn("Durum", options=["Aktif","Hedef","Pasif"] + st.session_state.get("ekstra_durumlar",[])),
         "temsilci":      st.column_config.TextColumn("Temsilci"),
         "islem_asamasi": st.column_config.SelectboxColumn("Aşama", options=tum_asama_opts),
         "aciklama":      st.column_config.TextColumn("Açıklama — yaz kaydet → arşivlenir", width="large"),
@@ -1607,38 +1607,134 @@ elif aktif == "liste":
     st.divider()
 
     # ── SAYFA RAPORU ─────────────────────────────────────────────────────────
-    with st.expander("📊 Sayfa Raporu", expanded=False):
-        rc1,rc2 = st.columns(2)
+    with st.expander("📊 Sayfa Raporu & Durum Yönetimi", expanded=False):
+
+        # ── ÜST METRİKLER ────────────────────────────────────────────────────
+        _df_aktif = df[df["silindi"].astype(str).isin(["0","False","","None"])] if "silindi" in df.columns else df
+        rm1,rm2,rm3,rm4 = st.columns(4)
+        rm1.metric("Toplam Aktif", len(_df_aktif))
+        rm2.metric("Beklenen Ciro", fmt_para(_df_aktif["beklenen_ciro"].sum()) if "beklenen_ciro" in _df_aktif.columns else "—")
+        rm3.metric("Gerçekleşen", fmt_para(_df_aktif["gerceklesen_ciro"].sum()) if "gerceklesen_ciro" in _df_aktif.columns else "—")
+        rm4.metric("Filtrede", len(df_f))
+
+        st.divider()
+        rc1, rc2 = st.columns(2)
+
+        # ── AŞAMA DAĞILIMI — veri olanlar gösterilir ────────────────────────
         with rc1:
             st.markdown("**🔄 Aşama Dağılımı:**")
-            if "islem_asamasi" in df.columns:
-                _rdf = df.groupby("islem_asamasi").agg(
-                    Adet=("firma","count"),
+            if "islem_asamasi" in _df_aktif.columns:
+                _rdf = _df_aktif[
+                    _df_aktif["islem_asamasi"].notna() &
+                    (_df_aktif["islem_asamasi"] != "") &
+                    (_df_aktif["islem_asamasi"] != "nan")
+                ].groupby("islem_asamasi").agg(
+                    Firma=("firma","count"),
                     Beklenen=("beklenen_ciro","sum"),
                     Gerceklesen=("gerceklesen_ciro","sum")
-                ).reset_index().sort_values("Adet",ascending=False)
-                _rdf["Beklenen"] = _rdf["Beklenen"].apply(fmt_para)
-                _rdf["Gerceklesen"] = _rdf["Gerceklesen"].apply(fmt_para)
-                st.dataframe(_rdf.rename(columns={"islem_asamasi":"Aşama"}), use_container_width=True, hide_index=True)
+                ).reset_index().sort_values("Firma", ascending=False)
+                if not _rdf.empty:
+                    _rdf["Başarı%"] = _rdf.apply(
+                        lambda r: f"%{r['Gerceklesen']/r['Beklenen']*100:.0f}" if r["Beklenen"]>0 else "—", axis=1)
+                    _rdf["Beklenen"]    = _rdf["Beklenen"].apply(fmt_para)
+                    _rdf["Gerceklesen"] = _rdf["Gerceklesen"].apply(fmt_para)
+                    st.dataframe(
+                        _rdf.rename(columns={"islem_asamasi":"Aşama","Firma":"Firma Sayısı"}),
+                        use_container_width=True, hide_index=True
+                    )
+                else:
+                    st.info("Aşama verisi yok")
+
+        # ── DURUM DAĞILIMI — veri olanlar + yönetim ────────────────────────
         with rc2:
-            st.markdown("**👤 Temsilci Dağılımı:**")
-            if "temsilci" in df.columns:
-                _tdf = df.groupby("temsilci").agg(Adet=("firma","count")).reset_index().sort_values("Adet",ascending=False).head(10)
-                st.dataframe(_tdf.rename(columns={"temsilci":"Temsilci"}), use_container_width=True, hide_index=True)
+            st.markdown("**📊 Durum Dağılımı:**")
+            if "durum" in _df_aktif.columns:
+                _ddf = _df_aktif[
+                    _df_aktif["durum"].notna() &
+                    (_df_aktif["durum"] != "") &
+                    (_df_aktif["durum"] != "nan")
+                ].groupby("durum").agg(
+                    Firma=("firma","count"),
+                    Beklenen=("beklenen_ciro","sum"),
+                    Gerceklesen=("gerceklesen_ciro","sum")
+                ).reset_index().sort_values("Firma", ascending=False)
+                if not _ddf.empty:
+                    _ddf["Beklenen"]    = _ddf["Beklenen"].apply(fmt_para)
+                    _ddf["Gerceklesen"] = _ddf["Gerceklesen"].apply(fmt_para)
+                    st.dataframe(
+                        _ddf.rename(columns={"durum":"Durum","Firma":"Firma Sayısı"}),
+                        use_container_width=True, hide_index=True
+                    )
+                else:
+                    st.info("Durum verisi yok")
+
+            # Durum yönetimi
+            st.markdown("**⚙️ Durum Ekle/Sil:**")
+            if "ekstra_durumlar" not in st.session_state:
+                st.session_state["ekstra_durumlar"] = []
+
+            # Mevcut durumlar
+            _varsayilan_durumlar = ["Aktif","Hedef","Pasif"]
+            _tum_durumlar = _varsayilan_durumlar.copy()
+            for _d in st.session_state["ekstra_durumlar"]:
+                if _d not in _tum_durumlar:
+                    _tum_durumlar.append(_d)
+
+            # Yeni durum ekle
+            _yd_col1, _yd_col2 = st.columns([3,1])
+            _yeni_durum = _yd_col1.text_input("Yeni durum:", placeholder="Örn: VIP, Potansiyel...", key="yeni_durum_inp")
+            if _yd_col2.button("➕ Ekle", key="durum_ekle_btn", use_container_width=True):
+                if _yeni_durum and _yeni_durum.strip() and _yeni_durum not in _tum_durumlar:
+                    st.session_state["ekstra_durumlar"].append(_yeni_durum.strip())
+                    st.success(f"✅ '{_yeni_durum}' eklendi!")
+                    st.rerun()
+
+            # Ekstra durumları sil
+            for _d in list(st.session_state["ekstra_durumlar"]):
+                _dc1, _dc2 = st.columns([4,1])
+                _adet = len(_df_aktif[_df_aktif["durum"]==_d]) if "durum" in _df_aktif.columns else 0
+                _dc1.caption(f"🔹 {_d} ({_adet} kayıt)")
+                if _adet == 0:  # Sadece veri yoksa silinebilir
+                    if _dc2.button("🗑️", key=f"durum_sil_{_d}"):
+                        st.session_state["ekstra_durumlar"].remove(_d)
+                        st.rerun()
+                else:
+                    _dc2.caption("—")  # Veri varsa silinemez
+
+        st.divider()
+
+        # ── TEMSİLCİ DAĞILIMI ────────────────────────────────────────────────
+        st.markdown("**👤 Temsilci Bazlı:**")
+        if "temsilci" in _df_aktif.columns:
+            _tdf = _df_aktif[
+                _df_aktif["temsilci"].notna() &
+                (_df_aktif["temsilci"] != "") &
+                (_df_aktif["temsilci"] != "nan")
+            ].groupby("temsilci").agg(
+                Firma=("firma","count"),
+                Beklenen=("beklenen_ciro","sum"),
+                Gerceklesen=("gerceklesen_ciro","sum")
+            ).reset_index().sort_values("Firma", ascending=False).head(10)
+            if not _tdf.empty:
+                _tdf["Beklenen"]    = _tdf["Beklenen"].apply(fmt_para)
+                _tdf["Gerceklesen"] = _tdf["Gerceklesen"].apply(fmt_para)
+                st.dataframe(_tdf.rename(columns={"temsilci":"Temsilci","Firma":"Firma Sayısı"}),
+                             use_container_width=True, hide_index=True)
+
+        # ── İL DAĞILIMI ───────────────────────────────────────────────────────
         st.markdown("**🗺️ İl Dağılımı:**")
-        if "il" in df.columns:
-            _idf = df.groupby("il").agg(Adet=("firma","count")).reset_index().sort_values("Adet",ascending=False).head(10)
-            st.dataframe(_idf.rename(columns={"il":"İl"}), use_container_width=True, hide_index=True)
-        st.markdown("**📝 Açıklamalı Kayıtlar:**")
-        if "aciklama" in df.columns:
-            _ndf = df[df["aciklama"].notna() & (df["aciklama"] != "") & (df["aciklama"] != "nan")]
-            st.caption(f"{len(_ndf)} kayıtta açıklama var")
-            if not _ndf.empty:
-                _gcols = [c for c in ["firma","yetkili","islem_asamasi","temsilci","aciklama"] if c in _ndf.columns]
-                st.dataframe(_ndf[_gcols].head(30), use_container_width=True, hide_index=True)
-        buf_rp = __import__("io").BytesIO()
-        df.to_excel(buf_rp, index=False); buf_rp.seek(0)
-        st.download_button("📥 Excel'e Aktar", data=buf_rp,
+        if "il" in _df_aktif.columns:
+            _idf = _df_aktif[
+                _df_aktif["il"].notna() & (_df_aktif["il"] != "") & (_df_aktif["il"] != "nan")
+            ].groupby("il").agg(Firma=("firma","count")).reset_index().sort_values("Firma",ascending=False).head(10)
+            if not _idf.empty:
+                st.dataframe(_idf.rename(columns={"il":"İl","Firma":"Firma Sayısı"}),
+                             use_container_width=True, hide_index=True)
+
+        # ── EXCEL ─────────────────────────────────────────────────────────────
+        _buf_rp = __import__("io").BytesIO()
+        df.to_excel(_buf_rp, index=False); _buf_rp.seek(0)
+        st.download_button("📥 Excel'e Aktar", data=_buf_rp,
             file_name=f"cari_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
             use_container_width=True, key="liste_excel_indir")
 
@@ -4821,7 +4917,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v4.8 &nbsp;|&nbsp; "
+    "MWCRMPRO v4.9 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
