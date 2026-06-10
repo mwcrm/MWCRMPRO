@@ -59,7 +59,7 @@ def get_kullanici_listesi():
     """2 dk cache'li kullanıcı listesi"""
     return db_read("kullanicilar", extra_sql="")
 
-@st.cache_data(ttl=120)
+@st.cache_data(ttl=0)
 def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
     """Supabase veya SQLite'dan DataFrame döner — 60sn cache"""
     sb = get_sb_client()
@@ -399,7 +399,7 @@ def init_db():
         for t in tables:
             try: conn.execute(t)
             except: pass
-        for col in ["olusturan TEXT", "beklenen_ciro REAL DEFAULT 0", "gerceklesen_ciro REAL DEFAULT 0"]:
+        for col in ["olusturan TEXT", "beklenen_ciro REAL DEFAULT 0", "gerceklesen_ciro REAL DEFAULT 0", "notlar TEXT DEFAULT ''"]:
             try: conn.execute(f"ALTER TABLE cari_kartlar ADD COLUMN {col}")
             except: pass
         conn.execute("UPDATE cari_kartlar SET silindi=0 WHERE silindi IS NULL")
@@ -1144,21 +1144,41 @@ elif aktif == "liste":
         with btn1:
             if st.button("💾 Değişiklikleri Kaydet", use_container_width=True, type="primary"):
                 kayit_sayi = 0
+                hatali = []
                 for _, row in edited_df.iterrows():
-                    if row.get("id"):
-                        db_update("cari_kartlar", {
-                            "firma": row.get("firma"), "yetkili": row.get("yetkili"),
-                            "gsm": row.get("gsm"), "sabit": row.get("sabit"),
-                            "email": row.get("email"), "il": row.get("il"),
-                            "ilce": row.get("ilce"), "durum": row.get("durum"),
-                            "temsilci": row.get("temsilci"),
-                            "islem_asamasi": row.get("islem_asamasi"),
-                            "notlar": row.get("notlar","")
-                        }, "id", row.get("id"))
-                        kayit_sayi += 1
+                    rid = row.get("id")
+                    if rid and str(rid) not in ["nan","None",""]:
+                        try:
+                            guncelle_data = {
+                                "firma": str(row.get("firma","") or ""),
+                                "yetkili": str(row.get("yetkili","") or ""),
+                                "gsm": str(row.get("gsm","") or ""),
+                                "sabit": str(row.get("sabit","") or ""),
+                                "email": str(row.get("email","") or ""),
+                                "il": str(row.get("il","") or ""),
+                                "ilce": str(row.get("ilce","") or ""),
+                                "durum": str(row.get("durum","") or ""),
+                                "temsilci": str(row.get("temsilci","") or ""),
+                                "islem_asamasi": str(row.get("islem_asamasi","") or ""),
+                            }
+                            # notlar alanı ayrıca dene — kolon yoksa hata vermesin
+                            notlar_val = str(row.get("notlar","") or "")
+                            try:
+                                db_update("cari_kartlar", {**guncelle_data, "notlar": notlar_val}, "id", int(rid))
+                            except:
+                                db_update("cari_kartlar", guncelle_data, "id", int(rid))
+                            kayit_sayi += 1
+                        except Exception as e_row:
+                            hatali.append(str(rid))
+                # Cache'i TAMAMEN temizle — rerun öncesi şart
                 try: db_read.clear()
                 except: pass
-                st.success(f"✅ {kayit_sayi} kayıt güncellendi!")
+                try: get_cari_listesi.clear()
+                except: pass
+                if kayit_sayi > 0:
+                    st.success(f"✅ {kayit_sayi} kayıt kaydedildi!")
+                if hatali:
+                    st.warning(f"⚠️ Şu ID'ler kaydedilemedi: {', '.join(hatali)}")
                 st.rerun()
 
         with btn2:
@@ -1187,7 +1207,58 @@ elif aktif == "liste":
 
         st.divider()
 
-        # ── AŞAMA BAZLI SAYFALAR ──────────────────────────────────────────────
+        # ── SAYFA RAPORU ───────────────────────────────────────────────────────
+        with st.expander("📊 Bu Sayfada Ne Var — Anlık Rapor", expanded=False):
+            r1,r2,r3,r4,r5 = st.columns(5)
+            r1.metric("Toplam Aktif", len(df))
+            r2.metric("Aktif Durum", len(df[df["durum"]=="Aktif"]) if "durum" in df.columns else 0)
+            r3.metric("Hedef", len(df[df["durum"]=="Hedef"]) if "durum" in df.columns else 0)
+            r4.metric("Pasif", len(df[df["durum"]=="Pasif"]) if "durum" in df.columns else 0)
+            r5.metric("Filtrede", len(df_filtered))
+
+            st.divider()
+            col_r1, col_r2 = st.columns(2)
+
+            with col_r1:
+                st.markdown("**🔄 Aşama Dağılımı:**")
+                if "islem_asamasi" in df.columns:
+                    asama_dag = df.groupby("islem_asamasi").agg(
+                        Adet=("firma","count"),
+                        Beklenen=("beklenen_ciro","sum"),
+                        Gerceklesen=("gerceklesen_ciro","sum")
+                    ).reset_index().sort_values("Adet",ascending=False)
+                    asama_dag["Beklenen"] = asama_dag["beklenen_ciro"].apply(fmt_para) if "beklenen_ciro" in asama_dag.columns else asama_dag["Beklenen"].apply(fmt_para)
+                    asama_dag["Gerceklesen"] = asama_dag["gerceklesen_ciro"].apply(fmt_para) if "gerceklesen_ciro" in asama_dag.columns else asama_dag["Gerceklesen"].apply(fmt_para)
+                    st.dataframe(asama_dag[["islem_asamasi","Adet","Beklenen","Gerceklesen"]].rename(columns={"islem_asamasi":"Aşama"}), use_container_width=True, hide_index=True)
+
+            with col_r2:
+                st.markdown("**👤 Temsilci Dağılımı:**")
+                if "temsilci" in df.columns:
+                    tem_dag = df.groupby("temsilci").agg(Adet=("firma","count")).reset_index().sort_values("Adet",ascending=False).head(10)
+                    st.dataframe(tem_dag.rename(columns={"temsilci":"Temsilci"}), use_container_width=True, hide_index=True)
+
+            st.divider()
+            st.markdown("**🗺️ İl Dağılımı (Top 10):**")
+            if "il" in df.columns:
+                il_dag = df.groupby("il").agg(Adet=("firma","count")).reset_index().sort_values("Adet",ascending=False).head(10)
+                st.dataframe(il_dag.rename(columns={"il":"İl"}), use_container_width=True, hide_index=True)
+
+            st.divider()
+            st.markdown("**📝 Açıklaması Olan Kayıtlar:**")
+            if "notlar" in df.columns:
+                df_notlu = df[df["notlar"].notna() & (df["notlar"] != "") & (df["notlar"] != "nan")]
+                st.caption(f"{len(df_notlu)} kayıtta açıklama var")
+                if not df_notlu.empty:
+                    gos = [c for c in ["firma","yetkili","islem_asamasi","temsilci","notlar"] if c in df_notlu.columns]
+                    st.dataframe(df_notlu[gos].head(20), use_container_width=True, hide_index=True)
+
+            # Excel indir
+            buf_liste = __import__('io').BytesIO()
+            df.to_excel(buf_liste, index=False)
+            buf_liste.seek(0)
+            st.download_button("📥 Tüm Listeyi Excel'e Aktar", data=buf_liste,
+                file_name=f"cari_liste_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                use_container_width=True)
         st.markdown("### 📂 Aşama Bazlı Sayfalar")
         st.caption("Her aşamanın kendi sayfası — aşama seçilince o aşamadaki kartlar otomatik gelir")
 
