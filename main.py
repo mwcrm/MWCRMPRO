@@ -624,7 +624,7 @@ def get_menu_tercihi(kullanici):
                 kayitli = _menu_json.loads(res.data[0]["deger"])
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
-                    tam_liste += ["kullanici","koddepo","admin_rapor","admin_rapor"]
+                    tam_liste += ["kullanici","koddepo","admin_rapor"]
                 for t in tam_liste:
                     if t not in kayitli:
                         kayitli.append(t)
@@ -640,7 +640,7 @@ def get_menu_tercihi(kullanici):
                 kayitli = _menu_json.loads(row[0])
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
-                    tam_liste += ["kullanici","koddepo","admin_rapor","admin_rapor"]
+                    tam_liste += ["kullanici","koddepo","admin_rapor"]
                 for t in tam_liste:
                     if t not in kayitli:
                         kayitli.append(t)
@@ -649,7 +649,7 @@ def get_menu_tercihi(kullanici):
     except: pass
     tam_liste = _TAB_LISTESI_DEFAULT.copy()
     if st.session_state.get("rol") == "admin":
-        tam_liste += ["kullanici","koddepo","admin_rapor","admin_rapor"]
+        tam_liste += ["kullanici","koddepo","admin_rapor"]
     return tam_liste
 
 def save_menu_tercihi(kullanici, sira):
@@ -670,6 +670,12 @@ def save_menu_tercihi(kullanici, sira):
     except: pass
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
+
+# Giriş kontrolü
+if not st.session_state.get("giris", False):
+    giris_ekrani()
+    st.stop()
+
 with st.sidebar:
     st.markdown("## 🏢 MWCRMPRO")
     st.caption(f"👤 {st.session_state.get('kullanici','')} | {st.session_state.get('rol','')}")
@@ -682,7 +688,7 @@ with st.sidebar:
     # ── MENÜ LİSTESİ ──────────────────────────────────────────────────────────
     _sb_liste = get_menu_tercihi(st.session_state["kullanici"])
     if st.session_state.get("rol") == "admin":
-        for _t in ["kullanici","koddepo","admin_rapor","admin_rapor"]:
+        for _t in ["kullanici","koddepo","admin_rapor"]:
             if _t not in _sb_liste:
                 _sb_liste.append(_t)
     # Yetki filtresi
@@ -737,7 +743,7 @@ with st.sidebar:
                     save_menu_tercihi(st.session_state["kullanici"], yeni_s)
                     st.rerun()
             if st.button("↺ Sıfırla", use_container_width=True):
-                save_menu_tercihi(st.session_state["kullanici"], _TAB_LISTESI_DEFAULT.copy() + ["kullanici","koddepo","admin_rapor","admin_rapor"])
+                save_menu_tercihi(st.session_state["kullanici"], _TAB_LISTESI_DEFAULT.copy() + ["kullanici","koddepo","admin_rapor"])
                 st.rerun()
 
         with st.expander("📢 Duyuru"):
