@@ -615,8 +615,15 @@ _TAB_ETIKETLER = {
 }
 
 def get_menu_tercihi(kullanici):
+    def _temizle(liste):
+        """Duplicate'leri temizle, sıralamasını koru"""
+        goruldu = []
+        for t in liste:
+            if t not in goruldu:
+                goruldu.append(t)
+        return goruldu
+
     try:
-        # Supabase veya SQLite'dan oku
         sb_m = get_sb_client()
         if sb_m:
             res = sb_m.table("kullanici_tercih").select("deger").eq("kullanici", kullanici).eq("anahtar","menu_sirasi").execute()
@@ -625,11 +632,12 @@ def get_menu_tercihi(kullanici):
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
                     tam_liste += ["kullanici","koddepo","admin_rapor"]
+                tam_liste = _temizle(tam_liste)
                 for t in tam_liste:
                     if t not in kayitli:
                         kayitli.append(t)
                 kayitli = [t for t in kayitli if t in tam_liste]
-                return kayitli
+                return _temizle(kayitli)
         else:
             conn = get_conn()
             conn.execute("CREATE TABLE IF NOT EXISTS kullanici_tercih (id INTEGER PRIMARY KEY AUTOINCREMENT, kullanici TEXT, anahtar TEXT, deger TEXT, UNIQUE(kullanici, anahtar))")
@@ -641,16 +649,17 @@ def get_menu_tercihi(kullanici):
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
                     tam_liste += ["kullanici","koddepo","admin_rapor"]
+                tam_liste = _temizle(tam_liste)
                 for t in tam_liste:
                     if t not in kayitli:
                         kayitli.append(t)
                 kayitli = [t for t in kayitli if t in tam_liste]
-                return kayitli
+                return _temizle(kayitli)
     except: pass
     tam_liste = _TAB_LISTESI_DEFAULT.copy()
     if st.session_state.get("rol") == "admin":
         tam_liste += ["kullanici","koddepo","admin_rapor"]
-    return tam_liste
+    return _temizle(tam_liste)
 
 def save_menu_tercihi(kullanici, sira):
     try:
@@ -736,6 +745,12 @@ with st.sidebar:
     if st.session_state.get("rol") == "admin":
         with st.expander("🎛️ Menü Sırası"):
             mevcut_sira_m = get_menu_tercihi(st.session_state["kullanici"])
+            # Duplicate temizle
+            _goster = []
+            for _t in mevcut_sira_m:
+                if _t not in _goster:
+                    _goster.append(_t)
+            mevcut_sira_m = _goster
             for idx_m, tab_key in enumerate(mevcut_sira_m):
                 c1, c2, c3 = st.columns([4,1,1])
                 c1.caption(_TAB_ETIKETLER.get(tab_key, tab_key))
@@ -749,7 +764,7 @@ with st.sidebar:
                     yeni_s[idx_m], yeni_s[idx_m+1] = yeni_s[idx_m+1], yeni_s[idx_m]
                     save_menu_tercihi(st.session_state["kullanici"], yeni_s)
                     st.rerun()
-            if st.button("↺ Sıfırla", use_container_width=True):
+            if st.button("↺ Sıfırla", use_container_width=True, key="menu_sifirla"):
                 save_menu_tercihi(st.session_state["kullanici"], _TAB_LISTESI_DEFAULT.copy() + ["kullanici","koddepo","admin_rapor"])
                 st.rerun()
 
