@@ -707,6 +707,13 @@ with st.sidebar:
                 _sb_liste = [t for t in _sb_liste if t in _yj.loads(_yv)]
         except: pass
 
+    # Duplicate key'leri temizle
+    _sb_liste_temiz = []
+    for _t in _sb_liste:
+        if _t not in _sb_liste_temiz:
+            _sb_liste_temiz.append(_t)
+    _sb_liste = _sb_liste_temiz
+
     for _tab_key in _sb_liste:
         _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
         _aktif_mi = st.session_state["aktif_tab"] == _tab_key
