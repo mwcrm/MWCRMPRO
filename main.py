@@ -1023,87 +1023,108 @@ elif aktif == "liste":
 
             # ── AÇIKLAMA GEÇMİŞİ ──────────────────────────────────────────────
             st.markdown("---")
-            st.markdown("#### 📝 Açıklamalar")
-
-            # Mevcut açıklamaları yükle
+            
+            # Açıklamaları direkt Supabase'den çek (cache yok)
+            df_ac = pd.DataFrame()
             try:
-                df_ac = db_read("cari_aciklamalar",
-                    extra_sql=f"WHERE cari_id={kart_id} ORDER BY tarih DESC")
+                if sb_liste:
+                    _res_ac = sb_liste.table("cari_aciklamalar").select("*").eq("cari_id", kart_id).order("tarih", desc=True).execute()
+                    df_ac = pd.DataFrame(_res_ac.data) if _res_ac.data else pd.DataFrame()
+                else:
+                    conn_ac2 = get_conn()
+                    conn_ac2.execute("CREATE TABLE IF NOT EXISTS cari_aciklamalar (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP, cari_id INTEGER, cari_adi TEXT, aciklama TEXT, olusturan TEXT)")
+                    conn_ac2.commit()
+                    df_ac = pd.read_sql(f"SELECT * FROM cari_aciklamalar WHERE cari_id={kart_id} ORDER BY tarih DESC", conn_ac2)
+                    conn_ac2.close()
             except:
                 df_ac = pd.DataFrame()
 
-            # Yeni açıklama ekle
-            with st.form(key=f"ac_form_{kart_id}"):
-                yeni_ac = st.text_area("✍️ Yeni Açıklama:", height=80,
-                    placeholder="Bugün görüştük, teklif istediler...")
-                if st.form_submit_button("💾 Açıklama Kaydet", use_container_width=True, type="primary"):
-                    if yeni_ac.strip():
-                        _ac_data = {
-                            "cari_id": kart_id,
-                            "cari_adi": str(kart_row.get("firma","")),
-                            "aciklama": yeni_ac.strip(),
-                            "olusturan": st.session_state.get("kullanici",""),
-                        }
-                        ok_ac = False
-                        if sb_liste:
-                            try:
-                                sb_liste.table("cari_aciklamalar").insert(_ac_data).execute()
-                                ok_ac = True
-                            except:
-                                pass
-                        if not ok_ac:
-                            try:
-                                conn_ac = get_conn()
-                                conn_ac.execute(
-                                    "CREATE TABLE IF NOT EXISTS cari_aciklamalar "
-                                    "(id INTEGER PRIMARY KEY AUTOINCREMENT, "
-                                    "tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP, "
-                                    "cari_id INTEGER, cari_adi TEXT, aciklama TEXT, olusturan TEXT)")
-                                conn_ac.execute(
-                                    "INSERT INTO cari_aciklamalar (cari_id,cari_adi,aciklama,olusturan) VALUES (?,?,?,?)",
-                                    (kart_id, str(kart_row.get("firma","")), yeni_ac.strip(), st.session_state.get("kullanici","")))
-                                conn_ac.commit(); conn_ac.close()
-                                ok_ac = True
-                            except: pass
-                        try: db_read.clear()
-                        except: pass
-                        if ok_ac:
-                            st.success("✅ Açıklama kaydedildi!"); st.rerun()
-                        else:
-                            st.error("Kaydedilemedi!")
-                    else:
-                        st.warning("Açıklama boş olamaz!")
+            # Kaç açıklama var — tıklanınca aç
+            ac_sayi = len(df_ac) if not df_ac.empty else 0
+            
+            col_ac1, col_ac2 = st.columns([3,2])
+            with col_ac1:
+                st.markdown(f"#### 📝 Notlar & Açıklamalar ({ac_sayi})")
+            with col_ac2:
+                yeni_ac_btn = st.button("✍️ Yeni Not Ekle", key=f"yeni_ac_btn_{kart_id}", use_container_width=True, type="primary")
 
-            # Geçmiş açıklamalar listesi
+            # Yeni not formu
+            if yeni_ac_btn:
+                st.session_state[f"yeni_ac_ac_{kart_id}"] = not st.session_state.get(f"yeni_ac_ac_{kart_id}", False)
+
+            if st.session_state.get(f"yeni_ac_ac_{kart_id}", False):
+                with st.form(key=f"ac_form_{kart_id}"):
+                    yeni_ac = st.text_area("✍️ Not/Açıklama:", height=100,
+                        placeholder="Örn: Bugün aradım, fiyat teklifini beğendiler. Önümüzdeki hafta toplantı yapacağız.")
+                    fc1, fc2 = st.columns(2)
+                    if fc1.form_submit_button("💾 Kaydet", use_container_width=True, type="primary"):
+                        if yeni_ac.strip():
+                            _ac_data = {
+                                "cari_id": kart_id,
+                                "cari_adi": str(kart_row.get("firma","")),
+                                "aciklama": yeni_ac.strip(),
+                                "olusturan": st.session_state.get("kullanici",""),
+                            }
+                            ok_ac = False
+                            if sb_liste:
+                                try:
+                                    sb_liste.table("cari_aciklamalar").insert(_ac_data).execute()
+                                    ok_ac = True
+                                except Exception as e_ac:
+                                    st.error(f"Supabase hata: {e_ac}")
+                            if not ok_ac:
+                                try:
+                                    conn_ac = get_conn()
+                                    conn_ac.execute("CREATE TABLE IF NOT EXISTS cari_aciklamalar (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP, cari_id INTEGER, cari_adi TEXT, aciklama TEXT, olusturan TEXT)")
+                                    conn_ac.execute("INSERT INTO cari_aciklamalar (cari_id,cari_adi,aciklama,olusturan) VALUES (?,?,?,?)",
+                                        (kart_id, str(kart_row.get("firma","")), yeni_ac.strip(), st.session_state.get("kullanici","")))
+                                    conn_ac.commit(); conn_ac.close()
+                                    ok_ac = True
+                                except Exception as e_ac2:
+                                    st.error(f"SQLite hata: {e_ac2}")
+                            if ok_ac:
+                                st.session_state[f"yeni_ac_ac_{kart_id}"] = False
+                                st.success("✅ Not kaydedildi!")
+                                st.rerun()
+                        else:
+                            st.warning("Not boş olamaz!")
+                    if fc2.form_submit_button("İptal", use_container_width=True):
+                        st.session_state[f"yeni_ac_ac_{kart_id}"] = False
+                        st.rerun()
+
+            # Geçmiş notlar
             if df_ac.empty:
-                st.info("Henüz açıklama yok.")
+                st.info("Henüz not yok. 'Yeni Not Ekle' butonuna tıklayın.")
             else:
-                st.caption(f"**{len(df_ac)} açıklama**")
-                for _, ac_row in df_ac.iterrows():
-                    ac1, ac2 = st.columns([5, 1])
+                # Tümünü göster / özet toggle
+                goster_tumu = st.checkbox(f"Tüm {ac_sayi} notu göster", key=f"ac_tum_{kart_id}", value=True)
+                goster_df = df_ac if goster_tumu else df_ac.head(3)
+                
+                for _, ac_row in goster_df.iterrows():
                     tarih_str = str(ac_row.get("tarih",""))[:16]
                     kullanici_str = str(ac_row.get("olusturan",""))
+                    ac_id = ac_row.get("id", 0)
+                    
+                    ac1, ac2 = st.columns([11, 1])
                     with ac1:
                         st.markdown(
-                            f"<div style='background:#f8f9fa;border-left:3px solid #1f6feb;"
-                            f"padding:8px 12px;border-radius:4px;margin:4px 0'>"
-                            f"<small style='color:#888'>📅 {tarih_str} &nbsp;|&nbsp; 👤 {kullanici_str}</small><br>"
-                            f"{ac_row.get('aciklama','')}"
+                            f"<div style='background:#f0f4ff;border-left:4px solid #1f6feb;"
+                            f"padding:10px 14px;border-radius:6px;margin:6px 0'>"
+                            f"<div style='font-size:0.78rem;color:#666;margin-bottom:4px'>"
+                            f"📅 <b>{tarih_str}</b> &nbsp;·&nbsp; 👤 {kullanici_str}</div>"
+                            f"<div style='font-size:0.95rem;color:#222'>{str(ac_row.get('aciklama','')).replace(chr(10),'<br>')}</div>"
                             f"</div>",
                             unsafe_allow_html=True
                         )
                     with ac2:
-                        if st.button("🗑️", key=f"acsil_{ac_row.get('id',0)}_{kart_id}",
-                                     help="Sil"):
+                        if st.button("🗑️", key=f"acsil_{ac_id}_{kart_id}", help="Sil"):
                             try:
                                 if sb_liste:
-                                    sb_liste.table("cari_aciklamalar").delete().eq("id", int(ac_row.get("id",0))).execute()
+                                    sb_liste.table("cari_aciklamalar").delete().eq("id", int(ac_id)).execute()
                                 else:
                                     conn_acd = get_conn()
-                                    conn_acd.execute("DELETE FROM cari_aciklamalar WHERE id=?", (int(ac_row.get("id",0)),))
+                                    conn_acd.execute("DELETE FROM cari_aciklamalar WHERE id=?", (int(ac_id),))
                                     conn_acd.commit(); conn_acd.close()
-                                try: db_read.clear()
-                                except: pass
                                 st.rerun()
                             except: pass
         except Exception as e:
