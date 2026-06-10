@@ -1024,89 +1024,87 @@ elif aktif == "liste":
             # ── NOT / AÇIKLAMA SİSTEMİ ────────────────────────────────────────
             st.markdown("---")
 
-            # Notları direkt Supabase'den çek — cache yok
+            # Notları Supabase'den çek
             df_ac = pd.DataFrame()
             try:
                 if sb_liste:
                     _res_ac = sb_liste.table("cari_aciklamalar").select("*").eq("cari_id", kart_id).order("tarih", desc=True).execute()
                     df_ac = pd.DataFrame(_res_ac.data) if _res_ac.data else pd.DataFrame()
                 else:
-                    _conn_ac0 = get_conn()
-                    _conn_ac0.execute("CREATE TABLE IF NOT EXISTS cari_aciklamalar (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP, cari_id INTEGER, cari_adi TEXT, aciklama TEXT, olusturan TEXT)")
-                    _conn_ac0.commit()
-                    df_ac = pd.read_sql(f"SELECT * FROM cari_aciklamalar WHERE cari_id={kart_id} ORDER BY tarih DESC", _conn_ac0)
-                    _conn_ac0.close()
+                    _c0 = get_conn()
+                    _c0.execute("CREATE TABLE IF NOT EXISTS cari_aciklamalar (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP, cari_id INTEGER, cari_adi TEXT, aciklama TEXT, olusturan TEXT)")
+                    _c0.commit()
+                    df_ac = pd.read_sql(f"SELECT * FROM cari_aciklamalar WHERE cari_id={kart_id} ORDER BY tarih DESC", _c0)
+                    _c0.close()
             except:
                 df_ac = pd.DataFrame()
 
             ac_sayi = len(df_ac)
-            st.markdown(f"#### 📝 Notlar ({ac_sayi} kayıt)")
+            st.markdown(f"#### 📝 Açıklamalar ({ac_sayi})")
 
-            # ── YENİ NOT FORMU ─────────────────────────────────────────────────
+            # YENİ AÇIKLAMA FORMU — her zaman görünür, kaydet sonrası temizlenir
             with st.form(key=f"not_form_{kart_id}", clear_on_submit=True):
-                yeni_not_metni = st.text_area(
-                    "✍️ Yeni Not Yaz:",
-                    height=90,
-                    placeholder="Bugün aradım, toplantı istediler...",
-                )
-                if st.form_submit_button("💾 Notu Kaydet", use_container_width=True, type="primary"):
-                    if yeni_not_metni and yeni_not_metni.strip():
-                        _ac_veri = {
+                st.markdown("**✍️ Yeni Açıklama Yaz:**")
+                _yeni_not = st.text_area("", height=100,
+                    placeholder="Bugün aradım, fiyat teklifini beğendiler...",
+                    label_visibility="collapsed")
+                if st.form_submit_button("💾 Açıklamayı Kaydet", use_container_width=True, type="primary"):
+                    if _yeni_not and _yeni_not.strip():
+                        _veri = {
                             "cari_id":   kart_id,
                             "cari_adi":  str(kart_row.get("firma", "")),
-                            "aciklama":  yeni_not_metni.strip(),
+                            "aciklama":  _yeni_not.strip(),
                             "olusturan": st.session_state.get("kullanici", ""),
                         }
-                        _kaydedildi = False
+                        _ok = False
                         if sb_liste:
                             try:
-                                sb_liste.table("cari_aciklamalar").insert(_ac_veri).execute()
-                                _kaydedildi = True
-                            except Exception as _e_sb:
-                                st.error(f"Hata: {_e_sb}")
-                        if not _kaydedildi:
+                                sb_liste.table("cari_aciklamalar").insert(_veri).execute()
+                                _ok = True
+                            except Exception as _esb:
+                                st.error(f"Hata: {_esb}")
+                        if not _ok:
                             try:
-                                _c = get_conn()
-                                _c.execute("CREATE TABLE IF NOT EXISTS cari_aciklamalar (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP, cari_id INTEGER, cari_adi TEXT, aciklama TEXT, olusturan TEXT)")
-                                _c.execute("INSERT INTO cari_aciklamalar (cari_id,cari_adi,aciklama,olusturan) VALUES (?,?,?,?)",
-                                    (kart_id, str(kart_row.get("firma","")), yeni_not_metni.strip(), st.session_state.get("kullanici","")))
-                                _c.commit(); _c.close()
-                                _kaydedildi = True
-                            except Exception as _e_sq:
-                                st.error(f"Hata: {_e_sq}")
-                        if _kaydedildi:
-                            st.success("✅ Not kaydedildi!")
+                                _cx = get_conn()
+                                _cx.execute("CREATE TABLE IF NOT EXISTS cari_aciklamalar (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP, cari_id INTEGER, cari_adi TEXT, aciklama TEXT, olusturan TEXT)")
+                                _cx.execute("INSERT INTO cari_aciklamalar (cari_id,cari_adi,aciklama,olusturan) VALUES (?,?,?,?)",
+                                    (kart_id, str(kart_row.get("firma","")), _yeni_not.strip(), st.session_state.get("kullanici","")))
+                                _cx.commit(); _cx.close()
+                                _ok = True
+                            except Exception as _esq:
+                                st.error(f"Hata: {_esq}")
+                        if _ok:
+                            st.success("✅ Açıklama kaydedildi!")
                             st.rerun()
                     else:
-                        st.warning("⚠️ Not boş olamaz!")
+                        st.warning("Açıklama boş olamaz!")
 
-            # ── GEÇMİŞ NOTLAR — HER NOT TIKLAYINCA AÇILIR ─────────────────────
+            # KAYDEDİLMİŞ AÇIKLAMALAR — tıklayınca açılır okunur
             if df_ac.empty:
-                st.info("Henüz not yok.")
+                st.caption("Henüz açıklama yok.")
             else:
-                st.markdown(f"**📋 Geçmiş Notlar:**")
-                for _i, _ac in df_ac.iterrows():
-                    _ac_id     = _ac.get("id", 0)
-                    _ac_tarih  = str(_ac.get("tarih", ""))[:16]
-                    _ac_kim    = str(_ac.get("olusturan", ""))
-                    _ac_metin  = str(_ac.get("aciklama", ""))
-                    _ac_onizle = _ac_metin[:60] + ("..." if len(_ac_metin) > 60 else "")
-
-                    with st.expander(f"📅 {_ac_tarih}  ·  👤 {_ac_kim}  ·  {_ac_onizle}"):
+                st.markdown("**📋 Kayıtlı Açıklamalar — tıklayınca açılır:**")
+                for _, _ac in df_ac.iterrows():
+                    _id    = _ac.get("id", 0)
+                    _tarih = str(_ac.get("tarih", ""))[:16]
+                    _kim   = str(_ac.get("olusturan", ""))
+                    _metin = str(_ac.get("aciklama", ""))
+                    _ozet  = _metin[:70] + ("..." if len(_metin) > 70 else "")
+                    with st.expander(f"📅 {_tarih}  👤 {_kim}  —  {_ozet}"):
                         st.markdown(
                             f"<div style='background:#f0f4ff;border-left:4px solid #1f6feb;"
-                            f"padding:12px 16px;border-radius:6px;line-height:1.6'>"
-                            f"{_ac_metin.replace(chr(10),'<br>')}"
+                            f"padding:12px 16px;border-radius:6px;font-size:0.95rem;line-height:1.7'>"
+                            f"{_metin.replace(chr(10), '<br>')}"
                             f"</div>",
                             unsafe_allow_html=True
                         )
-                        if st.button("🗑️ Bu Notu Sil", key=f"acsil_{_ac_id}_{kart_id}"):
+                        if st.button("🗑️ Sil", key=f"acsil_{_id}_{kart_id}"):
                             try:
                                 if sb_liste:
-                                    sb_liste.table("cari_aciklamalar").delete().eq("id", int(_ac_id)).execute()
+                                    sb_liste.table("cari_aciklamalar").delete().eq("id", int(_id)).execute()
                                 else:
                                     _cd = get_conn()
-                                    _cd.execute("DELETE FROM cari_aciklamalar WHERE id=?", (int(_ac_id),))
+                                    _cd.execute("DELETE FROM cari_aciklamalar WHERE id=?", (int(_id),))
                                     _cd.commit(); _cd.close()
                                 st.rerun()
                             except: pass
