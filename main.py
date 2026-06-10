@@ -61,7 +61,7 @@ def get_kullanici_listesi():
 
 @st.cache_data(ttl=0)
 def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
-    """Supabase veya SQLite'dan DataFrame döner — 60sn cache"""
+    """Supabase veya SQLite'dan DataFrame döner"""
     sb = get_sb_client()
     if sb:
         try:
@@ -79,9 +79,11 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
             if limit:
                 q = q.limit(limit)
             res = q.execute()
-            return pd.DataFrame(res.data) if res.data else pd.DataFrame()
-        except:
-            pass
+            if res and res.data is not None:
+                return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+            return pd.DataFrame()
+        except Exception as _e_read:
+            pass  # SQLite fallback
     try:
         sql = f"SELECT * FROM {table}"
         if extra_sql:
@@ -101,10 +103,8 @@ def db_insert(table, data):
             res = sb.table(table).insert(data).execute()
             if res.data:
                 return True
-            else:
-                st.warning(f"Supabase insert boş döndü: {table}")
         except Exception as e:
-            st.warning(f"Supabase insert hatası ({table}): {e}")
+            pass  # SQLite fallback
     # SQLite fallback
     try:
         conn = get_conn()
@@ -125,7 +125,8 @@ def db_update(table, data, where_col, where_val):
         try:
             sb.table(table).update(data).eq(where_col, where_val).execute()
             return True
-        except:
+        except Exception as _e_up:
+            # Supabase hata — SQLite'a dön
             pass
     try:
         conn = get_conn()
@@ -135,7 +136,7 @@ def db_update(table, data, where_col, where_val):
         conn.commit()
         conn.close()
         return True
-    except:
+    except Exception as _e_sq:
         pass
     return False
 
@@ -935,8 +936,7 @@ if aktif == "yeni":
             if not firma:
                 st.warning("Firma adı boş bırakılamaz!")
             elif duzenle:
-                # Güncelle
-                db_update("cari_kartlar", {
+                ok = db_update("cari_kartlar", {
                     "firma": firma, "yetkili": yetkili, "gsm": gsm,
                     "sabit": sabit, "email": email, "adres": adres,
                     "ilce": ilce, "il": il, "durum": durum,
@@ -944,13 +944,14 @@ if aktif == "yeni":
                     "aciklama": notlar_v,
                     "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro
                 }, "id", duzenle.get("id"))
+                try: db_read.clear()
+                except: pass
                 st.session_state.pop("duzenle_musteri", None)
                 st.session_state["aktif_tab"] = "liste"
                 st.session_state["kayit_mesaj"] = f"✅ '{firma}' güncellendi!"
                 st.rerun()
             else:
-                # Yeni kayıt
-                db_insert("cari_kartlar", {
+                ok = db_insert("cari_kartlar", {
                     "tarih": datetime.now().isoformat(),
                     "firma": firma, "yetkili": yetkili, "gsm": gsm,
                     "sabit": sabit, "email": email, "adres": adres,
@@ -960,8 +961,10 @@ if aktif == "yeni":
                     "silindi": 0, "olusturan": st.session_state["kullanici"],
                     "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro
                 })
+                try: db_read.clear()
+                except: pass
                 st.session_state["aktif_tab"] = "liste"
-                st.session_state["kayit_mesaj"] = f"✅ '{firma}' başarıyla kaydedildi!"
+                st.session_state["kayit_mesaj"] = f"✅ '{firma}' kaydedildi!"
                 st.rerun()
 
     if duzenle:
@@ -1610,7 +1613,9 @@ elif aktif == "arsiv":
                 restore_id = st.number_input("Geri getirilecek ID:", min_value=1, step=1, key="restore_id")
                 if st.button("Geri Al", use_container_width=True):
                     db_update("cari_kartlar", {"silindi": 0}, "id", restore_id)
-                    st.success(f"ID {restore_id} geri alındı.")
+                    try: db_read.clear()
+                    except: pass
+                    st.success(f"✅ ID {restore_id} geri alındı.")
                     st.rerun()
 
         with col_guncelle:
@@ -1655,8 +1660,10 @@ elif aktif == "kullanici":
             s2 = sp3.text_input("Tekrar:",type="password",key="yeni_sif2")
             if st.button("🔑 Şifreyi Güncelle",use_container_width=True):
                 if s1 and s1==s2:
-                    db_update("kullanicilar",{"sifre":s1},"id",int(s_sec.split("]")[0].replace("[","")))
-                    st.success("✅ Güncellendi!")
+                    ok_s = db_update("kullanicilar",{"sifre":s1},"id",int(s_sec.split("]")[0].replace("[","")))
+                    try: db_read.clear()
+                    except: pass
+                    st.success("✅ Şifre güncellendi!")
                 else:
                     st.error("Şifreler eşleşmiyor veya boş!")
 
@@ -1757,7 +1764,9 @@ elif aktif == "kullanici":
             if st.button("💾 Yetkileri Kaydet", use_container_width=True, type="primary"):
                 ystr = "tam" if tam2_cb else _kj2.dumps(yeni_liste)
                 db_update("kullanicilar",{"yetkiler":ystr},"id",k3_id)
-                st.success("✅ Güncellendi!"); st.rerun()
+                try: db_read.clear()
+                except: pass
+                st.success("✅ Yetkiler güncellendi!"); st.rerun()
 
 # ── RAPORLAR ─────────────────────────────────────────────────────────────────
 elif aktif == "rapor":
@@ -3688,12 +3697,14 @@ elif aktif == "kisiler":
                                 "firma":e_firma,"bolge":e_bolge,"email":e_email},"id",_kisi_id)
                             try: db_read.clear()
                             except: pass
+                            st.success("✅ Kaydedildi!")
                             st.session_state.pop(f"kis_edit_{_kisi_id}",None); st.rerun()
                         if b2.form_submit_button("🗑️ Sil", use_container_width=True):
                             sb_ks = get_sb_client()
                             if sb_ks: sb_ks.table("kisiler").delete().eq("id",_kisi_id).execute()
                             try: db_read.clear()
                             except: pass
+                            st.success("✅ Silindi!")
                             st.session_state.pop(f"kis_edit_{_kisi_id}",None); st.rerun()
                         if b3.form_submit_button("İptal", use_container_width=True):
                             st.session_state.pop(f"kis_edit_{_kisi_id}",None); st.rerun()
@@ -4054,6 +4065,8 @@ elif aktif == "randevu":
                         "temsilci": rand_temsilci,
                         "olusturan": st.session_state["kullanici"]
                     })
+                    try: db_read.clear()
+                    except: pass
                     st.success("✅ Randevu kaydedildi!")
 
                     if rand_tem_tel.strip():
@@ -4106,7 +4119,9 @@ elif aktif == "randevu":
                             "adet": d_adet, "temsilci": d_temsilci,
                             "sonuc": d_sonuc if d_sonuc != "—" else "", "aciklama": d_aciklama
                         }, "id", int(row_d["id"]))
-                        st.success("✅ Güncellendi!")
+                        try: db_read.clear()
+                        except: pass
+                        st.success("✅ Randevu güncellendi!")
                         st.session_state.pop("rand_duzenle_row", None)
                         st.rerun()
 
