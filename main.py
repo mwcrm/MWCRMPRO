@@ -31,6 +31,20 @@ def get_sb_client():
         pass
     return None
 
+@st.cache_resource
+def get_sb_service():
+    """Supabase service_role client — log ve admin işlemler için"""
+    try:
+        from supabase import create_client
+        url = st.secrets.get("SUPABASE_URL","")
+        # Önce service key dene, yoksa normal key
+        key = st.secrets.get("SUPABASE_SERVICE_KEY","") or st.secrets.get("SUPABASE_KEY","")
+        if url and key:
+            return create_client(url, key)
+    except:
+        pass
+    return None
+
 def get_sb():
     return get_sb_client()
 
@@ -450,27 +464,30 @@ otomatik_yedek()
 
 # ── KULLANICI LOG FONKSİYONU ──────────────────────────────────────────────────
 def kullanici_log_kaydet(islem, sayfa="", detay=""):
-    """Her işlemi logla — Supabase'e yaz"""
+    """Her işlemi logla — service_role key ile Supabase'e yaz"""
     try:
-        _sb_log = get_sb_client()
-        if not _sb_log: return
         if not st.session_state.get("giris", False): return
+        _sb_log = get_sb_service()
+        if not _sb_log: return
         _sb_log.table("kullanici_log").insert({
-            "kullanici": st.session_state.get("kullanici", "?"),
-            "rol":       st.session_state.get("rol", "?"),
-            "sayfa":     sayfa or st.session_state.get("aktif_tab", ""),
-            "islem":     islem,
+            "kullanici": str(st.session_state.get("kullanici", "?")),
+            "rol":       str(st.session_state.get("rol", "?")),
+            "sayfa":     str(sayfa or st.session_state.get("aktif_tab", "")),
+            "islem":     str(islem),
             "detay":     str(detay)[:500],
         }).execute()
     except:
         pass
 
 def sayfa_log(sayfa):
-    """Sayfa ziyaretini logla — aynı sayfayı tekrar loglamaktan kaçın"""
-    _log_key = f"_logged_{sayfa}"
-    if not st.session_state.get(_log_key):
-        st.session_state[_log_key] = True
-        kullanici_log_kaydet("SAYFA_ZİYARET", sayfa, f"{sayfa} sayfası açıldı")
+    """Sayfa değişince logla — önceki sayfa farklıysa yaz"""
+    try:
+        _onceki = st.session_state.get("_son_sayfa", "")
+        if _onceki != sayfa:
+            st.session_state["_son_sayfa"] = sayfa
+            kullanici_log_kaydet("SAYFA_GİRİŞİ", sayfa, f"→ {sayfa}")
+    except:
+        pass
 
 
 def giris_ekrani():
@@ -876,6 +893,9 @@ with col_cik:
 
 st.divider()
 aktif = st.session_state["aktif_tab"]
+# ── OTOMATİK SAYFA TAKİBİ ───────────────────────────────────────────────────
+sayfa_log(aktif)
+
 
 # ── YENİ KART EKLE / DÜZENLE ─────────────────────────────────────────────────
 if aktif == "yeni":
@@ -1824,18 +1844,46 @@ elif aktif == "kullanici":
         st.markdown("### 📊 Kullanıcı Aktivite Logu")
         st.caption("Kim giriş yaptı, hangi sayfaya girdi, ne yaptı — tarih saat ile")
 
-        _sb_log = get_sb_client()
+        _sb_log = get_sb_service()
         _df_log = pd.DataFrame()
+        _log_hata = ""
 
         try:
             if _sb_log:
-                _r_log = _sb_log.table("kullanici_log").select("*").order("tarih", desc=True).limit(500).execute()
+                _r_log = _sb_log.table("kullanici_log").select("*").order("tarih", desc=True).limit(1000).execute()
                 _df_log = pd.DataFrame(_r_log.data) if _r_log.data else pd.DataFrame()
+            else:
+                _log_hata = "Supabase bağlantısı yok"
         except Exception as _e_log:
+            _log_hata = str(_e_log)
             st.error(f"Log yüklenemedi: {_e_log}")
 
+        # Test log butonu
+        col_test1, col_test2 = st.columns(2)
+        with col_test1:
+            if st.button("🔄 Logları Yenile", key="log_yenile", use_container_width=True):
+                kullanici_log_kaydet("LOG_SAYFASI_YENİLENDİ", "kullanici", "Admin log sayfasını yeniledi")
+                st.rerun()
+        with col_test2:
+            if st.button("🧪 Test Log Yaz", key="log_test", use_container_width=True):
+                try:
+                    _sb_log.table("kullanici_log").insert({
+                        "kullanici": st.session_state.get("kullanici","admin"),
+                        "rol": st.session_state.get("rol","admin"),
+                        "sayfa": "test",
+                        "islem": "TEST_LOG",
+                        "detay": "Manuel test logu yazıldı",
+                    }).execute()
+                    st.success("✅ Test logu yazıldı! Şimdi yenile.")
+                except Exception as _et:
+                    st.error(f"Test log hatası: {_et}")
+
+        if _log_hata:
+            st.warning(f"⚠️ {_log_hata}")
+
         if _df_log.empty:
-            st.info("Henüz log kaydı yok.")
+            st.warning("Log kaydı yok. 'Test Log Yaz' butonuna basıp 'Logları Yenile' dene.")
+            st.info("Eğer test logu da yazılmıyorsa Supabase'de tablo/izin sorunu var.")
         else:
             # Filtreler
             lf1, lf2, lf3, lf4 = st.columns(4)
@@ -4783,7 +4831,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v4.5 &nbsp;|&nbsp; "
+    "MWCRMPRO v4.7 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
