@@ -774,10 +774,45 @@ with st.sidebar:
                 d_i = st.text_area("İçerik:", height=50)
                 d_t = st.selectbox("Tip:", ["bilgi","uyari","hata"])
                 if st.form_submit_button("📢 Yayınla") and d_b:
-                    db_insert("duyurular", {"baslik":d_b,"icerik":d_i,"tip":d_t,
-                        "olusturan":st.session_state["kullanici"],"aktif":1})
-                    st.success("Yayınlandı!")
+                    _sb_d = get_sb_client()
+                    if _sb_d:
+                        try:
+                            _sb_d.table("duyurular").insert({
+                                "baslik":d_b,"icerik":d_i,"tip":d_t,
+                                "olusturan":st.session_state["kullanici"],"aktif":1
+                            }).execute()
+                            st.success("✅ Yayınlandı!")
+                        except Exception as _ed:
+                            st.error(f"Hata: {_ed}")
+                    else:
+                        db_insert("duyurular", {"baslik":d_b,"icerik":d_i,"tip":d_t,
+                            "olusturan":st.session_state["kullanici"],"aktif":1})
+                        st.success("✅ Yayınlandı!")
                     st.rerun()
+            # Mevcut duyuruları göster
+            try:
+                _sb_dy = get_sb_client()
+                if _sb_dy:
+                    _dy_res = _sb_dy.table("duyurular").select("*").eq("aktif",1).order("tarih",desc=True).execute()
+                    _df_dy = pd.DataFrame(_dy_res.data) if _dy_res.data else pd.DataFrame()
+                else:
+                    _df_dy = db_read("duyurular", extra_sql="WHERE aktif=1 ORDER BY tarih DESC")
+                if not _df_dy.empty:
+                    st.markdown("**Aktif Duyurular:**")
+                    for _, _dy in _df_dy.iterrows():
+                        _tip = _dy.get("tip","bilgi")
+                        _renk = "#1f6feb" if _tip=="bilgi" else "#ff9800" if _tip=="uyari" else "#f44336"
+                        st.markdown(
+                            f"<div style='border-left:4px solid {_renk};padding:6px 10px;margin:4px 0;background:#f8f9fa;border-radius:4px'>"
+                            f"<b>{_dy.get('baslik','')}</b> <small style='color:#888'>— {_tip}</small><br>"
+                            f"{_dy.get('icerik','')}</div>",
+                            unsafe_allow_html=True
+                        )
+                        if st.button("🗑️ Kaldır", key=f"dy_sil_{_dy.get('id',0)}"):
+                            if _sb_dy:
+                                _sb_dy.table("duyurular").update({"aktif":0}).eq("id",int(_dy.get("id",0))).execute()
+                            st.rerun()
+            except: pass
 
 # ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
 col_bas, col_kul, col_cik = st.columns([6, 2, 1])
@@ -4257,11 +4292,45 @@ elif aktif == "admin_rapor":
 
     _tum_veriler = _ar_veri_yukle()
 
-    # ── KAYITLI RAPORLAR ─────────────────────────────────────────────────────
-    if "ar_kayitli_raporlar" not in st.session_state:
-        st.session_state["ar_kayitli_raporlar"] = {}
-    if "ar_aktif_rapor" not in st.session_state:
-        st.session_state["ar_aktif_rapor"] = None
+    # ── KAYITLI RAPORLAR — Supabase'den yükle ────────────────────────────────
+    _ar_sb = get_sb_client()
+    _ar_kul = st.session_state.get("kullanici","admin")
+
+    def _ar_raporlari_yukle():
+        """Kayıtlı rapor tasarımlarını Supabase'den yükle"""
+        try:
+            if _ar_sb:
+                _res = _ar_sb.table("kullanici_tercih").select("deger").eq("kullanici", _ar_kul).eq("anahtar","rapor_tasarimlari").execute()
+                if _res.data:
+                    return _arj.loads(_res.data[0]["deger"])
+            else:
+                _c = get_conn()
+                _row = _c.execute("SELECT deger FROM kullanici_tercih WHERE kullanici=? AND anahtar='rapor_tasarimlari'", (_ar_kul,)).fetchone()
+                _c.close()
+                if _row: return _arj.loads(_row[0])
+        except: pass
+        return {}
+
+    def _ar_raporlari_kaydet(raporlar):
+        """Rapor tasarımlarını Supabase'e kaydet"""
+        try:
+            _veri = _arj.dumps(raporlar, ensure_ascii=False)
+            if _ar_sb:
+                _ar_sb.table("kullanici_tercih").upsert({
+                    "kullanici": _ar_kul,
+                    "anahtar": "rapor_tasarimlari",
+                    "deger": _veri
+                }, on_conflict="kullanici,anahtar").execute()
+            else:
+                _c = get_conn()
+                _c.execute("INSERT OR REPLACE INTO kullanici_tercih (kullanici,anahtar,deger) VALUES (?,?,?)",
+                    (_ar_kul, "rapor_tasarimlari", _veri))
+                _c.commit(); _c.close()
+            return True
+        except: return False
+
+    # Her zaman Supabase'den taze yükle
+    _kayitli_raporlar = _ar_raporlari_yukle()
 
     # Üst bar
     r_ust1, r_ust2, r_ust3, r_ust4 = st.columns([3,2,2,1])
@@ -4270,25 +4339,31 @@ elif aktif == "admin_rapor":
     with r_ust2:
         if st.button("💾 Bu Raporu Kaydet", use_container_width=True, type="primary", key="ar_kaydet_btn"):
             if _rapor_adi.strip():
-                st.session_state["ar_kayitli_raporlar"][_rapor_adi] = {
-                    "tablo":    st.session_state.get("ar_sec_tablo",""),
-                    "kolonlar": st.session_state.get("ar_sec_kolonlar",[]),
-                    "filtreler":st.session_state.get("ar_filtreler",{}),
-                    "siralama": st.session_state.get("ar_siralama",""),
-                    "siralama_yon": st.session_state.get("ar_siralama_yon", True),
+                _kayitli_raporlar[_rapor_adi.strip()] = {
+                    "tablo":       st.session_state.get("ar_sec_tablo",""),
+                    "kolonlar":    st.session_state.get("ar_sec_kolonlar",[]),
+                    "siralama":    st.session_state.get("ar_siralama",""),
+                    "siralama_yon":st.session_state.get("ar_siralama_yon", True),
                 }
-                st.success(f"✅ '{_rapor_adi}' kaydedildi!")
+                if _ar_raporlari_kaydet(_kayitli_raporlar):
+                    st.success(f"✅ '{_rapor_adi}' kaydedildi!")
+                    st.rerun()
+                else:
+                    st.error("Kaydedilemedi!")
+            else:
+                st.warning("Rapor adı girin!")
     with r_ust3:
-        _kayitli = list(st.session_state["ar_kayitli_raporlar"].keys())
-        if _kayitli:
-            _yukle_sec = st.selectbox("📂 Kayıtlı Rapor:", ["— Yeni —"] + _kayitli, key="ar_yukle_sec")
-            if _yukle_sec != "— Yeni —":
-                _r = st.session_state["ar_kayitli_raporlar"][_yukle_sec]
-                st.session_state["ar_sec_tablo"]   = _r.get("tablo","")
-                st.session_state["ar_sec_kolonlar"]= _r.get("kolonlar",[])
-                st.session_state["ar_filtreler"]   = _r.get("filtreler",{})
-                st.session_state["ar_siralama"]    = _r.get("siralama","")
-                st.session_state["ar_siralama_yon"]= _r.get("siralama_yon",True)
+        if _kayitli_raporlar:
+            _rapor_listesi = list(_kayitli_raporlar.keys())
+            _yukle_sec = st.selectbox("📂 Kayıtlı Rapor Yükle:", ["— Seçin —"] + _rapor_listesi, key="ar_yukle_sec")
+            if _yukle_sec != "— Seçin —":
+                _r = _kayitli_raporlar[_yukle_sec]
+                st.session_state["ar_sec_tablo"]    = _r.get("tablo","")
+                st.session_state["ar_sec_kolonlar"] = _r.get("kolonlar",[])
+                st.session_state["ar_siralama"]     = _r.get("siralama","")
+                st.session_state["ar_siralama_yon"] = _r.get("siralama_yon",True)
+        else:
+            st.caption("Henüz kayıtlı rapor yok")
     with r_ust4:
         if st.button("🔄 Yenile", use_container_width=True, key="ar_yenile"):
             _ar_veri_yukle.clear()
@@ -4500,14 +4575,16 @@ elif aktif == "admin_rapor":
                 st.info("Sayısal sütun yok.")
 
         # Kayıtlı raporlar listesi
-        if st.session_state["ar_kayitli_raporlar"]:
-            with st.expander(f"📂 Kayıtlı Raporlar ({len(st.session_state['ar_kayitli_raporlar'])})"):
-                for _rn, _rv in list(st.session_state["ar_kayitli_raporlar"].items()):
+        if _kayitli_raporlar:
+            with st.expander(f"📂 Kayıtlı Raporlar ({len(_kayitli_raporlar)})"):
+                for _rn in list(_kayitli_raporlar.keys()):
+                    _rv = _kayitli_raporlar[_rn]
                     _rc1, _rc2, _rc3 = st.columns([4,2,1])
-                    _rc1.markdown(f"**{_rn}** — {_rv.get('tablo','')}")
-                    _rc2.caption(f"{len(_rv.get('kolonlar',[]))} sütun")
+                    _rc1.markdown(f"**{_rn}**")
+                    _rc2.caption(f"{_rv.get('tablo','')}")
                     if _rc3.button("🗑️", key=f"ar_sil_{_rn}"):
-                        del st.session_state["ar_kayitli_raporlar"][_rn]
+                        del _kayitli_raporlar[_rn]
+                        _ar_raporlari_kaydet(_kayitli_raporlar)
                         st.rerun()
 
 
