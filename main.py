@@ -1042,46 +1042,43 @@ elif aktif == "liste":
             ac_sayi = len(df_ac)
             st.markdown(f"#### 📝 Notlar ({ac_sayi} kayıt)")
 
-            # ── YENİ NOT FORMU — HER ZAMAN GÖRÜNÜR ────────────────────────────
-            _not_key = f"not_text_{kart_id}"
-            yeni_not_metni = st.text_area(
-                "✍️ Yeni Not Yaz:",
-                height=90,
-                key=_not_key,
-                placeholder="Bugün aradım, toplantı istediler. Fiyatı beğendiler...",
-                label_visibility="visible"
-            )
-            if st.button("💾 Notu Kaydet", key=f"not_kaydet_{kart_id}", use_container_width=True, type="primary"):
-                _metin = st.session_state.get(_not_key, "").strip()
-                if _metin:
-                    _ac_veri = {
-                        "cari_id":   kart_id,
-                        "cari_adi":  str(kart_row.get("firma", "")),
-                        "aciklama":  _metin,
-                        "olusturan": st.session_state.get("kullanici", ""),
-                    }
-                    _kaydedildi = False
-                    if sb_liste:
-                        try:
-                            sb_liste.table("cari_aciklamalar").insert(_ac_veri).execute()
-                            _kaydedildi = True
-                        except Exception as _e_sb:
-                            st.error(f"Supabase hatası: {_e_sb}")
-                    if not _kaydedildi:
-                        try:
-                            _c = get_conn()
-                            _c.execute("CREATE TABLE IF NOT EXISTS cari_aciklamalar (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP, cari_id INTEGER, cari_adi TEXT, aciklama TEXT, olusturan TEXT)")
-                            _c.execute("INSERT INTO cari_aciklamalar (cari_id,cari_adi,aciklama,olusturan) VALUES (?,?,?,?)",
-                                (kart_id, str(kart_row.get("firma","")), _metin, st.session_state.get("kullanici","")))
-                            _c.commit(); _c.close()
-                            _kaydedildi = True
-                        except Exception as _e_sq:
-                            st.error(f"Kayıt hatası: {_e_sq}")
-                    if _kaydedildi:
-                        st.success("✅ Not kaydedildi!")
-                        st.rerun()
-                else:
-                    st.warning("⚠️ Not boş olamaz!")
+            # ── YENİ NOT FORMU ─────────────────────────────────────────────────
+            with st.form(key=f"not_form_{kart_id}", clear_on_submit=True):
+                yeni_not_metni = st.text_area(
+                    "✍️ Yeni Not Yaz:",
+                    height=90,
+                    placeholder="Bugün aradım, toplantı istediler...",
+                )
+                if st.form_submit_button("💾 Notu Kaydet", use_container_width=True, type="primary"):
+                    if yeni_not_metni and yeni_not_metni.strip():
+                        _ac_veri = {
+                            "cari_id":   kart_id,
+                            "cari_adi":  str(kart_row.get("firma", "")),
+                            "aciklama":  yeni_not_metni.strip(),
+                            "olusturan": st.session_state.get("kullanici", ""),
+                        }
+                        _kaydedildi = False
+                        if sb_liste:
+                            try:
+                                sb_liste.table("cari_aciklamalar").insert(_ac_veri).execute()
+                                _kaydedildi = True
+                            except Exception as _e_sb:
+                                st.error(f"Hata: {_e_sb}")
+                        if not _kaydedildi:
+                            try:
+                                _c = get_conn()
+                                _c.execute("CREATE TABLE IF NOT EXISTS cari_aciklamalar (id INTEGER PRIMARY KEY AUTOINCREMENT, tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP, cari_id INTEGER, cari_adi TEXT, aciklama TEXT, olusturan TEXT)")
+                                _c.execute("INSERT INTO cari_aciklamalar (cari_id,cari_adi,aciklama,olusturan) VALUES (?,?,?,?)",
+                                    (kart_id, str(kart_row.get("firma","")), yeni_not_metni.strip(), st.session_state.get("kullanici","")))
+                                _c.commit(); _c.close()
+                                _kaydedildi = True
+                            except Exception as _e_sq:
+                                st.error(f"Hata: {_e_sq}")
+                        if _kaydedildi:
+                            st.success("✅ Not kaydedildi!")
+                            st.rerun()
+                    else:
+                        st.warning("⚠️ Not boş olamaz!")
 
             # ── GEÇMİŞ NOTLAR — HER NOT TIKLAYINCA AÇILIR ─────────────────────
             if df_ac.empty:
