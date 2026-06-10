@@ -599,7 +599,7 @@ def parse_para(s):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "teklif", "kisiler", "rapor", "excel", "arsiv", "mesajlar", "kullanici"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "teklif", "kisiler", "rapor", "excel", "arsiv", "mesajlar", "kullanici", "admin_rapor"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -612,7 +612,7 @@ _TAB_ETIKETLER = {
     "kullanici": "👥 Kullanıcı Yönetimi",
     "koddepo": "💾 Kod Deposu",
     "mesajlar": "💬 Mesajlar",
-    "admin_rapor": "🧩 Admin Rapor Tasarım",
+    "admin_rapor": "📊 Rapor Tasarla",
 }
 
 def get_menu_tercihi(kullanici):
@@ -4265,15 +4265,12 @@ elif aktif == "mesajlar":
 
 # ── ADMİN RAPOR TASARIM ──────────────────────────────────────────────────────
 elif aktif == "admin_rapor":
-    if st.session_state.get("rol") != "admin":
-        st.error("Bu sayfa sadece adminlere özeldir.")
-        st.stop()
 
     import json as _arj
     import io as _ario
 
-    st.markdown("## 🧩 Admin Rapor Tasarım Merkezi v4.2")
-    st.caption("Veri kaynağı seç · Sütun/filtre/sıralama ayarla · Rapor adı ver · Kaydet · Yenile")
+    st.markdown("## 📊 Rapor Tasarla")
+    st.caption("Veri kaynağı seç → Sütunları seç → Filtrele → Sırala → Kaydet → Excel/CSV indir")
 
     _ar_sb  = get_sb_client()
     _ar_kul = st.session_state.get("kullanici", "admin")
@@ -4312,7 +4309,7 @@ elif aktif == "admin_rapor":
             st.error(f"Kayıt hatası: {_e}")
             return False
 
-    # ── VERİ YÜKLE ───────────────────────────────────────────────────────────
+    # ── VERİ YÜKLE — CACHE YOK, HER ZAMAN TAZE ──────────────────────────────
     _TABLOLAR = {
         "🏢 Cari Kartlar":    "cari_kartlar",
         "📅 Randevular":      "randevular",
@@ -4322,21 +4319,52 @@ elif aktif == "admin_rapor":
         "📋 İşlem Kayıtları": "islem_kaydi",
         "👥 Kullanıcılar":    "kullanicilar",
         "👔 Temsilciler":     "temsilciler",
+        "📬 Mesajlar":        "mesajlar",
+        "📢 Duyurular":       "duyurular",
+    }
+
+    # Sütun başlıkları sözlüğü — tüm tablolardan
+    _KOLON_BASLIKLARI = {
+        # Cari kartlar
+        "id":"ID", "firma":"Firma Adı", "yetkili":"Yetkili", "gsm":"GSM",
+        "sabit":"Sabit Tel", "email":"Email", "adres":"Adres",
+        "il":"İl", "ilce":"İlçe", "durum":"Durum", "temsilci":"Temsilci",
+        "islem_asamasi":"Aşama", "aciklama":"Açıklama",
+        "beklenen_ciro":"Beklenen Ciro", "gerceklesen_ciro":"Gerçekleşen Ciro",
+        "tarih":"Tarih", "olusturan":"Oluşturan", "silindi":"Silindi",
+        # Randevular
+        "randevu_tarihi":"Randevu Tarihi", "randevu_saati":"Saat",
+        "musteri_id":"Müşteri ID", "musteri_adi":"Müşteri Adı",
+        "bolge":"Bölge", "gorev":"Görev", "takip":"Takip",
+        "adet":"Adet", "sonuc":"Sonuç", "aciklama":"Açıklama",
+        # Kişiler
+        "ad":"Ad", "soyad":"Soyad", "telefon":"Telefon",
+        "bolge":"Bölge", "kaynak":"Kaynak", "notlar":"Notlar",
+        # Teklifler
+        "satirlar":"Satırlar", "toplam_tutar":"Toplam Tutar",
+        # İşlem kaydı
+        "islem_turu":"İşlem Türü", "icerik":"İçerik",
+        "gonderim_bilgisi":"Gönderim Bilgisi",
+        # Açıklamalar
+        "cari_id":"Cari ID", "cari_adi":"Cari Adı",
     }
 
     def _veri_getir(tablo_adi):
+        """Cache yok — her çağrıda taze veri"""
         tbl = _TABLOLAR.get(tablo_adi, "")
         if not tbl: return pd.DataFrame()
         try:
             if _ar_sb:
+                # Limit yok — tüm veri
                 r = _ar_sb.table(tbl).select("*").execute()
-                return pd.DataFrame(r.data) if r.data else pd.DataFrame()
+                df = pd.DataFrame(r.data) if r.data else pd.DataFrame()
             else:
                 c = get_conn()
                 df = pd.read_sql(f"SELECT * FROM {tbl}", c)
                 c.close()
-                return df
-        except:
+            # Sütun adlarını Türkçe göster (opsiyonel)
+            return df
+        except Exception as _e_vg:
             return pd.DataFrame()
 
     # ── SESSION STATE BAŞLAT ─────────────────────────────────────────────────
@@ -4404,7 +4432,10 @@ elif aktif == "admin_rapor":
 
     with tb4:
         st.markdown("&nbsp;")
-        if st.button("🔄", use_container_width=True, key="ar_yenile_btn", help="Verileri yenile"):
+        if st.button("🔄 Yenile", use_container_width=True, key="ar_yenile_btn", help="Verileri yenile"):
+            # Tüm cache'leri temizle
+            try: db_read.clear()
+            except: pass
             st.rerun()
 
     st.divider()
@@ -4423,20 +4454,34 @@ elif aktif == "admin_rapor":
                                   index=_tablo_idx, key="ar_tablo",
                                   label_visibility="collapsed")
 
-        # Veriyi getir
+        # Veriyi getir — cache yok, her zaman taze
         _df_ham = _veri_getir(_sec_tablo)
 
         if _df_ham.empty:
-            st.warning("Bu kaynakta veri yok.")
+            st.warning(f"Bu kaynakta veri yok.")
+            st.info(f"Tablo: {_TABLOLAR.get(_sec_tablo,'?')}")
         else:
             _tum_kol = list(_df_ham.columns)
+            st.caption(f"✅ {len(_df_ham)} satır · {len(_tum_kol)} sütun")
 
-            # Sütun seçimi
+            # Sütun seçimi — Türkçe adlarıyla
             st.markdown("**📌 Sütunlar:**")
             _onceki = [k for k in st.session_state.get("ar_kolonlar",[]) if k in _tum_kol]
-            _varsayilan = _onceki if _onceki else _tum_kol[:min(6, len(_tum_kol))]
-            _sec_kol = st.multiselect("", _tum_kol, default=_varsayilan,
-                                      key="ar_kolonlar", label_visibility="collapsed")
+            _varsayilan = _onceki if _onceki else _tum_kol[:min(7, len(_tum_kol))]
+            _sec_kol = st.multiselect(
+                "",
+                options=_tum_kol,
+                default=_varsayilan,
+                format_func=lambda k: _KOLON_BASLIKLARI.get(k, k),
+                key="ar_kolonlar",
+                label_visibility="collapsed"
+            )
+            tc1, tc2 = st.columns(2)
+            if tc1.button("✅ Tümü", key="ar_tumu", use_container_width=True):
+                st.session_state["ar_kolonlar"] = _tum_kol; st.rerun()
+            if tc2.button("🗑️ Sıfırla", key="ar_temizle_kol", use_container_width=True):
+                st.session_state["ar_kolonlar"] = []; st.rerun()
+
 
             # Sıralama
             st.markdown("**🔢 Sırala:**")
@@ -4568,7 +4613,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v4.2 &nbsp;|&nbsp; "
+    "MWCRMPRO v4.4 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
