@@ -1127,6 +1127,7 @@ elif aktif == "liste":
 
         col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi","notlar"]
 
+        # ── DEĞİŞİKLİKLERİ SESSION_STATE'E KAYDET (buton basılmadan önce) ──────
         edited_df = st.data_editor(
             df_edit,
             use_container_width=True,
@@ -1136,6 +1137,9 @@ elif aktif == "liste":
             key="cari_editor"
         )
 
+        # Her render'da edited_df'i session_state'e yaz — buton basılınca kaybolmaz
+        st.session_state["_cari_editor_son"] = edited_df.to_dict("records")
+
         secili_df = edited_df[edited_df["Seç"] == True]
         secili_sayi = len(secili_df)
 
@@ -1143,42 +1147,48 @@ elif aktif == "liste":
         btn1, btn2, btn3 = st.columns(3)
         with btn1:
             if st.button("💾 Değişiklikleri Kaydet", use_container_width=True, type="primary"):
+                # session_state'ten al — butona basılınca edited_df sıfırlanır ama biz sakladık
+                kayit_rows = st.session_state.get("_cari_editor_son", [])
                 kayit_sayi = 0
                 hatali = []
-                for _, row in edited_df.iterrows():
+                for row in kayit_rows:
                     rid = row.get("id")
                     if rid and str(rid) not in ["nan","None",""]:
                         try:
                             guncelle_data = {
-                                "firma": str(row.get("firma","") or ""),
-                                "yetkili": str(row.get("yetkili","") or ""),
-                                "gsm": str(row.get("gsm","") or ""),
-                                "sabit": str(row.get("sabit","") or ""),
-                                "email": str(row.get("email","") or ""),
-                                "il": str(row.get("il","") or ""),
-                                "ilce": str(row.get("ilce","") or ""),
-                                "durum": str(row.get("durum","") or ""),
-                                "temsilci": str(row.get("temsilci","") or ""),
-                                "islem_asamasi": str(row.get("islem_asamasi","") or ""),
+                                "firma":        str(row.get("firma","") or ""),
+                                "yetkili":      str(row.get("yetkili","") or ""),
+                                "gsm":          str(row.get("gsm","") or ""),
+                                "sabit":        str(row.get("sabit","") or ""),
+                                "email":        str(row.get("email","") or ""),
+                                "il":           str(row.get("il","") or ""),
+                                "ilce":         str(row.get("ilce","") or ""),
+                                "durum":        str(row.get("durum","") or ""),
+                                "temsilci":     str(row.get("temsilci","") or ""),
+                                "islem_asamasi":str(row.get("islem_asamasi","") or ""),
+                                "notlar":       str(row.get("notlar","") or ""),
                             }
-                            # notlar alanı ayrıca dene — kolon yoksa hata vermesin
-                            notlar_val = str(row.get("notlar","") or "")
-                            try:
-                                db_update("cari_kartlar", {**guncelle_data, "notlar": notlar_val}, "id", int(rid))
-                            except:
-                                db_update("cari_kartlar", guncelle_data, "id", int(rid))
+                            sb_up = get_sb_client()
+                            if sb_up:
+                                sb_up.table("cari_kartlar").update(guncelle_data).eq("id", int(rid)).execute()
+                            else:
+                                conn_up = get_conn()
+                                sets = ", ".join([f"{k}=?" for k in guncelle_data])
+                                conn_up.execute(f"UPDATE cari_kartlar SET {sets} WHERE id=?",
+                                    list(guncelle_data.values()) + [int(rid)])
+                                conn_up.commit(); conn_up.close()
                             kayit_sayi += 1
                         except Exception as e_row:
-                            hatali.append(str(rid))
-                # Cache'i TAMAMEN temizle — rerun öncesi şart
+                            hatali.append(f"{rid}:{e_row}")
                 try: db_read.clear()
                 except: pass
                 try: get_cari_listesi.clear()
                 except: pass
+                st.session_state.pop("_cari_editor_son", None)
                 if kayit_sayi > 0:
                     st.success(f"✅ {kayit_sayi} kayıt kaydedildi!")
                 if hatali:
-                    st.warning(f"⚠️ Şu ID'ler kaydedilemedi: {', '.join(hatali)}")
+                    st.warning(f"⚠️ Kaydedilemedi: {hatali[:3]}")
                 st.rerun()
 
         with btn2:
@@ -1296,25 +1306,46 @@ elif aktif == "liste":
                 column_order=col_order,
                 key=f"asama_editor_{secili_asama_sayfa}"
             )
+            # Her render'da session_state'e kaydet
+            st.session_state[f"_asama_editor_{secili_asama_sayfa}"] = edited_asama.to_dict("records")
             secili_asama_df = edited_asama[edited_asama["Seç"]==True]
 
             a1,a2,a3,a4 = st.columns(4)
             with a1:
                 if st.button("💾 Kaydet", key=f"asama_kaydet_{secili_asama_sayfa}", use_container_width=True, type="primary"):
-                    for _, row in edited_asama.iterrows():
-                        if row.get("id"):
-                            db_update("cari_kartlar",{
-                                "firma":row.get("firma"),"yetkili":row.get("yetkili"),
-                                "gsm":row.get("gsm"),"sabit":row.get("sabit"),
-                                "email":row.get("email"),"il":row.get("il"),
-                                "ilce":row.get("ilce"),"durum":row.get("durum"),
-                                "temsilci":row.get("temsilci"),
-                                "islem_asamasi":row.get("islem_asamasi"),
-                                "notlar":row.get("notlar","")
-                            },"id",row.get("id"))
+                    kayit_rows_a = st.session_state.get(f"_asama_editor_{secili_asama_sayfa}", [])
+                    k_sayi = 0
+                    for row in kayit_rows_a:
+                        rid = row.get("id")
+                        if rid and str(rid) not in ["nan","None",""]:
+                            try:
+                                gd = {
+                                    "firma":str(row.get("firma","") or ""),
+                                    "yetkili":str(row.get("yetkili","") or ""),
+                                    "gsm":str(row.get("gsm","") or ""),
+                                    "sabit":str(row.get("sabit","") or ""),
+                                    "email":str(row.get("email","") or ""),
+                                    "il":str(row.get("il","") or ""),
+                                    "ilce":str(row.get("ilce","") or ""),
+                                    "durum":str(row.get("durum","") or ""),
+                                    "temsilci":str(row.get("temsilci","") or ""),
+                                    "islem_asamasi":str(row.get("islem_asamasi","") or ""),
+                                    "notlar":str(row.get("notlar","") or ""),
+                                }
+                                sb_a = get_sb_client()
+                                if sb_a:
+                                    sb_a.table("cari_kartlar").update(gd).eq("id",int(rid)).execute()
+                                else:
+                                    conn_a = get_conn()
+                                    sets = ", ".join([f"{k}=?" for k in gd])
+                                    conn_a.execute(f"UPDATE cari_kartlar SET {sets} WHERE id=?", list(gd.values())+[int(rid)])
+                                    conn_a.commit(); conn_a.close()
+                                k_sayi += 1
+                            except: pass
                     try: db_read.clear()
                     except: pass
-                    st.success("✅ Kaydedildi!"); st.rerun()
+                    st.session_state.pop(f"_asama_editor_{secili_asama_sayfa}", None)
+                    st.success(f"✅ {k_sayi} kaydedildi!"); st.rerun()
             with a2:
                 # Aşama değiştir
                 hedef_asama = st.selectbox("→ Aşama Taşı:", tum_asama_opts, key=f"tasi_{secili_asama_sayfa}")
