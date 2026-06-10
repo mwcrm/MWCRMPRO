@@ -1092,9 +1092,10 @@ elif aktif == "liste":
         "durum":         st.column_config.SelectboxColumn("Durum", options=["Aktif","Hedef","Pasif"]),
         "temsilci":      st.column_config.TextColumn("Temsilci"),
         "islem_asamasi": st.column_config.SelectboxColumn("Aşama", options=tum_asama_opts),
-        "aciklama":      st.column_config.TextColumn("Açıklama", width="large"),
+        "aciklama":      st.column_config.TextColumn("Açıklama — yaz kaydet → arşivlenir", width="large"),
+        "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width="small"),
     }
-    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi","aciklama"]
+    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi","aciklama","📨 Notlar"]
 
     # ── DATA EDITOR ─────────────────────────────────────────────────────────────
     df_edit = df_f.copy()
@@ -1102,6 +1103,22 @@ elif aktif == "liste":
     if "aciklama" not in df_edit.columns:
         df_edit["aciklama"] = ""
     df_edit["aciklama"] = df_edit["aciklama"].fillna("").astype(str).replace("nan","")
+
+    # Her firma için not sayısını göster
+    if sb_liste:
+        try:
+            _res_notlar = sb_liste.table("cari_aciklamalar").select("cari_id").execute()
+            if _res_notlar.data:
+                import collections
+                _not_sayac = collections.Counter([str(r["cari_id"]) for r in _res_notlar.data])
+                df_edit["📨 Notlar"] = df_edit["id"].apply(lambda x: f"📨 {_not_sayac.get(str(int(x)),0)}" if _not_sayac.get(str(int(x)),0) > 0 else "")
+            else:
+                df_edit["📨 Notlar"] = ""
+        except:
+            df_edit["📨 Notlar"] = ""
+    else:
+        df_edit["📨 Notlar"] = ""
+
     df_edit.insert(0, "Seç", False)
 
     # KEY YAKLAŞIMI: her render'da edited_df'i yakala, session_state'e yaz
@@ -1201,8 +1218,37 @@ elif aktif == "liste":
                 try: db_read.clear()
                 except: pass
                 st.session_state.pop("_ls_tablo", None)
+
+                # Açıklama hücresi doluysa cari_aciklamalar'a arşivle + hücreyi temizle
+                _arsiv_sayi = 0
+                for row in _rows:
+                    rid = row.get("id")
+                    _ac_yeni = str(row.get("aciklama","") or "").strip()
+                    if not rid or not _ac_yeni or _ac_yeni == "nan": continue
+                    try:
+                        rid = int(float(str(rid)))
+                        # cari_aciklamalar'a ekle
+                        _ac_veri = {
+                            "cari_id":   rid,
+                            "cari_adi":  str(row.get("firma","")),
+                            "aciklama":  _ac_yeni,
+                            "olusturan": st.session_state.get("kullanici",""),
+                        }
+                        if sb_liste:
+                            sb_liste.table("cari_aciklamalar").insert(_ac_veri).execute()
+                            # Hücreyi temizle
+                            sb_liste.table("cari_kartlar").update({"aciklama":""}).eq("id",rid).execute()
+                        else:
+                            _cx = get_conn()
+                            _cx.execute("INSERT INTO cari_aciklamalar (cari_id,cari_adi,aciklama,olusturan) VALUES (?,?,?,?)",
+                                (rid, str(row.get("firma","")), _ac_yeni, st.session_state.get("kullanici","")))
+                            _cx.execute("UPDATE cari_kartlar SET aciklama='' WHERE id=?", (rid,))
+                            _cx.commit(); _cx.close()
+                        _arsiv_sayi += 1
+                    except: pass
+
                 if kayit_sayi > 0:
-                    st.success(f"✅ {kayit_sayi} satır kaydedildi!")
+                    st.success(f"✅ {kayit_sayi} satır kaydedildi!" + (f" · {_arsiv_sayi} açıklama 📨 arşivlendi!" if _arsiv_sayi > 0 else ""))
                 else:
                     st.warning("Hiç kayıt yapılamadı.")
                 if hata_list:
