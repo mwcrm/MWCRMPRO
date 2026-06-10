@@ -881,16 +881,6 @@ with st.sidebar:
             except: pass
 
 # ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
-col_bas, col_kul, col_cik = st.columns([6, 2, 1])
-with col_bas:
-    st.title("🏢 MWCRMPRO - Cari Yönetim Sistemi")
-with col_kul:
-    st.markdown(f"<br>👤 **{st.session_state['kullanici']}** ({st.session_state['rol']})", unsafe_allow_html=True)
-with col_cik:
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.button("🚪 Çıkış"):
-        cikis()
-
 st.divider()
 aktif = st.session_state["aktif_tab"]
 # ── OTOMATİK SAYFA TAKİBİ ───────────────────────────────────────────────────
@@ -4831,7 +4821,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v4.7 &nbsp;|&nbsp; "
+    "MWCRMPRO v4.8 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
