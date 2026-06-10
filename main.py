@@ -3163,9 +3163,7 @@ elif aktif == "whatsapp":
     st.markdown("## 💬 WhatsApp Entegrasyonu")
 
     # ── BAĞLANTI AYARLARI ──────────────────────────────────────────────────────
-    with st.sidebar:
-        st.divider()
-        st.markdown("### 📡 Waha Bağlantısı")
+    with st.expander("📡 Waha Bağlantı Ayarları"):
         waha_url = st.text_input("Waha URL:", value=st.session_state.get("waha_url","http://localhost:3000"), key="waha_url_input")
         waha_session = st.text_input("Session:", value=st.session_state.get("waha_session","default"), key="waha_session_input")
         if st.button("💾 Kaydet", key="waha_kaydet"):
