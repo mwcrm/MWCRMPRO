@@ -4257,341 +4257,303 @@ elif aktif == "admin_rapor":
     import json as _arj
     import io as _ario
 
-    st.markdown("## 🧩 Admin Rapor Tasarım Merkezi")
-    st.caption("Tüm sistem verilerini istediğin gibi birleştir, filtrele, sırala, kaydet, Excel'e aktar.")
+    st.markdown("## 🧩 Admin Rapor Tasarım Merkezi v4.2")
+    st.caption("Veri kaynağı seç · Sütun/filtre/sıralama ayarla · Rapor adı ver · Kaydet · Yenile")
 
-    # ── TÜM VERİLERİ YÜKLE ───────────────────────────────────────────────────
-    _sb = get_sb_client()
+    _ar_sb  = get_sb_client()
+    _ar_kul = st.session_state.get("kullanici", "admin")
 
-    @st.cache_data(ttl=30)
-    def _ar_veri_yukle():
-        _veriler = {}
-        _tablolar = {
-            "cari_kartlar":     "🏢 Cari Kartlar",
-            "randevular":       "📅 Randevular",
-            "teklifler":        "📄 Teklifler",
-            "kisiler":          "📞 Kişiler",
-            "cari_aciklamalar": "📝 Açıklamalar",
-            "islem_kaydi":      "📋 İşlem Kayıtları",
-            "kullanicilar":     "👥 Kullanıcılar",
-            "temsilciler":      "👔 Temsilciler",
-        }
-        sb = get_sb_client()
-        for tbl, ad in _tablolar.items():
-            try:
-                if sb:
-                    r = sb.table(tbl).select("*").execute()
-                    _veriler[ad] = pd.DataFrame(r.data) if r.data else pd.DataFrame()
-                else:
-                    conn = get_conn()
-                    _veriler[ad] = pd.read_sql(f"SELECT * FROM {tbl}", conn)
-                    conn.close()
-            except:
-                _veriler[ad] = pd.DataFrame()
-        return _veriler
-
-    _tum_veriler = _ar_veri_yukle()
-
-    # ── KAYITLI RAPORLAR — Supabase'den yükle ────────────────────────────────
-    _ar_sb = get_sb_client()
-    _ar_kul = st.session_state.get("kullanici","admin")
-
-    def _ar_raporlari_yukle():
-        """Kayıtlı rapor tasarımlarını Supabase'den yükle"""
+    # ── KAYDET / YÜKLE FONKSİYONLARI ────────────────────────────────────────
+    def _ar_yukle():
         try:
             if _ar_sb:
-                _res = _ar_sb.table("kullanici_tercih").select("deger").eq("kullanici", _ar_kul).eq("anahtar","rapor_tasarimlari").execute()
-                if _res.data:
-                    return _arj.loads(_res.data[0]["deger"])
+                r = _ar_sb.table("kullanici_tercih").select("deger") \
+                    .eq("kullanici", _ar_kul).eq("anahtar", "rapor_tasarimlari").execute()
+                if r.data:
+                    return _arj.loads(r.data[0]["deger"])
             else:
-                _c = get_conn()
-                _row = _c.execute("SELECT deger FROM kullanici_tercih WHERE kullanici=? AND anahtar='rapor_tasarimlari'", (_ar_kul,)).fetchone()
-                _c.close()
-                if _row: return _arj.loads(_row[0])
+                c = get_conn()
+                row = c.execute("SELECT deger FROM kullanici_tercih WHERE kullanici=? AND anahtar='rapor_tasarimlari'",
+                                (_ar_kul,)).fetchone()
+                c.close()
+                if row: return _arj.loads(row[0])
         except: pass
         return {}
 
-    def _ar_raporlari_kaydet(raporlar):
-        """Rapor tasarımlarını Supabase'e kaydet"""
+    def _ar_kaydet(raporlar):
         try:
-            _veri = _arj.dumps(raporlar, ensure_ascii=False)
+            veri = _arj.dumps(raporlar, ensure_ascii=False)
             if _ar_sb:
-                _ar_sb.table("kullanici_tercih").upsert({
-                    "kullanici": _ar_kul,
-                    "anahtar": "rapor_tasarimlari",
-                    "deger": _veri
-                }, on_conflict="kullanici,anahtar").execute()
+                _ar_sb.table("kullanici_tercih").upsert(
+                    {"kullanici": _ar_kul, "anahtar": "rapor_tasarimlari", "deger": veri},
+                    on_conflict="kullanici,anahtar").execute()
             else:
-                _c = get_conn()
-                _c.execute("INSERT OR REPLACE INTO kullanici_tercih (kullanici,anahtar,deger) VALUES (?,?,?)",
-                    (_ar_kul, "rapor_tasarimlari", _veri))
-                _c.commit(); _c.close()
+                c = get_conn()
+                c.execute("INSERT OR REPLACE INTO kullanici_tercih (kullanici,anahtar,deger) VALUES (?,?,?)",
+                          (_ar_kul, "rapor_tasarimlari", veri))
+                c.commit(); c.close()
             return True
-        except: return False
+        except Exception as _e:
+            st.error(f"Kayıt hatası: {_e}")
+            return False
 
-    # Her zaman Supabase'den taze yükle
-    _kayitli_raporlar = _ar_raporlari_yukle()
+    # ── VERİ YÜKLE ───────────────────────────────────────────────────────────
+    _TABLOLAR = {
+        "🏢 Cari Kartlar":    "cari_kartlar",
+        "📅 Randevular":      "randevular",
+        "📄 Teklifler":       "teklifler",
+        "📞 Kişiler":         "kisiler",
+        "📝 Açıklamalar":     "cari_aciklamalar",
+        "📋 İşlem Kayıtları": "islem_kaydi",
+        "👥 Kullanıcılar":    "kullanicilar",
+        "👔 Temsilciler":     "temsilciler",
+    }
 
-    # Üst bar
-    r_ust1, r_ust2, r_ust3, r_ust4 = st.columns([3,2,2,1])
-    with r_ust1:
-        _rapor_adi = st.text_input("📋 Rapor Adı:", placeholder="Örn: Aylık Satış Raporu", key="ar_rapor_adi")
-    with r_ust2:
-        if st.button("💾 Bu Raporu Kaydet", use_container_width=True, type="primary", key="ar_kaydet_btn"):
-            if _rapor_adi.strip():
-                _kayitli_raporlar[_rapor_adi.strip()] = {
-                    "tablo":       st.session_state.get("ar_sec_tablo",""),
-                    "kolonlar":    st.session_state.get("ar_sec_kolonlar",[]),
-                    "siralama":    st.session_state.get("ar_siralama",""),
-                    "siralama_yon":st.session_state.get("ar_siralama_yon", True),
-                }
-                if _ar_raporlari_kaydet(_kayitli_raporlar):
-                    st.success(f"✅ '{_rapor_adi}' kaydedildi!")
-                    st.rerun()
-                else:
-                    st.error("Kaydedilemedi!")
+    def _veri_getir(tablo_adi):
+        tbl = _TABLOLAR.get(tablo_adi, "")
+        if not tbl: return pd.DataFrame()
+        try:
+            if _ar_sb:
+                r = _ar_sb.table(tbl).select("*").execute()
+                return pd.DataFrame(r.data) if r.data else pd.DataFrame()
             else:
-                st.warning("Rapor adı girin!")
-    with r_ust3:
-        if _kayitli_raporlar:
-            _rapor_listesi = list(_kayitli_raporlar.keys())
-            _yukle_sec = st.selectbox("📂 Kayıtlı Rapor Yükle:", ["— Seçin —"] + _rapor_listesi, key="ar_yukle_sec")
-            if _yukle_sec != "— Seçin —":
-                _r = _kayitli_raporlar[_yukle_sec]
-                st.session_state["ar_sec_tablo"]    = _r.get("tablo","")
-                st.session_state["ar_sec_kolonlar"] = _r.get("kolonlar",[])
-                st.session_state["ar_siralama"]     = _r.get("siralama","")
-                st.session_state["ar_siralama_yon"] = _r.get("siralama_yon",True)
+                c = get_conn()
+                df = pd.read_sql(f"SELECT * FROM {tbl}", c)
+                c.close()
+                return df
+        except:
+            return pd.DataFrame()
+
+    # ── SESSION STATE BAŞLAT ─────────────────────────────────────────────────
+    for _k, _v in [
+        ("ar_tablo",   list(_TABLOLAR.keys())[0]),
+        ("ar_kolonlar", []),
+        ("ar_siralama", ""),
+        ("ar_yon",      True),
+        ("ar_filtreler", {}),
+        ("ar_son_rapor", ""),
+    ]:
+        if _k not in st.session_state:
+            st.session_state[_k] = _v
+
+    # ── KAYITLI RAPORLAR ─────────────────────────────────────────────────────
+    _raporlar = _ar_yukle()
+
+    # Üst toolbar
+    tb1, tb2, tb3, tb4 = st.columns([2, 2, 3, 1])
+
+    with tb1:
+        st.markdown("**💾 Raporu Kaydet:**")
+        _ar_ad = st.text_input("", placeholder="Rapor adı...", key="ar_rapor_adi_inp", label_visibility="collapsed")
+
+    with tb2:
+        st.markdown("&nbsp;")
+        if st.button("💾 Kaydet", use_container_width=True, type="primary", key="ar_kaydet_btn"):
+            _ad = st.session_state.get("ar_rapor_adi_inp","").strip()
+            if _ad:
+                _raporlar[_ad] = {
+                    "tablo":    st.session_state["ar_tablo"],
+                    "kolonlar": st.session_state["ar_kolonlar"],
+                    "siralama": st.session_state["ar_siralama"],
+                    "yon":      st.session_state["ar_yon"],
+                }
+                if _ar_kaydet(_raporlar):
+                    st.session_state["ar_son_rapor"] = _ad
+                    st.success(f"✅ '{_ad}' kaydedildi!")
+                    st.rerun()
+            else:
+                st.warning("⚠️ Rapor adı girin!")
+
+    with tb3:
+        st.markdown("**📂 Kayıtlı Rapor Yükle:**")
+        if _raporlar:
+            _sec = st.selectbox("", ["— Seçin —"] + list(_raporlar.keys()),
+                                key="ar_yukle_sec", label_visibility="collapsed")
+            if _sec != "— Seçin —" and st.button("📂 Yükle", key="ar_yukle_btn", use_container_width=True):
+                _r = _raporlar[_sec]
+                st.session_state["ar_tablo"]    = _r.get("tablo", list(_TABLOLAR.keys())[0])
+                st.session_state["ar_kolonlar"] = _r.get("kolonlar", [])
+                st.session_state["ar_siralama"] = _r.get("siralama", "")
+                st.session_state["ar_yon"]      = _r.get("yon", True)
+                st.success(f"✅ '{_sec}' yüklendi!")
+                st.rerun()
+            # Sil
+            if _raporlar:
+                _sil_sec = st.selectbox("Sil:", ["— Seçin —"] + list(_raporlar.keys()), key="ar_sil_sec")
+                if _sil_sec != "— Seçin —" and st.button("🗑️ Raporu Sil", key="ar_sil_btn"):
+                    del _raporlar[_sil_sec]
+                    _ar_kaydet(_raporlar)
+                    st.rerun()
         else:
             st.caption("Henüz kayıtlı rapor yok")
-    with r_ust4:
-        if st.button("🔄 Yenile", use_container_width=True, key="ar_yenile"):
-            _ar_veri_yukle.clear()
+
+    with tb4:
+        st.markdown("&nbsp;")
+        if st.button("🔄", use_container_width=True, key="ar_yenile_btn", help="Verileri yenile"):
             st.rerun()
 
     st.divider()
 
-    # ── TABLO SEÇ ─────────────────────────────────────────────────────────────
-    col_sol, col_sag = st.columns([1, 3])
+    # ── ANA TASARIM ALANI ────────────────────────────────────────────────────
+    sol, sag = st.columns([1, 3])
 
-    with col_sol:
-        st.markdown("### ⚙️ Ayarlar")
+    with sol:
+        st.markdown("### ⚙️ Tasarım")
 
-        # Tablo seç
-        _tablo_listesi = list(_tum_veriler.keys())
-        _sec_tablo = st.selectbox("📊 Veri Kaynağı:",
-            _tablo_listesi,
-            index=_tablo_listesi.index(st.session_state.get("ar_sec_tablo", _tablo_listesi[0]))
-                if st.session_state.get("ar_sec_tablo","") in _tablo_listesi else 0,
-            key="ar_sec_tablo")
+        # Veri kaynağı
+        st.markdown("**📊 Veri Kaynağı:**")
+        _tablo_idx = list(_TABLOLAR.keys()).index(st.session_state["ar_tablo"]) \
+                     if st.session_state["ar_tablo"] in _TABLOLAR else 0
+        _sec_tablo = st.selectbox("", list(_TABLOLAR.keys()),
+                                  index=_tablo_idx, key="ar_tablo",
+                                  label_visibility="collapsed")
 
-        _df_kaynak = _tum_veriler.get(_sec_tablo, pd.DataFrame()).copy()
+        # Veriyi getir
+        _df_ham = _veri_getir(_sec_tablo)
 
-        if _df_kaynak.empty:
-            st.warning("Bu tabloda veri yok.")
-            st.stop()
-
-        _tum_kolonlar = list(_df_kaynak.columns)
-
-        st.markdown("---")
-        st.markdown("**📌 Sütun Seç & Sırala:**")
-        st.caption("İstediğin sütunları seç")
-
-        # Önceden seçili kolonları koru
-        _onceki = [k for k in st.session_state.get("ar_sec_kolonlar",[]) if k in _tum_kolonlar]
-        _varsayilan = _onceki if _onceki else _tum_kolonlar[:min(6,len(_tum_kolonlar))]
-
-        _sec_kolonlar = st.multiselect(
-            "Sütunlar:",
-            _tum_kolonlar,
-            default=_varsayilan,
-            key="ar_sec_kolonlar"
-        )
-
-        st.markdown("---")
-        st.markdown("**🔢 Sıralama:**")
-        _siralama_kol = st.selectbox("Sırala:",
-            ["—"] + (_sec_kolonlar if _sec_kolonlar else _tum_kolonlar),
-            index=0,
-            key="ar_siralama")
-        _siralama_yon = st.radio("Yön:", ["⬆️ Artan","⬇️ Azalan"],
-            index=0 if st.session_state.get("ar_siralama_yon", True) else 1,
-            horizontal=True, key="ar_siralama_yon_radio")
-        st.session_state["ar_siralama_yon"] = (_siralama_yon == "⬆️ Artan")
-
-        st.markdown("---")
-        st.markdown("**🔍 Filtrele:**")
-        if "ar_filtreler" not in st.session_state:
-            st.session_state["ar_filtreler"] = {}
-
-        # Her seçili kolon için filtre
-        _aktif_filtreler = {}
-        for _kol in (_sec_kolonlar[:5] if _sec_kolonlar else []):
-            _orn_degerler = _df_kaynak[_kol].dropna().astype(str).unique().tolist()
-            if len(_orn_degerler) <= 20:  # Az değer → seçim
-                _fil = st.multiselect(
-                    f"{_kol}:",
-                    _orn_degerler,
-                    default=[],
-                    key=f"ar_fil_{_kol}"
-                )
-                if _fil: _aktif_filtreler[_kol] = _fil
-            else:  # Çok değer → metin arama
-                _fil_txt = st.text_input(f"{_kol} ara:", key=f"ar_fil_{_kol}", placeholder="...")
-                if _fil_txt: _aktif_filtreler[_kol] = _fil_txt
-
-        st.session_state["ar_filtreler"] = _aktif_filtreler
-
-        st.markdown("---")
-        st.markdown("**🧮 Gruplama:**")
-        _grup_kol = st.selectbox("Grupla:",
-            ["—"] + (_sec_kolonlar if _sec_kolonlar else []),
-            key="ar_grup_kol")
-        _sayisal_kolonlar = [k for k in (_sec_kolonlar if _sec_kolonlar else [])
-                             if pd.api.types.is_numeric_dtype(_df_kaynak[k])]
-        if _grup_kol != "—" and _sayisal_kolonlar:
-            _toplam_kol = st.multiselect("Toplam al:", _sayisal_kolonlar, key="ar_toplam_kol")
+        if _df_ham.empty:
+            st.warning("Bu kaynakta veri yok.")
         else:
-            _toplam_kol = []
+            _tum_kol = list(_df_ham.columns)
 
-    # ── RAPOR GÖRÜNÜMÜ ────────────────────────────────────────────────────────
-    with col_sag:
-        st.markdown("### 📊 Rapor Görünümü")
+            # Sütun seçimi
+            st.markdown("**📌 Sütunlar:**")
+            _onceki = [k for k in st.session_state.get("ar_kolonlar",[]) if k in _tum_kol]
+            _varsayilan = _onceki if _onceki else _tum_kol[:min(6, len(_tum_kol))]
+            _sec_kol = st.multiselect("", _tum_kol, default=_varsayilan,
+                                      key="ar_kolonlar", label_visibility="collapsed")
 
-        # Veriyi hazırla
-        _df_rapor = _df_kaynak.copy()
+            # Sıralama
+            st.markdown("**🔢 Sırala:**")
+            _kol_opts = ["—"] + (_sec_kol if _sec_kol else _tum_kol)
+            _sir_idx = _kol_opts.index(st.session_state["ar_siralama"]) \
+                       if st.session_state["ar_siralama"] in _kol_opts else 0
+            _siralama = st.selectbox("", _kol_opts, index=_sir_idx,
+                                     key="ar_siralama", label_visibility="collapsed")
+            _yon = st.radio("", ["⬆️ Artan", "⬇️ Azalan"],
+                            index=0 if st.session_state.get("ar_yon", True) else 1,
+                            horizontal=True, key="ar_yon_radio")
+            st.session_state["ar_yon"] = (_yon == "⬆️ Artan")
 
-        # Filtre uygula
-        for _fkol, _fdeger in _aktif_filtreler.items():
-            if _fkol in _df_rapor.columns:
-                if isinstance(_fdeger, list):
-                    _df_rapor = _df_rapor[_df_rapor[_fkol].astype(str).isin(_fdeger)]
+            # Filtreler
+            st.markdown("**🔍 Filtreler:**")
+            _aktif_fil = {}
+            _fil_kolonlar = _sec_kol[:6] if _sec_kol else _tum_kol[:4]
+            for _fk in _fil_kolonlar:
+                if _fk not in _df_ham.columns: continue
+                _vals = _df_ham[_fk].dropna().astype(str).unique().tolist()
+                if len(_vals) <= 15:
+                    _f = st.multiselect(f"{_fk}:", _vals, key=f"ar_fil_{_fk}")
+                    if _f: _aktif_fil[_fk] = _f
                 else:
-                    _df_rapor = _df_rapor[_df_rapor[_fkol].astype(str).str.contains(_fdeger, case=False, na=False)]
+                    _f = st.text_input(f"{_fk} ara:", key=f"ar_fil_{_fk}", placeholder="...")
+                    if _f: _aktif_fil[_fk] = _f
 
-        # Kolon seç
-        if _sec_kolonlar:
-            _goster_kol = [k for k in _sec_kolonlar if k in _df_rapor.columns]
-            _df_rapor = _df_rapor[_goster_kol]
+            # Gruplama
+            st.markdown("**🧮 Grupla:**")
+            _grup = st.selectbox("", ["—"] + (_sec_kol if _sec_kol else []),
+                                 key="ar_grup", label_visibility="collapsed")
+            _say_kols = [k for k in (_sec_kol if _sec_kol else [])
+                         if _df_ham[k].dtype in ['int64','float64']] if _sec_kol else []
+            _toplam = []
+            if _grup != "—" and _say_kols:
+                _toplam = st.multiselect("Toplam:", _say_kols, key="ar_toplam")
 
-        # Sırala
-        if _siralama_kol != "—" and _siralama_kol in _df_rapor.columns:
-            _df_rapor = _df_rapor.sort_values(_siralama_kol, ascending=st.session_state.get("ar_siralama_yon", True))
+    with sag:
+        if _df_ham.empty:
+            st.info("Sol taraftan veri kaynağı seçin.")
+        else:
+            # Raporu hazırla
+            _df_rapor = _df_ham.copy()
 
-        # Gruplama
-        if _grup_kol != "—" and _grup_kol in _df_rapor.columns and _toplam_kol:
-            _gkol_fil = [k for k in _toplam_kol if k in _df_rapor.columns]
-            if _gkol_fil:
-                _df_rapor = _df_rapor.groupby(_grup_kol)[_gkol_fil].sum().reset_index()
+            # Filtre
+            for _fk, _fv in _aktif_fil.items():
+                if _fk in _df_rapor.columns:
+                    if isinstance(_fv, list):
+                        _df_rapor = _df_rapor[_df_rapor[_fk].astype(str).isin(_fv)]
+                    else:
+                        _df_rapor = _df_rapor[_df_rapor[_fk].astype(str).str.contains(_fv, case=False, na=False)]
 
-        # Metrik
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Satır", len(_df_rapor))
-        m2.metric("Sütun", len(_df_rapor.columns))
-        m3.metric("Kaynak", _sec_tablo)
+            # Sütun seç
+            if _sec_kol:
+                _gkol = [k for k in _sec_kol if k in _df_rapor.columns]
+                _df_rapor = _df_rapor[_gkol] if _gkol else _df_rapor
 
-        # Raporu göster — düzenlenebilir
-        st.markdown(f"**{_sec_tablo} — {len(_df_rapor)} satır**")
-        _df_editor = st.data_editor(
-            _df_rapor,
-            use_container_width=True,
-            num_rows="dynamic",
-            key="ar_editor"
-        )
+            # Sıralama
+            if _siralama != "—" and _siralama in _df_rapor.columns:
+                _df_rapor = _df_rapor.sort_values(_siralama, ascending=st.session_state.get("ar_yon", True))
 
-        # Alt butonlar
-        alt1, alt2, alt3, alt4 = st.columns(4)
+            # Gruplama
+            if _grup != "—" and _grup in _df_rapor.columns and _toplam:
+                _tl = [k for k in _toplam if k in _df_rapor.columns]
+                if _tl:
+                    _df_rapor = _df_rapor.groupby(_grup)[_tl].sum().reset_index()
 
-        # Excel indir
-        with alt1:
-            _buf = _ario.BytesIO()
-            _df_editor.to_excel(_buf, index=False)
-            _buf.seek(0)
-            st.download_button(
-                "📥 Excel İndir",
-                data=_buf,
-                file_name=f"rapor_{_sec_tablo}_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.xlsx",
-                use_container_width=True
+            # Metrikler
+            mc1, mc2, mc3, mc4 = st.columns(4)
+            mc1.metric("Satır", len(_df_rapor))
+            mc2.metric("Sütun", len(_df_rapor.columns))
+            mc3.metric("Kaynak", _sec_tablo.split()[1] if len(_sec_tablo.split())>1 else _sec_tablo)
+            _son = st.session_state.get("ar_son_rapor","")
+            mc4.metric("Aktif Rapor", _son if _son else "—")
+
+            st.markdown(f"**{_sec_tablo} · {len(_df_rapor)} satır**")
+
+            # Düzenlenebilir tablo
+            _edited = st.data_editor(
+                _df_rapor,
+                use_container_width=True,
+                num_rows="dynamic",
+                key="ar_editor"
             )
 
-        # CSV indir
-        with alt2:
-            st.download_button(
-                "📄 CSV İndir",
-                data=_df_editor.to_csv(index=False).encode("utf-8-sig"),
-                file_name=f"rapor_{_sec_tablo}.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
+            # Alt işlem butonları
+            a1, a2, a3, a4 = st.columns(4)
 
-        # Değişiklikleri kaydet
-        with alt3:
-            if st.button("💾 Düzenlemeleri Kaydet", use_container_width=True, type="primary", key="ar_duzenle_kaydet"):
-                _ar_editor_state = st.session_state.get("ar_editor", {})
-                _ar_edited = _ar_editor_state.get("edited_rows", {})
-                _ar_added  = _ar_editor_state.get("added_rows", [])
-                _kayit_n = 0
-                # Düzenlenen satırlar
-                for _idx_s, _degis in _ar_edited.items():
-                    try:
-                        _idx = int(_idx_s)
-                        if "id" in _df_rapor.columns and _idx < len(_df_rapor):
-                            _row_id = int(_df_rapor.iloc[_idx]["id"])
-                            _tbl_adi = {v:k for k,v in {
-                                "🏢 Cari Kartlar":"cari_kartlar",
-                                "📅 Randevular":"randevular",
-                                "📄 Teklifler":"teklifler",
-                                "📞 Kişiler":"kisiler",
-                                "📝 Açıklamalar":"cari_aciklamalar",
-                                "📋 İşlem Kayıtları":"islem_kaydi",
-                                "👥 Kullanıcılar":"kullanicilar",
-                                "👔 Temsilciler":"temsilciler",
-                            }.items()}.get(_sec_tablo,"")
-                            if _tbl_adi and _sb:
-                                _sb.table(_tbl_adi).update(_degis).eq("id", _row_id).execute()
-                                _kayit_n += 1
-                    except: pass
-                if _kayit_n > 0:
-                    _ar_veri_yukle.clear()
-                    st.success(f"✅ {_kayit_n} satır güncellendi!")
+            with a1:
+                _buf = _ario.BytesIO()
+                _edited.to_excel(_buf, index=False); _buf.seek(0)
+                st.download_button("📥 Excel", data=_buf,
+                    file_name=f"rapor_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    use_container_width=True)
+            with a2:
+                st.download_button("📄 CSV",
+                    data=_edited.to_csv(index=False).encode("utf-8-sig"),
+                    file_name="rapor.csv", mime="text/csv",
+                    use_container_width=True)
+            with a3:
+                if st.button("🔄 Sıfırla", key="ar_sifirla", use_container_width=True):
+                    for _k in ["ar_kolonlar","ar_siralama","ar_yon","ar_son_rapor"]:
+                        st.session_state.pop(_k, None)
                     st.rerun()
+            with a4:
+                if st.button("📊 İstatistik", key="ar_istat", use_container_width=True):
+                    st.session_state["ar_istat_ac"] = not st.session_state.get("ar_istat_ac", False)
 
-        with alt4:
-            if st.button("🗑️ Sıfırla", use_container_width=True, key="ar_sifirla"):
-                for _k in ["ar_sec_kolonlar","ar_filtreler","ar_siralama","ar_siralama_yon"]:
-                    st.session_state.pop(_k, None)
-                st.rerun()
+            if st.session_state.get("ar_istat_ac"):
+                _skols = [k for k in _edited.columns if pd.api.types.is_numeric_dtype(_edited[k])]
+                if _skols:
+                    st.dataframe(_edited[_skols].describe().T.round(2), use_container_width=True)
+                else:
+                    st.info("Sayısal sütun yok.")
 
-        st.divider()
+            # Kayıtlı raporlar listesi
+            if _raporlar:
+                with st.expander(f"📂 Kayıtlı Raporlar ({len(_raporlar)})"):
+                    for _rn, _rv in list(_raporlar.items()):
+                        _r1, _r2 = st.columns([5, 1])
+                        _r1.markdown(f"**{_rn}** · {_rv.get('tablo','')} · {len(_rv.get('kolonlar',[]))} sütun")
+                        if _r2.button("🗑️", key=f"ar_rsil_{_rn}"):
+                            del _raporlar[_rn]
+                            _ar_kaydet(_raporlar)
+                            st.rerun()
 
-        # İstatistik özeti
-        with st.expander("📈 İstatistik Özeti"):
-            _say_kols = [k for k in _df_rapor.columns if pd.api.types.is_numeric_dtype(_df_rapor[k])]
-            if _say_kols:
-                _istat = _df_rapor[_say_kols].describe().T
-                _istat.columns = ["Sayı","Ort","Std","Min","25%","50%","75%","Max"]
-                st.dataframe(_istat.round(2), use_container_width=True)
-            else:
-                st.info("Sayısal sütun yok.")
-
-        # Kayıtlı raporlar listesi
-        if _kayitli_raporlar:
-            with st.expander(f"📂 Kayıtlı Raporlar ({len(_kayitli_raporlar)})"):
-                for _rn in list(_kayitli_raporlar.keys()):
-                    _rv = _kayitli_raporlar[_rn]
-                    _rc1, _rc2, _rc3 = st.columns([4,2,1])
-                    _rc1.markdown(f"**{_rn}**")
-                    _rc2.caption(f"{_rv.get('tablo','')}")
-                    if _rc3.button("🗑️", key=f"ar_sil_{_rn}"):
-                        del _kayitli_raporlar[_rn]
-                        _ar_raporlari_kaydet(_kayitli_raporlar)
-                        st.rerun()
 
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v2.5 &nbsp;|&nbsp; "
+    "MWCRMPRO v4.2 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
