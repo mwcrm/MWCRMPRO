@@ -2663,27 +2663,36 @@ elif aktif == "rapor":
         toplam_beklenen = df_rapor["beklenen_ciro"].sum()
         toplam_gercek   = df_rapor["gerceklesen_ciro"].sum()
 
-        # Üst metrikler
-        m1,m2,m3,m4,m5,m6 = st.columns(6)
-        m1.metric("Toplam", toplam)
-        m2.metric("Aktif", len(df_rapor[df_rapor["durum"]=="Aktif"]))
-        m3.metric("Hedef", len(df_rapor[df_rapor["durum"]=="Hedef"]))
-        m4.metric("Pasif", len(df_rapor[df_rapor["durum"]=="Pasif"]))
-        m5.metric("Beklenen", fmt_para(toplam_beklenen))
-        m6.metric("Gerçekleşen", fmt_para(toplam_gercek))
-    else:
-        st.info("Henüz müşteri kaydı yok.")
-
-    st.divider()
-    st.markdown("### 📅 Randevu Raporları")
-
     if not df_rand_r.empty and "adet" in df_rand_r.columns:
         df_rand_r["adet"] = pd.to_numeric(df_rand_r["adet"], errors="coerce").fillna(0)
-        rm1,rm2,rm3,rm4 = st.columns(4)
-        rm1.metric("Toplam Randevu", len(df_rand_r))
-        rm2.metric("✅ Bitti", len(df_rand_r[df_rand_r["sonuc"]=="Bitti"]) if "sonuc" in df_rand_r.columns else 0)
-        rm3.metric("🔄 Devam", len(df_rand_r[df_rand_r["sonuc"]=="Devam Ediyor"]) if "sonuc" in df_rand_r.columns else 0)
-        rm4.metric("❌ Gidilmedi", len(df_rand_r[df_rand_r["sonuc"]=="Gidilmedi"]) if "sonuc" in df_rand_r.columns else 0)
+
+    # ── YAN YANA BAŞLIKLAR ────────────────────────────────────────────────────
+    col_cari, col_rand = st.columns(2)
+
+    with col_cari:
+        st.markdown("### 📊 Cari Raporlar")
+        if not df_rapor.empty:
+            m1,m2,m3 = st.columns(3)
+            m1.metric("Toplam", toplam)
+            m2.metric("Aktif", len(df_rapor[df_rapor["durum"]=="Aktif"]))
+            m3.metric("Hedef", len(df_rapor[df_rapor["durum"]=="Hedef"]))
+            m1b,m2b = st.columns(2)
+            m1b.metric("Beklenen", fmt_para(toplam_beklenen))
+            m2b.metric("Gerçekleşen", fmt_para(toplam_gercek))
+        else:
+            st.info("Henüz müşteri kaydı yok.")
+
+    with col_rand:
+        st.markdown("### 📅 Randevu Raporları")
+        if not df_rand_r.empty:
+            rm1,rm2 = st.columns(2)
+            rm1.metric("Toplam Randevu", len(df_rand_r))
+            rm2.metric("✅ Bitti", len(df_rand_r[df_rand_r["sonuc"]=="Bitti"]) if "sonuc" in df_rand_r.columns else 0)
+            rm1b,rm2b = st.columns(2)
+            rm1b.metric("🔄 Devam", len(df_rand_r[df_rand_r["sonuc"]=="Devam Ediyor"]) if "sonuc" in df_rand_r.columns else 0)
+            rm2b.metric("❌ Gidilmedi", len(df_rand_r[df_rand_r["sonuc"]=="Gidilmedi"]) if "sonuc" in df_rand_r.columns else 0)
+        else:
+            st.info("Randevu yok.")
 
     with st.expander("📊 Genel Özet — Tarih & Temsilci"):
         if df_rand_r.empty:
@@ -2752,8 +2761,6 @@ elif aktif == "rapor":
             st.download_button("📥 Randevu Raporu", data=buf_rs, file_name="randevu_raporu.xlsx", use_container_width=True)
 
     st.divider()
-    st.markdown("### 🏢 Cari Raporlar")
-
     with st.expander("🔄 Aşama & Durum Bazlı Detay Raporu", expanded=False):
         if df_rapor.empty: st.info("Veri yok.")
         else:
