@@ -757,7 +757,7 @@ def save_menu_tercihi(kullanici, sira):
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 
 # ── VERSİYON KONTROL SİSTEMİ ─────────────────────────────────────────────────
-GUNCEL_SURUM = "v6.2"  # Bu kodun versiyonu — her güncellemede artır
+GUNCEL_SURUM = "v6.3"  # Bu kodun versiyonu — her güncellemede artır
 
 def _surum_kontrol():
     """Kullanıcı stable sürümde mi kontrol et"""
@@ -2039,6 +2039,68 @@ elif aktif == "kullanici":
     sayfa_log("kullanici")
     st.markdown("## 👥 Kullanıcı Yönetimi")
 
+    _ben = st.session_state.get("kullanici","")
+    _rol = st.session_state.get("rol","")
+
+    # ── NORMAL KULLANICI — sadece şifre + kendi logu ──────────────────────────
+    if _rol != "admin":
+        ut1, ut2 = st.tabs(["🔑 Şifre Değiştir", "📊 Aktivitelerim"])
+
+        with ut1:
+            st.markdown(f"**👤 {_ben}** — Şifrenizi değiştirin")
+            with st.form("kendi_sifre_form"):
+                _eski = st.text_input("Mevcut Şifre:", type="password")
+                _yeni1 = st.text_input("Yeni Şifre:", type="password")
+                _yeni2 = st.text_input("Yeni Şifre Tekrar:", type="password")
+                if st.form_submit_button("💾 Şifremi Değiştir", type="primary", use_container_width=True):
+                    if not _eski or not _yeni1 or not _yeni2:
+                        st.warning("Tüm alanları doldurun!")
+                    elif _yeni1 != _yeni2:
+                        st.error("Yeni şifreler eşleşmiyor!")
+                    elif len(_yeni1) < 4:
+                        st.warning("Şifre en az 4 karakter olmalı!")
+                    else:
+                        # Eski şifreyi doğrula
+                        _df_ben = db_read("kullanicilar", extra_sql="")
+                        if not _df_ben.empty:
+                            _satir = _df_ben[_df_ben["kullanici_adi"]==_ben]
+                            if not _satir.empty:
+                                if str(_satir.iloc[0].get("sifre","")) == _eski:
+                                    db_update("kullanicilar",{"sifre":_yeni1},"kullanici_adi",_ben)
+                                    try: db_read.clear()
+                                    except: pass
+                                    kullanici_log_kaydet("SIFRE_DEGISTIRDI","kullanici","Kendi şifresini değiştirdi")
+                                    st.success("✅ Şifreniz güncellendi!")
+                                else:
+                                    st.error("❌ Mevcut şifre hatalı!")
+
+        with ut2:
+            st.markdown(f"**📊 {_ben} — Aktivite Geçmişim**")
+            _sb_ut = get_sb_client()
+            try:
+                _r_klog = _sb_ut.table("kullanici_log").select("*") \
+                    .eq("kullanici",_ben).order("tarih",desc=True).limit(100).execute()
+                _df_klog = pd.DataFrame(_r_klog.data) if _r_klog.data else pd.DataFrame()
+            except:
+                _df_klog = pd.DataFrame()
+
+            if _df_klog.empty:
+                st.info("Henüz aktivite kaydı yok.")
+            else:
+                km1,km2,km3 = st.columns(3)
+                km1.metric("Toplam İşlem", len(_df_klog))
+                _bugun_k = len(_df_klog[pd.to_datetime(_df_klog["tarih"],errors="coerce").dt.date == pd.Timestamp.now().date()])
+                km2.metric("Bugün", _bugun_k)
+                km3.metric("Son Giriş", str(_df_klog[_df_klog["islem"]=="GİRİŞ_YAPILDI"]["tarih"].max())[:16] if "GİRİŞ_YAPILDI" in _df_klog["islem"].values else "—")
+                st.dataframe(
+                    _df_klog[["tarih","sayfa","islem","detay"]].rename(
+                        columns={"tarih":"Tarih","sayfa":"Sayfa","islem":"İşlem","detay":"Detay"}
+                    ).assign(Tarih=_df_klog["tarih"].astype(str).str[:16]),
+                    use_container_width=True, hide_index=True
+                )
+        st.stop()
+
+    # ── ADMİN — tam yetki ─────────────────────────────────────────────────────
     TUM_MENULER = {
         "yeni":"➕ Yeni Kart","liste":"📋 Cari Liste","randevu":"📅 Randevular",
         "teklif":"📄 Teklif","kisiler":"📞 Kişiler","rapor":"📊 Raporlar",
@@ -5300,7 +5362,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v6.2 &nbsp;|&nbsp; "
+    "MWCRMPRO v6.3 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
