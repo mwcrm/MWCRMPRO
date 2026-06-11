@@ -757,7 +757,7 @@ def save_menu_tercihi(kullanici, sira):
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 
 # ── VERSİYON KONTROL SİSTEMİ ─────────────────────────────────────────────────
-GUNCEL_SURUM = "v6.3"  # Bu kodun versiyonu — her güncellemede artır
+GUNCEL_SURUM = "v6.4"  # Bu kodun versiyonu — her güncellemede artır
 
 def _surum_kontrol():
     """Kullanıcı stable sürümde mi kontrol et"""
@@ -784,11 +784,20 @@ if st.session_state.get("rol") != "admin":
             _res = _sb_s.table("sistem_ayarlari").select("deger").eq("anahtar","stable_surum").execute()
             if _res.data:
                 _stable = _res.data[0]["deger"]
-                # Sadece "guncelleniyor" değilse kontrol et — kullanıcı her zaman çalışır
-                if _stable != "guncelleniyor" and _stable != GUNCEL_SURUM:
-                    pass  # Eski sürümde çalışmaya devam et — sorun yok
+                if _stable != GUNCEL_SURUM:
+                    st.markdown("""
+                    <div style='text-align:center;padding:60px 20px'>
+                    <div style='font-size:3rem'>⏳</div>
+                    <h2 style='color:#ff9800'>Güncelleme Hazırlanıyor</h2>
+                    <p style='color:#888;font-size:1rem'>Sistem yeni sürüme hazırlanıyor.<br>
+                    Yönetici onayı bekleniyor, kısa süre içinde devam edebilirsiniz.</p>
+                    <p style='color:#666;font-size:0.85rem'>Verileriniz güvende — hiçbir şey kaybolmadı.</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    st.stop()
     except:
-        pass  # Hata olursa engelleme yapma
+        pass  # Bağlantı hatası olursa engelleme yapma
+
 
 with st.sidebar:
     st.markdown("## 🏢 MWCRMPRO")
@@ -5362,7 +5371,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v6.3 &nbsp;|&nbsp; "
+    "MWCRMPRO v6.4 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
