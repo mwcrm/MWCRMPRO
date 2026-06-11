@@ -2924,6 +2924,12 @@ elif aktif == "teklif":
 
     st.markdown("## Teklif Olustur")
 
+    # Cari kartlar — tablo için
+    _df_cari_tek = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+    for _c in ["beklenen_ciro","gerceklesen_ciro"]:
+        if _c in _df_cari_tek.columns:
+            _df_cari_tek[_c] = pd.to_numeric(_df_cari_tek[_c], errors="coerce").fillna(0)
+
     IL_KM = {
         ("Istanbul","Ankara"):454,("Ankara","Istanbul"):454,
         ("Istanbul","Izmir"):479,("Izmir","Istanbul"):479,
@@ -3449,27 +3455,52 @@ elif aktif == "teklif":
                     st.success("🗑️ Teklif silindi!")
                     st.rerun()
 
-            # Özet tablo
+            # ── TEKLİF + İŞLEM YAN YANA ──────────────────────────────────────
             st.divider()
-            goster_cols = [c for c in ["id","tarih","musteri_adi","toplam_tutar","olusturan"] if c in df_tek.columns]
-            df_ozet = df_tek[goster_cols].copy()
-            if "toplam_tutar" in df_ozet.columns:
-                df_ozet["toplam_tutar"] = df_ozet["toplam_tutar"].apply(lambda x: fmt_para(float(x or 0)))
-            st.dataframe(df_ozet, use_container_width=True, hide_index=True)
+            _col_tek, _col_isl = st.columns(2)
+
+            with _col_tek:
+                st.caption("**📄 Kayıtlı Teklifler**")
+                _df_tek_oz = df_tek[["id","tarih","musteri_adi","olusturan"]].copy()
+                _df_tek_oz["tarih"] = _df_tek_oz["tarih"].astype(str).str[:16]
+                # Cari kartlardan tüm bilgileri ekle
+                if not _df_cari_tek.empty:
+                    _ciro_cols = ["firma","gsm","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro"]
+                    _ciro = _df_cari_tek[[c for c in _ciro_cols if c in _df_cari_tek.columns]]
+                    _df_tek_oz = _df_tek_oz.merge(_ciro, left_on="musteri_adi", right_on="firma", how="left")
+                    _df_tek_oz["beklenen_ciro"] = pd.to_numeric(_df_tek_oz["beklenen_ciro"], errors="coerce").fillna(0)
+                    _df_tek_oz["gerceklesen_ciro"] = pd.to_numeric(_df_tek_oz["gerceklesen_ciro"], errors="coerce").fillna(0)
+                    _df_tek_oz["fark"] = _df_tek_oz["gerceklesen_ciro"] - _df_tek_oz["beklenen_ciro"]
+                    _df_tek_oz["beklened_ciro"] = _df_tek_oz["beklenen_ciro"].apply(fmt_para)
+                    _df_tek_oz["gerceklesen_ciro"] = _df_tek_oz["gerceklesen_ciro"].apply(fmt_para)
+                    _df_tek_oz["fark"] = _df_tek_oz["fark"].apply(fmt_para)
+                _df_tek_oz.rename(columns={
+                    "id":"ID","tarih":"Tarih","musteri_adi":"Müşteri",
+                    "gsm":"Tel","temsilci":"Temsilci","islem_asamasi":"Aşama",
+                    "beklened_ciro":"Hedef","gerceklesen_ciro":"Gerçekleşen",
+                    "fark":"Fark","olusturan":"Gönderen"
+                }, inplace=True)
+                if "bolge" in _df_tek_oz.columns:
+                    _df_tek_oz.rename(columns={"bolge":"Bölge"}, inplace=True)
+                _goster = [c for c in ["ID","Tarih","Müşteri","Tel","Temsilci","Aşama","Bölge","Hedef","Gerçekleşen","Fark","Gönderen"] if c in _df_tek_oz.columns]
+                st.dataframe(_df_tek_oz[_goster], use_container_width=True, hide_index=True)
+
+            with _col_isl:
+                st.caption("**📱 Gönderim Kayıtları**")
+                try:
+                    _df_isl = db_read("islem_kaydi", order_col="tarih", limit=50)
+                    if not _df_isl.empty:
+                        _df_isl = _df_isl[_df_isl["islem_turu"].str.contains("Teklif|WhatsApp|Email|WA", case=False, na=False)]
+                        _df_isl["tarih"] = _df_isl["tarih"].astype(str).str[:16]
+                        _df_isl.rename(columns={"id":"ID","tarih":"Tarih","musteri_adi":"Müşteri","islem_turu":"Tür","gonderim_bilgisi":"Numara","olusturan":"Gönderen"}, inplace=True)
+                        st.dataframe(_df_isl[["Tarih","Tür","Müşteri","Numara","Gönderen"]], use_container_width=True, hide_index=True)
+                    else:
+                        st.info("Kayıt yok.")
+                except Exception as _e:
+                    st.error(f"Hata: {_e}")
 
     except Exception as e:
         st.error(f"Hata: {e}")
-
-    st.markdown("### Islem Kayitlari")
-    try:
-        df_islem = db_read("islem_kaydi", order_col="tarih", limit=30)
-        if not df_islem.empty:
-            goster = [c for c in ["tarih","musteri_adi","islem_turu","gonderim_bilgisi","olusturan"] if c in df_islem.columns]
-            st.dataframe(df_islem[goster], use_container_width=True, hide_index=True)
-        else:
-            st.info("Henuz islem kaydi yok.")
-    except Exception as e:
-        st.error(f"Islem kaydi hatasi: {e}")
 
 # ── EXCEL AKTAR ──────────────────────────────────────────────────────────────
 elif aktif == "excel":
