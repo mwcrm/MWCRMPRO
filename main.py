@@ -757,7 +757,7 @@ def save_menu_tercihi(kullanici, sira):
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 
 # ── VERSİYON KONTROL SİSTEMİ ─────────────────────────────────────────────────
-GUNCEL_SURUM = "v6.1"  # Bu kodun versiyonu — her güncellemede artır
+GUNCEL_SURUM = "v6.2"  # Bu kodun versiyonu — her güncellemede artır
 
 def _surum_kontrol():
     """Kullanıcı stable sürümde mi kontrol et"""
@@ -2355,22 +2355,25 @@ elif aktif == "kullanici":
                 </div>
                 """, unsafe_allow_html=True)
                 st.markdown("")
-                # Yayınla butonu
-                if _stable_v != GUNCEL_SURUM:
-                    if st.button(f"🚀 {GUNCEL_SURUM} Yayınla", type="primary", use_container_width=True, key="surum_yayinla"):
-                        try:
-                            _sb_sv.table("sistem_ayarlari").upsert(
-                                {"anahtar":"stable_surum","deger":GUNCEL_SURUM},
-                                on_conflict="anahtar").execute()
-                            kullanici_log_kaydet("SURUM_YAYINLANDI","kullanici",
-                                f"{_stable_v} → {GUNCEL_SURUM} yayınlandı")
-                            st.success(f"✅ {GUNCEL_SURUM} yayınlandı!")
-                            st.balloons()
-                            st.rerun()
-                        except Exception as _esv:
-                            st.error(f"Hata: {_esv}")
+                # Yayınla butonu — her zaman görünür
+                if _stable_v == GUNCEL_SURUM:
+                    st.success(f"✅ Son sürüm ({GUNCEL_SURUM}) zaten yayında")
                 else:
-                    st.success("✅ Son sürüm yayında")
+                    st.info(f"📢 Kullanıcılar **{_stable_v}** sürümünde. **{GUNCEL_SURUM}** hazır.")
+
+                if st.button(f"🚀 {GUNCEL_SURUM} Sürümünü Yayınla",
+                            type="primary", use_container_width=True, key="surum_yayinla"):
+                    try:
+                        _sb_sv.table("sistem_ayarlari").upsert(
+                            {"anahtar":"stable_surum","deger":GUNCEL_SURUM},
+                            on_conflict="anahtar").execute()
+                        kullanici_log_kaydet("SURUM_YAYINLANDI","kullanici",
+                            f"{_stable_v} → {GUNCEL_SURUM} yayınlandı")
+                        st.success(f"✅ {GUNCEL_SURUM} yayınlandı!")
+                        st.balloons()
+                        st.rerun()
+                    except Exception as _esv:
+                        st.error(f"Hata: {_esv}")
 
                 # Geri yükle — önceki sürüme dön
                 st.markdown("")
@@ -5297,7 +5300,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v6.1 &nbsp;|&nbsp; "
+    "MWCRMPRO v6.2 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
