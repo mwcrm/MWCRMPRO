@@ -1298,6 +1298,37 @@ elif aktif == "liste":
                 except: pass
                 st.success("Arşive gönderildi!"); st.rerun()
 
+            # ── HIZLI KAYDET ─────────────────────────────────────────────────
+            if st.button("💾 Değişiklikleri Kaydet", key=f"hiz_kyt_{kart_id}", use_container_width=True, type="primary"):
+                _editor_state = st.session_state.get("cari_editor", {})
+                _edited_rows  = _editor_state.get("edited_rows", {})
+                _tablo_json   = st.session_state.get("_ls_tablo")
+                _kayit_sayi   = 0
+                if _edited_rows and _tablo_json:
+                    import json as _hk_json
+                    try:
+                        _rows = _hk_json.loads(_tablo_json)
+                        for idx_str, degisiklikler in _edited_rows.items():
+                            try:
+                                idx = int(idx_str)
+                                if idx >= len(_rows): continue
+                                rid = int(float(str(_rows[idx].get("id",0))))
+                                if not rid: continue
+                                guncelle = {k: str(v) if v is not None else ""
+                                           for k, v in degisiklikler.items() if k != "Seç"}
+                                if not guncelle: continue
+                                if sb_liste:
+                                    sb_liste.table("cari_kartlar").update(guncelle).eq("id", rid).execute()
+                                _kayit_sayi += 1
+                            except: pass
+                    except: pass
+                if _kayit_sayi > 0:
+                    try: db_read.clear()
+                    except: pass
+                    st.success(f"✅ {_kayit_sayi} satır kaydedildi!")
+                else:
+                    st.info("Tabloda değişiklik yok. Tabloda düzenleme yaptıktan sonra buradan kaydedebilirsiniz.")
+
             # ── HIZLI KAYDET BUTONU — ayrı satırda her zaman görünsün ────
             if st.button("💾 Bu Firmayı Kaydet", key=f"hiz_kyt_{kart_id}", use_container_width=True, type="primary"):
                 try:
