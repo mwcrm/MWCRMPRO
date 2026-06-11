@@ -758,7 +758,7 @@ with st.sidebar:
         cikis()
 
     st.divider()
-    st.markdown("**📌 Menü**")
+    st.divider()
 
     # ── MENÜ LİSTESİ ──────────────────────────────────────────────────────────
     _sb_liste = get_menu_tercihi(st.session_state["kullanici"])
@@ -1082,6 +1082,18 @@ elif aktif == "liste":
     m2.metric("Aktif",  len(df[df["durum"]=="Aktif"])  if "durum" in df.columns else 0)
     m3.metric("Hedef",  len(df[df["durum"]=="Hedef"])  if "durum" in df.columns else 0)
     m4.metric("Pasif",  len(df[df["durum"]=="Pasif"])  if "durum" in df.columns else 0)
+
+    # Aşama metrikleri — veri olan her aşama gösterilir
+    if "islem_asamasi" in df.columns:
+        _asama_grp = df[
+            df["islem_asamasi"].notna() &
+            (df["islem_asamasi"].astype(str).str.strip() != "") &
+            (df["islem_asamasi"].astype(str) != "nan")
+        ]["islem_asamasi"].value_counts()
+        if not _asama_grp.empty:
+            _asama_cols = st.columns(len(_asama_grp))
+            for _ci, (_asama_adi, _asama_sayi) in enumerate(_asama_grp.items()):
+                _asama_cols[_ci].metric(_asama_adi, _asama_sayi)
 
     # ── FİLTRE ──────────────────────────────────────────────────────────────────
     f1,f2,f3 = st.columns(3)
@@ -4968,7 +4980,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v5.0 &nbsp;|&nbsp; "
+    "MWCRMPRO v5.1 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
