@@ -2757,25 +2757,37 @@ elif aktif == "rapor":
                 Beklenen=("beklenen_ciro","sum"),
                 Gerceklesen=("gerceklesen_ciro","sum")
             ).reset_index().sort_values("Adet",ascending=False)
+            a_oz = df_rapor_fil.groupby("islem_asamasi").agg(
+                Adet=("firma","count"),
+                Beklenen=("beklenen_ciro","sum"),
+                Gerceklesen=("gerceklesen_ciro","sum")
+            ).reset_index().sort_values("Adet",ascending=False)
             a_oz["Başarı%"] = a_oz.apply(lambda r: f"{r['Gerceklesen']/r['Beklenen']*100:.1f}%" if r["Beklenen"]>0 else "—", axis=1)
-            a_oz["Beklenen"] = a_oz["Beklenen"].apply(fmt_para)
-            a_oz["Gerceklesen"] = a_oz["Gerceklesen"].apply(fmt_para)
-            a_oz.columns = ["Aşama","Müşteri Sayısı","Beklenen Ciro","Gerçekleşen","Başarı%"]
-            st.markdown(f"**📊 Aşama Özeti** — {len(df_rapor_fil)} kayıt")
-            st.dataframe(a_oz, use_container_width=True, hide_index=True)
 
-            # Durum özeti de göster
+            # Aşama + Durum tek satırda metrikler
+            st.caption(f"**Aşama Özeti** — {len(df_rapor_fil)} kayıt")
+            _a_cols = st.columns(len(a_oz))
+            for _i, (_,_row) in enumerate(a_oz.iterrows()):
+                _a_cols[_i].metric(
+                    str(_row["islem_asamasi"]),
+                    f"{int(_row['Adet'])} firma",
+                    delta=_row["Başarı%"] if _row["Başarı%"] != "—" else None
+                )
+
             if "durum" in df_rapor_fil.columns:
                 d_oz2 = df_rapor_fil.groupby("durum").agg(
                     Adet=("firma","count"),
                     Beklenen=("beklenen_ciro","sum"),
                     Gerceklesen=("gerceklesen_ciro","sum")
                 ).reset_index().sort_values("Adet",ascending=False)
-                d_oz2["Beklenen"] = d_oz2["Beklenen"].apply(fmt_para)
-                d_oz2["Gerceklesen"] = d_oz2["Gerceklesen"].apply(fmt_para)
-                d_oz2.columns = ["Durum","Müşteri Sayısı","Beklenen Ciro","Gerçekleşen"]
-                st.markdown("**📊 Durum Özeti:**")
-                st.dataframe(d_oz2, use_container_width=True, hide_index=True)
+                st.caption("**Durum Özeti**")
+                _d_cols = st.columns(len(d_oz2))
+                for _i, (_,_row) in enumerate(d_oz2.iterrows()):
+                    _d_cols[_i].metric(
+                        str(_row["durum"]),
+                        f"{int(_row['Adet'])} firma",
+                        delta=fmt_para(_row["Gerceklesen"])
+                    )
 
             st.divider()
             # Her aşama için detay tab
@@ -2857,46 +2869,6 @@ elif aktif == "rapor":
                     st.download_button("📥 İndir", data=buf_wa, file_name="wa_email.xlsx", use_container_width=True)
         except Exception as e:
             st.error(f"Hata: {e}")
-
-    st.divider()
-    st.markdown("### 📄 Teklif Raporları")
-
-    if not df_tek_r.empty and "toplam_tutar" in df_tek_r.columns:
-        df_tek_r["toplam_tutar"] = pd.to_numeric(df_tek_r["toplam_tutar"], errors="coerce").fillna(0)
-        tk1,tk2,tk3 = st.columns(3)
-        tk1.metric("Toplam Teklif", len(df_tek_r))
-        tk2.metric("Toplam Tutar", fmt_para(df_tek_r["toplam_tutar"].sum()))
-        tk3.metric("Ort. Teklif", fmt_para(df_tek_r["toplam_tutar"].mean()))
-
-    with st.expander("📄 Verilen Teklifler Raporu"):
-        if df_tek_r.empty:
-            st.info("Teklif yok.")
-        else:
-            # Cari kartlarla birleştir — beklenen/gerçekleşen ciro bilgilerini ekle
-            _df_tek_cari = df_tek_r.copy()
-            if not df_rapor.empty:
-                _cari_lookup = df_rapor[["firma","beklenen_ciro","gerceklesen_ciro","durum","islem_asamasi"]].drop_duplicates("firma")
-                _df_tek_cari = _df_tek_cari.merge(_cari_lookup, left_on="musteri_adi", right_on="firma", how="left")
-
-            # Tüm teklif verilen müşteriler
-            _df_tek_cari["beklenen_ciro"] = pd.to_numeric(_df_tek_cari.get("beklenen_ciro",0), errors="coerce").fillna(0)
-            _df_tek_cari["gerceklesen_ciro"] = pd.to_numeric(_df_tek_cari.get("gerceklesen_ciro",0), errors="coerce").fillna(0)
-
-            st.caption(f"**{len(_df_tek_cari)} teklif** — tüm teklif verilen müşteriler")
-
-            goster_cols = [c for c in ["id","tarih","musteri_adi","durum","islem_asamasi","beklenen_ciro","gerceklesen_ciro","olusturan","notlar"] if c in _df_tek_cari.columns]
-            df_gs = _df_tek_cari[goster_cols].copy()
-            if "beklenen_ciro" in df_gs.columns:
-                df_gs["beklenen_ciro"] = df_gs["beklenen_ciro"].apply(fmt_para)
-            if "gerceklesen_ciro" in df_gs.columns:
-                df_gs["gerceklesen_ciro"] = df_gs["gerceklesen_ciro"].apply(fmt_para)
-            if "tarih" in df_gs.columns:
-                df_gs["tarih"] = df_gs["tarih"].astype(str).str[:16]
-            st.dataframe(df_gs, use_container_width=True, hide_index=True)
-
-            buf_t = _rio2.BytesIO(); _df_tek_cari.to_excel(buf_t, index=False); buf_t.seek(0)
-            st.download_button("📥 İndir", data=buf_t, file_name="teklifler.xlsx", use_container_width=True)
-
 
 
 elif aktif == "teklif":
