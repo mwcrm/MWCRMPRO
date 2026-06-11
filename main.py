@@ -2742,7 +2742,6 @@ elif aktif == "rapor":
             buf_b = _rio2.BytesIO(); b_oz.to_excel(buf_b, index=False); buf_b.seek(0)
             st.download_button("📥 İndir", data=buf_b, file_name="bolge.xlsx", use_container_width=True)
 
-    st.divider()
     with st.expander("🔄 Aşama & Durum Bazlı Detay Raporu", expanded=False):
         if df_rapor.empty: st.info("Veri yok.")
         else:
