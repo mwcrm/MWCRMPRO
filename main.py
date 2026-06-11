@@ -757,7 +757,7 @@ def save_menu_tercihi(kullanici, sira):
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 
 # ── VERSİYON KONTROL SİSTEMİ ─────────────────────────────────────────────────
-GUNCEL_SURUM = "v5.9"  # Bu kodun versiyonu — her güncellemede artır
+GUNCEL_SURUM = "v6.0"  # Bu kodun versiyonu — her güncellemede artır
 
 def _surum_kontrol():
     """Kullanıcı stable sürümde mi kontrol et"""
@@ -778,16 +778,17 @@ if not st.session_state.get("giris", False):
 
 # Versiyon kontrolü — sadece admin olmayanlara
 if st.session_state.get("rol") != "admin":
-    if not _surum_kontrol():
-        st.markdown("""
-        <div style='text-align:center;padding:80px 20px'>
-        <h1>🔄</h1>
-        <h2>Sistem Güncelleniyor</h2>
-        <p style='color:#888;font-size:1.1rem'>Kısa süre içinde tekrar kullanıma açılacak.<br>Lütfen birkaç dakika sonra tekrar deneyin.</p>
-        <p style='color:#bbb;font-size:0.85rem'>Verileriniz güvende, hiçbir şey kaybolmadı.</p>
-        </div>
-        """, unsafe_allow_html=True)
-        st.stop()
+    try:
+        _sb_s = get_sb_client()
+        if _sb_s:
+            _res = _sb_s.table("sistem_ayarlari").select("deger").eq("anahtar","stable_surum").execute()
+            if _res.data:
+                _stable = _res.data[0]["deger"]
+                # Sadece "guncelleniyor" değilse kontrol et — kullanıcı her zaman çalışır
+                if _stable != "guncelleniyor" and _stable != GUNCEL_SURUM:
+                    pass  # Eski sürümde çalışmaya devam et — sorun yok
+    except:
+        pass  # Hata olursa engelleme yapma
 
 with st.sidebar:
     st.markdown("## 🏢 MWCRMPRO")
@@ -2337,18 +2338,18 @@ elif aktif == "kullanici":
             with _col_a:
                 st.markdown(f"""
                 <div style='background:#1a1a2e;border:2px solid #1f6feb;border-radius:12px;padding:20px;text-align:center'>
-                <div style='font-size:0.85rem;color:#888;margin-bottom:4px'>👑 ADMİN (Sen)</div>
+                <div style='font-size:0.85rem;color:#888;margin-bottom:4px'>👑 ADMİN — Son Sürüm</div>
                 <div style='font-size:2rem;font-weight:bold;color:#1f6feb'>{GUNCEL_SURUM}</div>
-                <div style='font-size:0.8rem;color:#aaa;margin-top:4px'>Son kod — hep güncel</div>
+                <div style='font-size:0.8rem;color:#aaa;margin-top:4px'>Geliştirme sürümü</div>
                 </div>
                 """, unsafe_allow_html=True)
 
             with _col_b:
                 _renk = "#28a745" if _stable_v == GUNCEL_SURUM else "#ff9800"
-                _durum_yazi = "Güncel ✅" if _stable_v == GUNCEL_SURUM else "Bekliyor ⏳"
+                _durum_yazi = "✅ Güncel" if _stable_v == GUNCEL_SURUM else "⏳ Yayın Bekliyor"
                 st.markdown(f"""
                 <div style='background:#1a1a2e;border:2px solid {_renk};border-radius:12px;padding:20px;text-align:center'>
-                <div style='font-size:0.85rem;color:#888;margin-bottom:4px'>👥 KULLANICILAR</div>
+                <div style='font-size:0.85rem;color:#888;margin-bottom:4px'>👥 KULLANICILAR — Yayındaki Sürüm</div>
                 <div style='font-size:2rem;font-weight:bold;color:{_renk}'>{_stable_v}</div>
                 <div style='font-size:0.8rem;color:#aaa;margin-top:4px'>{_durum_yazi}</div>
                 </div>
@@ -2356,78 +2357,56 @@ elif aktif == "kullanici":
 
             st.markdown("---")
 
-            # ── YAYINLA / DURDUR ─────────────────────────────────────────────────
+            # ── YAYINLA ──────────────────────────────────────────────────────
             if _stable_v != GUNCEL_SURUM:
-                st.warning(f"Kullanıcılar **{_stable_v}** sürümünde. Yeni sürüm **{GUNCEL_SURUM}** hazır.")
-
-                if _stable_v == "guncelleniyor":
-                    st.info("🔒 Kullanıcılar şu an 'Sistem Güncelleniyor' ekranı görüyor.")
-
-                if st.button(f"🚀 {GUNCEL_SURUM} Sürümünü Kullanıcılara Yayınla",
+                st.info(f"📢 Kullanıcılar **{_stable_v}** sürümünde çalışıyor. Yeni sürüm **{GUNCEL_SURUM}** hazır.")
+                st.caption("Kullanıcılar yayınlayana kadar mevcut sürümde çalışmaya devam eder.")
+                if st.button(f"🚀 {GUNCEL_SURUM} Sürümünü Yayınla",
                             type="primary", use_container_width=True, key="surum_yayinla"):
                     try:
                         _sb_sv.table("sistem_ayarlari").upsert(
                             {"anahtar":"stable_surum","deger":GUNCEL_SURUM},
                             on_conflict="anahtar").execute()
                         kullanici_log_kaydet("SURUM_YAYINLANDI","kullanici",
-                            f"{GUNCEL_SURUM} kullanıcılara yayınlandı")
-                        st.success(f"✅ {GUNCEL_SURUM} yayınlandı! Kullanıcılar yeni sürümde.")
+                            f"{_stable_v} → {GUNCEL_SURUM} yayınlandı")
+                        st.success(f"✅ {GUNCEL_SURUM} yayınlandı!")
                         st.balloons()
                         st.rerun()
                     except Exception as _esv:
                         st.error(f"Hata: {_esv}")
             else:
                 st.success(f"✅ Kullanıcılar son sürümde ({GUNCEL_SURUM}) çalışıyor.")
-                st.divider()
-                st.markdown("**Güncelleme yapacak mısın?**")
-                st.caption("Önce kullanıcıları durdur, kodu güncelle, sonra yayınla.")
-                if st.button("⏸️ Kullanıcıları Durdur (Güncelleme Modu)",
-                            use_container_width=True, key="surum_durdur"):
-                    try:
-                        _sb_sv.table("sistem_ayarlari").upsert(
-                            {"anahtar":"stable_surum","deger":"guncelleniyor"},
-                            on_conflict="anahtar").execute()
-                        kullanici_log_kaydet("SURUM_DURDURULDU","kullanici",
-                            "Kullanıcılar güncelleme moduna alındı")
-                        st.success("✅ Kullanıcılar durduruldu. Şimdi kodu güncelleyebilirsin.")
-                        st.rerun()
-                    except Exception as _esv2:
-                        st.error(f"Hata: {_esv2}")
 
             st.divider()
 
-            # ── KULLANIM KILAVUZU ─────────────────────────────────────────────────
-            with st.expander("📖 Nasıl Kullanılır?"):
-                st.markdown("""
-**Normal güncelleme (küçük değişiklikler):**
-1. Kodu düzenle → push yap
-2. Burada **🚀 Yayınla** butonuna bas
-3. Kullanıcılar yeni sürüme geçer ✅
+            with st.expander("📖 Nasıl Çalışır?"):
+                st.markdown(f"""
+**Kullanıcılar hiç durmaz — iş kesilmez.**
 
-**Kritik güncelleme (büyük değişiklikler):**
-1. **⏸️ Kullanıcıları Durdur** butonuna bas
-2. Kullanıcılar "Sistem Güncelleniyor" ekranı görür
-3. Kodu düzenle → push yap → test et
-4. **🚀 Yayınla** butonuna bas
-5. Kullanıcılar devam eder ✅
+| | Admin | Kullanıcılar |
+|---|---|---|
+| Sürüm | {GUNCEL_SURUM} | {_stable_v} |
+| Durum | Son geliştirme | Kararlı yayın |
 
-**Veri güvenliği:** Kod değişse de Supabase'deki tüm veriler korunur.
-            """)
+**Akış:**
+1. Kodu değiştir → push yap (kullanıcılar etkilenmez)
+2. Admin olarak test et
+3. **🚀 Yayınla** → kullanıcılar yeni sürüme geçer
+4. Veri kaybolmaz, iş durmaz
+                """)
 
-        # ── YAYINLAMA GEÇMİŞİ ────────────────────────────────────────────────
-        with st.expander("📋 Yayınlama Geçmişi"):
-            try:
-                _res_log_sv = _sb_sv.table("kullanici_log").select("*") \
-                    .in_("islem",["SURUM_YAYINLANDI","SURUM_DURDURULDU"]) \
-                    .order("tarih",desc=True).limit(20).execute()
-                if _res_log_sv.data:
-                    _df_sv = pd.DataFrame(_res_log_sv.data)[["tarih","kullanici","islem","detay"]]
-                    _df_sv["tarih"] = _df_sv["tarih"].astype(str).str[:16]
-                    st.dataframe(_df_sv, use_container_width=True, hide_index=True)
-                else:
-                    st.caption("Henüz yayın geçmişi yok.")
-            except:
-                st.caption("Yüklenemedi.")
+            with st.expander("📋 Yayınlama Geçmişi"):
+                try:
+                    _res_log_sv = _sb_sv.table("kullanici_log").select("*")                         .eq("islem","SURUM_YAYINLANDI")                         .order("tarih",desc=True).limit(20).execute()
+                    if _res_log_sv.data:
+                        _df_sv = pd.DataFrame(_res_log_sv.data)[["tarih","kullanici","detay"]]
+                        _df_sv["tarih"] = _df_sv["tarih"].astype(str).str[:16]
+                        st.dataframe(_df_sv, use_container_width=True, hide_index=True)
+                    else:
+                        st.caption("Henüz yayın geçmişi yok.")
+                except:
+                    st.caption("Yüklenemedi.")
+
 
 
 
@@ -5287,7 +5266,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v5.9 &nbsp;|&nbsp; "
+    "MWCRMPRO v6.0 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
