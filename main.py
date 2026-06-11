@@ -1077,38 +1077,34 @@ elif aktif == "liste":
             tum_asama_opts.append(_ea)
 
     # ── ÜST METRİKLER ───────────────────────────────────────────────────────────
-    # ── ÜST METRİKLER — DÜZENLİ ────────────────────────────────────────────
-    st.markdown("**📊 Özet**")
-
-    # Satır 1: Toplam + Durum bazlı
+    # ── ÜST METRİKLER ────────────────────────────────────────────────────────
+    # Durum satırı — sabit 5 kolon, boşluk sağda
     if "durum" in df.columns:
-        _tum_durumlar_met = ["Aktif","Hedef","Pasif"] + [
+        _tum_d = ["Aktif","Hedef","Pasif"] + [
             d for d in df["durum"].dropna().unique()
             if str(d).strip() and str(d) != "nan" and d not in ["Aktif","Hedef","Pasif"]
         ]
-        _durum_veri = [(d, len(df[df["durum"]==d])) for d in _tum_durumlar_met if len(df[df["durum"]==d]) > 0]
-        _durum_veri = [("Toplam", len(df))] + _durum_veri
+        _d_veri = [("Toplam", len(df))] + [(d, len(df[df["durum"]==d])) for d in _tum_d if len(df[df["durum"]==d]) > 0]
     else:
-        _durum_veri = [("Toplam", len(df))]
+        _d_veri = [("Toplam", len(df))]
 
-    # Satır 1 — max 5 kolon
-    _sat1 = _durum_veri[:5]
-    _cols1 = st.columns(len(_sat1))
-    for i, (ad, sayi) in enumerate(_sat1):
-        _cols1[i].metric(ad, sayi)
+    _c = st.columns(5)
+    for i in range(5):
+        if i < len(_d_veri):
+            _c[i].metric(_d_veri[i][0], _d_veri[i][1])
 
-    # Satır 2 — Aşama bazlı
+    # Aşama satırı — sabit 5 kolon, boşluk sağda
     if "islem_asamasi" in df.columns:
-        _asama_grp = df[
-            df["islem_asamasi"].notna() &
-            (df["islem_asamasi"].astype(str).str.strip() != "") &
-            (df["islem_asamasi"].astype(str) != "nan")
-        ]["islem_asamasi"].value_counts()
-        if not _asama_grp.empty:
-            _sat2 = list(_asama_grp.items())[:5]
-            _cols2 = st.columns(len(_sat2))
-            for i, (ad, sayi) in enumerate(_sat2):
-                _cols2[i].metric(ad, int(sayi))
+        _a_veri = [
+            (a, int(n)) for a, n in
+            df[df["islem_asamasi"].notna() & (df["islem_asamasi"].astype(str).str.strip() != "") & (df["islem_asamasi"].astype(str) != "nan")]
+            ["islem_asamasi"].value_counts().items()
+        ]
+        if _a_veri:
+            _ca = st.columns(5)
+            for i in range(5):
+                if i < len(_a_veri):
+                    _ca[i].metric(_a_veri[i][0], _a_veri[i][1])
 
     # ── FİLTRE ──────────────────────────────────────────────────────────────────
     f1,f2,f3 = st.columns(3)
@@ -5126,7 +5122,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v5.4 &nbsp;|&nbsp; "
+    "MWCRMPRO v5.5 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
