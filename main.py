@@ -498,7 +498,11 @@ def _tanimlar_yukle(tip):
             _r = _sb.table("sistem_tanimlar").select("deger").eq("tip", tip).order("sira").execute()
             if _r.data:
                 return [d["deger"] for d in _r.data]
-    except: pass
+            # Veri yok ama tablo erişilebilir — boş liste döndür
+            return []
+    except Exception as _te:
+        pass
+    # Fallback
     if tip == "asama":
         return ["İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"]
     return ["Aktif","Hedef","Pasif"]
@@ -1157,20 +1161,20 @@ elif aktif == "liste":
 
     # ── ASAMA & DURUM LİSTELERİ — sistem_tanimlar tablosundan ──────────────────
     tum_asama_opts = _tanimlar_yukle("asama")
-    # df'de olan ama tabloda olmayan aşamaları da ekle
-    if not df.empty and "islem_asamasi" in df.columns:
-        for _da in df["islem_asamasi"].dropna().unique():
-            if str(_da).strip() and str(_da) not in ["nan",""] and _da not in tum_asama_opts:
-                tum_asama_opts.append(str(_da))
-
     tum_durum_opts = _tanimlar_yukle("durum")
-    # df'de olan ama tabloda olmayan durumları da ekle
-    if not df.empty and "durum" in df.columns:
-        for _dd in df["durum"].dropna().unique():
-            if str(_dd).strip() and str(_dd) not in ["nan",""] and _dd not in tum_durum_opts:
-                tum_durum_opts.append(str(_dd))
 
-    # ── ÜST METRİKLER — TIKLANABİLİR ───────────────────────────────────────
+    # df'de olan ama tabloda olmayan aşama/durumları da ekle
+    if not df.empty:
+        if "islem_asamasi" in df.columns:
+            for _da in df["islem_asamasi"].dropna().unique():
+                if str(_da).strip() and str(_da) not in ["nan",""] and _da not in tum_asama_opts:
+                    tum_asama_opts.append(str(_da))
+        if "durum" in df.columns:
+            for _dd in df["durum"].dropna().unique():
+                if str(_dd).strip() and str(_dd) not in ["nan",""] and _dd not in tum_durum_opts:
+                    tum_durum_opts.append(str(_dd))
+
+    # ── ÜST METRİKLER — TÜM DURUM VE AŞAMALAR ──────────────────────────────
     # Durum satırı
     _d_veri = [("Toplam", len(df))]
     for _dn in tum_durum_opts:
@@ -1182,19 +1186,15 @@ elif aktif == "liste":
         if i < len(_d_veri):
             _ad, _sayi = _d_veri[i]
             if _c[i].button(f"**{_ad}**\n{_sayi}", key=f"dur_btn_{i}", use_container_width=True):
-                if _ad == "Toplam":
-                    st.session_state["fil_durum"] = "Tümü"
-                else:
-                    st.session_state["fil_durum"] = _ad
+                st.session_state["fil_durum"] = "Tümü" if _ad == "Toplam" else _ad
                 st.rerun()
 
     # Aşama satırı
-    _a_veri = []
-    for _an in tum_asama_opts:
-        _ac = len(df[df["islem_asamasi"]==_an]) if "islem_asamasi" in df.columns else 0
-        _a_veri.append((_an, _ac))
-
-    if _a_veri:
+    if tum_asama_opts:
+        _a_veri = []
+        for _an in tum_asama_opts:
+            _ac = len(df[df["islem_asamasi"]==_an]) if "islem_asamasi" in df.columns else 0
+            _a_veri.append((_an, _ac))
         _ca = st.columns(min(len(_a_veri), 6))
         for i in range(len(_ca)):
             if i < len(_a_veri):
