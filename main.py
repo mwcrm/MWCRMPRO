@@ -2754,14 +2754,6 @@ elif aktif == "rapor":
     st.divider()
     st.markdown("### 🏢 Cari Raporlar")
 
-    with st.expander("📊 Durum Dağılımı"):
-        if df_rapor.empty: st.info("Veri yok.")
-        else:
-            d_oz = df_rapor.groupby("durum").agg(Adet=("firma","count"),Beklenen=("beklenen_ciro","sum"),Gerceklesen=("gerceklesen_ciro","sum")).reset_index()
-            d_oz["Beklenen"] = d_oz["Beklenen"].apply(fmt_para)
-            d_oz["Gerceklesen"] = d_oz["Gerceklesen"].apply(fmt_para)
-            st.dataframe(d_oz, use_container_width=True, hide_index=True)
-
     with st.expander("🔄 Aşama & Durum Bazlı Detay Raporu", expanded=False):
         if df_rapor.empty: st.info("Veri yok.")
         else:
