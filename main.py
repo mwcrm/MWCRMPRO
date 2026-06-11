@@ -2839,19 +2839,6 @@ elif aktif == "rapor":
                         buf_ar = _rio2.BytesIO(); df_asama_r.to_excel(buf_ar, index=False); buf_ar.seek(0)
                         st.download_button(f"📥 {asama_adi} Excel", data=buf_ar, file_name=f"asama_{asama_adi}.xlsx", use_container_width=True, key=f"dl_asama_{asama_adi}")
 
-    with st.expander("👤 Temsilci Bazlı Rapor"):
-        if df_rapor.empty: st.info("Veri yok.")
-        else:
-            t_oz3 = df_rapor.groupby("temsilci").agg(
-                Musteri=("firma","count"), Beklenen=("beklenen_ciro","sum"),
-                Gerceklesen=("gerceklesen_ciro","sum"), Fark=("fark","sum")
-            ).reset_index().sort_values("Gerceklesen",ascending=False)
-            t_oz3["Başarı%"] = t_oz3.apply(lambda r: f"{r['Gerceklesen']/r['Beklenen']*100:.1f}%" if r["Beklenen"]>0 else "0%", axis=1)
-            t_oz3["Beklenen"] = t_oz3["Beklenen"].apply(fmt_para)
-            t_oz3["Gerceklesen"] = t_oz3["Gerceklesen"].apply(fmt_para)
-            t_oz3["Fark"] = t_oz3["Fark"].apply(fmt_para)
-            st.dataframe(t_oz3, use_container_width=True, hide_index=True)
-
     with st.expander("🗺️ İl Bazlı Rapor (Top 15)"):
         if df_rapor.empty: st.info("Veri yok.")
         else:
