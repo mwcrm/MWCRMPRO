@@ -1444,67 +1444,42 @@ elif aktif == "liste":
     btn_k, btn_a, btn_s = st.columns(3)
     with btn_k:
         if st.button("💾 Değişiklikleri Kaydet", use_container_width=True, type="primary", key="liste_kaydet"):
-            # session_state'teki son tabloyu al
-            _tablo_json = st.session_state.get("_ls_tablo")
-            if not _tablo_json:
-                st.warning("Önce bir hücreye tıklayıp değişiklik yapın.")
+            # Sadece değişen satırları kaydet — edited_rows
+            _editor_state = st.session_state.get("cari_editor", {})
+            _edited_rows = _editor_state.get("edited_rows", {})
+
+            if not _edited_rows:
+                st.info("Değişiklik yok.")
             else:
+                kayit_sayi = 0
+                hata_list = []
+                _tablo_json = st.session_state.get("_ls_tablo")
                 try:
-                    _rows = _json_ls.loads(_tablo_json)
+                    _rows = _json_ls.loads(_tablo_json) if _tablo_json else []
                 except:
                     _rows = []
-                kayit_sayi = 0
-                hata_list  = []
-                for row in _rows:
-                    rid = row.get("id")
-                    if not rid or str(rid) in ["nan","None",""]: continue
+
+                for idx_str, degisiklikler in _edited_rows.items():
                     try:
-                        rid = int(float(str(rid)))
-                        guncelle = {
-                            "firma":         str(row.get("firma","") or ""),
-                            "yetkili":       str(row.get("yetkili","") or ""),
-                            "gsm":           str(row.get("gsm","") or ""),
-                            "sabit":         str(row.get("sabit","") or ""),
-                            "email":         str(row.get("email","") or ""),
-                            "il":            str(row.get("il","") or ""),
-                            "ilce":          str(row.get("ilce","") or ""),
-                            "durum":         str(row.get("durum","") or ""),
-                            "temsilci":      str(row.get("temsilci","") or ""),
-                            "islem_asamasi": str(row.get("islem_asamasi","") or ""),
-                            "aciklama":      str(row.get("aciklama","") or ""),
-                        }
-                        # notlar olmayan Supabase için 2 deneme
-                        ok = False
+                        idx = int(idx_str)
+                        if idx >= len(_rows): continue
+                        rid = int(float(str(_rows[idx].get("id",0))))
+                        if not rid: continue
+                        # Sadece değişen kolonları gönder
+                        guncelle = {k: str(v) if v is not None else "" 
+                                   for k, v in degisiklikler.items() if k != "Seç"}
+                        if not guncelle: continue
                         if sb_liste:
-                            try:
-                                sb_liste.table("cari_kartlar").update(guncelle).eq("id", rid).execute()
-                                ok = True
-                            except Exception as e1:
-                                # notlar kolonu yoksa onsuz dene
-                                g2 = {k:v for k,v in guncelle.items() if k != "aciklama"}
-                                try:
-                                    sb_liste.table("cari_kartlar").update(g2).eq("id", rid).execute()
-                                    ok = True
-                                except Exception as e2:
-                                    hata_list.append(f"ID{rid}: {e2}")
+                            sb_liste.table("cari_kartlar").update(guncelle).eq("id", rid).execute()
                         else:
                             conn_u = get_conn()
-                            try:
-                                sets = ", ".join([f"{k}=?" for k in guncelle])
-                                conn_u.execute(f"UPDATE cari_kartlar SET {sets} WHERE id=?",
-                                    list(guncelle.values()) + [rid])
-                                conn_u.commit(); ok = True
-                            except:
-                                g2 = {k:v for k,v in guncelle.items() if k != "aciklama"}
-                                sets = ", ".join([f"{k}=?" for k in g2])
-                                conn_u.execute(f"UPDATE cari_kartlar SET {sets} WHERE id=?",
-                                    list(g2.values()) + [rid])
-                                conn_u.commit()
-                                ok = True
-                            conn_u.close()
-                        if ok: kayit_sayi += 1
+                            sets = ", ".join([f"{k}=?" for k in guncelle])
+                            conn_u.execute(f"UPDATE cari_kartlar SET {sets} WHERE id=?",
+                                list(guncelle.values()) + [rid])
+                            conn_u.commit(); conn_u.close()
+                        kayit_sayi += 1
                     except Exception as e_row:
-                        hata_list.append(f"ID{rid}: {e_row}")
+                        hata_list.append(str(e_row))
 
                 try: db_read.clear()
                 except: pass
