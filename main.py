@@ -2689,30 +2689,32 @@ elif aktif == "rapor":
                 st.dataframe(t_oz, use_container_width=True, hide_index=True)
 
     with st.expander("🗺️ Bölge Raporu"):
-        if df_rand_r.empty:
-            st.info("Randevu yok.")
-        elif "bolge" in df_rand_r.columns:
-            # Randevu verisini cari kartlarla birleştir — beklenen/gerçekleşen ciro ekle
-            _bolge_ciro = pd.DataFrame()
-            if not df_rapor.empty and "il" in df_rapor.columns:
-                _bolge_ciro = df_rapor.groupby("il").agg(
-                    Beklenen=("beklenen_ciro","sum"),
-                    Gerceklesen=("gerceklesen_ciro","sum")
-                ).reset_index().rename(columns={"il":"bolge"})
+        # Randevu bölge tablosu
+        if not df_rand_r.empty and "bolge" in df_rand_r.columns:
             b_oz = df_rand_r.groupby("bolge").agg(
                 Randevu=("id","count"), Musteri=("musteri_adi","nunique"),
                 Bitti=("sonuc", lambda x: (x=="Bitti").sum())
             ).reset_index().sort_values("Randevu", ascending=False)
-            if not _bolge_ciro.empty:
-                b_oz = b_oz.merge(_bolge_ciro, on="bolge", how="left")
-                b_oz["Beklenen"] = b_oz["Beklenen"].fillna(0).apply(fmt_para)
-                b_oz["Gerceklesen"] = b_oz["Gerceklesen"].fillna(0).apply(fmt_para)
-                b_oz.columns = ["Bölge","Randevu","Müşteri","Bitti","Beklenen Ciro","Gerçekleşen"]
-            else:
-                b_oz.columns = ["Bölge","Randevu","Müşteri","Bitti"]
+            b_oz.columns = ["Bölge","Randevu","Müşteri","Bitti"]
+            st.caption("**Randevu Bölge Dağılımı:**")
             st.dataframe(b_oz, use_container_width=True, hide_index=True)
             buf_b = _rio2.BytesIO(); b_oz.to_excel(buf_b, index=False); buf_b.seek(0)
-            st.download_button("📥 İndir", data=buf_b, file_name="bolge.xlsx", use_container_width=True)
+            st.download_button("📥 İndir", data=buf_b, file_name="bolge_randevu.xlsx", use_container_width=True)
+        else:
+            st.info("Randevu yok.")
+
+        # İl bazlı ciro tablosu — cari kartlardan
+        if not df_rapor.empty and "il" in df_rapor.columns:
+            st.caption("**İl Bazlı Ciro:**")
+            il_ciro = df_rapor[df_rapor["il"].notna() & (df_rapor["il"].astype(str).str.strip() != "") & (df_rapor["il"].astype(str) != "nan")].groupby("il").agg(
+                Firma=("firma","count"),
+                Beklenen=("beklenen_ciro","sum"),
+                Gerceklesen=("gerceklesen_ciro","sum")
+            ).reset_index().sort_values("Beklenen", ascending=False)
+            il_ciro["Beklenen"] = il_ciro["Beklenen"].apply(fmt_para)
+            il_ciro["Gerceklesen"] = il_ciro["Gerceklesen"].apply(fmt_para)
+            il_ciro.columns = ["İl","Firma","Beklenen Ciro","Gerçekleşen"]
+            st.dataframe(il_ciro, use_container_width=True, hide_index=True)
 
     with st.expander("🎯 Görev Raporu"):
         if df_rand_r.empty:
