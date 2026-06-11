@@ -1171,31 +1171,28 @@ elif aktif == "liste":
                 tum_durum_opts.append(str(_dd))
 
     # ── ÜST METRİKLER ────────────────────────────────────────────────────────
-    # Durum satırı — tüm tanımlı durumlar, veri olanlar gösterilir
+    # Durum satırı — TÜM durumlar gösterilir, sayısı 0 da olsa
     _d_veri = [("Toplam", len(df))]
-    if "durum" in df.columns:
-        for _dn in tum_durum_opts:
-            _dc = len(df[df["durum"]==_dn])
-            if _dc > 0:
-                _d_veri.append((_dn, _dc))
+    for _dn in tum_durum_opts:
+        _dc = len(df[df["durum"]==_dn]) if "durum" in df.columns else 0
+        _d_veri.append((_dn, _dc))
 
-    _c = st.columns(5)
-    for i in range(5):
+    _c = st.columns(min(len(_d_veri), 6))
+    for i in range(len(_c)):
         if i < len(_d_veri):
             _c[i].metric(_d_veri[i][0], _d_veri[i][1])
 
-    # Aşama satırı — tüm tanımlı aşamalar, veri olanlar gösterilir
-    if "islem_asamasi" in df.columns:
-        _a_veri = []
-        for _an in tum_asama_opts:
-            _ac = len(df[df["islem_asamasi"]==_an])
-            if _ac > 0:
-                _a_veri.append((_an, _ac))
-        if _a_veri:
-            _ca = st.columns(5)
-            for i in range(5):
-                if i < len(_a_veri):
-                    _ca[i].metric(_a_veri[i][0], _a_veri[i][1])
+    # Aşama satırı — TÜM aşamalar gösterilir, sayısı 0 da olsa
+    _a_veri = []
+    for _an in tum_asama_opts:
+        _ac = len(df[df["islem_asamasi"]==_an]) if "islem_asamasi" in df.columns else 0
+        _a_veri.append((_an, _ac))
+
+    if _a_veri:
+        _ca = st.columns(min(len(_a_veri), 6))
+        for i in range(len(_ca)):
+            if i < len(_a_veri):
+                _ca[i].metric(_a_veri[i][0], _a_veri[i][1])
 
     # ── FİLTRE ──────────────────────────────────────────────────────────────────
     f1,f2,f3 = st.columns(3)
