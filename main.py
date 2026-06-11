@@ -1161,31 +1161,30 @@ elif aktif == "liste":
             if str(_da).strip() and str(_da) not in ["nan",""] and _da not in tum_asama_opts:
                 tum_asama_opts.append(str(_da))
 
-    # ── ÜST METRİKLER ───────────────────────────────────────────────────────────
     # ── ÜST METRİKLER ────────────────────────────────────────────────────────
-    # Durum satırı — sabit 5 kolon, boşluk sağda
+    # Durum satırı — df'den direkt oku, veri olanlar görünür
+    _d_veri = [("Toplam", len(df))]
     if "durum" in df.columns:
-        _tum_d = ["Aktif","Hedef","Pasif"] + [
-            d for d in df["durum"].dropna().unique()
-            if str(d).strip() and str(d) != "nan" and d not in ["Aktif","Hedef","Pasif"]
-        ]
-        _d_veri = [("Toplam", len(df))] + [(d, len(df[df["durum"]==d])) for d in _tum_d if len(df[df["durum"]==d]) > 0]
-    else:
-        _d_veri = [("Toplam", len(df))]
+        _durum_sayilari = df[
+            df["durum"].notna() & (df["durum"].astype(str).str.strip() != "") & (df["durum"].astype(str) != "nan")
+        ]["durum"].value_counts()
+        for _dn, _dc in _durum_sayilari.items():
+            _d_veri.append((str(_dn), int(_dc)))
 
     _c = st.columns(5)
     for i in range(5):
         if i < len(_d_veri):
             _c[i].metric(_d_veri[i][0], _d_veri[i][1])
 
-    # Aşama satırı — sabit 5 kolon, boşluk sağda
+    # Aşama satırı — df'den direkt oku, veri olanlar görünür
     if "islem_asamasi" in df.columns:
-        _a_veri = [
-            (a, int(n)) for a, n in
-            df[df["islem_asamasi"].notna() & (df["islem_asamasi"].astype(str).str.strip() != "") & (df["islem_asamasi"].astype(str) != "nan")]
-            ["islem_asamasi"].value_counts().items()
-        ]
-        if _a_veri:
+        _asama_sayilari = df[
+            df["islem_asamasi"].notna() &
+            (df["islem_asamasi"].astype(str).str.strip() != "") &
+            (df["islem_asamasi"].astype(str) != "nan")
+        ]["islem_asamasi"].value_counts()
+        if not _asama_sayilari.empty:
+            _a_veri = [(str(a), int(n)) for a, n in _asama_sayilari.items()]
             _ca = st.columns(5)
             for i in range(5):
                 if i < len(_a_veri):
@@ -1194,7 +1193,13 @@ elif aktif == "liste":
     # ── FİLTRE ──────────────────────────────────────────────────────────────────
     f1,f2,f3 = st.columns(3)
     filtre_asama = f1.selectbox("Aşama:", ["Tümü"]+tum_asama_opts, key="fil_asama")
-    filtre_durum = f2.selectbox("Durum:", ["Tümü","Aktif","Hedef","Pasif"], key="fil_durum")
+    # Durum filtresi — df'deki tüm durumlar
+    _tum_d = ["Aktif","Hedef","Pasif"]
+    if "durum" in df.columns:
+        for _dd in df["durum"].dropna().unique():
+            if str(_dd).strip() and str(_dd) != "nan" and _dd not in _tum_d:
+                _tum_d.append(str(_dd))
+    filtre_durum = f2.selectbox("Durum:", ["Tümü"]+_tum_d, key="fil_durum")
     ara_txt      = f3.text_input("🔍 Ara:", placeholder="Firma, yetkili, il...", key="ara_liste")
 
     df_f = df.copy()
