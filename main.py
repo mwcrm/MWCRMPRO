@@ -746,10 +746,38 @@ def save_menu_tercihi(kullanici, sira):
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 
+# ── VERSİYON KONTROL SİSTEMİ ─────────────────────────────────────────────────
+GUNCEL_SURUM = "v5.5"  # Bu kodun versiyonu — her güncellemede artır
+
+def _surum_kontrol():
+    """Kullanıcı stable sürümde mi kontrol et"""
+    try:
+        _sb_s = get_sb_client()
+        if not _sb_s: return True  # Bağlantı yoksa geç
+        _res = _sb_s.table("sistem_ayarlari").select("deger").eq("anahtar","stable_surum").execute()
+        if _res.data:
+            return _res.data[0]["deger"] == GUNCEL_SURUM
+        return True
+    except:
+        return True  # Hata olursa engelleme
+
 # Giriş kontrolü
 if not st.session_state.get("giris", False):
     giris_ekrani()
     st.stop()
+
+# Versiyon kontrolü — sadece admin olmayanlara
+if st.session_state.get("rol") != "admin":
+    if not _surum_kontrol():
+        st.markdown("""
+        <div style='text-align:center;padding:80px 20px'>
+        <h1>🔄</h1>
+        <h2>Sistem Güncelleniyor</h2>
+        <p style='color:#888;font-size:1.1rem'>Kısa süre içinde tekrar kullanıma açılacak.<br>Lütfen birkaç dakika sonra tekrar deneyin.</p>
+        <p style='color:#bbb;font-size:0.85rem'>Verileriniz güvende, hiçbir şey kaybolmadı.</p>
+        </div>
+        """, unsafe_allow_html=True)
+        st.stop()
 
 with st.sidebar:
     st.markdown("## 🏢 MWCRMPRO")
@@ -2006,7 +2034,7 @@ elif aktif == "kullanici":
         "excel":"📥 Excel","arsiv":"🗃️ Arşiv","mesajlar":"💬 Mesajlar"
     }
 
-    kul_tab1, kul_tab2, kul_tab3, kul_tab4 = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log"])
+    kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5 = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi"])
 
     with kul_tab1:
         df_kul = db_read("kullanicilar", extra_sql="")
@@ -2266,7 +2294,79 @@ elif aktif == "kullanici":
                     except Exception as _e_del:
                         st.error(f"Silinemedi: {_e_del}")
 
-# ── RAPORLAR ─────────────────────────────────────────────────────────────────
+    with kul_tab5:
+        st.markdown("### 🚀 Sürüm Yönetimi")
+        st.caption("Kullanıcıların hangi sürümü göreceğini buradan kontrol edersin. Admin her zaman son sürümü görür.")
+
+        _sb_sv = get_sb_client()
+
+        # Mevcut durumu göster
+        try:
+            _res_stable = _sb_sv.table("sistem_ayarlari").select("deger").eq("anahtar","stable_surum").execute()
+            _res_guncel = _sb_sv.table("sistem_ayarlari").select("deger").eq("anahtar","guncel_surum").execute()
+            _stable_v = _res_stable.data[0]["deger"] if _res_stable.data else "?"
+            _guncel_v = _res_guncel.data[0]["deger"] if _res_guncel.data else "?"
+        except:
+            _stable_v = "?"
+            _guncel_v = "?"
+
+        sv1, sv2, sv3 = st.columns(3)
+        sv1.metric("Kodun Sürümü", GUNCEL_SURUM)
+        sv2.metric("Kullanıcı Sürümü", _stable_v)
+        sv3.metric("Durum", "✅ Güncel" if _stable_v == GUNCEL_SURUM else "⚠️ Farklı")
+
+        st.divider()
+
+        if _stable_v != GUNCEL_SURUM:
+            st.warning(f"⚠️ Kullanıcılar **{_stable_v}** sürümünde, sistemde **{GUNCEL_SURUM}** var.")
+            st.info("Kullanıcılar şu an 'Sistem Güncelleniyor' ekranı görüyor.")
+
+            if st.button("🚀 Kullanıcılara Yayınla", type="primary", use_container_width=True, key="surum_yayinla"):
+                try:
+                    _sb_sv.table("sistem_ayarlari").upsert(
+                        {"anahtar":"stable_surum","deger":GUNCEL_SURUM},
+                        on_conflict="anahtar").execute()
+                    _sb_sv.table("sistem_ayarlari").upsert(
+                        {"anahtar":"guncel_surum","deger":GUNCEL_SURUM},
+                        on_conflict="anahtar").execute()
+                    kullanici_log_kaydet("SURUM_YAYINLANDI","kullanici",f"{GUNCEL_SURUM} yayınlandı")
+                    st.success(f"✅ {GUNCEL_SURUM} kullanıcılara yayınlandı!")
+                    st.balloons()
+                    st.rerun()
+                except Exception as _esv:
+                    st.error(f"Yayınlanamadı: {_esv}")
+        else:
+            st.success(f"✅ Kullanıcılar son sürümde ({GUNCEL_SURUM}) çalışıyor.")
+
+            st.divider()
+            st.markdown("**🔒 Kullanıcıları Güncelleme Moduna Al:**")
+            st.caption("Yeni kod push yapacaksın, önce kullanıcıları durdur.")
+            if st.button("⏸️ Güncelleme Moduna Al", use_container_width=True, key="surum_durdur"):
+                try:
+                    _sb_sv.table("sistem_ayarlari").upsert(
+                        {"anahtar":"stable_surum","deger":"guncelleniyor"},
+                        on_conflict="anahtar").execute()
+                    kullanici_log_kaydet("SURUM_DURDURULDU","kullanici","Kullanıcılar güncelleme moduna alındı")
+                    st.success("✅ Kullanıcılar durduruldu. Şimdi kodu güncelleyebilirsin.")
+                    st.rerun()
+                except Exception as _esv2:
+                    st.error(f"Hata: {_esv2}")
+
+        st.divider()
+        st.markdown("**📋 Sürüm Geçmişi:**")
+        try:
+            _res_log_sv = _sb_sv.table("kullanici_log").select("*") \
+                .eq("islem","SURUM_YAYINLANDI").order("tarih",desc=True).limit(10).execute()
+            if _res_log_sv.data:
+                _df_sv = pd.DataFrame(_res_log_sv.data)[["tarih","kullanici","detay"]]
+                _df_sv["tarih"] = _df_sv["tarih"].astype(str).str[:16]
+                st.dataframe(_df_sv, use_container_width=True, hide_index=True)
+            else:
+                st.caption("Henüz yayın geçmişi yok.")
+        except:
+            st.caption("Log yüklenemedi.")
+
+
 elif aktif == "rapor":
     sayfa_log("rapor")
     import io as _rio2
@@ -5122,7 +5222,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v5.5 &nbsp;|&nbsp; "
+    "MWCRMPRO v5.6 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
