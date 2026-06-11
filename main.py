@@ -1668,21 +1668,55 @@ elif aktif == "liste":
                     else:
                         st.error("Eklenemedi!")
 
-            st.caption("Tüm aşamalar:")
-            for _a in _mevcut_asamalar:
+            st.caption("Tüm aşamalar — sırala:")
+            for _ai, _a in enumerate(_mevcut_asamalar):
                 _adet = len(df[df["islem_asamasi"]==_a]) if not df.empty and "islem_asamasi" in df.columns else 0
-                _ac1, _ac2, _ac3 = st.columns([3,1,1])
+                _ac1, _ac2, _ac3, _ac4, _ac5 = st.columns([3,1,1,1,1])
                 _ac1.caption(f"{'🔹' if _adet>0 else '⬜'} **{_a}** ({_adet})")
 
-                if _ac2.button("✏️", key=f"asm_duz_{_a}", help="Düzenle"):
+                # Sırala ▲▼
+                if _ai > 0:
+                    if _ac2.button("▲", key=f"asm_up_{_ai}", help="Yukarı"):
+                        try:
+                            _sb_s = get_sb_client()
+                            if _sb_s:
+                                # Sıra değerlerini al
+                                _r1 = _sb_s.table("sistem_tanimlar").select("id,sira").eq("tip","asama").eq("deger",_a).execute()
+                                _r2 = _sb_s.table("sistem_tanimlar").select("id,sira").eq("tip","asama").eq("deger",_mevcut_asamalar[_ai-1]).execute()
+                                if _r1.data and _r2.data:
+                                    _s1, _s2 = _r1.data[0]["sira"], _r2.data[0]["sira"]
+                                    _sb_s.table("sistem_tanimlar").update({"sira":_s2}).eq("id",_r1.data[0]["id"]).execute()
+                                    _sb_s.table("sistem_tanimlar").update({"sira":_s1}).eq("id",_r2.data[0]["id"]).execute()
+                        except: pass
+                        st.rerun()
+                else:
+                    _ac2.caption("")
+
+                if _ai < len(_mevcut_asamalar)-1:
+                    if _ac3.button("▼", key=f"asm_dn_{_ai}", help="Aşağı"):
+                        try:
+                            _sb_s = get_sb_client()
+                            if _sb_s:
+                                _r1 = _sb_s.table("sistem_tanimlar").select("id,sira").eq("tip","asama").eq("deger",_a).execute()
+                                _r2 = _sb_s.table("sistem_tanimlar").select("id,sira").eq("tip","asama").eq("deger",_mevcut_asamalar[_ai+1]).execute()
+                                if _r1.data and _r2.data:
+                                    _s1, _s2 = _r1.data[0]["sira"], _r2.data[0]["sira"]
+                                    _sb_s.table("sistem_tanimlar").update({"sira":_s2}).eq("id",_r1.data[0]["id"]).execute()
+                                    _sb_s.table("sistem_tanimlar").update({"sira":_s1}).eq("id",_r2.data[0]["id"]).execute()
+                        except: pass
+                        st.rerun()
+                else:
+                    _ac3.caption("")
+
+                if _ac4.button("✏️", key=f"asm_duz_{_ai}", help="Düzenle"):
                     st.session_state[f"asm_edit_{_a}"] = True
 
                 if _adet == 0:
-                    if _ac3.button("🗑️", key=f"asm_sil_{_a}", help="Sil"):
+                    if _ac5.button("🗑️", key=f"asm_sil_{_ai}", help="Sil"):
                         if _tanim_sil("asama", _a):
                             st.rerun()
                 else:
-                    _ac3.caption("—")
+                    _ac5.caption("—")
 
                 if st.session_state.get(f"asm_edit_{_a}"):
                     with st.form(f"asm_form_{_a}"):
@@ -1718,21 +1752,54 @@ elif aktif == "liste":
                     else:
                         st.error("Eklenemedi!")
 
-            st.caption("Tüm durumlar:")
-            for _d in _mevcut_durumlar:
+            st.caption("Tüm durumlar — sırala:")
+            for _di, _d in enumerate(_mevcut_durumlar):
                 _dadet = len(df[df["durum"]==_d]) if not df.empty and "durum" in df.columns else 0
-                _dc1, _dc2, _dc3 = st.columns([3,1,1])
+                _dc1, _dc2, _dc3, _dc4, _dc5 = st.columns([3,1,1,1,1])
                 _dc1.caption(f"{'🔹' if _dadet>0 else '⬜'} **{_d}** ({_dadet})")
 
-                if _dc2.button("✏️", key=f"dur_duz_{_d}", help="Düzenle"):
+                # Sırala ▲▼
+                if _di > 0:
+                    if _dc2.button("▲", key=f"dur_up_{_di}", help="Yukarı"):
+                        try:
+                            _sb_sd = get_sb_client()
+                            if _sb_sd:
+                                _r1 = _sb_sd.table("sistem_tanimlar").select("id,sira").eq("tip","durum").eq("deger",_d).execute()
+                                _r2 = _sb_sd.table("sistem_tanimlar").select("id,sira").eq("tip","durum").eq("deger",_mevcut_durumlar[_di-1]).execute()
+                                if _r1.data and _r2.data:
+                                    _s1, _s2 = _r1.data[0]["sira"], _r2.data[0]["sira"]
+                                    _sb_sd.table("sistem_tanimlar").update({"sira":_s2}).eq("id",_r1.data[0]["id"]).execute()
+                                    _sb_sd.table("sistem_tanimlar").update({"sira":_s1}).eq("id",_r2.data[0]["id"]).execute()
+                        except: pass
+                        st.rerun()
+                else:
+                    _dc2.caption("")
+
+                if _di < len(_mevcut_durumlar)-1:
+                    if _dc3.button("▼", key=f"dur_dn_{_di}", help="Aşağı"):
+                        try:
+                            _sb_sd = get_sb_client()
+                            if _sb_sd:
+                                _r1 = _sb_sd.table("sistem_tanimlar").select("id,sira").eq("tip","durum").eq("deger",_d).execute()
+                                _r2 = _sb_sd.table("sistem_tanimlar").select("id,sira").eq("tip","durum").eq("deger",_mevcut_durumlar[_di+1]).execute()
+                                if _r1.data and _r2.data:
+                                    _s1, _s2 = _r1.data[0]["sira"], _r2.data[0]["sira"]
+                                    _sb_sd.table("sistem_tanimlar").update({"sira":_s2}).eq("id",_r1.data[0]["id"]).execute()
+                                    _sb_sd.table("sistem_tanimlar").update({"sira":_s1}).eq("id",_r2.data[0]["id"]).execute()
+                        except: pass
+                        st.rerun()
+                else:
+                    _dc3.caption("")
+
+                if _dc4.button("✏️", key=f"dur_duz_{_di}", help="Düzenle"):
                     st.session_state[f"dur_edit_{_d}"] = True
 
                 if _dadet == 0:
-                    if _dc3.button("🗑️", key=f"dur_sil_{_d}", help="Sil"):
+                    if _dc5.button("🗑️", key=f"dur_sil_{_di}", help="Sil"):
                         if _tanim_sil("durum", _d):
                             st.rerun()
                 else:
-                    _dc3.caption("—")
+                    _dc5.caption("—")
 
                 if st.session_state.get(f"dur_edit_{_d}"):
                     with st.form(f"dur_form_{_d}"):
