@@ -1083,7 +1083,25 @@ elif aktif == "liste":
     m3.metric("Hedef",  len(df[df["durum"]=="Hedef"])  if "durum" in df.columns else 0)
     m4.metric("Pasif",  len(df[df["durum"]=="Pasif"])  if "durum" in df.columns else 0)
 
-    # Aşama metrikleri — veri olan her aşama gösterilir
+    # Ekstra durumlar metrikleri
+    try:
+        import json as _mjson
+        _sb_met = get_sb_client()
+        _ekstra_dur_met = []
+        if _sb_met:
+            _res_dur = _sb_met.table("kullanici_tercih").select("deger") \
+                .eq("kullanici","__sistem__").eq("anahtar","ekstra_durumlar").execute()
+            if _res_dur.data:
+                _ekstra_dur_met = _mjson.loads(_res_dur.data[0]["deger"])
+        if _ekstra_dur_met and "durum" in df.columns:
+            _ekd_cols = st.columns(len(_ekstra_dur_met))
+            for _ei, _ed in enumerate(_ekstra_dur_met):
+                _ec = len(df[df["durum"]==_ed])
+                if _ec > 0:
+                    _ekd_cols[_ei].metric(_ed, _ec)
+    except: pass
+
+    # Aşama metrikleri — veri olan her aşama
     if "islem_asamasi" in df.columns:
         _asama_grp = df[
             df["islem_asamasi"].notna() &
@@ -1091,9 +1109,9 @@ elif aktif == "liste":
             (df["islem_asamasi"].astype(str) != "nan")
         ]["islem_asamasi"].value_counts()
         if not _asama_grp.empty:
-            _asama_cols = st.columns(len(_asama_grp))
-            for _ci, (_asama_adi, _asama_sayi) in enumerate(_asama_grp.items()):
-                _asama_cols[_ci].metric(_asama_adi, _asama_sayi)
+            _asama_cols = st.columns(min(len(_asama_grp), 6))
+            for _ci, (_asama_adi, _asama_sayi) in enumerate(list(_asama_grp.items())[:6]):
+                _asama_cols[_ci].metric(_asama_adi, int(_asama_sayi))
 
     # ── FİLTRE ──────────────────────────────────────────────────────────────────
     f1,f2,f3 = st.columns(3)
@@ -1500,41 +1518,172 @@ elif aktif == "liste":
 
     st.divider()
 
-    # ── AŞAMA & BAŞLIK YÖNETİMİ ─────────────────────────────────────────────
-    with st.expander("⚙️ Aşama & Başlık Yönetimi"):
+    # ── AŞAMA & DURUM YÖNETİMİ — Supabase'e kayıtlı ─────────────────────────
+    with st.expander("⚙️ Aşama & Durum Yönetimi"):
+        import json as _ydj
+
+        def _sb_tercih_yukle(anahtar):
+            try:
+                _sb = get_sb_client()
+                if _sb:
+                    r = _sb.table("kullanici_tercih").select("deger") \
+                        .eq("kullanici","__sistem__").eq("anahtar",anahtar).execute()
+                    if r.data: return _ydj.loads(r.data[0]["deger"])
+            except: pass
+            return []
+
+        def _sb_tercih_kaydet(anahtar, liste):
+            try:
+                _sb = get_sb_client()
+                if _sb:
+                    _sb.table("kullanici_tercih").upsert({
+                        "kullanici":"__sistem__","anahtar":anahtar,
+                        "deger":_ydj.dumps(liste,ensure_ascii=False)
+                    }, on_conflict="kullanici,anahtar").execute()
+                    return True
+            except: pass
+            return False
+
         yc1, yc2 = st.columns(2)
+
+        # ── AŞAMA YÖNETİMİ ────────────────────────────────────────────────────
         with yc1:
-            st.markdown("**➕ Yeni Aşama Ekle**")
-            yeni_asama_inp = st.text_input("Aşama adı:", key="yeni_asama_inp", placeholder="Demo, Numune...")
-            if st.button("➕ Aşama Ekle", key="asama_ekle_btn"):
-                if yeni_asama_inp and yeni_asama_inp.strip():
-                    if yeni_asama_inp not in st.session_state["ekstra_asamalar"]:
-                        st.session_state["ekstra_asamalar"].append(yeni_asama_inp.strip())
-                    st.success(f"✅ '{yeni_asama_inp}' eklendi!"); st.rerun()
-            st.markdown("**Tüm Aşamalar:**")
-            for asm in tum_asama_opts:
-                adet = len(df[df["islem_asamasi"]==asm]) if not df.empty else 0
-                c1,c2 = st.columns([5,1])
-                c1.caption(f"🔹 {asm} ({adet} kayıt)")
-                if asm in st.session_state["ekstra_asamalar"]:
-                    if c2.button("✕", key=f"del_asama_{asm}"):
-                        st.session_state["ekstra_asamalar"].remove(asm)
-                        st.rerun()
+            st.markdown("**🔄 Aşama Yönetimi**")
+
+            _kayitli_asamalar = _sb_tercih_yukle("ekstra_asamalar")
+            _varsayilan_asamalar = ["İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"]
+            _tum_asamalar_yon = _varsayilan_asamalar.copy()
+            for _a in _kayitli_asamalar:
+                if _a not in _tum_asamalar_yon:
+                    _tum_asamalar_yon.append(_a)
+
+            # Yeni aşama ekle
+            _ya1, _ya2 = st.columns([3,1])
+            _yeni_a = _ya1.text_input("Yeni aşama:", key="yeni_asama_ekle", placeholder="Demo, Numune, Görüşme...", label_visibility="collapsed")
+            if _ya2.button("➕ Ekle", key="asama_ekle_sb", use_container_width=True):
+                if _yeni_a and _yeni_a.strip() and _yeni_a.strip() not in _tum_asamalar_yon:
+                    _kayitli_asamalar.append(_yeni_a.strip())
+                    _sb_tercih_kaydet("ekstra_asamalar", _kayitli_asamalar)
+                    st.success(f"✅ '{_yeni_a}' eklendi!")
+                    st.rerun()
+                elif _yeni_a.strip() in _tum_asamalar_yon:
+                    st.warning("Bu aşama zaten var!")
+
+            st.caption("Tüm aşamalar:")
+            for _a in _tum_asamalar_yon:
+                _adet = len(df[df["islem_asamasi"]==_a]) if not df.empty and "islem_asamasi" in df.columns else 0
+                _ac1, _ac2, _ac3 = st.columns([3,1,1])
+                _ac1.caption(f"{'🔹' if _adet>0 else '⬜'} **{_a}** ({_adet})")
+
+                # Düzenle
+                if _a in _kayitli_asamalar:
+                    if _ac2.button("✏️", key=f"asm_duz_{_a}", help="Düzenle"):
+                        st.session_state[f"asm_edit_{_a}"] = True
+                    # Sil — veri yoksa
+                    if _adet == 0:
+                        if _ac3.button("🗑️", key=f"asm_sil_{_a}", help="Sil"):
+                            _kayitli_asamalar.remove(_a)
+                            _sb_tercih_kaydet("ekstra_asamalar", _kayitli_asamalar)
+                            st.rerun()
+                    else:
+                        _ac3.caption("—")
+                else:
+                    _ac2.caption("—")
+                    _ac3.caption("—")
+
+                # Düzenleme formu
+                if st.session_state.get(f"asm_edit_{_a}"):
+                    with st.form(f"asm_form_{_a}"):
+                        _yeni_asm = st.text_input("Yeni ad:", value=_a, key=f"asm_inp_{_a}")
+                        _f1, _f2 = st.columns(2)
+                        if _f1.form_submit_button("💾 Kaydet"):
+                            if _yeni_asm and _yeni_asm.strip() != _a:
+                                idx = _kayitli_asamalar.index(_a)
+                                _kayitli_asamalar[idx] = _yeni_asm.strip()
+                                _sb_tercih_kaydet("ekstra_asamalar", _kayitli_asamalar)
+                                # Supabase'de bu aşamadaki kartları da güncelle
+                                _sb2 = get_sb_client()
+                                if _sb2:
+                                    try:
+                                        _sb2.table("cari_kartlar").update(
+                                            {"islem_asamasi":_yeni_asm.strip()}
+                                        ).eq("islem_asamasi",_a).execute()
+                                    except: pass
+                                st.session_state.pop(f"asm_edit_{_a}", None)
+                                st.success(f"✅ '{_a}' → '{_yeni_asm}' güncellendi!")
+                                st.rerun()
+                        if _f2.form_submit_button("İptal"):
+                            st.session_state.pop(f"asm_edit_{_a}", None)
+                            st.rerun()
+
+        # ── DURUM YÖNETİMİ ────────────────────────────────────────────────────
         with yc2:
-            st.markdown("**➕ Yeni Sütun Başlığı**")
-            st.info("Açıklama sütunu her kayıtta mevcuttur. Yeni başlık eklemek için buraya yazın — bilgi Açıklama alanına kaydedilir.")
-            if "ekstra_kolonlar" not in st.session_state:
-                st.session_state["ekstra_kolonlar"] = []
-            yeni_baslik_inp = st.text_input("Başlık adı:", key="yeni_baslik_inp", placeholder="Potansiyel, Kaynak...")
-            if st.button("➕ Başlık Ekle", key="baslik_ekle_btn"):
-                if yeni_baslik_inp and yeni_baslik_inp not in st.session_state["ekstra_kolonlar"]:
-                    st.session_state["ekstra_kolonlar"].append(yeni_baslik_inp.strip())
-                    st.success(f"✅ '{yeni_baslik_inp}' eklendi!"); st.rerun()
-            for ek in st.session_state.get("ekstra_kolonlar",[]):
-                c1,c2 = st.columns([5,1])
-                c1.caption(f"📌 {ek}")
-                if c2.button("✕", key=f"del_ek_{ek}"):
-                    st.session_state["ekstra_kolonlar"].remove(ek); st.rerun()
+            st.markdown("**📊 Durum Yönetimi**")
+
+            _kayitli_durumlar = _sb_tercih_yukle("ekstra_durumlar")
+            _varsayilan_durumlar = ["Aktif","Hedef","Pasif"]
+            _tum_durumlar_yon = _varsayilan_durumlar.copy()
+            for _d in _kayitli_durumlar:
+                if _d not in _tum_durumlar_yon:
+                    _tum_durumlar_yon.append(_d)
+
+            # Yeni durum ekle
+            _yd1, _yd2 = st.columns([3,1])
+            _yeni_d = _yd1.text_input("Yeni durum:", key="yeni_durum_ekle", placeholder="VIP, Potansiyel...", label_visibility="collapsed")
+            if _yd2.button("➕ Ekle", key="durum_ekle_sb", use_container_width=True):
+                if _yeni_d and _yeni_d.strip() and _yeni_d.strip() not in _tum_durumlar_yon:
+                    _kayitli_durumlar.append(_yeni_d.strip())
+                    _sb_tercih_kaydet("ekstra_durumlar", _kayitli_durumlar)
+                    st.success(f"✅ '{_yeni_d}' eklendi!")
+                    st.rerun()
+                elif _yeni_d.strip() in _tum_durumlar_yon:
+                    st.warning("Bu durum zaten var!")
+
+            st.caption("Tüm durumlar:")
+            for _d in _tum_durumlar_yon:
+                _dadet = len(df[df["durum"]==_d]) if not df.empty and "durum" in df.columns else 0
+                _dc1, _dc2, _dc3 = st.columns([3,1,1])
+                _dc1.caption(f"{'🔹' if _dadet>0 else '⬜'} **{_d}** ({_dadet})")
+
+                if _d in _kayitli_durumlar:
+                    if _dc2.button("✏️", key=f"dur_duz_{_d}", help="Düzenle"):
+                        st.session_state[f"dur_edit_{_d}"] = True
+                    if _dadet == 0:
+                        if _dc3.button("🗑️", key=f"dur_sil_{_d}", help="Sil"):
+                            _kayitli_durumlar.remove(_d)
+                            _sb_tercih_kaydet("ekstra_durumlar", _kayitli_durumlar)
+                            st.rerun()
+                    else:
+                        _dc3.caption("—")
+                else:
+                    _dc2.caption("—")
+                    _dc3.caption("—")
+
+                # Düzenleme formu
+                if st.session_state.get(f"dur_edit_{_d}"):
+                    with st.form(f"dur_form_{_d}"):
+                        _yeni_dur = st.text_input("Yeni ad:", value=_d, key=f"dur_inp_{_d}")
+                        _f1, _f2 = st.columns(2)
+                        if _f1.form_submit_button("💾 Kaydet"):
+                            if _yeni_dur and _yeni_dur.strip() != _d:
+                                idx = _kayitli_durumlar.index(_d)
+                                _kayitli_durumlar[idx] = _yeni_dur.strip()
+                                _sb_tercih_kaydet("ekstra_durumlar", _kayitli_durumlar)
+                                _sb3 = get_sb_client()
+                                if _sb3:
+                                    try:
+                                        _sb3.table("cari_kartlar").update(
+                                            {"durum":_yeni_dur.strip()}
+                                        ).eq("durum",_d).execute()
+                                    except: pass
+                                st.session_state.pop(f"dur_edit_{_d}", None)
+                                st.success(f"✅ '{_d}' → '{_yeni_dur}' güncellendi!")
+                                st.rerun()
+                        if _f2.form_submit_button("İptal"):
+                            st.session_state.pop(f"dur_edit_{_d}", None)
+                            st.rerun()
+
+
 
     # ── AŞAMA BAZLI SAYFALAR ─────────────────────────────────────────────────
     st.markdown("### 📂 Aşama Sayfaları")
@@ -4980,7 +5129,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v5.1 &nbsp;|&nbsp; "
+    "MWCRMPRO v5.2 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
