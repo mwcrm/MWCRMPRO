@@ -1461,47 +1461,13 @@ elif aktif == "liste":
 
     import json as _json_ls
 
-    def _anlik_kaydet():
-        """Her hücre değişiminde anında Supabase'e yaz"""
-        _state = st.session_state.get("cari_editor", {})
-        _edited = _state.get("edited_rows", {})
-        if not _edited: return
-        _tablo_json = st.session_state.get("_ls_tablo")
-        if not _tablo_json: return
-        try:
-            _rows = _json_ls.loads(_tablo_json)
-        except:
-            return
-        _sb = get_sb_client()
-        for idx_str, degisiklikler in _edited.items():
-            try:
-                idx = int(idx_str)
-                if idx >= len(_rows): continue
-                rid = int(float(str(_rows[idx].get("id",0))))
-                if not rid: continue
-                guncelle = {k: str(v) if v is not None else ""
-                           for k, v in degisiklikler.items() if k != "Seç"}
-                if not guncelle: continue
-                if _sb:
-                    _sb.table("cari_kartlar").update(guncelle).eq("id", rid).execute()
-                else:
-                    conn_u = get_conn()
-                    sets = ", ".join([f"{k}=?" for k in guncelle])
-                    conn_u.execute(f"UPDATE cari_kartlar SET {sets} WHERE id=?",
-                        list(guncelle.values()) + [rid])
-                    conn_u.commit(); conn_u.close()
-            except: pass
-        try: db_read.clear()
-        except: pass
-
     edited_df = st.data_editor(
         df_edit,
         use_container_width=True,
         num_rows="fixed",
         column_config=col_config,
         column_order=col_order,
-        key="cari_editor",
-        on_change=_anlik_kaydet
+        key="cari_editor"
     )
 
     # Her render'da tüm tabloyu session_state'e kaydet
@@ -1523,43 +1489,46 @@ elif aktif == "liste":
     # ── BUTONLAR ──────────────────────────────────────────────────────────────
     btn_k, btn_a, btn_s = st.columns(3)
     with btn_k:
-        st.success("✅ Anlık kayıt aktif — her değişiklik otomatik kaydedilir")
-        if st.button("💾 Tümünü Kaydet", use_container_width=True, type="primary", key="liste_kaydet"):
-            # Manuel tüm kaydet — tüm satırları gönder
-            _tablo_json = st.session_state.get("_ls_tablo")
+        if st.button("💾 Değişiklikleri Kaydet", use_container_width=True, type="primary", key="liste_kaydet"):
+            _editor_state = st.session_state.get("cari_editor", {})
+            _edited_rows  = _editor_state.get("edited_rows", {})
+            _tablo_json   = st.session_state.get("_ls_tablo")
             kayit_sayi = 0
-            if _tablo_json:
+            hata_list  = []
+            if not _edited_rows:
+                st.info("Değişiklik yok.")
+            else:
                 try:
-                    _rows = _json_ls.loads(_tablo_json)
+                    _rows = _json_ls.loads(_tablo_json) if _tablo_json else []
                 except:
                     _rows = []
-                _sb2 = get_sb_client()
-                for row in _rows:
-                    rid = row.get("id")
-                    if not rid or str(rid) in ["nan","None",""]: continue
+                for idx_str, degisiklikler in _edited_rows.items():
                     try:
-                        rid = int(float(str(rid)))
-                        guncelle = {
-                            "firma": str(row.get("firma","") or ""),
-                            "yetkili": str(row.get("yetkili","") or ""),
-                            "gsm": str(row.get("gsm","") or ""),
-                            "sabit": str(row.get("sabit","") or ""),
-                            "email": str(row.get("email","") or ""),
-                            "il": str(row.get("il","") or ""),
-                            "ilce": str(row.get("ilce","") or ""),
-                            "durum": str(row.get("durum","") or ""),
-                            "temsilci": str(row.get("temsilci","") or ""),
-                            "islem_asamasi": str(row.get("islem_asamasi","") or ""),
-                            "aciklama": str(row.get("aciklama","") or ""),
-                        }
-                        if _sb2:
-                            _sb2.table("cari_kartlar").update(guncelle).eq("id", rid).execute()
+                        idx = int(idx_str)
+                        if idx >= len(_rows): continue
+                        rid = int(float(str(_rows[idx].get("id",0))))
+                        if not rid: continue
+                        guncelle = {k: str(v) if v is not None else ""
+                                   for k, v in degisiklikler.items() if k != "Seç"}
+                        if not guncelle: continue
+                        if sb_liste:
+                            sb_liste.table("cari_kartlar").update(guncelle).eq("id", rid).execute()
+                        else:
+                            conn_u = get_conn()
+                            sets = ", ".join([f"{k}=?" for k in guncelle])
+                            conn_u.execute(f"UPDATE cari_kartlar SET {sets} WHERE id=?",
+                                list(guncelle.values()) + [rid])
+                            conn_u.commit(); conn_u.close()
                         kayit_sayi += 1
-                    except: pass
-            try: db_read.clear()
-            except: pass
-            st.success(f"✅ {kayit_sayi} kayıt güncellendi!")
-            st.rerun()
+                    except Exception as e_row:
+                        hata_list.append(str(e_row))
+                try: db_read.clear()
+                except: pass
+                if kayit_sayi > 0:
+                    st.success(f"✅ {kayit_sayi} satır kaydedildi!")
+                if hata_list:
+                    st.error(f"Hata: {'; '.join(hata_list[:2])}")
+                st.rerun()
     with btn_a:
         if secili_sayi > 0:
             if st.button(f"🗑️ Seçili {secili_sayi} → Arşive", use_container_width=True, key="liste_arsiv"):
