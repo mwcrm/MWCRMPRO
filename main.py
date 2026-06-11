@@ -2665,17 +2665,22 @@ elif aktif == "rapor":
     if not df_rand_r.empty and "adet" in df_rand_r.columns:
         df_rand_r["adet"] = pd.to_numeric(df_rand_r["adet"], errors="coerce").fillna(0)
 
-    # ── TEK SATIRDA TÜM METRİKLER ────────────────────────────────────────────
-    _mc = st.columns(9)
-    _mc[0].metric("🏢 Cari", toplam)
-    _mc[1].metric("Aktif", len(df_rapor[df_rapor["durum"]=="Aktif"]) if not df_rapor.empty else 0)
-    _mc[2].metric("Hedef", len(df_rapor[df_rapor["durum"]=="Hedef"]) if not df_rapor.empty else 0)
-    _mc[3].metric("Beklenen", fmt_para(toplam_beklenen))
-    _mc[4].metric("Gerçekleşen", fmt_para(toplam_gercek))
-    _mc[5].metric("📅 Randevu", len(df_rand_r) if not df_rand_r.empty else 0)
-    _mc[6].metric("✅ Bitti", len(df_rand_r[df_rand_r["sonuc"]=="Bitti"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0)
-    _mc[7].metric("🔄 Devam", len(df_rand_r[df_rand_r["sonuc"]=="Devam Ediyor"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0)
-    _mc[8].metric("❌ Gidilmedi", len(df_rand_r[df_rand_r["sonuc"]=="Gidilmedi"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0)
+    # ── ÖZET SATIRI — küçük metin ─────────────────────────────────────────────
+    _aktif_say  = len(df_rapor[df_rapor["durum"]=="Aktif"]) if not df_rapor.empty else 0
+    _hedef_say  = len(df_rapor[df_rapor["durum"]=="Hedef"]) if not df_rapor.empty else 0
+    _rand_say   = len(df_rand_r) if not df_rand_r.empty else 0
+    _bitti_say  = len(df_rand_r[df_rand_r["sonuc"]=="Bitti"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0
+    _devam_say  = len(df_rand_r[df_rand_r["sonuc"]=="Devam Ediyor"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0
+    _gidilmedi  = len(df_rand_r[df_rand_r["sonuc"]=="Gidilmedi"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0
+    st.caption(
+        f"🏢 **Cari:** {toplam} kayıt &nbsp;|&nbsp; "
+        f"Aktif: {_aktif_say} &nbsp; Hedef: {_hedef_say} &nbsp;|&nbsp; "
+        f"Beklenen: {fmt_para(toplam_beklenen)} &nbsp; Gerçekleşen: {fmt_para(toplam_gercek)} "
+        f"&nbsp;&nbsp;&nbsp; "
+        f"📅 **Randevu:** {_rand_say} toplam &nbsp;|&nbsp; "
+        f"✅ Bitti: {_bitti_say} &nbsp; 🔄 Devam: {_devam_say} &nbsp; ❌ Gidilmedi: {_gidilmedi}"
+    )
+    st.divider()
 
     with st.expander("📅 Tarih & Görev Raporu"):
         if df_rand_r.empty:
@@ -2692,7 +2697,6 @@ elif aktif == "rapor":
                 _rg["beklenen_ciro"] = 0
                 _rg["gerceklesen_ciro"] = 0
 
-            # Tarih + Görev bazlı özet
             _grp_cols = ["randevu_tarihi","gorev"] if "gorev" in _rg.columns else ["randevu_tarihi"]
             _tg = _rg.groupby(_grp_cols).agg(
                 Randevu=("id","count"),
@@ -2713,10 +2717,11 @@ elif aktif == "rapor":
             st.dataframe(_tg, use_container_width=True, hide_index=True)
             buf_tg = _rio2.BytesIO(); _tg.to_excel(buf_tg, index=False); buf_tg.seek(0)
             st.download_button("📥 İndir", data=buf_tg, file_name="tarih_gorev.xlsx", use_container_width=True)
+
+    with st.expander("🗺️ Bölge Raporu"):
         if df_rand_r.empty or "bolge" not in df_rand_r.columns:
             st.info("Randevu yok.")
         else:
-            # Randevu + cari kart birleştir — müşteri adı üzerinden
             _rand_ciro = df_rand_r[["bolge","musteri_adi"]].drop_duplicates()
             if not df_rapor.empty:
                 _cari_ciro = df_rapor[["firma","beklenen_ciro","gerceklesen_ciro"]]
@@ -4505,6 +4510,15 @@ elif aktif == "kisiler":
                                         "sablon_adi": sec if sec not in ["—","✏️"] else "Manuel",
                                         "mesaj":mesaj_txt[:500],"gonderen":ben
                                     }).execute()
+                                    # Aynı zamanda islem_kaydi'ye de yaz — WA raporunda görünsün
+                                    sb_log.table("islem_kaydi").insert({
+                                        "musteri_id": 0,
+                                        "musteri_adi": isim,
+                                        "islem_turu": "📱 WA Kişi — " + (sec if sec not in ["—","✏️"] else "Manuel"),
+                                        "icerik": mesaj_txt[:300],
+                                        "gonderim_bilgisi": t_wa,
+                                        "olusturan": ben
+                                    }).execute()
                                     try: db_read.clear()
                                     except: pass
                             except: pass
@@ -4838,14 +4852,19 @@ elif aktif == "randevu":
                         elif len(t_wa)==10: t_wa = '90'+t_wa
                         msg_wa = f"📅 RANDEVU HATIRLATMA\nMüşteri: {musteri_r}\nTarih: {tarih_r} {saat_r}\nBölge: {bolge_r}\nGörev: {gorev_r}\nİyi çalışmalar!"
                         wa_link = f"https://wa.me/{t_wa}?text={msg_wa.replace(' ','%20').replace(chr(10),'%0A')}"
-                        if wc3.link_button("📱 WA Gönder", wa_link, use_container_width=True, type="primary" if yaklasan else "secondary"):
-                            db_insert("islem_kaydi", {
-                                "musteri_id": 0, "musteri_adi": musteri_r,
-                                "islem_turu": "📅 WA Randevu Hatırlatma",
-                                "icerik": f"Tarih: {tarih_r} {saat_r} | Bölge: {bolge_r} | Görev: {gorev_r}",
-                                "gonderim_bilgisi": t_wa,
-                                "olusturan": st.session_state.get("kullanici","")
-                            })
+                        wc3.link_button("📱 WA Gönder", wa_link, use_container_width=True, type="primary" if yaklasan else "secondary")
+                        _log_key = f"rnd_wa_{row.get('id','')}"
+                        if not st.session_state.get(_log_key):
+                            st.session_state[_log_key] = True
+                            try:
+                                db_insert("islem_kaydi", {
+                                    "musteri_id": 0, "musteri_adi": musteri_r,
+                                    "islem_turu": "📅 WA Randevu Hatırlatma",
+                                    "icerik": f"Tarih: {tarih_r} {saat_r} | Bölge: {bolge_r} | Görev: {gorev_r}",
+                                    "gonderim_bilgisi": t_wa,
+                                    "olusturan": st.session_state.get("kullanici","")
+                                })
+                            except: pass
                     else:
                         # Manuel tel girişi
                         manuel_t = wc3.text_input("Tel:", placeholder="05xx", key=f"wa_tel_{row.get('id','')}", label_visibility="collapsed")
