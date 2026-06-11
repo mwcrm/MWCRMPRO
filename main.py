@@ -1277,7 +1277,7 @@ elif aktif == "liste":
                 ger = float(kart_row.get("gerceklesen_ciro",0) or 0)
                 st.metric("Beklenen",     fmt_para(bek))
                 st.metric("Gerçekleşen",  fmt_para(ger), delta=fmt_para(ger-bek))
-            ab1,ab2,ab3,ab4,ab5 = st.columns(5)
+            ab1,ab2,ab3,ab4 = st.columns(4)
             if ab1.button("✏️ Düzenle", key=f"kd_{kart_id}", use_container_width=True):
                 d2 = {str(k):(None if str(v) in ["nan","None","NaT"] else v) for k,v in kart_row.items()}
                 for _k in ["firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","aciklama"]:
@@ -1298,8 +1298,8 @@ elif aktif == "liste":
                 except: pass
                 st.success("Arşive gönderildi!"); st.rerun()
 
-            # ── HIZLI KAYDET BUTONU ───────────────────────────────────────
-            if ab5.button("💾 Kaydet", key=f"hiz_kyt_{kart_id}", use_container_width=True, type="primary"):
+            # ── HIZLI KAYDET BUTONU — ayrı satırda her zaman görünsün ────
+            if st.button("💾 Bu Firmayı Kaydet", key=f"hiz_kyt_{kart_id}", use_container_width=True, type="primary"):
                 try:
                     _editor_state = st.session_state.get("cari_editor", {})
                     _edited_rows  = _editor_state.get("edited_rows", {})
