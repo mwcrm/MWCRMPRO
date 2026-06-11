@@ -1600,7 +1600,8 @@ elif aktif == "liste":
 
             # Yeni aşama ekle
             _ya1, _ya2 = st.columns([3,1])
-            _yeni_a = _ya1.text_input("Yeni aşama:", key="yeni_asama_ekle", placeholder="Demo, Numune, Görüşme...", label_visibility="collapsed")
+            _yeni_a = _ya1.text_input("", key="yeni_asama_ekle",
+                placeholder="Yeni aşama adı...", label_visibility="collapsed")
             if _ya2.button("➕ Ekle", key="asama_ekle_sb", use_container_width=True):
                 if _yeni_a and _yeni_a.strip() and _yeni_a.strip() not in _tum_asamalar_yon:
                     _kayitli_asamalar.append(_yeni_a.strip())
@@ -1616,20 +1617,24 @@ elif aktif == "liste":
                 _ac1, _ac2, _ac3 = st.columns([3,1,1])
                 _ac1.caption(f"{'🔹' if _adet>0 else '⬜'} **{_a}** ({_adet})")
 
-                # Düzenle
-                if _a in _kayitli_asamalar:
-                    if _ac2.button("✏️", key=f"asm_duz_{_a}", help="Düzenle"):
-                        st.session_state[f"asm_edit_{_a}"] = True
-                    # Sil — veri yoksa
-                    if _adet == 0:
-                        if _ac3.button("🗑️", key=f"asm_sil_{_a}", help="Sil"):
+                # Düzenle — tüm aşamalar
+                if _ac2.button("✏️", key=f"asm_duz_{_a}", help="Düzenle"):
+                    st.session_state[f"asm_edit_{_a}"] = True
+
+                # Sil — sadece veri yoksa
+                if _adet == 0:
+                    if _ac3.button("🗑️", key=f"asm_sil_{_a}", help="Sil"):
+                        if _a in _kayitli_asamalar:
                             _kayitli_asamalar.remove(_a)
-                            _sb_tercih_kaydet("ekstra_asamalar", _kayitli_asamalar)
-                            st.rerun()
-                    else:
-                        _ac3.caption("—")
+                        elif _a in _varsayilan_asamalar:
+                            # Varsayılan aşamayı "silindi" listesine ekle
+                            _silinen = _sb_tercih_yukle("silinen_asamalar")
+                            if _a not in _silinen:
+                                _silinen.append(_a)
+                            _sb_tercih_kaydet("silinen_asamalar", _silinen)
+                        _sb_tercih_kaydet("ekstra_asamalar", _kayitli_asamalar)
+                        st.rerun()
                 else:
-                    _ac2.caption("—")
                     _ac3.caption("—")
 
                 # Düzenleme formu
@@ -1637,23 +1642,29 @@ elif aktif == "liste":
                     with st.form(f"asm_form_{_a}"):
                         _yeni_asm = st.text_input("Yeni ad:", value=_a, key=f"asm_inp_{_a}")
                         _f1, _f2 = st.columns(2)
-                        if _f1.form_submit_button("💾 Kaydet"):
-                            if _yeni_asm and _yeni_asm.strip() != _a:
-                                idx = _kayitli_asamalar.index(_a)
-                                _kayitli_asamalar[idx] = _yeni_asm.strip()
+                        if _f1.form_submit_button("💾 Kaydet", use_container_width=True):
+                            if _yeni_asm and _yeni_asm.strip() and _yeni_asm.strip() != _a:
+                                # Listede güncelle
+                                if _a in _kayitli_asamalar:
+                                    _kayitli_asamalar[_kayitli_asamalar.index(_a)] = _yeni_asm.strip()
+                                elif _a in _varsayilan_asamalar:
+                                    _kayitli_asamalar.append(_yeni_asm.strip())
+                                    _silinen2 = _sb_tercih_yukle("silinen_asamalar")
+                                    if _a not in _silinen2: _silinen2.append(_a)
+                                    _sb_tercih_kaydet("silinen_asamalar", _silinen2)
                                 _sb_tercih_kaydet("ekstra_asamalar", _kayitli_asamalar)
-                                # Supabase'de bu aşamadaki kartları da güncelle
-                                _sb2 = get_sb_client()
-                                if _sb2:
-                                    try:
+                                # Kartları da güncelle
+                                try:
+                                    _sb2 = get_sb_client()
+                                    if _sb2:
                                         _sb2.table("cari_kartlar").update(
                                             {"islem_asamasi":_yeni_asm.strip()}
                                         ).eq("islem_asamasi",_a).execute()
-                                    except: pass
+                                except: pass
                                 st.session_state.pop(f"asm_edit_{_a}", None)
                                 st.success(f"✅ '{_a}' → '{_yeni_asm}' güncellendi!")
                                 st.rerun()
-                        if _f2.form_submit_button("İptal"):
+                        if _f2.form_submit_button("İptal", use_container_width=True):
                             st.session_state.pop(f"asm_edit_{_a}", None)
                             st.rerun()
 
