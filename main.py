@@ -1188,6 +1188,10 @@ elif aktif == "liste":
     tum_asama_opts = _tanimlar_yukle("asama")
     tum_durum_opts = _tanimlar_yukle("durum")
 
+    # DEBUG — geçici
+    st.caption(f"🔍 Aşamalar: {tum_asama_opts}")
+    st.caption(f"🔍 Durumlar: {tum_durum_opts}")
+
     # df'de olan ama tabloda olmayan aşama/durumları da ekle
     if not df.empty:
         if "islem_asamasi" in df.columns:
