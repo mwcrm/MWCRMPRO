@@ -2748,46 +2748,35 @@ elif aktif == "rapor":
             if _fil_durum_r != "Tümü":
                 df_rapor_fil = df_rapor_fil[df_rapor_fil["durum"]==_fil_durum_r]
 
-            # Tüm aşamaları bul
             tum_asama_r = sorted(df_rapor_fil["islem_asamasi"].dropna().unique().tolist())
 
-            # Özet tablo — aşama + durum
-            a_oz = df_rapor_fil.groupby("islem_asamasi").agg(
-                Adet=("firma","count"),
-                Beklenen=("beklenen_ciro","sum"),
-                Gerceklesen=("gerceklesen_ciro","sum")
-            ).reset_index().sort_values("Adet",ascending=False)
-            a_oz = df_rapor_fil.groupby("islem_asamasi").agg(
-                Adet=("firma","count"),
-                Beklenen=("beklenen_ciro","sum"),
-                Gerceklesen=("gerceklesen_ciro","sum")
-            ).reset_index().sort_values("Adet",ascending=False)
-            a_oz["Başarı%"] = a_oz.apply(lambda r: f"{r['Gerceklesen']/r['Beklenen']*100:.1f}%" if r["Beklenen"]>0 else "—", axis=1)
+            # ── ÖZET TABLOLAR YAN YANA ──────────────────────────────────────
+            oz_sol, oz_sag = st.columns(2)
 
-            # Aşama + Durum tek satırda metrikler
-            st.caption(f"**Aşama Özeti** — {len(df_rapor_fil)} kayıt")
-            _a_cols = st.columns(len(a_oz))
-            for _i, (_,_row) in enumerate(a_oz.iterrows()):
-                _a_cols[_i].metric(
-                    str(_row["islem_asamasi"]),
-                    f"{int(_row['Adet'])} firma",
-                    delta=_row["Başarı%"] if _row["Başarı%"] != "—" else None
-                )
-
-            if "durum" in df_rapor_fil.columns:
-                d_oz2 = df_rapor_fil.groupby("durum").agg(
-                    Adet=("firma","count"),
+            with oz_sol:
+                st.caption(f"**Aşama Özeti** — {len(df_rapor_fil)} kayıt")
+                a_oz = df_rapor_fil.groupby("islem_asamasi").agg(
+                    Firma=("firma","count"),
                     Beklenen=("beklenen_ciro","sum"),
-                    Gerceklesen=("gerceklesen_ciro","sum")
-                ).reset_index().sort_values("Adet",ascending=False)
+                    Gerçekleşen=("gerceklesen_ciro","sum")
+                ).reset_index().sort_values("Firma",ascending=False)
+                a_oz["Başarı%"] = a_oz.apply(lambda r: f"{r['Gerçekleşen']/r['Beklenen']*100:.0f}%" if r["Beklenen"]>0 else "—", axis=1)
+                a_oz["Beklenen"] = a_oz["Beklenen"].apply(fmt_para)
+                a_oz["Gerçekleşen"] = a_oz["Gerçekleşen"].apply(fmt_para)
+                a_oz.columns = ["Aşama","Firma","Beklenen","Gerçekleşen","Başarı%"]
+                st.dataframe(a_oz, use_container_width=True, hide_index=True)
+
+            with oz_sag:
                 st.caption("**Durum Özeti**")
-                _d_cols = st.columns(len(d_oz2))
-                for _i, (_,_row) in enumerate(d_oz2.iterrows()):
-                    _d_cols[_i].metric(
-                        str(_row["durum"]),
-                        f"{int(_row['Adet'])} firma",
-                        delta=fmt_para(_row["Gerceklesen"])
-                    )
+                d_oz2 = df_rapor_fil.groupby("durum").agg(
+                    Firma=("firma","count"),
+                    Beklenen=("beklenen_ciro","sum"),
+                    Gerçekleşen=("gerceklesen_ciro","sum")
+                ).reset_index().sort_values("Firma",ascending=False)
+                d_oz2["Beklenen"] = d_oz2["Beklenen"].apply(fmt_para)
+                d_oz2["Gerçekleşen"] = d_oz2["Gerçekleşen"].apply(fmt_para)
+                d_oz2.columns = ["Durum","Firma","Beklenen","Gerçekleşen"]
+                st.dataframe(d_oz2, use_container_width=True, hide_index=True)
 
             st.divider()
             # Her aşama için detay tab
@@ -2796,22 +2785,8 @@ elif aktif == "rapor":
                 for tab_i, asama_adi in enumerate(tum_asama_r):
                     with asama_tabs[tab_i]:
                         df_asama_r = df_rapor_fil[df_rapor_fil["islem_asamasi"]==asama_adi]
-                        st.markdown(f"**{asama_adi} — {len(df_asama_r)} firma**")
-
-                        # Metrikler
-                        rm1,rm2,rm3,rm4,rm5 = st.columns(5)
-                        rm1.metric("Firma", len(df_asama_r))
-                        rm2.metric("Aktif", len(df_asama_r[df_asama_r["durum"]=="Aktif"]) if "durum" in df_asama_r.columns else 0)
-                        rm3.metric("Hedef", len(df_asama_r[df_asama_r["durum"]=="Hedef"]) if "durum" in df_asama_r.columns else 0)
-                        rm4.metric("Beklenen", fmt_para(df_asama_r["beklenen_ciro"].sum()))
-                        rm5.metric("Gerçekleşen", fmt_para(df_asama_r["gerceklesen_ciro"].sum()))
-
-                        # Durum dağılımı mini
-                        if "durum" in df_asama_r.columns:
-                            _dur_mini = df_asama_r.groupby("durum").size().reset_index(name="Adet")
-                            st.caption(" · ".join([f"{r['durum']}: {r['Adet']}" for _,r in _dur_mini.iterrows()]))
-
-                        # Liste
+                        _dur_ozet = " · ".join([f"{r['durum']}: {r['Adet']}" for _,r in df_asama_r.groupby("durum").size().reset_index(name="Adet").iterrows()]) if "durum" in df_asama_r.columns else ""
+                        st.caption(f"**{len(df_asama_r)} firma** · {_dur_ozet} · Beklenen: {fmt_para(df_asama_r['beklenen_ciro'].sum())} · Gerçekleşen: {fmt_para(df_asama_r['gerceklesen_ciro'].sum())}")
                         goster_cols = [c for c in ["id","tarih","firma","yetkili","gsm","il","durum","temsilci","beklenen_ciro","gerceklesen_ciro"] if c in df_asama_r.columns]
                         df_show = df_asama_r[goster_cols].copy()
                         if "beklenen_ciro" in df_show.columns:
@@ -2821,9 +2796,8 @@ elif aktif == "rapor":
                         if "tarih" in df_show.columns:
                             df_show["tarih"] = df_show["tarih"].astype(str).str[:10]
                         st.dataframe(df_show, use_container_width=True, hide_index=True)
-
                         buf_ar = _rio2.BytesIO(); df_asama_r.to_excel(buf_ar, index=False); buf_ar.seek(0)
-                        st.download_button(f"📥 {asama_adi} Excel", data=buf_ar, file_name=f"asama_{asama_adi}.xlsx", use_container_width=True, key=f"dl_asama_{asama_adi}")
+                        st.download_button(f"📥 Excel", data=buf_ar, file_name=f"asama_{asama_adi}.xlsx", use_container_width=True, key=f"dl_asama_{asama_adi}")
 
     with st.expander("🗺️ İl Bazlı Rapor (Top 15)"):
         if df_rapor.empty: st.info("Veri yok.")
