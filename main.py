@@ -2833,25 +2833,79 @@ elif aktif == "rapor":
 
     with st.expander("📱 WhatsApp & Email Gönderim Raporu"):
         try:
-            df_wa = db_read("islem_kaydi", order_col="tarih", limit=500)
-            if df_wa.empty:
+            # ── islem_kaydi tablosu ──────────────────────────────────────────
+            df_ik = db_read("islem_kaydi", order_col="tarih", limit=1000)
+            if not df_ik.empty and "islem_turu" in df_ik.columns:
+                df_ik = df_ik[df_ik["islem_turu"].str.contains("WhatsApp|Email|WA|Teklif|Randevu|Uyarı", case=False, na=False)]
+            # Kolonları standartlaştır
+            if not df_ik.empty:
+                df_ik = df_ik.rename(columns={
+                    "musteri_adi": "Müşteri",
+                    "islem_turu": "Kanal",
+                    "gonderim_bilgisi": "Numara/Email",
+                    "olusturan": "Gönderen",
+                    "icerik": "Detay",
+                    "tarih": "Tarih"
+                })
+                df_ik["Kaynak"] = "Sistem"
+                df_ik = df_ik[["Tarih","Müşteri","Kanal","Detay","Numara/Email","Gönderen","Kaynak"]]
+
+            # ── kisiler_mesaj_log tablosu ────────────────────────────────────
+            df_kml = db_read("kisiler_mesaj_log", order_col="tarih", limit=1000)
+            if not df_kml.empty:
+                df_kml = df_kml.rename(columns={
+                    "kisi_adi": "Müşteri",
+                    "sablon_adi": "Kanal",
+                    "mesaj": "Detay",
+                    "telefon": "Numara/Email",
+                    "gonderen": "Gönderen",
+                    "tarih": "Tarih"
+                })
+                df_kml["Kanal"] = "📱 WA Kişi — " + df_kml["Kanal"].astype(str)
+                df_kml["Kaynak"] = "Kişiler"
+                df_kml = df_kml[["Tarih","Müşteri","Kanal","Detay","Numara/Email","Gönderen","Kaynak"]]
+
+            # ── Birleştir ────────────────────────────────────────────────────
+            _parcalar = [df for df in [df_ik, df_kml] if not df.empty]
+            if not _parcalar:
                 st.info("Henüz WA/Email gönderim kaydı yok.")
             else:
-                # Sadece WA/Email kayıtlarını filtrele
-                _wa_filtred = df_wa.copy()
-                if "islem_turu" in _wa_filtred.columns:
-                    _wa_filtred = _wa_filtred[_wa_filtred["islem_turu"].str.contains("WhatsApp|Email|Teklif", case=False, na=False)]
-                if _wa_filtred.empty:
-                    st.info("WA/Email kaydı bulunamadı.")
-                else:
-                    st.caption(f"{len(_wa_filtred)} kayıt")
-                    goster_wa = [c for c in ["tarih","musteri_adi","islem_turu","gonderim_bilgisi","olusturan"] if c in _wa_filtred.columns]
-                    df_wa_gos = _wa_filtred[goster_wa].copy()
-                    if "tarih" in df_wa_gos.columns:
-                        df_wa_gos["tarih"] = df_wa_gos["tarih"].astype(str).str[:16]
-                    st.dataframe(df_wa_gos, use_container_width=True, hide_index=True)
-                    buf_wa = _rio2.BytesIO(); _wa_filtred.to_excel(buf_wa, index=False); buf_wa.seek(0)
-                    st.download_button("📥 İndir", data=buf_wa, file_name="wa_email.xlsx", use_container_width=True)
+                df_tum = pd.concat(_parcalar, ignore_index=True)
+                df_tum["Tarih"] = pd.to_datetime(df_tum["Tarih"], errors="coerce")
+                df_tum = df_tum.sort_values("Tarih", ascending=False)
+                df_tum["Tarih"] = df_tum["Tarih"].astype(str).str[:16]
+
+                # ── Metrikler ────────────────────────────────────────────────
+                _wm1,_wm2,_wm3,_wm4,_wm5 = st.columns(5)
+                _wm1.metric("Toplam Gönderim", len(df_tum))
+                _wm2.metric("📱 WA Teklif", len(df_tum[df_tum["Kanal"].str.contains("WhatsApp Teklif|WA Teklif", na=False)]))
+                _wm3.metric("✉️ Email", len(df_tum[df_tum["Kanal"].str.contains("Email", na=False)]))
+                _wm4.metric("📅 Randevu WA", len(df_tum[df_tum["Kanal"].str.contains("Randevu|Uyarı", na=False)]))
+                _wm5.metric("👤 Kişi WA", len(df_tum[df_tum["Kaynak"]=="Kişiler"]))
+
+                # ── Filtreler ────────────────────────────────────────────────
+                _wf1, _wf2, _wf3 = st.columns(3)
+                _kanal_opts = ["Tümü"] + sorted(df_tum["Kanal"].dropna().unique().tolist())
+                _fil_kanal = _wf1.selectbox("Kanal:", _kanal_opts, key="wa_fil_kanal")
+                _fil_gonderen = _wf2.selectbox("Gönderen:", ["Tümü"] + sorted(df_tum["Gönderen"].dropna().unique().tolist()), key="wa_fil_gon")
+                _fil_ara = _wf3.text_input("🔍 Müşteri ara:", key="wa_fil_ara")
+
+                df_gos = df_tum.copy()
+                if _fil_kanal != "Tümü": df_gos = df_gos[df_gos["Kanal"]==_fil_kanal]
+                if _fil_gonderen != "Tümü": df_gos = df_gos[df_gos["Gönderen"]==_fil_gonderen]
+                if _fil_ara: df_gos = df_gos[df_gos["Müşteri"].str.contains(_fil_ara, case=False, na=False)]
+
+                st.caption(f"**{len(df_gos)} kayıt**")
+
+                # Detay çok uzunsa kısalt
+                df_gos_show = df_gos.copy()
+                df_gos_show["Detay"] = df_gos_show["Detay"].astype(str).str[:80]
+
+                st.dataframe(df_gos_show[["Tarih","Müşteri","Kanal","Numara/Email","Gönderen","Detay"]], use_container_width=True, hide_index=True)
+
+                buf_wa = _rio2.BytesIO(); df_gos.to_excel(buf_wa, index=False); buf_wa.seek(0)
+                st.download_button("📥 Excel İndir", data=buf_wa, file_name=f"wa_email_{datetime.now().strftime('%Y%m%d')}.xlsx", use_container_width=True)
+
         except Exception as e:
             st.error(f"Hata: {e}")
 
@@ -4784,7 +4838,14 @@ elif aktif == "randevu":
                         elif len(t_wa)==10: t_wa = '90'+t_wa
                         msg_wa = f"📅 RANDEVU HATIRLATMA\nMüşteri: {musteri_r}\nTarih: {tarih_r} {saat_r}\nBölge: {bolge_r}\nGörev: {gorev_r}\nİyi çalışmalar!"
                         wa_link = f"https://wa.me/{t_wa}?text={msg_wa.replace(' ','%20').replace(chr(10),'%0A')}"
-                        wc3.link_button("📱 WA Gönder", wa_link, use_container_width=True, type="primary" if yaklasan else "secondary")
+                        if wc3.link_button("📱 WA Gönder", wa_link, use_container_width=True, type="primary" if yaklasan else "secondary"):
+                            db_insert("islem_kaydi", {
+                                "musteri_id": 0, "musteri_adi": musteri_r,
+                                "islem_turu": "📅 WA Randevu Hatırlatma",
+                                "icerik": f"Tarih: {tarih_r} {saat_r} | Bölge: {bolge_r} | Görev: {gorev_r}",
+                                "gonderim_bilgisi": t_wa,
+                                "olusturan": st.session_state.get("kullanici","")
+                            })
                     else:
                         # Manuel tel girişi
                         manuel_t = wc3.text_input("Tel:", placeholder="05xx", key=f"wa_tel_{row.get('id','')}", label_visibility="collapsed")
@@ -4878,6 +4939,13 @@ elif aktif == "randevu":
                         msg2 = f"🗓️ YENİ RANDEVU\nMüşteri: {musteri_adi}\nTarih: {rand_tarih} {rand_saat}\nBölge: {rand_bolge}\nGörev: {rand_gorev}\nİyi çalışmalar!"
                         wa2 = f"https://wa.me/{twt2}?text={msg2.replace(' ','%20').replace(chr(10),'%0A')}"
                         st.link_button("📱 Temsilciye WA Uyarısı Gönder", wa2, use_container_width=True, type="primary")
+                        db_insert("islem_kaydi", {
+                            "musteri_id": musteri_id, "musteri_adi": musteri_adi,
+                            "islem_turu": "📅 WA Temsilci Uyarısı",
+                            "icerik": f"Temsilci: {rand_temsilci} | Tarih: {rand_tarih} {rand_saat} | Bölge: {rand_bolge} | Görev: {rand_gorev}",
+                            "gonderim_bilgisi": twt2,
+                            "olusturan": st.session_state.get("kullanici","")
+                        })
                     st.rerun()
 
     with r_tab3:
