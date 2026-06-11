@@ -757,7 +757,7 @@ def save_menu_tercihi(kullanici, sira):
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 
 # ── VERSİYON KONTROL SİSTEMİ ─────────────────────────────────────────────────
-GUNCEL_SURUM = "v6.0"  # Bu kodun versiyonu — her güncellemede artır
+GUNCEL_SURUM = "v6.1"  # Bu kodun versiyonu — her güncellemede artır
 
 def _surum_kontrol():
     """Kullanıcı stable sürümde mi kontrol et"""
@@ -2324,92 +2324,123 @@ elif aktif == "kullanici":
             st.markdown("### 🚀 Sürüm Yönetimi")
 
             _sb_sv = get_sb_client()
+            _simdi = pd.Timestamp.now().strftime("%d.%m.%Y %H:%M")
 
+            # Supabase'den stable bilgilerini çek
             try:
                 _res_stable = _sb_sv.table("sistem_ayarlari").select("deger").eq("anahtar","stable_surum").execute()
                 _stable_v = _res_stable.data[0]["deger"] if _res_stable.data else GUNCEL_SURUM
             except:
                 _stable_v = GUNCEL_SURUM
 
-            # ── DURUM KARTI ───────────────────────────────────────────────────────
+            # Son yayın tarihini çek
+            try:
+                _res_ytar = _sb_sv.table("kullanici_log").select("tarih,kullanici").eq("islem","SURUM_YAYINLANDI").order("tarih",desc=True).limit(1).execute()
+                _son_yayin = _res_ytar.data[0]["tarih"][:16].replace("T"," ") if _res_ytar.data else "—"
+                _son_yayin_kim = _res_ytar.data[0]["kullanici"] if _res_ytar.data else "—"
+            except:
+                _son_yayin = "—"
+                _son_yayin_kim = "—"
+
             st.markdown("---")
             _col_a, _col_b = st.columns(2)
 
+            # ── ADMİN KARTI ──────────────────────────────────────────────────
             with _col_a:
                 st.markdown(f"""
-                <div style='background:#1a1a2e;border:2px solid #1f6feb;border-radius:12px;padding:20px;text-align:center'>
-                <div style='font-size:0.85rem;color:#888;margin-bottom:4px'>👑 ADMİN — Son Sürüm</div>
-                <div style='font-size:2rem;font-weight:bold;color:#1f6feb'>{GUNCEL_SURUM}</div>
-                <div style='font-size:0.8rem;color:#aaa;margin-top:4px'>Geliştirme sürümü</div>
+                <div style='background:#0d1117;border:2px solid #1f6feb;border-radius:12px;padding:20px'>
+                <div style='font-size:0.85rem;color:#888;margin-bottom:8px'>👑 ADMİN — Son Geliştirme Sürümü</div>
+                <div style='font-size:2.2rem;font-weight:bold;color:#1f6feb;margin-bottom:4px'>{GUNCEL_SURUM}</div>
+                <div style='font-size:0.8rem;color:#666'>📅 Şu an: {_simdi}</div>
                 </div>
                 """, unsafe_allow_html=True)
+                st.markdown("")
+                # Yayınla butonu
+                if _stable_v != GUNCEL_SURUM:
+                    if st.button(f"🚀 {GUNCEL_SURUM} Yayınla", type="primary", use_container_width=True, key="surum_yayinla"):
+                        try:
+                            _sb_sv.table("sistem_ayarlari").upsert(
+                                {"anahtar":"stable_surum","deger":GUNCEL_SURUM},
+                                on_conflict="anahtar").execute()
+                            kullanici_log_kaydet("SURUM_YAYINLANDI","kullanici",
+                                f"{_stable_v} → {GUNCEL_SURUM} yayınlandı")
+                            st.success(f"✅ {GUNCEL_SURUM} yayınlandı!")
+                            st.balloons()
+                            st.rerun()
+                        except Exception as _esv:
+                            st.error(f"Hata: {_esv}")
+                else:
+                    st.success("✅ Son sürüm yayında")
 
+                # Geri yükle — önceki sürüme dön
+                st.markdown("")
+                with st.expander("🔄 Önceki Sürüme Geri Al"):
+                    try:
+                        _res_gecmis = _sb_sv.table("kullanici_log").select("tarih,detay").eq("islem","SURUM_YAYINLANDI").order("tarih",desc=True).limit(10).execute()
+                        if _res_gecmis.data and len(_res_gecmis.data) > 1:
+                            _gecmis_opts = [r["detay"] for r in _res_gecmis.data[1:6]]
+                            _geri_sec = st.selectbox("Sürüm seç:", _gecmis_opts, key="geri_yukle_sec")
+                            if st.button("🔄 Geri Yükle", key="geri_yukle_btn", use_container_width=True):
+                                # Sürüm adını parse et
+                                import re as _re_sv
+                                _match = _re_sv.search(r'→ (v[\d.]+)', _geri_sec)
+                                if _match:
+                                    _geri_v = _match.group(1)
+                                    _sb_sv.table("sistem_ayarlari").upsert(
+                                        {"anahtar":"stable_surum","deger":_geri_v},
+                                        on_conflict="anahtar").execute()
+                                    kullanici_log_kaydet("SURUM_GERİ_ALINDI","kullanici",f"→ {_geri_v}")
+                                    st.success(f"✅ {_geri_v} geri yüklendi!")
+                                    st.rerun()
+                        else:
+                            st.caption("Geri alınabilecek sürüm yok.")
+                    except Exception as _eg:
+                        st.caption(f"Hata: {_eg}")
+
+            # ── KULLANICI KARTI ───────────────────────────────────────────────
             with _col_b:
                 _renk = "#28a745" if _stable_v == GUNCEL_SURUM else "#ff9800"
-                _durum_yazi = "✅ Güncel" if _stable_v == GUNCEL_SURUM else "⏳ Yayın Bekliyor"
+                _durum_yazi = "✅ Güncel" if _stable_v == GUNCEL_SURUM else "⏳ Güncelleme Hazır"
                 st.markdown(f"""
-                <div style='background:#1a1a2e;border:2px solid {_renk};border-radius:12px;padding:20px;text-align:center'>
-                <div style='font-size:0.85rem;color:#888;margin-bottom:4px'>👥 KULLANICILAR — Yayındaki Sürüm</div>
-                <div style='font-size:2rem;font-weight:bold;color:{_renk}'>{_stable_v}</div>
-                <div style='font-size:0.8rem;color:#aaa;margin-top:4px'>{_durum_yazi}</div>
+                <div style='background:#0d1117;border:2px solid {_renk};border-radius:12px;padding:20px'>
+                <div style='font-size:0.85rem;color:#888;margin-bottom:8px'>👥 KULLANICILAR — Yayındaki Sürüm</div>
+                <div style='font-size:2.2rem;font-weight:bold;color:{_renk};margin-bottom:4px'>{_stable_v}</div>
+                <div style='font-size:0.8rem;color:#666'>📅 Son yayın: {_son_yayin}</div>
+                <div style='font-size:0.8rem;color:#666'>👤 Yayınlayan: {_son_yayin_kim}</div>
+                <div style='font-size:0.85rem;color:{_renk};margin-top:8px'>{_durum_yazi}</div>
                 </div>
                 """, unsafe_allow_html=True)
 
-            st.markdown("---")
-
-            # ── YAYINLA ──────────────────────────────────────────────────────
-            if _stable_v != GUNCEL_SURUM:
-                st.info(f"📢 Kullanıcılar **{_stable_v}** sürümünde çalışıyor. Yeni sürüm **{GUNCEL_SURUM}** hazır.")
-                st.caption("Kullanıcılar yayınlayana kadar mevcut sürümde çalışmaya devam eder.")
-                if st.button(f"🚀 {GUNCEL_SURUM} Sürümünü Yayınla",
-                            type="primary", use_container_width=True, key="surum_yayinla"):
+                # Yayınlama geçmişi
+                st.markdown("")
+                with st.expander("📋 Yayınlama Geçmişi"):
                     try:
-                        _sb_sv.table("sistem_ayarlari").upsert(
-                            {"anahtar":"stable_surum","deger":GUNCEL_SURUM},
-                            on_conflict="anahtar").execute()
-                        kullanici_log_kaydet("SURUM_YAYINLANDI","kullanici",
-                            f"{_stable_v} → {GUNCEL_SURUM} yayınlandı")
-                        st.success(f"✅ {GUNCEL_SURUM} yayınlandı!")
-                        st.balloons()
-                        st.rerun()
-                    except Exception as _esv:
-                        st.error(f"Hata: {_esv}")
-            else:
-                st.success(f"✅ Kullanıcılar son sürümde ({GUNCEL_SURUM}) çalışıyor.")
+                        _res_log_sv = _sb_sv.table("kullanici_log").select("*")                             .in_("islem",["SURUM_YAYINLANDI","SURUM_GERİ_ALINDI"])                             .order("tarih",desc=True).limit(15).execute()
+                        if _res_log_sv.data:
+                            _df_sv = pd.DataFrame(_res_log_sv.data)[["tarih","kullanici","islem","detay"]]
+                            _df_sv["tarih"] = _df_sv["tarih"].astype(str).str[:16].str.replace("T"," ")
+                            _df_sv.columns = ["Tarih","Kim","İşlem","Detay"]
+                            st.dataframe(_df_sv, use_container_width=True, hide_index=True)
+                        else:
+                            st.caption("Henüz yayın geçmişi yok.")
+                    except:
+                        st.caption("Yüklenemedi.")
 
             st.divider()
-
             with st.expander("📖 Nasıl Çalışır?"):
                 st.markdown(f"""
 **Kullanıcılar hiç durmaz — iş kesilmez.**
 
 | | Admin | Kullanıcılar |
 |---|---|---|
-| Sürüm | {GUNCEL_SURUM} | {_stable_v} |
+| Sürüm | **{GUNCEL_SURUM}** | **{_stable_v}** |
 | Durum | Son geliştirme | Kararlı yayın |
 
-**Akış:**
-1. Kodu değiştir → push yap (kullanıcılar etkilenmez)
+1. Kodu değiştir → push yap *(kullanıcılar etkilenmez)*
 2. Admin olarak test et
 3. **🚀 Yayınla** → kullanıcılar yeni sürüme geçer
-4. Veri kaybolmaz, iş durmaz
+4. Sorun çıkarsa **🔄 Geri Al** → önceki sürüme dön
                 """)
-
-            with st.expander("📋 Yayınlama Geçmişi"):
-                try:
-                    _res_log_sv = _sb_sv.table("kullanici_log").select("*")                         .eq("islem","SURUM_YAYINLANDI")                         .order("tarih",desc=True).limit(20).execute()
-                    if _res_log_sv.data:
-                        _df_sv = pd.DataFrame(_res_log_sv.data)[["tarih","kullanici","detay"]]
-                        _df_sv["tarih"] = _df_sv["tarih"].astype(str).str[:16]
-                        st.dataframe(_df_sv, use_container_width=True, hide_index=True)
-                    else:
-                        st.caption("Henüz yayın geçmişi yok.")
-                except:
-                    st.caption("Yüklenemedi.")
-
-
-
-
 
 elif aktif == "rapor":
     sayfa_log("rapor")
@@ -5266,7 +5297,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v6.0 &nbsp;|&nbsp; "
+    "MWCRMPRO v6.1 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
