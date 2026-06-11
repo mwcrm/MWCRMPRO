@@ -491,17 +491,42 @@ def sayfa_log(sayfa):
 
 
 def _tanimlar_yukle(tip):
-    """sistem_tanimlar tablosundan aşama/durum listesi çek"""
+    """sistem_tanimlar tablosundan aşama/durum listesi çek
+    + cari_kartlar'daki eksik değerleri otomatik ekle"""
+    _sb = get_sb_client()
+    _liste = []
     try:
-        _sb = get_sb_client()
         if _sb:
             _r = _sb.table("sistem_tanimlar").select("deger").eq("tip", tip).order("sira").execute()
             if _r.data:
-                return [d["deger"] for d in _r.data]
-            # Veri yok ama tablo erişilebilir — boş liste döndür
-            return []
-    except Exception as _te:
-        pass
+                _liste = [d["deger"] for d in _r.data]
+    except: pass
+
+    # cari_kartlar'daki değerleri de ekle — eksik olanları sistem_tanimlar'a yaz
+    try:
+        if _sb:
+            _kolon = "islem_asamasi" if tip == "asama" else "durum"
+            _cr = _sb.table("cari_kartlar").select(_kolon).execute()
+            if _cr.data:
+                _mevcut_max = len(_liste)
+                for _row in _cr.data:
+                    _val = str(_row.get(_kolon,"") or "").strip()
+                    if _val and _val != "nan" and _val not in _liste:
+                        _liste.append(_val)
+                        # sistem_tanimlar'a da ekle
+                        try:
+                            _mevcut_max += 1
+                            _sb.table("sistem_tanimlar").insert({
+                                "tip": tip,
+                                "deger": _val,
+                                "sira": _mevcut_max
+                            }).execute()
+                        except: pass
+    except: pass
+
+    if _liste:
+        return _liste
+
     # Fallback
     if tip == "asama":
         return ["İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"]
@@ -807,7 +832,7 @@ def save_menu_tercihi(kullanici, sira):
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 
 # ── VERSİYON KONTROL SİSTEMİ ─────────────────────────────────────────────────
-GUNCEL_SURUM = "v6.5"  # Bu kodun versiyonu — her güncellemede artır
+GUNCEL_SURUM = "v6.6"  # Bu kodun versiyonu — her güncellemede artır
 
 def _surum_kontrol():
     """Kullanıcı stable sürümde mi kontrol et"""
@@ -5462,7 +5487,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v6.5 &nbsp;|&nbsp; "
+    "MWCRMPRO v6.6 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
