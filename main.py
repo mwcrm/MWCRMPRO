@@ -1008,13 +1008,27 @@ if aktif == "yeni":
         # Dinamik aşama listesi (sistemdeki tüm aşamalar + ekstralar)
         _asama_base = ["İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"]
         try:
+            _sb_ya = get_sb_client()
+            if _sb_ya:
+                import json as _yaj
+                _r_ya = _sb_ya.table("kullanici_tercih").select("deger") \
+                    .eq("kullanici","__sistem__").eq("anahtar","ekstra_asamalar").execute()
+                _ya_ekstra = _yaj.loads(_r_ya.data[0]["deger"]) if _r_ya.data else []
+                _r_yas = _sb_ya.table("kullanici_tercih").select("deger") \
+                    .eq("kullanici","__sistem__").eq("anahtar","silinen_asamalar").execute()
+                _ya_silinen = _yaj.loads(_r_yas.data[0]["deger"]) if _r_yas.data else []
+                _asama_base = [a for a in _asama_base if a not in _ya_silinen]
+                for _e in _ya_ekstra:
+                    if _e not in _asama_base: _asama_base.append(_e)
+        except: pass
+        # df'den de ekle
+        try:
             _df_as2 = db_read("cari_kartlar", extra_sql="WHERE silindi=0 OR silindi IS NULL")
             if not _df_as2.empty and "islem_asamasi" in _df_as2.columns:
-                _asama_base = sorted(set(_asama_base + [str(a) for a in _df_as2["islem_asamasi"].dropna().unique() if str(a).strip() and str(a)!="nan"]))
+                for _a in _df_as2["islem_asamasi"].dropna().unique():
+                    if str(_a).strip() and str(_a) not in ["nan",""] and _a not in _asama_base:
+                        _asama_base.append(str(_a))
         except: pass
-        if "ekstra_asamalar" in st.session_state:
-            for _ea in st.session_state["ekstra_asamalar"]:
-                if _ea not in _asama_base: _asama_base.append(_ea)
         asama_opts = _asama_base
         _varsayilan_asama = st.session_state.pop("varsayilan_asama", None)
         _asama_default = duzenle.get("islem_asamasi") if duzenle else _varsayilan_asama
@@ -1109,20 +1123,43 @@ elif aktif == "liste":
         except:
             pass  # Kolon yoksa update sırasında hata alırız, onu da yakalayacağız
 
-    # ── ASAMA LİSTESİ ───────────────────────────────────────────────────────────
+    # ── ASAMA LİSTESİ — Supabase'den + df'den ──────────────────────────────────
     _ASAMA_VARSAYILAN = ["İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"]
-    if not df.empty and "islem_asamasi" in df.columns:
-        _asama_ek = [str(a) for a in df["islem_asamasi"].dropna().unique()
-                     if str(a).strip() and str(a) not in ["nan",""]]
-        tum_asama_opts = sorted(set(_ASAMA_VARSAYILAN + _asama_ek))
-    else:
-        tum_asama_opts = _ASAMA_VARSAYILAN.copy()
-    # Kalıcı ekstra aşamaları session_state'te tut
-    if "ekstra_asamalar" not in st.session_state:
-        st.session_state["ekstra_asamalar"] = []
-    for _ea in st.session_state["ekstra_asamalar"]:
+
+    # Supabase'den kayıtlı ekstra aşamaları al
+    try:
+        import json as _asama_json
+        _sb_asama = get_sb_client()
+        if _sb_asama:
+            _res_asama = _sb_asama.table("kullanici_tercih").select("deger") \
+                .eq("kullanici","__sistem__").eq("anahtar","ekstra_asamalar").execute()
+            _kayitli_asama_list = _asama_json.loads(_res_asama.data[0]["deger"]) if _res_asama.data else []
+        else:
+            _kayitli_asama_list = []
+    except:
+        _kayitli_asama_list = []
+
+    # Silinen varsayılan aşamaları al
+    try:
+        if _sb_asama:
+            _res_silinen = _sb_asama.table("kullanici_tercih").select("deger") \
+                .eq("kullanici","__sistem__").eq("anahtar","silinen_asamalar").execute()
+            _silinen_asama_list = _asama_json.loads(_res_silinen.data[0]["deger"]) if _res_silinen.data else []
+        else:
+            _silinen_asama_list = []
+    except:
+        _silinen_asama_list = []
+
+    # Tüm aşamalar: varsayılan (silinmeyenler) + kayıtlı ekstralar + df'dekiler
+    tum_asama_opts = [a for a in _ASAMA_VARSAYILAN if a not in _silinen_asama_list]
+    for _ea in _kayitli_asama_list:
         if _ea not in tum_asama_opts:
             tum_asama_opts.append(_ea)
+    # df'de olan ama listede olmayan aşamaları da ekle
+    if not df.empty and "islem_asamasi" in df.columns:
+        for _da in df["islem_asamasi"].dropna().unique():
+            if str(_da).strip() and str(_da) not in ["nan",""] and _da not in tum_asama_opts:
+                tum_asama_opts.append(str(_da))
 
     # ── ÜST METRİKLER ───────────────────────────────────────────────────────────
     # ── ÜST METRİKLER ────────────────────────────────────────────────────────
