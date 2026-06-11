@@ -757,7 +757,7 @@ def save_menu_tercihi(kullanici, sira):
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 
 # ── VERSİYON KONTROL SİSTEMİ ─────────────────────────────────────────────────
-GUNCEL_SURUM = "v5.6"  # Bu kodun versiyonu — her güncellemede artır
+GUNCEL_SURUM = "v5.9"  # Bu kodun versiyonu — her güncellemede artır
 
 def _surum_kontrol():
     """Kullanıcı stable sürümde mi kontrol et"""
