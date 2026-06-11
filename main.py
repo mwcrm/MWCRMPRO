@@ -2677,18 +2677,42 @@ elif aktif == "rapor":
     _mc[7].metric("🔄 Devam", len(df_rand_r[df_rand_r["sonuc"]=="Devam Ediyor"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0)
     _mc[8].metric("❌ Gidilmedi", len(df_rand_r[df_rand_r["sonuc"]=="Gidilmedi"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0)
 
-    with st.expander("📊 Genel Özet — Tarih Bazlı"):
+    with st.expander("📅 Tarih & Görev Raporu"):
         if df_rand_r.empty:
             st.info("Randevu yok.")
         else:
-            if "randevu_tarihi" in df_rand_r.columns:
-                t_oz = df_rand_r.groupby("randevu_tarihi").agg(
-                    Musteri=("musteri_adi","nunique"), Randevu=("id","count")
-                ).reset_index().sort_values("randevu_tarihi", ascending=False)
-                t_oz.columns = ["Tarih","Müşteri","Randevu"]
-                st.dataframe(t_oz, use_container_width=True, hide_index=True)
+            # Randevu + cari kart ciro birleştir
+            _rg = df_rand_r.copy()
+            if not df_rapor.empty:
+                _ciro_map = df_rapor[["firma","beklenen_ciro","gerceklesen_ciro"]].copy()
+                _rg = _rg.merge(_ciro_map, left_on="musteri_adi", right_on="firma", how="left")
+                _rg["beklenen_ciro"] = pd.to_numeric(_rg["beklenen_ciro"], errors="coerce").fillna(0)
+                _rg["gerceklesen_ciro"] = pd.to_numeric(_rg["gerceklesen_ciro"], errors="coerce").fillna(0)
+            else:
+                _rg["beklenen_ciro"] = 0
+                _rg["gerceklesen_ciro"] = 0
 
-    with st.expander("🗺️ Bölge Raporu"):
+            # Tarih + Görev bazlı özet
+            _grp_cols = ["randevu_tarihi","gorev"] if "gorev" in _rg.columns else ["randevu_tarihi"]
+            _tg = _rg.groupby(_grp_cols).agg(
+                Randevu=("id","count"),
+                Musteri=("musteri_adi","nunique"),
+                Bitti=("sonuc", lambda x: (x=="Bitti").sum()) if "sonuc" in _rg.columns else ("id","count"),
+                Beklenen=("beklenen_ciro","sum"),
+                Gerceklesen=("gerceklesen_ciro","sum"),
+            ).reset_index().sort_values("randevu_tarihi", ascending=False)
+            _tg["Fark"] = _tg["Gerceklesen"] - _tg["Beklenen"]
+            _tg["Beklenen"] = _tg["Beklenen"].apply(fmt_para)
+            _tg["Gerceklesen"] = _tg["Gerceklesen"].apply(fmt_para)
+            _tg["Fark"] = _tg["Fark"].apply(fmt_para)
+            _tg.rename(columns={
+                "randevu_tarihi":"Tarih","gorev":"Görev",
+                "Randevu":"Randevu","Musteri":"Müşteri","Bitti":"Bitti",
+                "Beklenen":"Beklenen Ciro","Gerceklesen":"Gerçekleşen","Fark":"Fark"
+            }, inplace=True)
+            st.dataframe(_tg, use_container_width=True, hide_index=True)
+            buf_tg = _rio2.BytesIO(); _tg.to_excel(buf_tg, index=False); buf_tg.seek(0)
+            st.download_button("📥 İndir", data=buf_tg, file_name="tarih_gorev.xlsx", use_container_width=True)
         if df_rand_r.empty or "bolge" not in df_rand_r.columns:
             st.info("Randevu yok.")
         else:
@@ -2713,19 +2737,6 @@ elif aktif == "rapor":
             st.dataframe(b_oz, use_container_width=True, hide_index=True)
             buf_b = _rio2.BytesIO(); b_oz.to_excel(buf_b, index=False); buf_b.seek(0)
             st.download_button("📥 İndir", data=buf_b, file_name="bolge.xlsx", use_container_width=True)
-
-    with st.expander("🎯 Görev Raporu"):
-        if df_rand_r.empty:
-            st.info("Randevu yok.")
-        elif "gorev" in df_rand_r.columns:
-            g_oz = df_rand_r.groupby("gorev").agg(
-                Adet=("id","count"),
-                Bitti=("sonuc", lambda x: (x=="Bitti").sum()),
-                Devam=("sonuc", lambda x: (x=="Devam Ediyor").sum()),
-                Gidilmedi=("sonuc", lambda x: (x=="Gidilmedi").sum()),
-            ).reset_index().sort_values("Adet", ascending=False)
-            g_oz["Başarı%"] = (g_oz["Bitti"]/g_oz["Adet"]*100).round(1).astype(str)+"%"
-            st.dataframe(g_oz, use_container_width=True, hide_index=True)
 
     st.divider()
     with st.expander("🔄 Aşama & Durum Bazlı Detay Raporu", expanded=False):
