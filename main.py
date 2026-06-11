@@ -2677,7 +2677,7 @@ elif aktif == "rapor":
     _mc[7].metric("🔄 Devam", len(df_rand_r[df_rand_r["sonuc"]=="Devam Ediyor"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0)
     _mc[8].metric("❌ Gidilmedi", len(df_rand_r[df_rand_r["sonuc"]=="Gidilmedi"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0)
 
-    with st.expander("📊 Genel Özet — Tarih & Temsilci"):
+    with st.expander("📊 Genel Özet — Tarih Bazlı"):
         if df_rand_r.empty:
             st.info("Randevu yok.")
         else:
@@ -2687,23 +2687,29 @@ elif aktif == "rapor":
                 ).reset_index().sort_values("randevu_tarihi", ascending=False)
                 t_oz.columns = ["Tarih","Müşteri","Randevu"]
                 st.dataframe(t_oz, use_container_width=True, hide_index=True)
-            if "temsilci" in df_rand_r.columns:
-                tem_oz = df_rand_r.groupby("temsilci").agg(
-                    Toplam=("id","count"),
-                    Bitti=("sonuc", lambda x: (x=="Bitti").sum()),
-                    Devam=("sonuc", lambda x: (x=="Devam Ediyor").sum()),
-                ).reset_index().sort_values("Toplam", ascending=False)
-                st.dataframe(tem_oz, use_container_width=True, hide_index=True)
 
     with st.expander("🗺️ Bölge Raporu"):
         if df_rand_r.empty:
             st.info("Randevu yok.")
         elif "bolge" in df_rand_r.columns:
+            # Randevu verisini cari kartlarla birleştir — beklenen/gerçekleşen ciro ekle
+            _bolge_ciro = pd.DataFrame()
+            if not df_rapor.empty and "il" in df_rapor.columns:
+                _bolge_ciro = df_rapor.groupby("il").agg(
+                    Beklenen=("beklenen_ciro","sum"),
+                    Gerceklesen=("gerceklesen_ciro","sum")
+                ).reset_index().rename(columns={"il":"bolge"})
             b_oz = df_rand_r.groupby("bolge").agg(
                 Randevu=("id","count"), Musteri=("musteri_adi","nunique"),
                 Bitti=("sonuc", lambda x: (x=="Bitti").sum())
             ).reset_index().sort_values("Randevu", ascending=False)
-            b_oz.columns = ["Bölge","Randevu","Müşteri","Bitti"]
+            if not _bolge_ciro.empty:
+                b_oz = b_oz.merge(_bolge_ciro, on="bolge", how="left")
+                b_oz["Beklenen"] = b_oz["Beklenen"].fillna(0).apply(fmt_para)
+                b_oz["Gerceklesen"] = b_oz["Gerceklesen"].fillna(0).apply(fmt_para)
+                b_oz.columns = ["Bölge","Randevu","Müşteri","Bitti","Beklenen Ciro","Gerçekleşen"]
+            else:
+                b_oz.columns = ["Bölge","Randevu","Müşteri","Bitti"]
             st.dataframe(b_oz, use_container_width=True, hide_index=True)
             buf_b = _rio2.BytesIO(); b_oz.to_excel(buf_b, index=False); buf_b.seek(0)
             st.download_button("📥 İndir", data=buf_b, file_name="bolge.xlsx", use_container_width=True)
@@ -2720,28 +2726,6 @@ elif aktif == "rapor":
             ).reset_index().sort_values("Adet", ascending=False)
             g_oz["Başarı%"] = (g_oz["Bitti"]/g_oz["Adet"]*100).round(1).astype(str)+"%"
             st.dataframe(g_oz, use_container_width=True, hide_index=True)
-            if "temsilci" in df_rand_r.columns:
-                st.markdown("**Temsilci × Görev:**")
-                st.dataframe(pd.crosstab(df_rand_r["temsilci"], df_rand_r["gorev"]), use_container_width=True)
-
-    with st.expander("📋 Takip & Sonuç Raporu"):
-        if df_rand_r.empty:
-            st.info("Randevu yok.")
-        else:
-            if "takip" in df_rand_r.columns:
-                st.markdown("**Takip:**")
-                st.dataframe(df_rand_r.groupby("takip").size().reset_index(name="Adet"), use_container_width=True, hide_index=True)
-            if "sonuc" in df_rand_r.columns:
-                st.markdown("**Sonuç:**")
-                st.dataframe(df_rand_r.groupby("sonuc").agg(Adet=("id","count"),Musteri=("musteri_adi","nunique")).reset_index(), use_container_width=True, hide_index=True)
-            acik = df_rand_r[~df_rand_r.get("sonuc",pd.Series()).isin(["Bitti","İptal","Gidilmedi"])] if "sonuc" in df_rand_r.columns else pd.DataFrame()
-            if not acik.empty:
-                st.warning(f"⚠️ {len(acik)} açık randevu!")
-                st.dataframe(acik[[c for c in ["randevu_tarihi","musteri_adi","bolge","gorev","temsilci","sonuc"] if c in acik.columns]], use_container_width=True, hide_index=True)
-            else:
-                st.success("✅ Tüm sonuçlar girilmiş.")
-            buf_rs = _rio2.BytesIO(); df_rand_r.to_excel(buf_rs, index=False); buf_rs.seek(0)
-            st.download_button("📥 Randevu Raporu", data=buf_rs, file_name="randevu_raporu.xlsx", use_container_width=True)
 
     st.divider()
     with st.expander("🔄 Aşama & Durum Bazlı Detay Raporu", expanded=False):
@@ -2849,22 +2833,6 @@ elif aktif == "rapor":
             st.dataframe(df_top, use_container_width=True, hide_index=True)
             buf_c = _rio2.BytesIO(); df_top.to_excel(buf_c, index=False); buf_c.seek(0)
             st.download_button("📥 İndir", data=buf_c, file_name="ciro_top20.xlsx", use_container_width=True)
-
-    with st.expander("🔍 Arama / Filtreleme Raporu"):
-        if df_rapor.empty: st.info("Veri yok.")
-        else:
-            fa1,fa2,fa3 = st.columns(3)
-            ara_r = fa1.text_input("Ara:", key="rp_ara")
-            fil_d = fa2.selectbox("Durum:", ["Tümü","Aktif","Hedef","Pasif"], key="rp_durum")
-            fil_a = fa3.selectbox("Aşama:", ["Tümü","İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"], key="rp_asama")
-            df_f = df_rapor.copy()
-            if ara_r: df_f = df_f[df_f.apply(lambda r: ara_r.lower() in str(r).lower(), axis=1)]
-            if fil_d != "Tümü": df_f = df_f[df_f["durum"]==fil_d]
-            if fil_a != "Tümü": df_f = df_f[df_f["islem_asamasi"]==fil_a]
-            st.caption(f"{len(df_f)} kayıt")
-            st.dataframe(df_f[[c for c in ["id","firma","yetkili","gsm","email","durum","islem_asamasi","temsilci","il"] if c in df_f.columns]], use_container_width=True, hide_index=True)
-            buf_f = _rio2.BytesIO(); df_f.to_excel(buf_f, index=False); buf_f.seek(0)
-            st.download_button("📥 İndir", data=buf_f, file_name="filtre_raporu.xlsx", use_container_width=True)
 
     with st.expander("📱 WhatsApp & Email Gönderim Raporu"):
         try:
