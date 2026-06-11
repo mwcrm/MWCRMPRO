@@ -1077,31 +1077,27 @@ elif aktif == "liste":
             tum_asama_opts.append(_ea)
 
     # ── ÜST METRİKLER ───────────────────────────────────────────────────────────
-    m1,m2,m3,m4 = st.columns(4)
-    m1.metric("Toplam", len(df))
-    m2.metric("Aktif",  len(df[df["durum"]=="Aktif"])  if "durum" in df.columns else 0)
-    m3.metric("Hedef",  len(df[df["durum"]=="Hedef"])  if "durum" in df.columns else 0)
-    m4.metric("Pasif",  len(df[df["durum"]=="Pasif"])  if "durum" in df.columns else 0)
+    # ── ÜST METRİKLER — DÜZENLİ ────────────────────────────────────────────
+    st.markdown("**📊 Özet**")
 
-    # Ekstra durumlar metrikleri
-    try:
-        import json as _mjson
-        _sb_met = get_sb_client()
-        _ekstra_dur_met = []
-        if _sb_met:
-            _res_dur = _sb_met.table("kullanici_tercih").select("deger") \
-                .eq("kullanici","__sistem__").eq("anahtar","ekstra_durumlar").execute()
-            if _res_dur.data:
-                _ekstra_dur_met = _mjson.loads(_res_dur.data[0]["deger"])
-        if _ekstra_dur_met and "durum" in df.columns:
-            _ekd_cols = st.columns(len(_ekstra_dur_met))
-            for _ei, _ed in enumerate(_ekstra_dur_met):
-                _ec = len(df[df["durum"]==_ed])
-                if _ec > 0:
-                    _ekd_cols[_ei].metric(_ed, _ec)
-    except: pass
+    # Satır 1: Toplam + Durum bazlı
+    if "durum" in df.columns:
+        _tum_durumlar_met = ["Aktif","Hedef","Pasif"] + [
+            d for d in df["durum"].dropna().unique()
+            if str(d).strip() and str(d) != "nan" and d not in ["Aktif","Hedef","Pasif"]
+        ]
+        _durum_veri = [(d, len(df[df["durum"]==d])) for d in _tum_durumlar_met if len(df[df["durum"]==d]) > 0]
+        _durum_veri = [("Toplam", len(df))] + _durum_veri
+    else:
+        _durum_veri = [("Toplam", len(df))]
 
-    # Aşama metrikleri — veri olan her aşama
+    # Satır 1 — max 5 kolon
+    _sat1 = _durum_veri[:5]
+    _cols1 = st.columns(len(_sat1))
+    for i, (ad, sayi) in enumerate(_sat1):
+        _cols1[i].metric(ad, sayi)
+
+    # Satır 2 — Aşama bazlı
     if "islem_asamasi" in df.columns:
         _asama_grp = df[
             df["islem_asamasi"].notna() &
@@ -1109,9 +1105,10 @@ elif aktif == "liste":
             (df["islem_asamasi"].astype(str) != "nan")
         ]["islem_asamasi"].value_counts()
         if not _asama_grp.empty:
-            _asama_cols = st.columns(min(len(_asama_grp), 6))
-            for _ci, (_asama_adi, _asama_sayi) in enumerate(list(_asama_grp.items())[:6]):
-                _asama_cols[_ci].metric(_asama_adi, int(_asama_sayi))
+            _sat2 = list(_asama_grp.items())[:5]
+            _cols2 = st.columns(len(_sat2))
+            for i, (ad, sayi) in enumerate(_sat2):
+                _cols2[i].metric(ad, int(sayi))
 
     # ── FİLTRE ──────────────────────────────────────────────────────────────────
     f1,f2,f3 = st.columns(3)
@@ -5129,7 +5126,7 @@ elif aktif == "admin_rapor":
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
-    "MWCRMPRO v5.2 &nbsp;|&nbsp; "
+    "MWCRMPRO v5.4 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
