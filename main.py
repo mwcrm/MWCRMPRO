@@ -2665,20 +2665,19 @@ elif aktif == "rapor":
     if not df_rand_r.empty and "adet" in df_rand_r.columns:
         df_rand_r["adet"] = pd.to_numeric(df_rand_r["adet"], errors="coerce").fillna(0)
 
-    # ── ÖZET SATIRI — küçük metin ─────────────────────────────────────────────
+    # ── ÖZET SATIRI ───────────────────────────────────────────────────────────
     _aktif_say  = len(df_rapor[df_rapor["durum"]=="Aktif"]) if not df_rapor.empty else 0
     _hedef_say  = len(df_rapor[df_rapor["durum"]=="Hedef"]) if not df_rapor.empty else 0
     _rand_say   = len(df_rand_r) if not df_rand_r.empty else 0
     _bitti_say  = len(df_rand_r[df_rand_r["sonuc"]=="Bitti"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0
     _devam_say  = len(df_rand_r[df_rand_r["sonuc"]=="Devam Ediyor"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0
     _gidilmedi  = len(df_rand_r[df_rand_r["sonuc"]=="Gidilmedi"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0
-    st.caption(
-        f"🏢 **Cari:** {toplam} kayıt &nbsp;|&nbsp; "
-        f"Aktif: {_aktif_say} &nbsp; Hedef: {_hedef_say} &nbsp;|&nbsp; "
-        f"Beklenen: {fmt_para(toplam_beklenen)} &nbsp; Gerçekleşen: {fmt_para(toplam_gercek)} "
-        f"&nbsp;&nbsp;&nbsp; "
-        f"📅 **Randevu:** {_rand_say} toplam &nbsp;|&nbsp; "
-        f"✅ Bitti: {_bitti_say} &nbsp; 🔄 Devam: {_devam_say} &nbsp; ❌ Gidilmedi: {_gidilmedi}"
+    st.markdown(
+        f"🏢 **Cari:** {toplam} kayıt &nbsp;·&nbsp; Aktif: **{_aktif_say}** &nbsp;·&nbsp; Hedef: **{_hedef_say}** &nbsp;·&nbsp; "
+        f"Beklenen: **{fmt_para(toplam_beklenen)}** &nbsp;·&nbsp; Gerçekleşen: **{fmt_para(toplam_gercek)}** "
+        f"&nbsp;&nbsp;|&nbsp;&nbsp; "
+        f"📅 **Randevu:** {_rand_say} &nbsp;·&nbsp; ✅ Bitti: **{_bitti_say}** &nbsp;·&nbsp; "
+        f"🔄 Devam: **{_devam_say}** &nbsp;·&nbsp; ❌ Gidilmedi: **{_gidilmedi}**"
     )
     st.divider()
 
@@ -2880,13 +2879,18 @@ elif aktif == "rapor":
                 df_tum = df_tum.sort_values("Tarih", ascending=False)
                 df_tum["Tarih"] = df_tum["Tarih"].astype(str).str[:16]
 
-                # ── Metrikler ────────────────────────────────────────────────
-                _wm1,_wm2,_wm3,_wm4,_wm5 = st.columns(5)
-                _wm1.metric("Toplam Gönderim", len(df_tum))
-                _wm2.metric("📱 WA Teklif", len(df_tum[df_tum["Kanal"].str.contains("WhatsApp Teklif|WA Teklif", na=False)]))
-                _wm3.metric("✉️ Email", len(df_tum[df_tum["Kanal"].str.contains("Email", na=False)]))
-                _wm4.metric("📅 Randevu WA", len(df_tum[df_tum["Kanal"].str.contains("Randevu|Uyarı", na=False)]))
-                _wm5.metric("👤 Kişi WA", len(df_tum[df_tum["Kaynak"]=="Kişiler"]))
+                # ── Özet satırı ──────────────────────────────────────────────
+                _wa_teklif  = len(df_tum[df_tum["Kanal"].str.contains("WhatsApp Teklif|WA Teklif", na=False)])
+                _wa_email   = len(df_tum[df_tum["Kanal"].str.contains("Email", na=False)])
+                _wa_randevu = len(df_tum[df_tum["Kanal"].str.contains("Randevu|Uyarı", na=False)])
+                _wa_kisi    = len(df_tum[df_tum["Kanal"].str.contains("WA Kişi", na=False)])
+                st.markdown(
+                    f"📊 Toplam: **{len(df_tum)}** &nbsp;·&nbsp; "
+                    f"📱 WA Teklif: **{_wa_teklif}** &nbsp;·&nbsp; "
+                    f"✉️ Email: **{_wa_email}** &nbsp;·&nbsp; "
+                    f"📅 Randevu WA: **{_wa_randevu}** &nbsp;·&nbsp; "
+                    f"👤 Kişi WA: **{_wa_kisi}**"
+                )
 
                 # ── Filtreler ────────────────────────────────────────────────
                 _wf1, _wf2, _wf3 = st.columns(3)
