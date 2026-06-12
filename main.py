@@ -4963,10 +4963,9 @@ elif aktif == "randevu":
     import io as _rio
     st.markdown("## 📅 Randevular")
     st.markdown("""<style>
-    div[data-testid="metric-container"] > label { font-size: 0.7rem !important; }
-    div[data-testid="metric-container"] > div { font-size: 0.85rem !important; }
-    div[data-testid="metric-container"] [data-testid="stMetricValue"] { font-size: 0.9rem !important; }
-    div[data-testid="metric-container"] [data-testid="stMetricLabel"] { font-size: 0.7rem !important; }
+    [data-testid="stMetricValue"] > div { font-size: 0.8rem !important; font-weight: 600 !important; }
+    [data-testid="stMetricLabel"] > div { font-size: 0.7rem !important; }
+    [data-testid="metric-container"] { padding: 4px 8px !important; }
     </style>""", unsafe_allow_html=True)
 
     # ── TÜM RANDEVULARI YİKLE ────────────────────────────────────────────────
