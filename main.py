@@ -3637,14 +3637,14 @@ elif aktif == "ozel_teklif":
         st.rerun()
 
     # Kolon genişlikleri
-    _CW = [1.5, 1.5, 1.8, 0.9, 0.9, 0.7, 1.2, 0.4]
+    _CW = [1.8, 1.8, 1.8, 0.9, 0.9, 0.7, 1.2, 0.4]
 
     for gi, g in enumerate(grp):
         st.markdown(f"---\n**Grup {gi+1}**")
 
         # Başlık satırı
         _bh = st.columns(_CW)
-        for _txt, _col in zip(["Çıkış İli","Varış İli","Tür","Baş Desi","Bit Desi","KG","Fiyat ₺",""], _bh):
+        for _txt, _col in zip(["Çıkış İlleri","Varış İlleri","Tür","Baş Desi","Bit Desi","KG","Fiyat ₺",""], _bh):
             _col.caption(f"**{_txt}**")
 
         satirlar = g.get("satirlar", [])
@@ -3653,16 +3653,18 @@ elif aktif == "ozel_teklif":
         for si, s in enumerate(satirlar):
             _rc = st.columns(_CW)
 
-            # Çıkış ili — dropdown
-            _c_idx = (_OZ_ILLER.index(s["cikis"])+1) if s.get("cikis") in _OZ_ILLER else 0
-            _cikis = _rc[0].selectbox("", [""]+_OZ_ILLER,
-                index=_c_idx,
+            # Çıkış illeri — multiselect
+            _cikis_def = s.get("cikis","")
+            _cikis_def_list = _cikis_def if isinstance(_cikis_def, list) else ([_cikis_def] if _cikis_def and _cikis_def in _OZ_ILLER else [])
+            _cikis = _rc[0].multiselect("", _OZ_ILLER,
+                default=_cikis_def_list,
                 key=f"oz2_c_{gi}_{si}", label_visibility="collapsed")
 
-            # Varış ili — dropdown
-            _v_idx = (_OZ_ILLER.index(s["varis"])+1) if s.get("varis") in _OZ_ILLER else 0
-            _varis = _rc[1].selectbox("", [""]+_OZ_ILLER,
-                index=_v_idx,
+            # Varış illeri — multiselect
+            _varis_def = s.get("varis","")
+            _varis_def_list = _varis_def if isinstance(_varis_def, list) else ([_varis_def] if _varis_def and _varis_def in _OZ_ILLER else [])
+            _varis = _rc[1].multiselect("", _OZ_ILLER,
+                default=_varis_def_list,
                 key=f"oz2_v_{gi}_{si}", label_visibility="collapsed")
 
             # Tür — multiselect
@@ -3708,9 +3710,18 @@ elif aktif == "ozel_teklif":
     st.divider()
     st.markdown("### 📋 Özet")
     for gi, g in enumerate(grp):
-        _cikis_set = list(dict.fromkeys([s["cikis"] for s in g["satirlar"] if s.get("cikis")]))
-        _varis_set = list(dict.fromkeys([s["varis"] for s in g["satirlar"] if s.get("varis")]))
-        st.markdown(f"**{', '.join(_cikis_set) or '—'} → {', '.join(_varis_set) or '—'}**")
+        _c_all = []
+        _v_all = []
+        for s in g.get("satirlar",[]):
+            _cv = s.get("cikis","")
+            _vv = s.get("varis","")
+            if isinstance(_cv, list): _c_all += _cv
+            elif _cv: _c_all.append(_cv)
+            if isinstance(_vv, list): _v_all += _vv
+            elif _vv: _v_all.append(_vv)
+        _c_all = list(dict.fromkeys(_c_all))
+        _v_all = list(dict.fromkeys(_v_all))
+        st.markdown(f"**{', '.join(_c_all) or '—'} → {', '.join(_v_all) or '—'}**")
         for s in g["satirlar"]:
             _t = ", ".join(s.get("tur",[]) or []) or "—"
             _b1 = int(s.get("bas",0) or 0)
@@ -3757,9 +3768,18 @@ elif aktif == "ozel_teklif":
     if _ks2.button("📱 WA Mesajı Oluştur", use_container_width=True, key="oz2_wa_olustur"):
         _msg = f"Sayın {_oz_hedef} yetkilisi,\n\nSize özel kargo fiyat teklifimiz:\n\n"
         for g in grp:
-            _cikis_set = list(dict.fromkeys([s["cikis"] for s in g["satirlar"] if s.get("cikis")]))
-            _varis_set = list(dict.fromkeys([s["varis"] for s in g["satirlar"] if s.get("varis")]))
-            _msg += f"📍 {', '.join(_cikis_set) or '—'} → {', '.join(_varis_set) or '—'}\n"
+            _c_all = []
+            _v_all = []
+            for s in g.get("satirlar",[]):
+                _cv = s.get("cikis","")
+                _vv = s.get("varis","")
+                if isinstance(_cv, list): _c_all += _cv
+                elif _cv: _c_all.append(_cv)
+                if isinstance(_vv, list): _v_all += _vv
+                elif _vv: _v_all.append(_vv)
+            _c_all = list(dict.fromkeys(_c_all))
+            _v_all = list(dict.fromkeys(_v_all))
+            _msg += f"📍 {', '.join(_c_all) or '—'} → {', '.join(_v_all) or '—'}\n"
             for s in g["satirlar"]:
                 _t  = ", ".join(s.get("tur",[]) or []) or "—"
                 _b1 = int(s.get("bas",0) or 0)
