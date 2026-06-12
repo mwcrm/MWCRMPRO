@@ -2772,20 +2772,6 @@ elif aktif == "rapor":
 
     _rapor_sira = _rapor_sira_yukle()
 
-    # Sıralama butonları
-    with st.expander("⚙️ Rapor Sırası"):
-        for _ri, _rk in enumerate(_rapor_sira):
-            _rc1, _rc2, _rc3 = st.columns([5,1,1])
-            _rc1.caption(_RAPOR_ETIKET.get(_rk, _rk))
-            if _ri > 0 and _rc2.button("▲", key=f"rp_up_{_rk}"):
-                _rapor_sira[_ri], _rapor_sira[_ri-1] = _rapor_sira[_ri-1], _rapor_sira[_ri]
-                _rapor_sira_kaydet(_rapor_sira)
-                st.rerun()
-            if _ri < len(_rapor_sira)-1 and _rc3.button("▼", key=f"rp_dn_{_rk}"):
-                _rapor_sira[_ri], _rapor_sira[_ri+1] = _rapor_sira[_ri+1], _rapor_sira[_ri]
-                _rapor_sira_kaydet(_rapor_sira)
-                st.rerun()
-
     # ── RAPOR SIRALAMA ────────────────────────────────────────────────────────
     _RAPOR_LISTESI = ["tarih_gorev","bolge","asama_durum","il_bazli","musteri_ciro","wa_email"]
     _RAPOR_ETIKET = {
@@ -2821,10 +2807,10 @@ elif aktif == "rapor":
         for _ri, _rk in enumerate(_rapor_sira):
             _rc1,_rc2,_rc3 = st.columns([5,1,1])
             _rc1.caption(_RAPOR_ETIKET.get(_rk,_rk))
-            if _ri > 0 and _rc2.button("▲", key=f"rp_up_{_rk}"):
+            if _ri > 0 and _rc2.button("▲", key=f"raporsira_up_{_rk}"):
                 _rapor_sira[_ri],_rapor_sira[_ri-1] = _rapor_sira[_ri-1],_rapor_sira[_ri]
                 _rapor_sira_kaydet(_rapor_sira); st.rerun()
-            if _ri < len(_rapor_sira)-1 and _rc3.button("▼", key=f"rp_dn_{_rk}"):
+            if _ri < len(_rapor_sira)-1 and _rc3.button("▼", key=f"raporsira_dn_{_rk}"):
                 _rapor_sira[_ri],_rapor_sira[_ri+1] = _rapor_sira[_ri+1],_rapor_sira[_ri]
                 _rapor_sira_kaydet(_rapor_sira); st.rerun()
 
