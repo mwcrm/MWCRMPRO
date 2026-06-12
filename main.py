@@ -5016,12 +5016,13 @@ elif aktif == "randevu":
             # ── ÜST RAPOR — başlıklarla aynı kolon genişliğinde ─────────────
             _CW = [0.4,1.1,1.8,1.3,1.3,1.1,1.1,1.1,1.1,0.4]
             _rc_rapor = st.columns(_CW)
-            _rapor_etiketler = ["Toplam","✅ Bitti","🔄 Devam","❌ Gidilmedi","📅 Bugün","📆 Bu Hafta","📆 Bu Ay","⚠️ Açık","🎯 Başarı","💰 Beklenen"]
-            _rapor_degerler  = [_toplam, _bitti, _devam, _gidilmedi, _bugun, _hafta, _ay, _acik_say, _basari, fmt_para(_beklenen)]
-            _rapor_filtreler = ["toplam","bitti","devam","gidilmedi","bugun","hafta","ay","acik","basari","beklenen"]
+            _rapor_etiketler = ["Toplam","✅ Bitti","🔄 Devam","❌ Gidilmedi","📅 Bugün","📆 Bu Hafta","📆 Bu Ay","⚠️ Açık","💰 Beklenen",""]
+            _rapor_degerler  = [_toplam, _bitti, _devam, _gidilmedi, _bugun, _hafta, _ay, _acik_say, fmt_para(_beklenen),""]
+            _rapor_filtreler = ["toplam","bitti","devam","gidilmedi","bugun","hafta","ay","acik","beklenen",""]
 
             for _ri, (_col, _lbl, _val, _fil) in enumerate(zip(_rc_rapor, _rapor_etiketler, _rapor_degerler, _rapor_filtreler)):
-                if _ri < 9:
+                if not _lbl: continue
+                if _ri <= 7:
                     if _col.button(f"{_lbl}\n{_val}", key=f"rp_fil_{_fil}", use_container_width=True):
                         if st.session_state.get("rp_aktif_fil") == _fil:
                             st.session_state.pop("rp_aktif_fil", None)
