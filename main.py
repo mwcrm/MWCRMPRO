@@ -5013,21 +5013,44 @@ elif aktif == "randevu":
                 _beklenen = _df_cari_r[_df_cari_r["firma"].isin(_mus_listesi)]["beklenen_ciro"].sum() if not _df_cari_r.empty else 0
             except: _beklenen = 0
 
-            st.markdown(
-                f"<div style='background:#1f6feb22;border-radius:6px;padding:6px 10px;margin-bottom:4px;font-size:0.85rem;font-weight:600;color:#1f6feb'>"
-                f"Toplam: <b>{_toplam}</b> &nbsp;·&nbsp; "
-                f"✅ Bitti: <b>{_bitti}</b> &nbsp;·&nbsp; "
-                f"🔄 Devam: <b>{_devam}</b> &nbsp;·&nbsp; "
-                f"❌ Gidilmedi: <b>{_gidilmedi}</b> &nbsp;·&nbsp; "
-                f"📅 Bugün: <b>{_bugun}</b> &nbsp;·&nbsp; "
-                f"📆 Bu Hafta: <b>{_hafta}</b> &nbsp;·&nbsp; "
-                f"📆 Bu Ay: <b>{_ay}</b> &nbsp;·&nbsp; "
-                f"⚠️ Açık: <b>{_acik_say}</b> &nbsp;·&nbsp; "
-                f"🎯 Başarı: <b>{_basari}</b> &nbsp;·&nbsp; "
-                f"💰 Beklenen: <b>{fmt_para(_beklenen)}</b>"
-                f"</div>",
-                unsafe_allow_html=True
-            )
+            # ── ÜST RAPOR — başlıklarla aynı kolon genişliğinde ─────────────
+            _CW = [0.4,1.1,1.8,1.3,1.3,1.1,1.1,1.1,1.1,0.4]
+            _rc_rapor = st.columns(_CW)
+            _rapor_etiketler = ["Toplam","✅ Bitti","🔄 Devam","❌ Gidilmedi","📅 Bugün","📆 Bu Hafta","📆 Bu Ay","⚠️ Açık","🎯 Başarı","💰 Beklenen"]
+            _rapor_degerler  = [_toplam, _bitti, _devam, _gidilmedi, _bugun, _hafta, _ay, _acik_say, _basari, fmt_para(_beklenen)]
+            _rapor_filtreler = ["toplam","bitti","devam","gidilmedi","bugun","hafta","ay","acik","basari","beklenen"]
+
+            for _ri, (_col, _lbl, _val, _fil) in enumerate(zip(_rc_rapor, _rapor_etiketler, _rapor_degerler, _rapor_filtreler)):
+                if _ri < 9:  # son kolon (beklenen) buton olmaz
+                    if _col.button(f"{_lbl}\n{_val}", key=f"rp_fil_{_fil}", use_container_width=True):
+                        if st.session_state.get("rp_aktif_fil") == _fil:
+                            st.session_state.pop("rp_aktif_fil", None)
+                        else:
+                            st.session_state["rp_aktif_fil"] = _fil
+                        st.rerun()
+                else:
+                    _col.markdown(f"<div style='text-align:center;font-size:0.75rem;font-weight:700;color:#1f6feb'>{_lbl}<br><b>{_val}</b></div>", unsafe_allow_html=True)
+
+            # Aktif filtre varsa uygula ve detay göster
+            _aktif_fil = st.session_state.get("rp_aktif_fil")
+            _df_detay = df_rand.copy()
+            if _aktif_fil == "bitti":      _df_detay = df_rand[df_rand["sonuc"]=="Bitti"]
+            elif _aktif_fil == "devam":    _df_detay = df_rand[df_rand["sonuc"]=="Devam Ediyor"]
+            elif _aktif_fil == "gidilmedi":_df_detay = df_rand[df_rand["sonuc"]=="Gidilmedi"]
+            elif _aktif_fil == "bugun":    _df_detay = df_rand[df_rand["randevu_tarihi"]==bugun_str]
+            elif _aktif_fil == "hafta":
+                _hf_bitis = (datetime.now()+pd.Timedelta(days=7)).strftime("%Y-%m-%d")
+                _df_detay = df_rand[(df_rand["randevu_tarihi"]>=bugun_str)&(df_rand["randevu_tarihi"]<=_hf_bitis)]
+            elif _aktif_fil == "ay":
+                _ay_bitis = datetime.now().strftime("%Y-%m-") + "31"
+                _df_detay = df_rand[(df_rand["randevu_tarihi"]>=bugun_str)&(df_rand["randevu_tarihi"]<=_ay_bitis)]
+            elif _aktif_fil == "acik":
+                _df_detay = df_rand[(df_rand["randevu_tarihi"]<bugun_str)&(~df_rand["sonuc"].isin(["Bitti","İptal","Gidilmedi"]))]
+
+            if _aktif_fil and _aktif_fil not in ["toplam","basari","beklenen"]:
+                _aktif_lbl = _rapor_etiketler[_rapor_filtreler.index(_aktif_fil)]
+                st.markdown(f"<div style='background:#1f6feb11;border-radius:4px;padding:4px 8px;font-size:0.8rem;color:#1f6feb'>🔍 <b>{_aktif_lbl}</b> — {len(_df_detay)} kayıt &nbsp; <small>(tekrar tıkla = kapat)</small></div>", unsafe_allow_html=True)
+                df_rand = _df_detay
 
             # Ciro bilgilerini cari kartlardan çek
             try:
@@ -5042,16 +5065,16 @@ elif aktif == "randevu":
             except: _ciro_map = {}
 
             # ── SATIR SATIR LİSTE + ✏️ DÜZENLE ───────────────────────────────
-            # Başlık
+            # Başlık — rapor kolonlarıyla aynı genişlik
             st.markdown("""<div style='background:#1f6feb22;border-radius:6px;padding:4px 0;margin-bottom:2px'>""", unsafe_allow_html=True)
-            _hcols = st.columns([0.4,1.1,1.8,1.3,1.3,1.1,1.1,1.1,1.1,0.4])
+            _hcols = st.columns(_CW)
             for _ht, _hc in zip(["ID","📅 Tarih","🏢 Müşteri","📍 Bölge","📋 Görev","🎯 Sonuç","💰 Hedef","✅ Gerçek","📊 Fark",""],_hcols):
                 _hc.markdown(f"<span style='font-size:0.8rem;font-weight:700;color:#1f6feb'>{_ht}</span>", unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
             for _, row in df_rand.iterrows():
                 _rid = int(row.get("id",0) or 0)
-                _rc = st.columns([0.4,1.1,1.8,1.3,1.3,1.1,1.1,1.1,1.1,0.4])
+                _rc = st.columns(_CW)
                 _tarih_r = str(row.get("randevu_tarihi",""))
                 try:
                     _gun_fark = (pd.to_datetime(_tarih_r).date() - datetime.now().date()).days
