@@ -3681,8 +3681,10 @@ elif aktif == "ozel_teklif":
                 key=f"oz2_v_{gi}_{si}", label_visibility="collapsed")
 
             # Tür — multiselect
+            _tur_def = [x for x in (s.get("tur",[]) or []) if x in _OZ_URUN]
+            if not _tur_def and _OZ_URUN: _tur_def = [_OZ_URUN[0]]
             _tur = _rc[2].multiselect("", _OZ_URUN,
-                default=s.get("tur",["Koli"]),
+                default=_tur_def,
                 key=f"oz2_tur_{gi}_{si}", label_visibility="collapsed")
 
             _bas = _rc[3].number_input("", min_value=0.0, step=1.0,
