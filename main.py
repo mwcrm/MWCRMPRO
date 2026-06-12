@@ -5015,22 +5015,19 @@ elif aktif == "randevu":
 
             # ── ÜST RAPOR — başlıklarla aynı kolon genişliğinde ─────────────
             _CW = [0.4,1.1,1.8,1.3,1.3,1.1,1.1,1.1,1.1,0.4]
-            _rc_rapor = st.columns(_CW)
-            _rapor_etiketler = ["Toplam","✅ Bitti","🔄 Devam","❌ Gidilmedi","📅 Bugün","📆 Bu Hafta","📆 Bu Ay","⚠️ Açık","💰 Beklenen",""]
-            _rapor_degerler  = [_toplam, _bitti, _devam, _gidilmedi, _bugun, _hafta, _ay, _acik_say, fmt_para(_beklenen),""]
-            _rapor_filtreler = ["toplam","bitti","devam","gidilmedi","bugun","hafta","ay","acik","beklenen",""]
+            _CW9 = [1.1,1.1,1.1,1.2,1.1,1.2,1.1,1.1,1.8]
+            _rc_rapor = st.columns(_CW9)
+            _rapor_etiketler = ["Toplam","✅ Bitti","🔄 Devam","❌ Gidilmedi","📅 Bugün","📆 Hafta","📆 Ay","⚠️ Açık","💰 Beklenen"]
+            _rapor_degerler  = [_toplam, _bitti, _devam, _gidilmedi, _bugun, _hafta, _ay, _acik_say, fmt_para(_beklenen)]
+            _rapor_filtreler = ["toplam","bitti","devam","gidilmedi","bugun","hafta","ay","acik","beklenen"]
 
-            for _ri, (_col, _lbl, _val, _fil) in enumerate(zip(_rc_rapor, _rapor_etiketler, _rapor_degerler, _rapor_filtreler)):
-                if not _lbl: continue
-                if _ri <= 7:
-                    if _col.button(f"{_lbl}\n{_val}", key=f"rp_fil_{_fil}", use_container_width=True):
-                        if st.session_state.get("rp_aktif_fil") == _fil:
-                            st.session_state.pop("rp_aktif_fil", None)
-                        else:
-                            st.session_state["rp_aktif_fil"] = _fil
-                        st.rerun()
-                else:
-                    _col.markdown(f"<div style='text-align:center;font-size:0.75rem;font-weight:700;color:#1f6feb'>{_lbl}<br><b>{_val}</b></div>", unsafe_allow_html=True)
+            for _col, _lbl, _val, _fil in zip(_rc_rapor, _rapor_etiketler, _rapor_degerler, _rapor_filtreler):
+                if _col.button(f"{_lbl}\n{_val}", key=f"rp_fil_{_fil}", use_container_width=True):
+                    if st.session_state.get("rp_aktif_fil") == _fil:
+                        st.session_state.pop("rp_aktif_fil", None)
+                    else:
+                        st.session_state["rp_aktif_fil"] = _fil
+                    st.rerun()
 
             # Aktif filtre varsa uygula ve detay göster
             _aktif_fil = st.session_state.get("rp_aktif_fil")
