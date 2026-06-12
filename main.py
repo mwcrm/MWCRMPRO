@@ -3713,7 +3713,280 @@ elif aktif == "excel":
     sayfa_log("excel")
     import io
 
-    st.markdown("## 📥 Excel ile Toplu Veri Aktarımı")
+    st.markdown("## 📥 Excel Aktar")
+
+    _ex_tab1, _ex_tab2 = st.tabs(["🧠 Akıllı Excel Okuyucu", "📤 Standart Aktar"])
+
+    with _ex_tab1:
+        st.markdown("### 🧠 Akıllı Excel Okuyucu")
+        st.caption("Başlıklar farklı olsa bile sistem otomatik tanır, kişi kartına göre eşleştirir.")
+
+        # ── BAŞLIK EŞLEŞTİRME SÖZLÜĞÜ ────────────────────────────────────────
+        _ALAN_HARITASI = {
+            "firma":        ["firma","firma adı","şirket","şirket adı","kurum","ünvan","unvan","müşteri","musteri","company","ad","ticari ünvan","ticaret ünvanı"],
+            "yetkili":      ["yetkili","muhatap","ilgili kişi","ilgili","kişi","yetkili kişi","sorumlu","contact","ad soyad","adı soyadı","yetkili adı"],
+            "gsm":          ["gsm","cep","cep tel","cep telefon","tgsm","mobil","mobile","telefon","tel","gsm no","cep no","telefon no","tel no"],
+            "sabit":        ["sabit","sabit tel","sabit telefon","iş tel","ofis tel","dahili","fax","faks","iş telefonu"],
+            "email":        ["email","e-mail","e-posta","eposta","mail","elektronik posta","e mail"],
+            "il":           ["il","şehir","sehir","city","province","il adı"],
+            "ilce":         ["ilçe","ilce","semt","district","ilçe adı"],
+            "adres":        ["adres","address","açık adres","acik adres","adres bilgisi","tam adres","adres (il/ilçe dahil)"],
+            "durum":        ["durum","status","aktif pasif","müşteri durumu"],
+            "temsilci":     ["temsilci","satış temsilcisi","satis temsilcisi","sorumlu","bayi","acente","satış ekibi"],
+            "islem_asamasi":["aşama","asama","süreç","surec","pipeline","stage","işlem aşaması","satış aşaması"],
+        }
+
+        def _kolon_eslestiir(baslik):
+            """Excel başlığını kişi kartı alanına eşleştir"""
+            _b = str(baslik).strip().lower()
+            for _alan, _liste in _alan_haritasi.items():
+                if _b in [x.lower() for x in _liste]:
+                    return _alan
+            # Kısmi eşleşme dene
+            for _alan, _liste in _alan_haritasi.items():
+                for _k in _liste:
+                    if _k.lower() in _b or _b in _k.lower():
+                        return _alan
+            return None
+
+        # Türkçe karakter normalize
+        def _norm(s):
+            import unicodedata
+            s = str(s).strip().lower()
+            s = s.replace("ı","i").replace("ğ","g").replace("ü","u")
+            s = s.replace("ş","s").replace("ö","o").replace("ç","c")
+            return s
+
+        def _kolon_eslestiir(baslik):
+            _b = _norm(str(baslik))
+            for _alan, _liste in _ALAN_HARITASI.items():
+                if _b in [_norm(x) for x in _liste]:
+                    return _alan
+            for _alan, _liste in _ALAN_HARITASI.items():
+                for _k in _liste:
+                    if _norm(_k) in _b or _b in _norm(_k):
+                        return _alan
+            return None
+
+        def _adres_ayir(adres_str):
+            """Adres içinden il/ilçe çıkarmaya çalış"""
+            import re as _re_ad
+            _il_listesi = list(ILLER_ILCELER.keys())
+            _il_bulunan = ""
+            _ilce_bulunan = ""
+            _adres_temiz = str(adres_str or "")
+            for _il in _il_listesi:
+                if _il.lower() in _adres_temiz.lower():
+                    _il_bulunan = _il
+                    for _ilce in ILLER_ILCELER.get(_il, []):
+                        if _ilce.lower() in _adres_temiz.lower():
+                            _ilce_bulunan = _ilce
+                            break
+                    break
+            return _il_bulunan, _ilce_bulunan, _adres_temiz
+
+        # ── DOSYA YÜKLE ──────────────────────────────────────────────────────
+        _yukle = st.file_uploader("Excel dosyası seç (.xlsx / .xls / .csv):",
+            type=["xlsx","xls","csv"], key="akilli_excel")
+
+        if _yukle:
+            try:
+                if _yukle.name.endswith(".csv"):
+                    import pandas as _pd_ex
+                    _df_ham = _pd_ex.read_csv(_yukle, encoding="utf-8-sig", dtype=str).fillna("")
+                else:
+                    _df_ham = pd.read_excel(_yukle, dtype=str).fillna("")
+
+                _toplam_satir = len(_df_ham)
+                _kolonlar = list(_df_ham.columns)
+
+                st.success(f"✅ Dosya okundu: **{_toplam_satir} satır**, **{len(_kolonlar)} kolon**")
+
+                # ── KOLON EŞLEŞTİRME ─────────────────────────────────────────
+                st.markdown("#### 🔍 Kolon Eşleştirme")
+                _eslesme = {}
+                _taninamayanlar = []
+
+                for _k in _kolonlar:
+                    _alan = _kolon_eslestiir(_k)
+                    if _alan:
+                        _eslesme[_k] = _alan
+                    else:
+                        _taninamayanlar.append(_k)
+
+                # Eşleşenleri göster
+                _alan_adlari = {
+                    "firma":"Firma Adı","yetkili":"Yetkili","gsm":"GSM",
+                    "sabit":"Sabit Tel","email":"Email","il":"İl","ilce":"İlçe",
+                    "adres":"Adres","durum":"Durum","temsilci":"Temsilci","islem_asamasi":"İşlem Aşaması"
+                }
+                _ec1, _ec2 = st.columns(2)
+                with _ec1:
+                    st.caption("**✅ Tanınan kolonlar:**")
+                    for _k, _a in _eslesme.items():
+                        st.caption(f"&nbsp;&nbsp; `{_k}` → **{_alan_adlari.get(_a,_a)}**")
+
+                with _ec2:
+                    if _taninamayanlar:
+                        st.caption("**❓ Tanınamayan kolonlar — sen seç:**")
+                        _alan_secenekler = ["— Atla —"] + list(_alan_adlari.keys())
+                        for _k in _taninamayanlar:
+                            _sec = st.selectbox(f"`{_k}`:", _alan_secenekler,
+                                key=f"kolon_sec_{_k}", label_visibility="visible")
+                            if _sec != "— Atla —":
+                                _eslesme[_k] = _sec
+                    else:
+                        st.success("Tüm kolonlar tanındı!")
+
+                # ── VERİ İŞLE ────────────────────────────────────────────────
+                if st.button("🔄 Analiz Et", use_container_width=True, type="primary", key="akilli_analiz"):
+                    _df_mevcut = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+                    _mevcut_firmalar = set(_df_mevcut["firma"].dropna().str.strip().str.lower().tolist()) if not _df_mevcut.empty else set()
+
+                    _sonuclar = []
+                    _tam = 0; _eksik = 0; _okunamadi = 0
+
+                    for _, _satir in _df_ham.iterrows():
+                        _kart = {a: "" for a in _alan_adlari}
+                        _dolu_alan = 0
+
+                        for _excel_kol, _kart_alan in _eslesme.items():
+                            _deger = str(_satir.get(_excel_kol, "") or "").strip()
+                            if _deger and _deger.lower() not in ["nan","none","-"]:
+                                # Adres alanından il/ilçe ayır
+                                if _kart_alan == "adres" and not _kart.get("il"):
+                                    _il_b, _ilce_b, _ = _adres_ayir(_deger)
+                                    if _il_b and not _kart.get("il"): _kart["il"] = _il_b
+                                    if _ilce_b and not _kart.get("ilce"): _kart["ilce"] = _ilce_b
+                                _kart[_kart_alan] = _deger
+                                _dolu_alan += 1
+
+                        if not _kart.get("firma"):
+                            _okunamadi += 1
+                            _sonuclar.append({**_kart, "_durum": "❌ Okunamadı", "_dolu": _dolu_alan})
+                            continue
+
+                        _mevcut_mi = _kart["firma"].strip().lower() in _mevcut_firmalar
+                        if _dolu_alan >= 3:
+                            _tam += 1
+                            _sonuclar.append({**_kart, "_durum": "🟡 Mevcut - Güncelle" if _mevcut_mi else "🟢 Yeni", "_dolu": _dolu_alan})
+                        else:
+                            _eksik += 1
+                            _sonuclar.append({**_kart, "_durum": "⚠️ Eksik Bilgi", "_dolu": _dolu_alan})
+
+                    st.session_state["akilli_sonuc"] = _sonuclar
+
+                    # Özet
+                    _yeni = len([s for s in _sonuclar if s["_durum"]=="🟢 Yeni"])
+                    _guncelle = len([s for s in _sonuclar if "Güncelle" in s["_durum"]])
+                    _eksik_say = len([s for s in _sonuclar if s["_durum"]=="⚠️ Eksik Bilgi"])
+                    _oku_say = len([s for s in _sonuclar if s["_durum"]=="❌ Okunamadı"])
+
+                    st.markdown(
+                        f"**Toplam: {_toplam_satir}** &nbsp;·&nbsp; "
+                        f"🟢 Yeni: **{_yeni}** &nbsp;·&nbsp; "
+                        f"🟡 Güncelle: **{_guncelle}** &nbsp;·&nbsp; "
+                        f"⚠️ Eksik: **{_eksik_say}** &nbsp;·&nbsp; "
+                        f"❌ Okunamadı: **{_oku_say}**"
+                    )
+                    st.rerun()
+
+                # ── SONUÇLARI GÖSTER ─────────────────────────────────────────
+                if st.session_state.get("akilli_sonuc"):
+                    _sonuclar = st.session_state["akilli_sonuc"]
+
+                    # Filtre
+                    _sf1, _sf2 = st.columns([3,1])
+                    _fil_durum_ex = _sf1.selectbox("Göster:", [
+                        "Tümü","🟢 Yeni","🟡 Mevcut - Güncelle","⚠️ Eksik Bilgi","❌ Okunamadı"
+                    ], key="akilli_fil")
+                    _goster = [s for s in _sonuclar if _fil_durum_ex=="Tümü" or s["_durum"]==_fil_durum_ex]
+                    _sf2.caption(f"**{len(_goster)} kayıt**")
+
+                    # Tablo başlık
+                    _th = st.columns([1.5,1,1,1,0.8,0.8,1,1,0.8])
+                    for _ht, _hc in zip(["🎯 Durum","🏢 Firma","👤 Yetkili","📱 GSM","🌆 İl","🏘 İlçe","📋 Aşama","📊 Durum","✅"],_th):
+                        _hc.caption(f"**{_ht}**")
+
+                    _secili_idxler = []
+                    for _gi, _s in enumerate(_goster):
+                        _tc = st.columns([1.5,1,1,1,0.8,0.8,1,1,0.8])
+                        _tc[0].caption(_s["_durum"])
+                        _tc[1].caption(str(_s.get("firma",""))[:20])
+                        _tc[2].caption(str(_s.get("yetkili",""))[:15])
+                        _tc[3].caption(str(_s.get("gsm",""))[:13])
+                        _tc[4].caption(str(_s.get("il",""))[:10])
+                        _tc[5].caption(str(_s.get("ilce",""))[:10])
+                        _tc[6].caption(str(_s.get("islem_asamasi",""))[:12])
+                        _tc[7].caption(str(_s.get("durum",""))[:10])
+                        if _tc[8].checkbox("", key=f"akilli_sec_{_gi}", value=_s["_durum"] in ["🟢 Yeni","🟡 Mevcut - Güncelle"]):
+                            _secili_idxler.append(_gi)
+
+                    st.divider()
+                    _ob1, _ob2, _ob3, _ob4 = st.columns(4)
+
+                    if _ob1.button("✅ Seçilileri Ekle/Güncelle", use_container_width=True, type="primary", key="akilli_onayla"):
+                        _sb_ex = get_sb_client()
+                        _eklendi = 0; _guncellendi = 0
+                        for _gi in _secili_idxler:
+                            _s = _goster[_gi]
+                            if _s["_durum"] == "❌ Okunamadı": continue
+                            _veri = {k: _s.get(k,"") for k in ["firma","yetkili","gsm","sabit","email","il","ilce","adres","durum","temsilci","islem_asamasi"]}
+                            _veri = {k: v for k, v in _veri.items() if v}
+                            if "🟡" in _s["_durum"]:
+                                if _sb_ex:
+                                    _sb_ex.table("cari_kartlar").update(_veri).eq("firma",_s["firma"]).execute()
+                                _guncellendi += 1
+                            else:
+                                _veri["silindi"] = 0
+                                _veri["olusturan"] = f"AkıllıExcel:{st.session_state['kullanici']}"
+                                db_insert("cari_kartlar", _veri)
+                                _eklendi += 1
+                        try: db_read.clear()
+                        except: pass
+                        st.success(f"✅ {_eklendi} eklendi, {_guncellendi} güncellendi!")
+                        st.session_state.pop("akilli_sonuc", None)
+                        st.rerun()
+
+                    if _ob2.button("🟢 Tüm Yenileri Onayla", use_container_width=True, key="akilli_yeni"):
+                        _sb_ex2 = get_sb_client()
+                        _say = 0
+                        for _s in _sonuclar:
+                            if _s["_durum"] != "🟢 Yeni": continue
+                            _veri = {k: _s.get(k,"") for k in ["firma","yetkili","gsm","sabit","email","il","ilce","adres","durum","temsilci","islem_asamasi"]}
+                            _veri = {k: v for k, v in _veri.items() if v}
+                            _veri["silindi"] = 0
+                            _veri["olusturan"] = f"AkıllıExcel:{st.session_state['kullanici']}"
+                            db_insert("cari_kartlar", _veri); _say += 1
+                        try: db_read.clear()
+                        except: pass
+                        st.success(f"✅ {_say} yeni firma eklendi!")
+                        st.session_state.pop("akilli_sonuc", None); st.rerun()
+
+                    if _ob3.button("🟡 Tüm Güncellemeleri Onayla", use_container_width=True, key="akilli_guncelle"):
+                        _sb_ex3 = get_sb_client()
+                        _say3 = 0
+                        for _s in _sonuclar:
+                            if "Güncelle" not in _s["_durum"]: continue
+                            _veri = {k: _s.get(k,"") for k in ["yetkili","gsm","sabit","email","il","ilce","adres","durum","temsilci","islem_asamasi"]}
+                            _veri = {k: v for k, v in _veri.items() if v}
+                            if _sb_ex3:
+                                _sb_ex3.table("cari_kartlar").update(_veri).eq("firma",_s["firma"]).execute()
+                            _say3 += 1
+                        try: db_read.clear()
+                        except: pass
+                        st.success(f"✅ {_say3} firma güncellendi!")
+                        st.session_state.pop("akilli_sonuc", None); st.rerun()
+
+                    if _ob4.button("🗑️ Temizle", use_container_width=True, key="akilli_temizle"):
+                        st.session_state.pop("akilli_sonuc", None); st.rerun()
+
+            except Exception as _ex_err:
+                st.error(f"Hata: {_ex_err}")
+
+    with _ex_tab2:
+
+            st.markdown("## 📥 Excel ile Toplu Veri Aktarımı")
 
     # ── ŞABLON İNDİR ──────────────────────────────────────────────────────────
     st.markdown("### 1️⃣ Şablonu İndir")
