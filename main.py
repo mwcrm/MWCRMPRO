@@ -3572,19 +3572,36 @@ elif aktif == "ozel_teklif":
 
     _OZ_URUN_VARSAYILAN = ["Koli","Sandık","Top","Çuval","Kasa","Palet","Diğer"]
 
-    # Ürün listesi: varsayılanlar + Supabase'deki ekstralar
+    # Ürün listesi: varsayılanlar + kullanici_tercih'teki ekstralar
     def _oz_urun_listesi():
         _liste = _OZ_URUN_VARSAYILAN.copy()
         try:
             _sb = get_sb_client()
             if _sb:
-                _r = _sb.table("sistem_tanimlar").select("deger").eq("tip","oz_urun").order("sira").execute()
+                import json as _oj
+                _r = _sb.table("kullanici_tercih").select("deger").eq("kullanici","__oz_urun__").eq("anahtar","ekstra_urunler").execute()
                 if _r.data:
-                    for _d in _r.data:
-                        if _d["deger"] not in _liste:
-                            _liste.append(_d["deger"])
+                    _ekstra = _oj.loads(_r.data[0]["deger"])
+                    for _d in _ekstra:
+                        if _d not in _liste:
+                            _liste.append(_d)
         except: pass
         return _liste
+
+    def _oz_urun_kaydet(liste):
+        try:
+            import json as _oj
+            _sb = get_sb_client()
+            if _sb:
+                _ekstra = [x for x in liste if x not in _OZ_URUN_VARSAYILAN]
+                _sb.table("kullanici_tercih").upsert({
+                    "kullanici": "__oz_urun__",
+                    "anahtar": "ekstra_urunler",
+                    "deger": _oj.dumps(_ekstra, ensure_ascii=False)
+                }, on_conflict="kullanici,anahtar").execute()
+                return True
+        except: pass
+        return False
 
     _OZ_URUN = _oz_urun_listesi()
     _OZ_ILLER = ["İstanbul","Ankara","İzmir","Bursa","Antalya","Adana","Konya",
@@ -3918,54 +3935,37 @@ elif aktif == "ozel_teklif":
 
     # ── ÜRÜN LİSTESİ YÖNETİMİ ────────────────────────────────────────────────
     with st.expander("⚙️ Ürün Listesi Yönetimi"):
-        st.caption("Teklif sayfasında görünen ürün listesini buradan yönetin.")
-        _sb_oz = get_sb_client()
+        st.caption("Varsayılan ürünlere ek olarak yeni ürün ekleyebilirsiniz.")
+        _tam_liste = _oz_urun_listesi()
+        _ekstra_liste = [x for x in _tam_liste if x not in _OZ_URUN_VARSAYILAN]
 
-        # Mevcut ürünleri göster
-        _mevcut_urunler = _oz_urun_listesi()
-        for _ui, _un in enumerate(_mevcut_urunler):
-            _uc1, _uc2, _uc3, _uc4 = st.columns([4,1,1,1])
-            _uc1.caption(f"**{_un}**")
-            if _ui > 0 and _uc2.button("▲", key=f"oz_urun_up_{_ui}"):
-                try:
-                    _r1 = _sb_oz.table("sistem_tanimlar").select("id,sira").eq("tip","oz_urun").eq("deger",_un).execute()
-                    _r2 = _sb_oz.table("sistem_tanimlar").select("id,sira").eq("tip","oz_urun").eq("deger",_mevcut_urunler[_ui-1]).execute()
-                    if _r1.data and _r2.data:
-                        _sb_oz.table("sistem_tanimlar").update({"sira":_r2.data[0]["sira"]}).eq("id",_r1.data[0]["id"]).execute()
-                        _sb_oz.table("sistem_tanimlar").update({"sira":_r1.data[0]["sira"]}).eq("id",_r2.data[0]["id"]).execute()
-                except: pass
-                st.rerun()
-            if _ui < len(_mevcut_urunler)-1 and _uc3.button("▼", key=f"oz_urun_dn_{_ui}"):
-                try:
-                    _r1 = _sb_oz.table("sistem_tanimlar").select("id,sira").eq("tip","oz_urun").eq("deger",_un).execute()
-                    _r2 = _sb_oz.table("sistem_tanimlar").select("id,sira").eq("tip","oz_urun").eq("deger",_mevcut_urunler[_ui+1]).execute()
-                    if _r1.data and _r2.data:
-                        _sb_oz.table("sistem_tanimlar").update({"sira":_r2.data[0]["sira"]}).eq("id",_r1.data[0]["id"]).execute()
-                        _sb_oz.table("sistem_tanimlar").update({"sira":_r1.data[0]["sira"]}).eq("id",_r2.data[0]["id"]).execute()
-                except: pass
-                st.rerun()
-            if _uc4.button("🗑️", key=f"oz_urun_sil_{_ui}"):
-                try:
-                    _sb_oz.table("sistem_tanimlar").delete().eq("tip","oz_urun").eq("deger",_un).execute()
+        st.markdown("**Varsayılan ürünler** (değiştirilemez):")
+        st.caption(" · ".join(_OZ_URUN_VARSAYILAN))
+
+        if _ekstra_liste:
+            st.markdown("**Ekstra ürünler:**")
+            for _ui, _un in enumerate(_ekstra_liste):
+                _uc1, _uc2 = st.columns([5,1])
+                _uc1.caption(f"🔹 {_un}")
+                if _uc2.button("🗑️", key=f"oz_urun_sil_{_ui}"):
+                    _ekstra_liste.remove(_un)
+                    _oz_urun_kaydet(_OZ_URUN_VARSAYILAN + _ekstra_liste)
                     st.rerun()
-                except: pass
 
-        # Yeni ürün ekle
         st.divider()
         _ya1, _ya2 = st.columns([4,1])
         _yeni_urun = _ya1.text_input("", placeholder="Yeni ürün adı...", key="oz_yeni_urun", label_visibility="collapsed")
         if _ya2.button("➕ Ekle", key="oz_urun_ekle_btn", use_container_width=True):
             if _yeni_urun and _yeni_urun.strip():
-                if _yeni_urun.strip() in _mevcut_urunler:
+                if _yeni_urun.strip() in _tam_liste:
                     st.warning("Bu ürün zaten var!")
                 else:
-                    try:
-                        _max_sira = len(_mevcut_urunler) + 1
-                        _sb_oz.table("sistem_tanimlar").insert({"tip":"oz_urun","deger":_yeni_urun.strip(),"sira":_max_sira}).execute()
+                    _ekstra_liste.append(_yeni_urun.strip())
+                    if _oz_urun_kaydet(_OZ_URUN_VARSAYILAN + _ekstra_liste):
                         st.success(f"✅ '{_yeni_urun}' eklendi!")
                         st.rerun()
-                    except:
-                        st.error("Eklenemedi — Supabase bağlantısı kontrol edin.")
+                    else:
+                        st.error("Kaydedilemedi!")
 
 
 elif aktif == "excel":
