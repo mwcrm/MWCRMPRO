@@ -3747,23 +3747,50 @@ elif aktif == "ozel_teklif":
 
     st.session_state["oz2_grp"] = grp
 
+    # ── MESAJ YARDIMCI FONKSİYONU ─────────────────────────────────────────────
+    def _oz_mesaj_olustur(_grp, _hedef, _vade):
+        _msg = f"Sayın {_hedef} yetkilisi,\n\nSize özel kargo fiyat teklifimiz:\n\n"
+        for _g in _grp:
+            for _s in _g.get("satirlar",[]):
+                _cv2 = _s.get("cikis","")
+                _vv2 = _s.get("varis","")
+                _cs2 = ", ".join(_cv2) if isinstance(_cv2, list) else (_cv2 or "")
+                _vs2 = ", ".join(_vv2) if isinstance(_vv2, list) else (_vv2 or "")
+                _tt2 = ", ".join(_s.get("tur",[]) or []) or ""
+                _b12 = int(_s.get("bas",0) or 0)
+                _b22 = int(_s.get("bit",0) or 0)
+                _kk2 = int(_s.get("kg",0) or 0)
+                _ff2 = float(_s.get("fiyat",0) or 0)
+                if not _cs2 and not _vs2 and not _tt2 and not _ff2: continue
+                _ds2 = f"{_b12}–{_b22} desi" if _b12 or _b22 else ""
+                _ks2 = f"{_kk2} kg" if _kk2 else ""
+                _msg += f"📍 {_cs2} → {_vs2}\n"
+                _msg += f"  • {_tt2}"
+                if _ds2: _msg += f" | {_ds2}"
+                if _ks2: _msg += f" | {_ks2}"
+                _msg += f" → {fmt_para(_ff2)}\n\n"
+        if _vade: _msg += f"Vade: {_vade}\n"
+        _msg += "\n7/24 ulaşabilirsiniz."
+        return _msg
+
     # ── ÖZET ─────────────────────────────────────────────────────────────────
     st.divider()
     st.markdown("### 📋 Özet")
-    for gi, g in enumerate(grp):
-        for s in g.get("satirlar",[]):
-            _cv = s.get("cikis","")
-            _vv = s.get("varis","")
-            _c_str = ", ".join(_cv) if isinstance(_cv, list) else (_cv or "—")
-            _v_str = ", ".join(_vv) if isinstance(_vv, list) else (_vv or "—")
-            _t  = ", ".join(s.get("tur",[]) or []) or "—"
-            _b1 = int(s.get("bas",0) or 0)
-            _b2 = int(s.get("bit",0) or 0)
-            _k  = int(s.get("kg",0) or 0)
-            _f  = float(s.get("fiyat",0) or 0)
-            _ds = f"{_b1}–{_b2} desi" if _b1 or _b2 else "—"
-            _ks = f"{_k} kg" if _k else "—"
-            st.caption(f"**{_c_str} → {_v_str}** &nbsp;·&nbsp; {_t} | {_ds} | KG: {_ks} | **{fmt_para(_f)}**")
+    for _og in grp:
+        for _os in _og.get("satirlar",[]):
+            _ocv = _os.get("cikis","")
+            _ovv = _os.get("varis","")
+            _ocs = ", ".join(_ocv) if isinstance(_ocv, list) else (_ocv or "")
+            _ovs = ", ".join(_ovv) if isinstance(_ovv, list) else (_ovv or "")
+            _ott = ", ".join(_os.get("tur",[]) or []) or ""
+            _ob1 = int(_os.get("bas",0) or 0)
+            _ob2 = int(_os.get("bit",0) or 0)
+            _okk = int(_os.get("kg",0) or 0)
+            _off = float(_os.get("fiyat",0) or 0)
+            if not _ocs and not _ovs and not _ott and not _off: continue
+            _ods = f"{_ob1}–{_ob2} desi" if _ob1 or _ob2 else "—"
+            _oks = f"{_okk} kg" if _okk else "—"
+            st.caption(f"**{_ocs} → {_ovs}** &nbsp;·&nbsp; {_ott} | {_ods} | KG: {_oks} | **{fmt_para(_off)}**")
 
     # ── KAYDET + MESAJ ────────────────────────────────────────────────────────
     st.divider()
@@ -3793,32 +3820,12 @@ elif aktif == "ozel_teklif":
             else:
                 db_insert("teklifler", _oz_veri)
                 st.success("✅ Teklif kaydedildi!")
+            st.session_state["oz2_wa_mesaj"] = _oz_mesaj_olustur(grp, _oz_hedef, _oz_vade)
             st.session_state.pop("oz2_grp", None)
             st.rerun()
 
     if _ks2.button("📱 WA Mesajı Oluştur", use_container_width=True, key="oz2_wa_olustur"):
-        _msg = f"Sayın {_oz_hedef} yetkilisi,\n\nSize özel kargo fiyat teklifimiz:\n\n"
-        for g in grp:
-            for s in g.get("satirlar",[]):
-                _cv = s.get("cikis","")
-                _vv = s.get("varis","")
-                _c_str = ", ".join(_cv) if isinstance(_cv, list) else (_cv or "—")
-                _v_str = ", ".join(_vv) if isinstance(_vv, list) else (_vv or "—")
-                _t  = ", ".join(s.get("tur",[]) or []) or "—"
-                _b1 = int(s.get("bas",0) or 0)
-                _b2 = int(s.get("bit",0) or 0)
-                _k  = int(s.get("kg",0) or 0)
-                _f  = float(s.get("fiyat",0) or 0)
-                _ds = f"{_b1}–{_b2} desi" if _b1 or _b2 else ""
-                _ks = f"{_k} kg" if _k else ""
-                _msg += f"📍 {_c_str} → {_v_str}\n"
-                _msg += f"  • {_t}"
-                if _ds: _msg += f" | {_ds}"
-                if _ks: _msg += f" | {_ks}"
-                _msg += f" → {fmt_para(_f)}\n\n"
-        if _oz_vade: _msg += f"Vade: {_oz_vade}\n"
-        _msg += "\n7/24 ulaşabilirsiniz."
-        st.session_state["oz2_wa_mesaj"] = _msg
+        st.session_state["oz2_wa_mesaj"] = _oz_mesaj_olustur(grp, _oz_hedef, _oz_vade)
         st.rerun()
 
     if st.session_state.get("oz2_wa_mesaj"):
