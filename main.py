@@ -5014,16 +5014,19 @@ elif aktif == "randevu":
             except: _beklenen = 0
 
             st.markdown(
-                f"Toplam: **{_toplam}** &nbsp;·&nbsp; "
-                f"✅ Bitti: **{_bitti}** &nbsp;·&nbsp; "
-                f"🔄 Devam: **{_devam}** &nbsp;·&nbsp; "
-                f"❌ Gidilmedi: **{_gidilmedi}** &nbsp;·&nbsp; "
-                f"📅 Bugün: **{_bugun}** &nbsp;·&nbsp; "
-                f"📆 Bu Hafta: **{_hafta}** &nbsp;·&nbsp; "
-                f"📆 Bu Ay: **{_ay}** &nbsp;·&nbsp; "
-                f"⚠️ Açık: **{_acik_say}** &nbsp;·&nbsp; "
-                f"🎯 Başarı: **{_basari}** &nbsp;·&nbsp; "
-                f"💰 Beklenen: **{fmt_para(_beklenen)}**"
+                f"<div style='background:#1f6feb22;border-radius:6px;padding:6px 10px;margin-bottom:4px;font-size:0.85rem;font-weight:600;color:#1f6feb'>"
+                f"Toplam: <b>{_toplam}</b> &nbsp;·&nbsp; "
+                f"✅ Bitti: <b>{_bitti}</b> &nbsp;·&nbsp; "
+                f"🔄 Devam: <b>{_devam}</b> &nbsp;·&nbsp; "
+                f"❌ Gidilmedi: <b>{_gidilmedi}</b> &nbsp;·&nbsp; "
+                f"📅 Bugün: <b>{_bugun}</b> &nbsp;·&nbsp; "
+                f"📆 Bu Hafta: <b>{_hafta}</b> &nbsp;·&nbsp; "
+                f"📆 Bu Ay: <b>{_ay}</b> &nbsp;·&nbsp; "
+                f"⚠️ Açık: <b>{_acik_say}</b> &nbsp;·&nbsp; "
+                f"🎯 Başarı: <b>{_basari}</b> &nbsp;·&nbsp; "
+                f"💰 Beklenen: <b>{fmt_para(_beklenen)}</b>"
+                f"</div>",
+                unsafe_allow_html=True
             )
 
             # Ciro bilgilerini cari kartlardan çek
