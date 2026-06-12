@@ -5016,77 +5016,95 @@ elif aktif == "randevu":
         if df_rand.empty:
             st.info("Randevu bulunamadı.")
         else:
-            rm1,rm2,rm3,rm4 = st.columns(4)
-            rm1.metric("Toplam", len(df_rand))
-            rm2.metric("✅ Bitti", len(df_rand[df_rand["sonuc"]=="Bitti"]) if "sonuc" in df_rand.columns else 0)
-            rm3.metric("🔄 Devam", len(df_rand[df_rand["sonuc"]=="Devam Ediyor"]) if "sonuc" in df_rand.columns else 0)
-            rm4.metric("❌ Gidilmedi", len(df_rand[df_rand["sonuc"]=="Gidilmedi"]) if "sonuc" in df_rand.columns else 0)
+            # ── 10 METRİK TEK SATIR ───────────────────────────────────────────
+            _toplam   = len(df_rand)
+            _bitti    = len(df_rand[df_rand["sonuc"]=="Bitti"]) if "sonuc" in df_rand.columns else 0
+            _devam    = len(df_rand[df_rand["sonuc"]=="Devam Ediyor"]) if "sonuc" in df_rand.columns else 0
+            _gidilmedi= len(df_rand[df_rand["sonuc"]=="Gidilmedi"]) if "sonuc" in df_rand.columns else 0
+            _bugun    = len(df_rand[df_rand["randevu_tarihi"]==bugun_str]) if "randevu_tarihi" in df_rand.columns else 0
+            _bu_hafta_bitis = (datetime.now()+pd.Timedelta(days=7)).strftime("%Y-%m-%d")
+            _hafta    = len(df_rand[(df_rand["randevu_tarihi"]>=bugun_str)&(df_rand["randevu_tarihi"]<=_bu_hafta_bitis)]) if "randevu_tarihi" in df_rand.columns else 0
+            _bu_ay_bitis = datetime.now().strftime("%Y-%m-") + "31"
+            _ay       = len(df_rand[(df_rand["randevu_tarihi"]>=bugun_str)&(df_rand["randevu_tarihi"]<=_bu_ay_bitis)]) if "randevu_tarihi" in df_rand.columns else 0
+            _acik_say = len(df_rand[(df_rand["randevu_tarihi"]<bugun_str)&(~df_rand["sonuc"].isin(["Bitti","İptal","Gidilmedi"]))]) if "sonuc" in df_rand.columns else 0
+            _basari   = f"%{int(_bitti/_toplam*100)}" if _toplam > 0 else "—"
+            # Beklenen ciro — randevusu olan müşterilerden
+            try:
+                _df_cari_r = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+                _mus_listesi = df_rand["musteri_adi"].dropna().unique().tolist()
+                _beklenen = _df_cari_r[_df_cari_r["firma"].isin(_mus_listesi)]["beklenen_ciro"].sum() if not _df_cari_r.empty else 0
+            except: _beklenen = 0
 
-            # Liste + WA + Düzenle
-            _g_cols = [c for c in ["id","randevu_tarihi","randevu_saati","musteri_adi","bolge","gorev","temsilci","sonuc","aciklama"] if c in df_rand.columns]
-            st.dataframe(df_rand[_g_cols], use_container_width=True, hide_index=True)
+            _mc = st.columns(10)
+            for _col, _lbl, _val in zip(_mc,
+                ["Toplam","✅ Bitti","🔄 Devam","❌ Gidilmedi","📅 Bugün","📆 Bu Hafta","📆 Bu Ay","⚠️ Açık","🎯 Başarı","💰 Beklenen"],
+                [_toplam, _bitti, _devam, _gidilmedi, _bugun, _hafta, _ay, _acik_say, _basari, fmt_para(_beklenen)]):
+                _col.metric(_lbl, _val)
 
-            # WA Uyarı
-            st.markdown("#### 📱 WA Uyarı Gönder")
-            import re as _re_r2
-            for _, row in df_rand.head(15).iterrows():
+            # ── SATIR SATIR LİSTE + ✏️ DÜZENLE ───────────────────────────────
+            _g_cols = [c for c in ["id","randevu_tarihi","randevu_saati","musteri_adi","bolge","gorev","temsilci","sonuc"] if c in df_rand.columns]
+
+            # Başlık
+            _hcols = st.columns([0.5,1.2,0.8,2,1.5,1.5,1.5,1.2,0.4])
+            for _ht, _hc in zip(["ID","Tarih","Saat","Müşteri","Bölge","Görev","Temsilci","Sonuç",""],_hcols):
+                _hc.caption(f"**{_ht}**")
+
+            for _, row in df_rand.iterrows():
+                _rid = int(row.get("id",0) or 0)
+                _rc = st.columns([0.5,1.2,0.8,2,1.5,1.5,1.5,1.2,0.4])
                 _tarih_r = str(row.get("randevu_tarihi",""))
-                _renk2 = "🔴" if _tarih_r == bugun_str else ("🟡" if _tarih_r == (datetime.now() + pd.Timedelta(days=1)).strftime("%Y-%m-%d") else "⚪")
-                _wc1,_wc2 = st.columns([5,1])
-                _wc1.caption(f"{_renk2} {_tarih_r} {row.get('randevu_saati','')} — **{row.get('musteri_adi','')}** | {row.get('temsilci','')} | {row.get('bolge','')} | {row.get('gorev','')}")
-                _tem_tel_r = str(row.get("temsilci_tel","") or "")
-                if _tem_tel_r:
-                    _tw2 = _re_r2.sub(r"[\s\-\(\)+]","",_tem_tel_r)
-                    if _tw2.startswith("0"): _tw2 = "90"+_tw2[1:]
-                    elif len(_tw2)==10: _tw2 = "90"+_tw2
-                    _msg2 = f"📅 RANDEVU HATIRLATMA\nMüşteri: {row.get('musteri_adi','')}\nTarih: {_tarih_r} {row.get('randevu_saati','')}\nBölge: {row.get('bolge','')}\nGörev: {row.get('gorev','')}"
-                    _wc2.link_button("📱",f"https://wa.me/{_tw2}?text={_msg2.replace(' ','%20').replace(chr(10),'%0A')}",use_container_width=True)
-                    _lk = f"rnd_wa_{row.get('id','')}"
-                    if not st.session_state.get(_lk):
-                        st.session_state[_lk] = True
-                        try:
-                            db_insert("islem_kaydi",{"musteri_id":0,"musteri_adi":str(row.get("musteri_adi","")),
-                                "islem_turu":"📅 WA Randevu Hatırlatma",
-                                "icerik":f"Tarih: {_tarih_r} {row.get('randevu_saati','')} | Bölge: {row.get('bolge','')} | Görev: {row.get('gorev','')}",
-                                "gonderim_bilgisi":_tw2,"olusturan":st.session_state.get("kullanici","")})
-                        except: pass
-                else:
-                    _wc2.caption("—")
+                _renk = "🔴" if _tarih_r==bugun_str else ("🟡" if _tarih_r==(datetime.now()+pd.Timedelta(days=1)).strftime("%Y-%m-%d") else "")
+                _rc[0].caption(str(_rid))
+                _rc[1].caption(f"{_renk}{_tarih_r}")
+                _rc[2].caption(str(row.get("randevu_saati",""))[:5])
+                _rc[3].caption(str(row.get("musteri_adi","") or ""))
+                _rc[4].caption(str(row.get("bolge","") or ""))
+                _rc[5].caption(str(row.get("gorev","") or ""))
+                _rc[6].caption(str(row.get("temsilci","") or ""))
+                _sonuc_r = str(row.get("sonuc","") or "")
+                _sonuc_renk = "✅" if _sonuc_r=="Bitti" else ("🔄" if _sonuc_r=="Devam Ediyor" else ("❌" if _sonuc_r=="Gidilmedi" else ""))
+                _rc[7].caption(f"{_sonuc_renk} {_sonuc_r}")
 
-            # Düzenle / Sil
-            with st.expander("✏️ Düzenle / Sil"):
-                _duz_id = st.number_input("Randevu ID:", min_value=1, step=1, key="rand_duz_id")
-                _df_duz = df_rand_all[df_rand_all["id"]==_duz_id] if _duz_id else pd.DataFrame()
-                if st.button("🔍 Getir", key="rand_getir") and not _df_duz.empty:
-                    st.session_state["rand_duz_row"] = _df_duz.iloc[0].to_dict()
-                if st.session_state.get("rand_duz_row"):
+                # ✏️ kalem — tıklanınca o satır açılır
+                if _rc[8].button("✏️", key=f"rand_duz_btn_{_rid}"):
+                    if st.session_state.get("rand_duz_row",{}).get("id") == _rid:
+                        st.session_state.pop("rand_duz_row", None)
+                    else:
+                        st.session_state["rand_duz_row"] = row.to_dict()
+                    st.rerun()
+
+                # Düzenleme formu — sadece seçili satır için açılır
+                if st.session_state.get("rand_duz_row",{}).get("id") == _rid:
                     row_d = st.session_state["rand_duz_row"]
-                    st.success(f"ID {row_d.get('id')} — {row_d.get('musteri_adi')} — {row_d.get('randevu_tarihi')}")
-                    with st.form("rand_duz_form"):
-                        dd1,dd2,dd3 = st.columns(3)
-                        d_tarih = dd1.text_input("Tarih:", value=str(row_d.get("randevu_tarihi","")))
-                        d_saat  = dd2.text_input("Saat:", value=str(row_d.get("randevu_saati","")))
-                        d_bolge = dd3.text_input("Bölge:", value=str(row_d.get("bolge","")))
-                        dd4,dd5 = st.columns(2)
-                        d_gorev = dd4.text_input("Görev:", value=str(row_d.get("gorev","")))
-                        d_temsilci = dd5.text_input("Temsilci:", value=str(row_d.get("temsilci","")))
+                    with st.form(f"rand_duz_form_{_rid}"):
+                        dd1,dd2,dd3,dd4 = st.columns(4)
+                        d_tarih    = dd1.text_input("Tarih:", value=str(row_d.get("randevu_tarihi","")))
+                        d_saat     = dd2.text_input("Saat:", value=str(row_d.get("randevu_saati","")))
+                        d_bolge    = dd3.text_input("Bölge:", value=str(row_d.get("bolge","")))
+                        d_temsilci = dd4.text_input("Temsilci:", value=str(row_d.get("temsilci","")))
+                        dd5,dd6 = st.columns(2)
+                        d_gorev = dd5.text_input("Görev:", value=str(row_d.get("gorev","")))
                         d_sonuc_opts = ["—","Bitti","Devam Ediyor","Gidilmedi","İptal"]
-                        d_sonuc_idx = d_sonuc_opts.index(row_d.get("sonuc","—")) if row_d.get("sonuc") in d_sonuc_opts else 0
-                        d_sonuc = st.selectbox("Sonuç:", d_sonuc_opts, index=d_sonuc_idx)
-                        d_aciklama = st.text_area("Açıklama:", value=str(row_d.get("aciklama","")), height=70)
-                        _db1,_db2 = st.columns(2)
-                        if _db1.form_submit_button("💾 Güncelle", use_container_width=True, type="primary"):
+                        d_sonuc_idx  = d_sonuc_opts.index(row_d.get("sonuc","—")) if row_d.get("sonuc") in d_sonuc_opts else 0
+                        d_sonuc    = dd6.selectbox("Sonuç:", d_sonuc_opts, index=d_sonuc_idx)
+                        d_aciklama = st.text_area("Açıklama:", value=str(row_d.get("aciklama","")), height=60)
+                        _fb1,_fb2,_fb3 = st.columns(3)
+                        if _fb1.form_submit_button("💾 Kaydet", use_container_width=True, type="primary"):
                             db_update("randevular",{"randevu_tarihi":d_tarih,"randevu_saati":d_saat,
                                 "bolge":d_bolge,"gorev":d_gorev,"temsilci":d_temsilci,
                                 "sonuc":d_sonuc if d_sonuc!="—" else "","aciklama":d_aciklama},
-                                "id",int(row_d["id"]))
+                                "id",_rid)
                             try: db_read.clear()
                             except: pass
-                            st.success("✅ Güncellendi!"); st.session_state.pop("rand_duz_row",None); st.rerun()
-                        if _db2.form_submit_button("🗑️ Sil", use_container_width=True):
+                            st.session_state.pop("rand_duz_row",None)
+                            st.success("✅ Güncellendi!"); st.rerun()
+                        if _fb2.form_submit_button("🗑️ Sil", use_container_width=True):
                             _sb_rd = get_sb_client()
-                            if _sb_rd: _sb_rd.table("randevular").delete().eq("id",int(row_d["id"])).execute()
-                            st.success("🗑️ Silindi!"); st.session_state.pop("rand_duz_row",None); st.rerun()
+                            if _sb_rd: _sb_rd.table("randevular").delete().eq("id",_rid).execute()
+                            st.session_state.pop("rand_duz_row",None)
+                            st.success("🗑️ Silindi!"); st.rerun()
+                        if _fb3.form_submit_button("İptal", use_container_width=True):
+                            st.session_state.pop("rand_duz_row",None); st.rerun()
 
             # Excel
             _buf_r = _rio.BytesIO(); df_rand.to_excel(_buf_r,index=False); _buf_r.seek(0)
