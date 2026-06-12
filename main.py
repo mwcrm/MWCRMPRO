@@ -3986,295 +3986,294 @@ elif aktif == "excel":
 
     with _ex_tab2:
 
-            st.markdown("## 📥 Excel ile Toplu Veri Aktarımı")
+            # ── ŞABLON İNDİR ──────────────────────────────────────────────────────────
+            st.markdown("### 1️⃣ Şablonu İndir")
+            st.info("Önce şablonu indirin, doldurun, sonra yükleyin. Başlıkları değiştirmeyin.")
 
-    # ── ŞABLON İNDİR ──────────────────────────────────────────────────────────
-    st.markdown("### 1️⃣ Şablonu İndir")
-    st.info("Önce şablonu indirin, doldurun, sonra yükleyin. Başlıkları değiştirmeyin.")
+            sablon_kolonlar = [
+                "firma", "yetkili", "gsm", "sabit", "email",
+                "adres", "ilce", "il", "durum", "temsilci",
+                "islem_asamasi", "beklenen_ciro", "gerceklesen_ciro"
+            ]
+            sablon_aciklama = {
+                "firma": "Zorunlu - Firma adı",
+                "yetkili": "Yetkili kişi adı",
+                "gsm": "GSM no (05xxxxxxxxx)",
+                "sabit": "Sabit telefon",
+                "email": "Email adresi",
+                "adres": "Açık adres",
+                "ilce": "İlçe adı",
+                "il": "İl adı (İstanbul, Ankara...)",
+                "durum": "Aktif / Hedef / Pasif",
+                "temsilci": "Satış temsilcisi adı",
+                "islem_asamasi": "İlk Temas / Teklif / Sözleşme / Kazanıldı / Kaybedildi",
+                "beklenen_ciro": "Sayı (örn: 50000)",
+                "gerceklesen_ciro": "Sayı (örn: 35000)"
+            }
 
-    sablon_kolonlar = [
-        "firma", "yetkili", "gsm", "sabit", "email",
-        "adres", "ilce", "il", "durum", "temsilci",
-        "islem_asamasi", "beklenen_ciro", "gerceklesen_ciro"
-    ]
-    sablon_aciklama = {
-        "firma": "Zorunlu - Firma adı",
-        "yetkili": "Yetkili kişi adı",
-        "gsm": "GSM no (05xxxxxxxxx)",
-        "sabit": "Sabit telefon",
-        "email": "Email adresi",
-        "adres": "Açık adres",
-        "ilce": "İlçe adı",
-        "il": "İl adı (İstanbul, Ankara...)",
-        "durum": "Aktif / Hedef / Pasif",
-        "temsilci": "Satış temsilcisi adı",
-        "islem_asamasi": "İlk Temas / Teklif / Sözleşme / Kazanıldı / Kaybedildi",
-        "beklenen_ciro": "Sayı (örn: 50000)",
-        "gerceklesen_ciro": "Sayı (örn: 35000)"
-    }
+            # Örnek veri ile şablon oluştur
+            sablon_veri = [{
+                "firma": "Örnek Firma A.Ş.",
+                "yetkili": "Ahmet Yılmaz",
+                "gsm": "05001234567",
+                "sabit": "02121234567",
+                "email": "ahmet@ornekfirma.com",
+                "adres": "Atatürk Cad. No:1",
+                "ilce": "Kadıköy",
+                "il": "İstanbul",
+                "durum": "Aktif",
+                "temsilci": "Satış Temsilcisi",
+                "islem_asamasi": "İlk Temas",
+                "beklenen_ciro": 100000,
+                "gerceklesen_ciro": 0
+            }, {
+                "firma": "Demo Lojistik Ltd.",
+                "yetkili": "Ayşe Kaya",
+                "gsm": "05329876543",
+                "sabit": "",
+                "email": "ayse@demolojistik.com",
+                "adres": "Sanayi Sok. No:5",
+                "ilce": "Çerkezköy",
+                "il": "Tekirdağ",
+                "durum": "Hedef",
+                "temsilci": "Satış Temsilcisi",
+                "islem_asamasi": "Teklif",
+                "beklenen_ciro": 250000,
+                "gerceklesen_ciro": 0
+            }]
 
-    # Örnek veri ile şablon oluştur
-    sablon_veri = [{
-        "firma": "Örnek Firma A.Ş.",
-        "yetkili": "Ahmet Yılmaz",
-        "gsm": "05001234567",
-        "sabit": "02121234567",
-        "email": "ahmet@ornekfirma.com",
-        "adres": "Atatürk Cad. No:1",
-        "ilce": "Kadıköy",
-        "il": "İstanbul",
-        "durum": "Aktif",
-        "temsilci": "Satış Temsilcisi",
-        "islem_asamasi": "İlk Temas",
-        "beklenen_ciro": 100000,
-        "gerceklesen_ciro": 0
-    }, {
-        "firma": "Demo Lojistik Ltd.",
-        "yetkili": "Ayşe Kaya",
-        "gsm": "05329876543",
-        "sabit": "",
-        "email": "ayse@demolojistik.com",
-        "adres": "Sanayi Sok. No:5",
-        "ilce": "Çerkezköy",
-        "il": "Tekirdağ",
-        "durum": "Hedef",
-        "temsilci": "Satış Temsilcisi",
-        "islem_asamasi": "Teklif",
-        "beklenen_ciro": 250000,
-        "gerceklesen_ciro": 0
-    }]
+            df_sablon = pd.DataFrame(sablon_veri, columns=sablon_kolonlar)
 
-    df_sablon = pd.DataFrame(sablon_veri, columns=sablon_kolonlar)
+            # Açıklama satırı ekle
+            df_aciklama = pd.DataFrame([sablon_aciklama], columns=sablon_kolonlar)
 
-    # Açıklama satırı ekle
-    df_aciklama = pd.DataFrame([sablon_aciklama], columns=sablon_kolonlar)
+            sablon_buf = io.BytesIO()
+            with pd.ExcelWriter(sablon_buf, engine="openpyxl") as writer:
+                df_sablon.to_excel(writer, sheet_name="Cari_Listesi", index=False)
+                df_aciklama.to_excel(writer, sheet_name="Aciklama", index=False)
+            sablon_buf.seek(0)
 
-    sablon_buf = io.BytesIO()
-    with pd.ExcelWriter(sablon_buf, engine="openpyxl") as writer:
-        df_sablon.to_excel(writer, sheet_name="Cari_Listesi", index=False)
-        df_aciklama.to_excel(writer, sheet_name="Aciklama", index=False)
-    sablon_buf.seek(0)
+            st.download_button(
+                "📥 Excel Şablonunu İndir",
+                data=sablon_buf,
+                file_name="cari_liste_sablonu.xlsx",
+                mime="application/vnd.ms-excel",
+                use_container_width=True,
+                type="primary"
+            )
 
-    st.download_button(
-        "📥 Excel Şablonunu İndir",
-        data=sablon_buf,
-        file_name="cari_liste_sablonu.xlsx",
-        mime="application/vnd.ms-excel",
-        use_container_width=True,
-        type="primary"
-    )
+            st.divider()
 
-    st.divider()
+            # ── EXCEL YÜKLE ───────────────────────────────────────────────────────────
+            st.markdown("### 2️⃣ Doldurulmuş Dosyayı Yükle")
+            yuklenen = st.file_uploader(
+                "Excel dosyası seçin (.xlsx veya .xls)",
+                type=["xlsx","xls"],
+                key="excel_yukle"
+            )
 
-    # ── EXCEL YÜKLE ───────────────────────────────────────────────────────────
-    st.markdown("### 2️⃣ Doldurulmuş Dosyayı Yükle")
-    yuklenen = st.file_uploader(
-        "Excel dosyası seçin (.xlsx veya .xls)",
-        type=["xlsx","xls"],
-        key="excel_yukle"
-    )
+            if yuklenen is not None:
+                try:
+                    df_yukle = pd.read_excel(yuklenen, sheet_name=0)
+                    st.success(f"✅ Dosya okundu: {len(df_yukle)} satır, {len(df_yukle.columns)} sütun")
 
-    if yuklenen is not None:
-        try:
-            df_yukle = pd.read_excel(yuklenen, sheet_name=0)
-            st.success(f"✅ Dosya okundu: {len(df_yukle)} satır, {len(df_yukle.columns)} sütun")
-
-            # Kolon eşleştirme
-            st.markdown("#### Kolon Eşleştirme")
-            eksik = [k for k in sablon_kolonlar if k not in df_yukle.columns]
-            if eksik:
-                st.warning(f"Şu kolonlar eksik/farklı: {', '.join(eksik)}")
-                st.markdown("**Kolon eşleştirmesi yapın:**")
-                eslesme = {}
-                dosya_kolonlari = list(df_yukle.columns)
-                for sb_kol in sablon_kolonlar:
-                    if sb_kol in dosya_kolonlari:
-                        eslesme[sb_kol] = sb_kol
+                    # Kolon eşleştirme
+                    st.markdown("#### Kolon Eşleştirme")
+                    eksik = [k for k in sablon_kolonlar if k not in df_yukle.columns]
+                    if eksik:
+                        st.warning(f"Şu kolonlar eksik/farklı: {', '.join(eksik)}")
+                        st.markdown("**Kolon eşleştirmesi yapın:**")
+                        eslesme = {}
+                        dosya_kolonlari = list(df_yukle.columns)
+                        for sb_kol in sablon_kolonlar:
+                            if sb_kol in dosya_kolonlari:
+                                eslesme[sb_kol] = sb_kol
+                            else:
+                                secim_kol = st.selectbox(
+                                    f"'{sb_kol}' kolonu için:",
+                                    ["-- Boş bırak --"] + dosya_kolonlari,
+                                    key=f"esles_{sb_kol}"
+                                )
+                                eslesme[sb_kol] = None if secim_kol == "-- Boş bırak --" else secim_kol
+                        # Yeniden adlandır
+                        rename_map = {v: k for k, v in eslesme.items() if v and v != k}
+                        if rename_map:
+                            df_yukle = df_yukle.rename(columns=rename_map)
                     else:
-                        secim_kol = st.selectbox(
-                            f"'{sb_kol}' kolonu için:",
-                            ["-- Boş bırak --"] + dosya_kolonlari,
-                            key=f"esles_{sb_kol}"
-                        )
-                        eslesme[sb_kol] = None if secim_kol == "-- Boş bırak --" else secim_kol
-                # Yeniden adlandır
-                rename_map = {v: k for k, v in eslesme.items() if v and v != k}
-                if rename_map:
-                    df_yukle = df_yukle.rename(columns=rename_map)
-            else:
-                st.success("✅ Tüm kolonlar eşleşti!")
-                eslesme = {k: k for k in sablon_kolonlar}
+                        st.success("✅ Tüm kolonlar eşleşti!")
+                        eslesme = {k: k for k in sablon_kolonlar}
 
-            # Önizleme
-            st.markdown("#### Önizleme (ilk 10 satır)")
-            preview_cols = [k for k in sablon_kolonlar if k in df_yukle.columns]
-            st.dataframe(df_yukle[preview_cols].head(10), use_container_width=True, hide_index=True)
+                    # Önizleme
+                    st.markdown("#### Önizleme (ilk 10 satır)")
+                    preview_cols = [k for k in sablon_kolonlar if k in df_yukle.columns]
+                    st.dataframe(df_yukle[preview_cols].head(10), use_container_width=True, hide_index=True)
 
-            # Doğrulama
-            st.markdown("#### Doğrulama")
-            hatalar = []
-            uyarilar = []
+                    # Doğrulama
+                    st.markdown("#### Doğrulama")
+                    hatalar = []
+                    uyarilar = []
 
-            if "firma" not in df_yukle.columns:
-                hatalar.append("'firma' kolonu zorunlu!")
-            else:
-                bos_firma = df_yukle["firma"].isna().sum() + (df_yukle["firma"] == "").sum()
-                if bos_firma > 0:
-                    hatalar.append(f"{bos_firma} satırda firma adı boş!")
+                    if "firma" not in df_yukle.columns:
+                        hatalar.append("'firma' kolonu zorunlu!")
+                    else:
+                        bos_firma = df_yukle["firma"].isna().sum() + (df_yukle["firma"] == "").sum()
+                        if bos_firma > 0:
+                            hatalar.append(f"{bos_firma} satırda firma adı boş!")
 
-            if "durum" in df_yukle.columns:
-                gecersiz_durum = df_yukle[~df_yukle["durum"].isin(["Aktif","Hedef","Pasif",""])]["firma"].count()
-                if gecersiz_durum > 0:
-                    uyarilar.append(f"{gecersiz_durum} satırda durum geçersiz (Aktif/Hedef/Pasif olmalı) → 'Hedef' yapılacak")
+                    if "durum" in df_yukle.columns:
+                        gecersiz_durum = df_yukle[~df_yukle["durum"].isin(["Aktif","Hedef","Pasif",""])]["firma"].count()
+                        if gecersiz_durum > 0:
+                            uyarilar.append(f"{gecersiz_durum} satırda durum geçersiz (Aktif/Hedef/Pasif olmalı) → 'Hedef' yapılacak")
 
-            if "islem_asamasi" in df_yukle.columns:
-                gecerli_asama = ["İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi",""]
-                gecersiz_asama = df_yukle[~df_yukle["islem_asamasi"].isin(gecerli_asama)]["firma"].count()
-                if gecersiz_asama > 0:
-                    uyarilar.append(f"{gecersiz_asama} satırda işlem aşaması geçersiz → 'İlk Temas' yapılacak")
+                    if "islem_asamasi" in df_yukle.columns:
+                        gecerli_asama = ["İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi",""]
+                        gecersiz_asama = df_yukle[~df_yukle["islem_asamasi"].isin(gecerli_asama)]["firma"].count()
+                        if gecersiz_asama > 0:
+                            uyarilar.append(f"{gecersiz_asama} satırda işlem aşaması geçersiz → 'İlk Temas' yapılacak")
 
-            if hatalar:
-                for h in hatalar:
-                    st.error(f"❌ {h}")
-            if uyarilar:
-                for u in uyarilar:
-                    st.warning(f"⚠️ {u}")
+                    if hatalar:
+                        for h in hatalar:
+                            st.error(f"❌ {h}")
+                    if uyarilar:
+                        for u in uyarilar:
+                            st.warning(f"⚠️ {u}")
 
-            if not hatalar:
-                st.success(f"✅ {len(df_yukle)} satır yüklenmeye hazır")
+                    if not hatalar:
+                        st.success(f"✅ {len(df_yukle)} satır yüklenmeye hazır")
 
-                # Mükerrer kontrol
-                _df_mevcut = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
-                mevcut_firmalar = set(_df_mevcut["firma"].dropna().str.strip().tolist()) if not _df_mevcut.empty else set()
+                        # Mükerrer kontrol
+                        _df_mevcut = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+                        mevcut_firmalar = set(_df_mevcut["firma"].dropna().str.strip().tolist()) if not _df_mevcut.empty else set()
 
-                mukerrer = df_yukle[df_yukle["firma"].astype(str).str.strip().isin(mevcut_firmalar)]
-                if len(mukerrer) > 0:
-                    st.warning(f"⚠️ {len(mukerrer)} firma zaten sistemde kayıtlı:")
-                    st.dataframe(mukerrer[["firma"]].head(10), use_container_width=True, hide_index=True)
-                    mukerrer_sec = st.radio(
-                        "Mükerrer kayıtlar için:",
-                        ["Atla (kaydetme)", "Üzerine yaz (güncelle)", "Yine de ekle (kopya oluşur)"],
-                        key="mukerrer_sec"
-                    )
-                else:
-                    mukerrer_sec = "Atla (kaydetme)"
+                        mukerrer = df_yukle[df_yukle["firma"].astype(str).str.strip().isin(mevcut_firmalar)]
+                        if len(mukerrer) > 0:
+                            st.warning(f"⚠️ {len(mukerrer)} firma zaten sistemde kayıtlı:")
+                            st.dataframe(mukerrer[["firma"]].head(10), use_container_width=True, hide_index=True)
+                            mukerrer_sec = st.radio(
+                                "Mükerrer kayıtlar için:",
+                                ["Atla (kaydetme)", "Üzerine yaz (güncelle)", "Yine de ekle (kopya oluşur)"],
+                                key="mukerrer_sec"
+                            )
+                        else:
+                            mukerrer_sec = "Atla (kaydetme)"
 
-                col_yukle_btn, _ = st.columns([2,4])
-                with col_yukle_btn:
-                    if st.button("🚀 Sisteme Aktar", use_container_width=True, type="primary"):
-                        basarili = 0
-                        atlanan = 0
-                        guncellenen = 0
-                        hatali = 0
+                        col_yukle_btn, _ = st.columns([2,4])
+                        with col_yukle_btn:
+                            if st.button("🚀 Sisteme Aktar", use_container_width=True, type="primary"):
+                                basarili = 0
+                                atlanan = 0
+                                guncellenen = 0
+                                hatali = 0
 
-                        for _, row in df_yukle.iterrows():
-                            try:
-                                firma_adi = str(row.get("firma","") or "").strip()
-                                if not firma_adi or firma_adi.lower() == "nan":
-                                    hatali += 1
-                                    continue
-
-                                def temiz(val):
-                                    """NaN ve None değerleri temizle"""
-                                    import math
-                                    if val is None: return ""
+                                for _, row in df_yukle.iterrows():
                                     try:
-                                        if math.isnan(float(val)): return ""
-                                    except: pass
-                                    s = str(val).strip()
-                                    return "" if s.lower() == "nan" else s
+                                        firma_adi = str(row.get("firma","") or "").strip()
+                                        if not firma_adi or firma_adi.lower() == "nan":
+                                            hatali += 1
+                                            continue
 
-                                def temiz_sayi(val):
-                                    try:
-                                        import math
-                                        f = float(val)
-                                        if math.isnan(f): return 0.0
-                                        return f
-                                    except: return 0.0
+                                        def temiz(val):
+                                            """NaN ve None değerleri temizle"""
+                                            import math
+                                            if val is None: return ""
+                                            try:
+                                                if math.isnan(float(val)): return ""
+                                            except: pass
+                                            s = str(val).strip()
+                                            return "" if s.lower() == "nan" else s
 
-                                yetkili_v  = temiz(row.get("yetkili",""))
-                                gsm_v      = fmt_tel(temiz(row.get("gsm","")))
-                                sabit_v    = fmt_tel(temiz(row.get("sabit","")))
-                                email_v    = temiz(row.get("email",""))
-                                adres_v    = temiz(row.get("adres",""))
-                                ilce_v     = temiz(row.get("ilce",""))
-                                il_v       = temiz(row.get("il",""))
-                                durum_v    = temiz(row.get("durum",""))
-                                temsilci_v = temiz(row.get("temsilci",""))
-                                asama_v    = temiz(row.get("islem_asamasi",""))
-                                bek_ciro   = temiz_sayi(row.get("beklenen_ciro",0))
-                                ger_ciro   = temiz_sayi(row.get("gerceklesen_ciro",0))
+                                        def temiz_sayi(val):
+                                            try:
+                                                import math
+                                                f = float(val)
+                                                if math.isnan(f): return 0.0
+                                                return f
+                                            except: return 0.0
 
-                                # Durum düzelt
-                                if durum_v not in ["Aktif","Hedef","Pasif"]:
-                                    durum_v = "Hedef"
-                                # Aşama düzelt
-                                if asama_v not in ["İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"]:
-                                    asama_v = "İlk Temas"
+                                        yetkili_v  = temiz(row.get("yetkili",""))
+                                        gsm_v      = fmt_tel(temiz(row.get("gsm","")))
+                                        sabit_v    = fmt_tel(temiz(row.get("sabit","")))
+                                        email_v    = temiz(row.get("email",""))
+                                        adres_v    = temiz(row.get("adres",""))
+                                        ilce_v     = temiz(row.get("ilce",""))
+                                        il_v       = temiz(row.get("il",""))
+                                        durum_v    = temiz(row.get("durum",""))
+                                        temsilci_v = temiz(row.get("temsilci",""))
+                                        asama_v    = temiz(row.get("islem_asamasi",""))
+                                        bek_ciro   = temiz_sayi(row.get("beklenen_ciro",0))
+                                        ger_ciro   = temiz_sayi(row.get("gerceklesen_ciro",0))
 
-                                firma_mevcut = firma_adi.strip() in mevcut_firmalar
+                                        # Durum düzelt
+                                        if durum_v not in ["Aktif","Hedef","Pasif"]:
+                                            durum_v = "Hedef"
+                                        # Aşama düzelt
+                                        if asama_v not in ["İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"]:
+                                            asama_v = "İlk Temas"
 
-                                if firma_mevcut and mukerrer_sec == "Atla (kaydetme)":
-                                    atlanan += 1
-                                    continue
-                                elif firma_mevcut and mukerrer_sec == "Üzerine yaz (güncelle)":
-                                    db_update("cari_kartlar", {
-                                        "yetkili": yetkili_v, "gsm": gsm_v, "sabit": sabit_v,
-                                        "email": email_v, "adres": adres_v, "ilce": ilce_v, "il": il_v,
-                                        "durum": durum_v, "temsilci": temsilci_v, "islem_asamasi": asama_v,
-                                        "beklenen_ciro": bek_ciro, "gerceklesen_ciro": ger_ciro
-                                    }, "firma", firma_adi)
-                                    guncellenen += 1
-                                else:
-                                    db_insert("cari_kartlar", {
-                                        "tarih": datetime.now().isoformat(),
-                                        "firma": firma_adi, "yetkili": yetkili_v, "gsm": gsm_v,
-                                        "sabit": sabit_v, "email": email_v, "adres": adres_v,
-                                        "ilce": ilce_v, "il": il_v, "durum": durum_v,
-                                        "temsilci": temsilci_v, "islem_asamasi": asama_v,
-                                        "silindi": 0, "olusturan": f"Excel:{st.session_state['kullanici']}",
-                                        "beklenen_ciro": bek_ciro, "gerceklesen_ciro": ger_ciro
-                                    })
-                                    basarili += 1
+                                        firma_mevcut = firma_adi.strip() in mevcut_firmalar
 
-                            except Exception as row_e:
-                                hatali += 1
+                                        if firma_mevcut and mukerrer_sec == "Atla (kaydetme)":
+                                            atlanan += 1
+                                            continue
+                                        elif firma_mevcut and mukerrer_sec == "Üzerine yaz (güncelle)":
+                                            db_update("cari_kartlar", {
+                                                "yetkili": yetkili_v, "gsm": gsm_v, "sabit": sabit_v,
+                                                "email": email_v, "adres": adres_v, "ilce": ilce_v, "il": il_v,
+                                                "durum": durum_v, "temsilci": temsilci_v, "islem_asamasi": asama_v,
+                                                "beklenen_ciro": bek_ciro, "gerceklesen_ciro": ger_ciro
+                                            }, "firma", firma_adi)
+                                            guncellenen += 1
+                                        else:
+                                            db_insert("cari_kartlar", {
+                                                "tarih": datetime.now().isoformat(),
+                                                "firma": firma_adi, "yetkili": yetkili_v, "gsm": gsm_v,
+                                                "sabit": sabit_v, "email": email_v, "adres": adres_v,
+                                                "ilce": ilce_v, "il": il_v, "durum": durum_v,
+                                                "temsilci": temsilci_v, "islem_asamasi": asama_v,
+                                                "silindi": 0, "olusturan": f"Excel:{st.session_state['kullanici']}",
+                                                "beklenen_ciro": bek_ciro, "gerceklesen_ciro": ger_ciro
+                                            })
+                                            basarili += 1
 
-                        st.markdown("---")
-                        r1, r2, r3, r4 = st.columns(4)
-                        r1.metric("✅ Eklendi", basarili)
-                        r2.metric("🔄 Güncellendi", guncellenen)
-                        r3.metric("⏭️ Atlandı", atlanan)
-                        r4.metric("❌ Hatalı", hatali)
-                        if basarili + guncellenen > 0:
-                            st.success(f"Aktarım tamamlandı! {basarili} yeni kayıt eklendi, {guncellenen} güncellendi.")
-                        if hatali > 0:
-                            st.warning(f"{hatali} satır hata nedeniyle atlandı.")
+                                    except Exception as row_e:
+                                        hatali += 1
 
-        except Exception as e:
-            st.error(f"Dosya okuma hatası: {e}")
-            st.info("Lütfen geçerli bir .xlsx dosyası yükleyin ve şablon formatına uyun.")
+                                st.markdown("---")
+                                r1, r2, r3, r4 = st.columns(4)
+                                r1.metric("✅ Eklendi", basarili)
+                                r2.metric("🔄 Güncellendi", guncellenen)
+                                r3.metric("⏭️ Atlandı", atlanan)
+                                r4.metric("❌ Hatalı", hatali)
+                                if basarili + guncellenen > 0:
+                                    st.success(f"Aktarım tamamlandı! {basarili} yeni kayıt eklendi, {guncellenen} güncellendi.")
+                                if hatali > 0:
+                                    st.warning(f"{hatali} satır hata nedeniyle atlandı.")
 
-    st.divider()
+                except Exception as e:
+                    st.error(f"Dosya okuma hatası: {e}")
+                    st.info("Lütfen geçerli bir .xlsx dosyası yükleyin ve şablon formatına uyun.")
 
-    # ── MEVCUT VERİLERİ DIŞA AKTAR ────────────────────────────────────────────
-    st.markdown("### 3️⃣ Mevcut Verileri Excel'e Aktar")
-    df_disari = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
+            st.divider()
 
-    st.markdown(f"Sistemde **{len(df_disari)}** aktif kayıt var.")
+            # ── MEVCUT VERİLERİ DIŞA AKTAR ────────────────────────────────────────────
+            st.markdown("### 3️⃣ Mevcut Verileri Excel'e Aktar")
+            df_disari = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
 
-    disari_buf = io.BytesIO()
-    df_disari.to_excel(disari_buf, index=False)
-    disari_buf.seek(0)
-    st.download_button(
-        "📤 Tüm Carileri Excel'e Aktar",
-        data=disari_buf,
-        file_name=f"cari_listesi_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-        mime="application/vnd.ms-excel",
-        use_container_width=True
-    )
+            st.markdown(f"Sistemde **{len(df_disari)}** aktif kayıt var.")
 
-# ── MUSTERİ ANALİZ ────────────────────────────────────────────────────────────
+            disari_buf = io.BytesIO()
+            df_disari.to_excel(disari_buf, index=False)
+            disari_buf.seek(0)
+            st.download_button(
+                "📤 Tüm Carileri Excel'e Aktar",
+                data=disari_buf,
+                file_name=f"cari_listesi_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                mime="application/vnd.ms-excel",
+                use_container_width=True
+            )
+
+            # ── MUSTERİ ANALİZ ────────────────────────────────────────────────────────────
+
 elif aktif == "analiz":
 
     st.markdown("## 🧠 Müşteri Analiz")
