@@ -1189,7 +1189,30 @@ elif aktif == "liste":
                     tum_durum_opts.append(str(_dd))
 
     # ── ÜST METRİKLER — TÜM DURUM VE AŞAMALAR ──────────────────────────────
-    # Durum satırı — hepsi gösterilir
+    # Durum emoji haritası
+    _DURUM_EMOJI = {
+        "Toplam":       "📊",
+        "Portföy":      "💼",
+        "Hedef":        "🎯",
+        "Aktif":        "✅",
+        "Deneme":       "🧪",
+        "Takip":        "👁️",
+        "Tekrar Ara":   "📞",
+        "Pasif":        "⚫",
+    }
+    # Aşama emoji haritası
+    _ASAMA_EMOJI = {
+        "İlk Temas":        "👋",
+        "Teklif":           "📄",
+        "Deneme":           "🧪",
+        "Sözleşme":         "📝",
+        "Kazanıldı":        "🏆",
+        "Kaybedildi":       "❌",
+        "Negatif Portföy":  "👎",
+        "Gereksizler":      "🗑️",
+    }
+
+    # Durum satırı
     _d_veri = [("Toplam", len(df))]
     for _dn in tum_durum_opts:
         _dc = len(df[df["durum"]==_dn]) if "durum" in df.columns else 0
@@ -1197,16 +1220,18 @@ elif aktif == "liste":
 
     _d_cols = st.columns(len(_d_veri))
     for i, (_ad, _sayi) in enumerate(_d_veri):
-        if _d_cols[i].button(f"**{_ad}**\n{_sayi}", key=f"dur_btn_{i}", use_container_width=True):
+        _em = _DURUM_EMOJI.get(_ad, "🔹")
+        if _d_cols[i].button(f"{_em} {_ad}\n{_sayi}", key=f"dur_btn_{i}", use_container_width=True):
             st.session_state["fil_durum"] = "Tümü" if _ad == "Toplam" else _ad
             st.rerun()
 
-    # Aşama satırı — hepsi gösterilir
+    # Aşama satırı
     if tum_asama_opts:
         _a_veri = [(a, len(df[df["islem_asamasi"]==a]) if "islem_asamasi" in df.columns else 0) for a in tum_asama_opts]
         _a_cols = st.columns(len(_a_veri))
         for i, (_an, _ac) in enumerate(_a_veri):
-            if _a_cols[i].button(f"**{_an}**\n{_ac}", key=f"asm_btn_{i}", use_container_width=True):
+            _em2 = _ASAMA_EMOJI.get(_an, "🔸")
+            if _a_cols[i].button(f"{_em2} {_an}\n{_ac}", key=f"asm_btn_{i}", use_container_width=True):
                 st.session_state["fil_asama"] = _an
                 st.rerun()
 
