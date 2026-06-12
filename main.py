@@ -732,7 +732,7 @@ _TAB_ETIKETLER = {
     "liste": "📋 Cari Liste / Düzenle",
     "arsiv": "🗃️ Arşiv (Silinenler)",
     "rapor": "📊 Raporlar",
-    "teklif": "📄 Teklif Oluştur",
+    "teklif": "📄 Spot Teklif",
     "ozel_teklif": "⭐ Özel Teklif",
     "excel": "📥 Excel Aktar",
     "kisiler": "📞 Telefon Kişiler",
@@ -1239,7 +1239,15 @@ elif aktif == "liste":
         f"[{int(r['id'])}] {r['firma']} | {r.get('il','')} | {r.get('islem_asamasi','')}"
         for _, r in df_f.iterrows()
     ]
-    secili_kart = st.selectbox("🔍 Müşteri Kartı Seç:", kart_opts, key="kart_sec")
+    if st.session_state.get("kart_sec_reset"):
+        st.session_state.pop("kart_sec_reset", None)
+        st.session_state.pop("kart_sec", None)
+    _ks_col1, _ks_col2 = st.columns([6,1])
+    secili_kart = _ks_col1.selectbox("🔍 Müşteri Kartı Seç:", kart_opts, key="kart_sec")
+    if secili_kart != "-- Müşteri Seçin --":
+        if _ks_col2.button("❌", key="kart_sec_temizle", use_container_width=True, help="Temizle"):
+            st.session_state["kart_sec_reset"] = True
+            st.rerun()
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
         try:
             kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
@@ -2970,17 +2978,25 @@ elif aktif == "teklif":
     sayfa_log("teklif")
     import json, re, io
 
-    st.markdown("## 📄 Teklif Oluştur")
+    st.markdown("## 📄 Spot Teklif")
 
     # ── MÜŞTERİ SEÇİMİ ───────────────────────────────────────────────────────
     _df_cari_tek = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
 
-    _tf1, _tf2 = st.columns([2,5])
+    if st.session_state.get("tek_mus_reset"):
+        st.session_state.pop("tek_mus_reset", None)
+        st.session_state.pop("teklif_musteri", None)
+        st.session_state.pop("hedef_mus", None)
+    _tf1, _tf2, _tf3 = st.columns([2,5,1])
     _t_fil = _tf1.selectbox("Filtre:", ["Tümü","Aktif","Hedef","Pasif"], key="teklif_fil")
     _df_m  = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
     _df_mf = _df_m if _t_fil == "Tümü" else _df_m[_df_m["durum"] == _t_fil]
     _m_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['firma']} ({r['durum']})" for _,r in _df_mf.iterrows()]
     _secim  = _tf2.selectbox("Müşteri:", _m_opts, key="teklif_musteri")
+    if _secim != "-- Müşteri Seçin --":
+        if _tf3.button("❌", key="tek_mus_temizle", use_container_width=True, help="Temizle"):
+            st.session_state["tek_mus_reset"] = True
+            st.rerun()
 
     secili_musteri = None
     gsm_kayitli = ""; email_kayitli = ""
@@ -3319,11 +3335,20 @@ elif aktif == "ozel_teklif":
 
     # ── MÜŞTERİ ──────────────────────────────────────────────────────────────
     _oz_dfm = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
-    _ozcol1, _ozcol2 = st.columns([2,4])
+    if st.session_state.get("oz2_mus_reset"):
+        st.session_state.pop("oz2_mus_reset", None)
+        st.session_state.pop("oz2_musteri", None)
+        st.session_state.pop("oz2_hedef", None)
+        st.session_state.pop("oz2_son_sec", None)
+    _ozcol1, _ozcol2, _ozcol3 = st.columns([2,4,1])
     _oz_fil = _ozcol1.selectbox("Filtre:", ["Tümü","Aktif","Hedef","Pasif"], key="oz2_fil")
     _oz_mf  = _oz_dfm if _oz_fil=="Tümü" else _oz_dfm[_oz_dfm["durum"]==_oz_fil]
     _oz_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['firma']} ({r['durum']})" for _,r in _oz_mf.iterrows()]
     _oz_sec  = _ozcol2.selectbox("Müşteri:", _oz_opts, key="oz2_musteri")
+    if _oz_sec != "-- Müşteri Seçin --":
+        if _ozcol3.button("❌", key="oz2_mus_temizle", use_container_width=True, help="Temizle"):
+            st.session_state["oz2_mus_reset"] = True
+            st.rerun()
 
     _oz_mus = None; _oz_gsm=""; _oz_eml=""
     if _oz_sec != "-- Müşteri Seçin --" and "[" in _oz_sec:
@@ -5087,8 +5112,17 @@ elif aktif == "randevu":
                     _onsel_idx = i
                     break
 
+        _rm1, _rm2 = st.columns([6,1])
+        _rand_mus_sec = _rm1.selectbox("Müşteri*:", musteri_rand_opts, index=_onsel_idx, key="rand_musteri_sec")
+        if _rand_mus_sec != "-- Müşteri Seçin --":
+            if _rm2.button("❌", key="rand_mus_temizle", use_container_width=True, help="Temizle"):
+                st.session_state["rand_musteri_sec"] = "-- Müşteri Seçin --"
+                st.rerun()
+
         with st.form("randevu_form"):
-            rand_musteri = st.selectbox("Müşteri*:", musteri_rand_opts, index=_onsel_idx, key="rand_musteri")
+            rand_musteri = st.selectbox("Müşteri:", musteri_rand_opts,
+                index=musteri_rand_opts.index(_rand_mus_sec) if _rand_mus_sec in musteri_rand_opts else 0,
+                key="rand_musteri")
             rc1, rc2, rc3 = st.columns(3)
             rand_tarih = rc1.date_input("Tarih*:", value=datetime.now().date(), key="rand_tarih")
             rand_saat  = rc2.time_input("Saat*:", key="rand_saat")
