@@ -665,33 +665,25 @@ st.set_page_config(page_title="MWCRMPRO", layout="wide")
 
 st.markdown("""
 <style>
-@media (max-width: 768px) {
-    .block-container { padding: 0.5rem !important; }
-    div[data-testid="column"] { min-width: 100% !important; }
-    .stButton>button { width: 100% !important; font-size: 13px !important; }
-    h1 { font-size: 1.3rem !important; }
-    h2 { font-size: 1.1rem !important; }
+/* ── GENEL BOŞLUK AZALTMA ───────────────────────────────── */
+.block-container {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+}
+h1, h2, h3, h4 {
+    margin-top: 0.2rem !important;
+    margin-bottom: 0.2rem !important;
+}
+hr {
+    margin: 0.4rem 0 !important;
 }
 .stButton>button { border-radius: 8px !important; }
-</style>
-""", unsafe_allow_html=True)
-
-if "giris" not in st.session_state:
-    st.session_state["giris"] = False
-if "kullanici" not in st.session_state:
-    st.session_state["kullanici"] = ""
-if "rol" not in st.session_state:
-    st.session_state["rol"] = ""
-if "aktif_tab" not in st.session_state:
-    st.session_state["aktif_tab"] = "liste"
-if "kayit_mesaj" not in st.session_state:
-    st.session_state["kayit_mesaj"] = ""
-
-st.markdown("""
-<style>
-/* Mobil uyumluluk */
+div[data-testid="stVerticalBlock"] > div {
+    gap: 0.3rem !important;
+}
+/* ── MOBİL ──────────────────────────────────────────────── */
 @media (max-width: 768px) {
-    .block-container { padding: 0.5rem !important; }
+    .block-container { padding: 0.3rem !important; }
     div[data-testid="column"] { min-width: 100% !important; }
     .stButton>button { width: 100% !important; font-size: 13px !important; }
     .stDataFrame { font-size: 11px !important; }
@@ -699,10 +691,9 @@ st.markdown("""
     h2 { font-size: 1.1rem !important; }
     h3 { font-size: 1rem !important; }
 }
-/* Genel buton iyileştirme */
-.stButton>button { border-radius: 8px !important; }
 </style>
 """, unsafe_allow_html=True)
+
 
 # ── MENÜ FONKSİYONLARI (sidebar'dan önce tanımlanmalı) ───────────────────────
 
