@@ -5022,23 +5022,30 @@ elif aktif == "randevu":
             # Başlık
             _hcols = st.columns([0.5,1.2,0.8,2,1.5,1.5,1.5,1.2,0.4])
             for _ht, _hc in zip(["ID","Tarih","Saat","Müşteri","Bölge","Görev","Temsilci","Sonuç",""],_hcols):
-                _hc.caption(f"**{_ht}**")
+                _hc.markdown(f"**{_ht}**")
 
             for _, row in df_rand.iterrows():
                 _rid = int(row.get("id",0) or 0)
                 _rc = st.columns([0.5,1.2,0.8,2,1.5,1.5,1.5,1.2,0.4])
                 _tarih_r = str(row.get("randevu_tarihi",""))
-                _renk = "🔴" if _tarih_r==bugun_str else ("🟡" if _tarih_r==(datetime.now()+pd.Timedelta(days=1)).strftime("%Y-%m-%d") else "")
-                _rc[0].caption(str(_rid))
-                _rc[1].caption(f"{_renk}{_tarih_r}")
-                _rc[2].caption(str(row.get("randevu_saati",""))[:5])
-                _rc[3].caption(str(row.get("musteri_adi","") or ""))
-                _rc[4].caption(str(row.get("bolge","") or ""))
-                _rc[5].caption(str(row.get("gorev","") or ""))
-                _rc[6].caption(str(row.get("temsilci","") or ""))
+                try:
+                    _fark = (pd.to_datetime(_tarih_r).date() - datetime.now().date()).days
+                    if _fark == 0:   _renk = "🔴"
+                    elif _fark <= 5 and _fark > 0: _renk = "🟡"
+                    elif _fark > 5:  _renk = "🟢"
+                    else:            _renk = "⚫"
+                except: _renk = ""
+
+                _rc[0].markdown(f"**{_rid}**")
+                _rc[1].markdown(f"{_renk} **{_tarih_r}**")
+                _rc[2].markdown(f"{str(row.get('randevu_saati',''))[:5]}")
+                _rc[3].markdown(f"**{str(row.get('musteri_adi','') or '')}**")
+                _rc[4].markdown(f"{str(row.get('bolge','') or '')}")
+                _rc[5].markdown(f"{str(row.get('gorev','') or '')}")
+                _rc[6].markdown(f"{str(row.get('temsilci','') or '')}")
                 _sonuc_r = str(row.get("sonuc","") or "")
-                _sonuc_renk = "✅" if _sonuc_r=="Bitti" else ("🔄" if _sonuc_r=="Devam Ediyor" else ("❌" if _sonuc_r=="Gidilmedi" else ""))
-                _rc[7].caption(f"{_sonuc_renk} {_sonuc_r}")
+                _sonuc_renk = "✅" if _sonuc_r=="Bitti" else ("🔄" if _sonuc_r=="Devam Ediyor" else ("❌" if _sonuc_r=="Gidilmedi" else "🔵"))
+                _rc[7].markdown(f"{_sonuc_renk} {_sonuc_r}")
 
                 # ✏️ kalem — tıklanınca o satır açılır
                 if _rc[8].button("✏️", key=f"rand_duz_btn_{_rid}"):
