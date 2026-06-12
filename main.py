@@ -3572,16 +3572,19 @@ elif aktif == "ozel_teklif":
 
     _OZ_URUN_VARSAYILAN = ["Koli","Sandık","Top","Çuval","Kasa","Palet","Diğer"]
 
-    # Ürün listesini Supabase'den çek, yoksa varsayılanı kullan
+    # Ürün listesi: varsayılanlar + Supabase'deki ekstralar
     def _oz_urun_listesi():
+        _liste = _OZ_URUN_VARSAYILAN.copy()
         try:
             _sb = get_sb_client()
             if _sb:
                 _r = _sb.table("sistem_tanimlar").select("deger").eq("tip","oz_urun").order("sira").execute()
                 if _r.data:
-                    return [d["deger"] for d in _r.data]
+                    for _d in _r.data:
+                        if _d["deger"] not in _liste:
+                            _liste.append(_d["deger"])
         except: pass
-        return _OZ_URUN_VARSAYILAN.copy()
+        return _liste
 
     _OZ_URUN = _oz_urun_listesi()
     _OZ_ILLER = ["İstanbul","Ankara","İzmir","Bursa","Antalya","Adana","Konya",
@@ -3681,9 +3684,15 @@ elif aktif == "ozel_teklif":
                 key=f"oz2_v_{gi}_{si}", label_visibility="collapsed")
 
             # Tür — multiselect
-            _tur_def = [x for x in (s.get("tur",[]) or []) if x in _OZ_URUN]
-            if not _tur_def and _OZ_URUN: _tur_def = [_OZ_URUN[0]]
-            _tur = _rc[2].multiselect("", _OZ_URUN,
+            _tur_saved = s.get("tur",[]) or []
+            # Kaydedilmiş ama listede olmayan ürünleri geçici ekle
+            _tur_listesi = _OZ_URUN.copy()
+            for _tx in _tur_saved:
+                if _tx and _tx not in _tur_listesi:
+                    _tur_listesi.append(_tx)
+            _tur_def = [x for x in _tur_saved if x]
+            if not _tur_def and _tur_listesi: _tur_def = [_tur_listesi[0]]
+            _tur = _rc[2].multiselect("", _tur_listesi,
                 default=_tur_def,
                 key=f"oz2_tur_{gi}_{si}", label_visibility="collapsed")
 
