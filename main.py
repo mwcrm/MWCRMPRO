@@ -4977,16 +4977,24 @@ elif aktif == "randevu":
 
     with r_tab1:
         # Filtreler
-        rf1,rf2,rf3 = st.columns(3)
-        _fil_tem  = rf1.text_input("Temsilci:", key="rand_fil_tem")
+        rf1,rf2,rf3,rf4 = st.columns(4)
+        _fil_tem   = rf1.text_input("Temsilci:", key="rand_fil_tem")
         _fil_sonuc = rf2.selectbox("Sonuç:", ["Tümü","Bitti","Devam Ediyor","Gidilmedi","İptal","—"], key="rand_sonuc")
-        _fil_ara  = rf3.text_input("🔍 Ara:", key="rand_fil_ara")
+        _fil_ara   = rf3.text_input("🔍 Ara:", key="rand_fil_ara")
+        _siralama  = rf4.selectbox("Sırala:", ["Tarih ↑","Tarih ↓","Müşteri A-Z","Müşteri Z-A","Temsilci A-Z"], key="rand_siralama")
 
         df_rand = df_rand_all.copy() if not df_rand_all.empty else pd.DataFrame()
         if not df_rand.empty:
             if _fil_tem: df_rand = df_rand[df_rand["temsilci"].str.contains(_fil_tem,case=False,na=False)]
             if _fil_sonuc != "Tümü": df_rand = df_rand[df_rand["sonuc"]==_fil_sonuc]
             if _fil_ara: df_rand = df_rand[df_rand.apply(lambda r: _fil_ara.lower() in str(r).lower(),axis=1)]
+            # Sıralama
+            if _siralama == "Tarih ↑": df_rand = df_rand.sort_values("randevu_tarihi", ascending=True)
+            elif _siralama == "Tarih ↓": df_rand = df_rand.sort_values("randevu_tarihi", ascending=False)
+            elif _siralama == "Müşteri A-Z": df_rand = df_rand.sort_values("musteri_adi", ascending=True)
+            elif _siralama == "Müşteri Z-A": df_rand = df_rand.sort_values("musteri_adi", ascending=False)
+            elif _siralama == "Temsilci A-Z": df_rand = df_rand.sort_values("temsilci", ascending=True)
+            df_rand = df_rand.reset_index(drop=True)
 
         if df_rand.empty:
             st.info("Randevu bulunamadı.")
@@ -5020,9 +5028,11 @@ elif aktif == "randevu":
             _g_cols = [c for c in ["id","randevu_tarihi","randevu_saati","musteri_adi","bolge","gorev","temsilci","sonuc"] if c in df_rand.columns]
 
             # Başlık
+            st.markdown("""<div style='background:#1f6feb22;border-radius:6px;padding:4px 0;margin-bottom:2px'>""", unsafe_allow_html=True)
             _hcols = st.columns([0.5,1.2,0.8,2,1.5,1.5,1.5,1.2,0.4])
-            for _ht, _hc in zip(["ID","Tarih","Saat","Müşteri","Bölge","Görev","Temsilci","Sonuç",""],_hcols):
-                _hc.markdown(f"**{_ht}**")
+            for _ht, _hc in zip(["ID","📅 Tarih","⏰ Saat","🏢 Müşteri","📍 Bölge","📋 Görev","👤 Temsilci","🎯 Sonuç",""],_hcols):
+                _hc.markdown(f"<span style='font-size:0.8rem;font-weight:700;color:#1f6feb'>{_ht}</span>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
 
             for _, row in df_rand.iterrows():
                 _rid = int(row.get("id",0) or 0)
