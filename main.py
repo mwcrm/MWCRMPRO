@@ -3565,8 +3565,7 @@ elif aktif == "teklif":
 # ── EXCEL AKTAR ──────────────────────────────────────────────────────────────
 
 elif aktif == "ozel_teklif":
-    saypa_log = sayfa_log
-    saypa_log("ozel_teklif")
+    sayfa_log("ozel_teklif")
     import json as _ozj, re as _ozre
 
     st.markdown("## ⭐ Özel Teklif")
@@ -3632,112 +3631,96 @@ elif aktif == "ozel_teklif":
         ]})
         st.rerun()
 
+    # Kolon genişlikleri — sabit başlık + satırlar hizalı
+    _COL_W = [1.8, 1.8, 1.8, 0.9, 0.9, 0.8, 1.2, 0.4]
+
     for gi, g in enumerate(grp):
         st.markdown(f"---\n**Satır {gi+1}**")
 
-        # ── BAŞLIK SATIRI ─────────────────────────────────────────────────────
-        _h = st.columns([1.8, 1.8, 1.6, 0.9, 0.9, 0.8, 1.2, 0.5])
-        _h[0].markdown("**Çıkış İlleri**")
-        _h[1].markdown("**Varış İlleri**")
-        _h[2].markdown("**Tür**")
-        _h[3].markdown("**Baş Desi**")
-        _h[4].markdown("**Bit Desi**")
-        _h[5].markdown("**KG**")
-        _h[6].markdown("**Fiyat ₺**")
-        _h[7].markdown("")
+        # ── BAŞLIK ────────────────────────────────────────────────────────────
+        _bh = st.columns(_COL_W)
+        _bh[0].caption("**Çıkış İlleri**")
+        _bh[1].caption("**Varış İlleri**")
+        _bh[2].caption("**Tür**")
+        _bh[3].caption("**Baş Desi**")
+        _bh[4].caption("**Bit Desi**")
+        _bh[5].caption("**KG**")
+        _bh[6].caption("**Fiyat ₺**")
+        _bh[7].caption("")
 
-        # Kaç satır göstereceğiz: max(cikis, varis, urun) kadar
         urunler = g.get("urunler", [])
-        cikis_list = list(g.get("cikis", []))
-        varis_list = list(g.get("varis", []))
-        n_rows = max(len(cikis_list), len(varis_list), len(urunler), 1)
+        n = len(urunler)
 
-        # Listeleri n_rows uzunluğuna tamamla
-        while len(cikis_list) < n_rows: cikis_list.append("")
-        while len(varis_list) < n_rows: varis_list.append("")
-        while len(urunler)    < n_rows: urunler.append(None)
-
-        new_cikis  = []
-        new_varis  = []
         new_urunler = []
+        for ui, u in enumerate(urunler):
+            _rc = st.columns(_COL_W)
 
-        for ri in range(n_rows):
-            _r = st.columns([1.8, 1.8, 1.6, 0.9, 0.9, 0.8, 1.2, 0.5])
+            # Çıkış illeri — sadece ilk ürün satırında göster, diğerleri boş
+            if ui == 0:
+                _cikis = _rc[0].multiselect("",
+                    _OZ_ILLER,
+                    default=[x for x in g.get("cikis",[]) if x in _OZ_ILLER],
+                    key=f"oz2_c_{gi}",
+                    label_visibility="collapsed")
+                g["cikis"] = _cikis
+            else:
+                _rc[0].caption(", ".join(g.get("cikis",[])) if g.get("cikis") else "")
 
-            # Çıkış ili
-            _cval = cikis_list[ri] if ri < len(g.get("cikis",[])) else ""
-            _csel = _r[0].selectbox("", [""] + _OZ_ILLER,
-                index=(_OZ_ILLER.index(_cval)+1) if _cval in _OZ_ILLER else 0,
-                key=f"oz2_c_{gi}_{ri}", label_visibility="collapsed")
-            if _csel: new_cikis.append(_csel)
+            # Varış illeri — sadece ilk ürün satırında göster
+            if ui == 0:
+                _varis = _rc[1].multiselect("",
+                    _OZ_ILLER,
+                    default=[x for x in g.get("varis",[]) if x in _OZ_ILLER],
+                    key=f"oz2_v_{gi}",
+                    label_visibility="collapsed")
+                g["varis"] = _varis
+            else:
+                _rc[1].caption(", ".join(g.get("varis",[])) if g.get("varis") else "")
 
-            # Varış ili
-            _vval = varis_list[ri] if ri < len(g.get("varis",[])) else ""
-            _vsel = _r[1].selectbox("", [""] + _OZ_ILLER,
-                index=(_OZ_ILLER.index(_vval)+1) if _vval in _OZ_ILLER else 0,
-                key=f"oz2_v_{gi}_{ri}", label_visibility="collapsed")
-            if _vsel: new_varis.append(_vsel)
+            # Ürün kolonları
+            _tur = _rc[2].multiselect("", _OZ_URUN,
+                default=u.get("tur",["Koli"]),
+                key=f"oz2_tur_{gi}_{ui}", label_visibility="collapsed")
+            _bas = _rc[3].number_input("", min_value=0.0, step=1.0,
+                value=float(u.get("bas",0) or 0),
+                key=f"oz2_bas_{gi}_{ui}", label_visibility="collapsed", format="%.0f")
+            _bit = _rc[4].number_input("", min_value=0.0, step=1.0,
+                value=float(u.get("bit",0) or 0),
+                key=f"oz2_bit_{gi}_{ui}", label_visibility="collapsed", format="%.0f")
+            _kg  = _rc[5].number_input("", min_value=0.0, step=1.0,
+                value=float(u.get("kg",0) or 0),
+                key=f"oz2_kg_{gi}_{ui}", label_visibility="collapsed", format="%.0f")
+            _fiy = _rc[6].number_input("", min_value=0.0, step=1.0,
+                value=float(u.get("fiyat",0) or 0),
+                key=f"oz2_fiy_{gi}_{ui}", label_visibility="collapsed", format="%.0f")
 
-            # Ürün satırı
-            _u = urunler[ri] if urunler[ri] is not None else {"tur":["Koli"],"bas":0,"bit":0,"kg":0,"fiyat":0}
-
-            _tur = _r[2].multiselect("", _OZ_URUN,
-                default=_u.get("tur",["Koli"]),
-                key=f"oz2_tur_{gi}_{ri}", label_visibility="collapsed")
-            _bas = _r[3].number_input("", min_value=0.0, step=1.0,
-                value=float(_u.get("bas",0) or 0),
-                key=f"oz2_bas_{gi}_{ri}", label_visibility="collapsed", format="%.0f")
-            _bit = _r[4].number_input("", min_value=0.0, step=1.0,
-                value=float(_u.get("bit",0) or 0),
-                key=f"oz2_bit_{gi}_{ri}", label_visibility="collapsed", format="%.0f")
-            _kg  = _r[5].number_input("", min_value=0.0, step=1.0,
-                value=float(_u.get("kg",0) or 0),
-                key=f"oz2_kg_{gi}_{ri}", label_visibility="collapsed", format="%.0f")
-            _fiy = _r[6].number_input("", min_value=0.0, step=1.0,
-                value=float(_u.get("fiyat",0) or 0),
-                key=f"oz2_fiy_{gi}_{ri}", label_visibility="collapsed", format="%.0f")
-
-            new_urunler.append({"tur":_tur,"bas":_bas,"bit":_bit,"kg":_kg,"fiyat":_fiy})
-
-            # Sil butonu (son satır değilse veya tek değilse)
-            if _r[7].button("➖", key=f"oz2_rsil_{gi}_{ri}") and n_rows > 1:
-                # bu satırı hem il hem üründen çıkar
-                if ri < len(g.get("cikis",[])): g["cikis"].pop(ri)
-                if ri < len(g.get("varis",[])): g["varis"].pop(ri)
-                if ri < len(urunler): urunler.pop(ri)
-                g["urunler"] = [u for u in urunler if u is not None]
+            _sil = _rc[7].button("➖", key=f"oz2_usil_{gi}_{ui}")
+            if not _sil or n <= 1:
+                new_urunler.append({"tur":_tur,"bas":_bas,"bit":_bit,"kg":_kg,"fiyat":_fiy})
+            else:
+                g["urunler"] = [x for x in urunler if urunler.index(x) != ui]
                 st.rerun()
 
-        # Yeni satır ekle (il + ürün)
-        _ba1, _ba2, _ba3 = st.columns([1,1,4])
-        if _ba1.button("➕ İl Satırı", key=f"oz2_il_ekle_{gi}"):
-            new_cikis.append("")
-            new_varis.append("")
-            new_urunler.append({"tur":["Koli"],"bas":0,"bit":0,"kg":0,"fiyat":0})
-        if _ba2.button("➕ Ürün Satırı", key=f"oz2_ur_ekle_{gi}"):
-            new_urunler.append({"tur":["Koli"],"bas":0,"bit":0,"kg":0,"fiyat":0})
-            while len(new_cikis) < len(new_urunler): new_cikis.append("")
-            while len(new_varis) < len(new_urunler): new_varis.append("")
+        g["urunler"] = new_urunler
 
-        # Sil grup
-        if _ba3.button(f"🗑️ Bu Satırı Sil", key=f"oz2_grp_sil_{gi}") and len(grp) > 1:
+        # Alt butonlar
+        _ba1, _ba2, _ba3 = st.columns([1.2, 1.5, 3])
+        if _ba1.button("➕ Ürün Ekle", key=f"oz2_uekle_{gi}", use_container_width=True):
+            g["urunler"].append({"tur":["Koli"],"bas":0,"bit":0,"kg":0,"fiyat":0})
+            st.rerun()
+        if _ba2.button("🗑️ Satırı Sil", key=f"oz2_gsil_{gi}", use_container_width=True) and len(grp) > 1:
             grp.pop(gi); st.rerun()
-
-        g["cikis"]   = [x for x in new_cikis if x]
-        g["varis"]   = [x for x in new_varis if x]
-        g["urunler"] = [u for u in new_urunler if u is not None]
 
     st.session_state["oz2_grp"] = grp
 
     # ── ÖZET ─────────────────────────────────────────────────────────────────
     st.divider()
     st.markdown("### 📋 Özet")
-    for gi, g in enumerate(grp):
+    for g in grp:
         _c = ", ".join(g.get("cikis",[])) or "—"
         _v = ", ".join(g.get("varis",[])) or "—"
         st.markdown(f"**{_c} → {_v}**")
         for u in g.get("urunler",[]):
-            if not u: continue
             _t  = ", ".join(u.get("tur",[]) or []) or "—"
             _b1 = int(u.get("bas",0) or 0)
             _b2 = int(u.get("bit",0) or 0)
@@ -3747,9 +3730,9 @@ elif aktif == "ozel_teklif":
             _ks = f"{_k} kg" if _k else "—"
             st.caption(f"&nbsp;&nbsp; · {_t} | {_ds} | KG: {_ks} | **{fmt_para(_f)}**")
 
-    # ── KAYDET ───────────────────────────────────────────────────────────────
+    # ── KAYDET + MESAJ ────────────────────────────────────────────────────────
     st.divider()
-    _ks1,_ks2 = st.columns(2)
+    _ks1, _ks2 = st.columns(2)
     if _ks1.button("💾 Teklifi Kaydet", use_container_width=True, type="primary", key="oz2_kaydet"):
         if not _oz_hedef:
             st.warning("Müşteri adı boş!")
@@ -3766,7 +3749,6 @@ elif aktif == "ozel_teklif":
             st.session_state.pop("oz2_grp", None)
             st.rerun()
 
-    # ── WA MESAJI ────────────────────────────────────────────────────────────
     if _ks2.button("📱 WA Mesajı Oluştur", use_container_width=True, key="oz2_wa_olustur"):
         _msg = f"Sayın {_oz_hedef} yetkilisi,\n\nSize özel kargo fiyat teklifimiz:\n\n"
         for g in grp:
@@ -3774,7 +3756,6 @@ elif aktif == "ozel_teklif":
             _v = ", ".join(g.get("varis",[])) or "—"
             _msg += f"📍 {_c} → {_v}\n"
             for u in g.get("urunler",[]):
-                if not u: continue
                 _t  = ", ".join(u.get("tur",[]) or []) or "—"
                 _b1 = int(u.get("bas",0) or 0)
                 _b2 = int(u.get("bit",0) or 0)
