@@ -3604,7 +3604,10 @@ elif aktif == "ozel_teklif":
 
     _tb1,_tb2,_tb3 = st.columns(3)
     _oz_fdef = str(_oz_mus["firma"]) if _oz_mus is not None else ""
-    if "oz2_hedef" not in st.session_state or st.session_state.get("oz2_son_sec") != _oz_sec:
+    if "oz2_duz_musteri" in st.session_state:
+        _oz_fdef = st.session_state.pop("oz2_duz_musteri")
+        st.session_state["oz2_hedef"] = _oz_fdef
+    elif "oz2_hedef" not in st.session_state or st.session_state.get("oz2_son_sec") != _oz_sec:
         st.session_state["oz2_hedef"] = _oz_fdef
         st.session_state["oz2_son_sec"] = _oz_sec
     _oz_hedef = _tb1.text_input("Hedef Müşteri", key="oz2_hedef")
@@ -3853,9 +3856,10 @@ elif aktif == "ozel_teklif":
                     try:
                         _oz_data2 = _ozj.loads(_oz_trow.get("satirlar","{}"))
                         st.session_state["oz2_grp"] = _oz_data2.get("grp", [])
-                        st.session_state["oz2_hedef"] = str(_oz_trow.get("musteri_adi",""))
                         st.session_state["oz2_duz_id"] = _oz_tid
-                        st.success("✅ Teklif düzenleme moduna alındı. Yukarıda düzenleyip kaydedin.")
+                        st.session_state["oz2_duz_musteri"] = str(_oz_trow.get("musteri_adi",""))
+                        st.session_state.pop("oz2_hedef", None)
+                        st.session_state.pop("oz2_son_sec", None)
                         st.rerun()
                     except Exception as _oe:
                         st.error(f"Hata: {_oe}")
