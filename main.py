@@ -3570,7 +3570,20 @@ elif aktif == "ozel_teklif":
 
     st.markdown("## ⭐ Özel Teklif")
 
-    _OZ_URUN  = ["Koli","Sandık","Top","Çuval","Kasa","Palet","Diğer"]
+    _OZ_URUN_VARSAYILAN = ["Koli","Sandık","Top","Çuval","Kasa","Palet","Diğer"]
+
+    # Ürün listesini Supabase'den çek, yoksa varsayılanı kullan
+    def _oz_urun_listesi():
+        try:
+            _sb = get_sb_client()
+            if _sb:
+                _r = _sb.table("sistem_tanimlar").select("deger").eq("tip","oz_urun").order("sira").execute()
+                if _r.data:
+                    return [d["deger"] for d in _r.data]
+        except: pass
+        return _OZ_URUN_VARSAYILAN.copy()
+
+    _OZ_URUN = _oz_urun_listesi()
     _OZ_ILLER = ["İstanbul","Ankara","İzmir","Bursa","Antalya","Adana","Konya",
         "Gaziantep","Mersin","Kayseri","Eskişehir","Diyarbakır","Samsun","Trabzon",
         "Erzurum","Şanlıurfa","Manisa","Balıkesir","Tekirdağ","Kocaeli","Sakarya",
@@ -3710,28 +3723,19 @@ elif aktif == "ozel_teklif":
     st.divider()
     st.markdown("### 📋 Özet")
     for gi, g in enumerate(grp):
-        _c_all = []
-        _v_all = []
         for s in g.get("satirlar",[]):
             _cv = s.get("cikis","")
             _vv = s.get("varis","")
-            if isinstance(_cv, list): _c_all += _cv
-            elif _cv: _c_all.append(_cv)
-            if isinstance(_vv, list): _v_all += _vv
-            elif _vv: _v_all.append(_vv)
-        _c_all = list(dict.fromkeys(_c_all))
-        _v_all = list(dict.fromkeys(_v_all))
-        st.markdown(f"**{', '.join(_c_all) or '—'} → {', '.join(_v_all) or '—'}**")
-        for s in g["satirlar"]:
-            _t = ", ".join(s.get("tur",[]) or []) or "—"
+            _c_str = ", ".join(_cv) if isinstance(_cv, list) else (_cv or "—")
+            _v_str = ", ".join(_vv) if isinstance(_vv, list) else (_vv or "—")
+            _t  = ", ".join(s.get("tur",[]) or []) or "—"
             _b1 = int(s.get("bas",0) or 0)
             _b2 = int(s.get("bit",0) or 0)
             _k  = int(s.get("kg",0) or 0)
             _f  = float(s.get("fiyat",0) or 0)
-            if not _t and not _b1 and not _b2 and not _f: continue
             _ds = f"{_b1}–{_b2} desi" if _b1 or _b2 else "—"
             _ks = f"{_k} kg" if _k else "—"
-            st.caption(f"&nbsp;&nbsp; · {_t} | {_ds} | KG: {_ks} | **{fmt_para(_f)}**")
+            st.caption(f"**{_c_str} → {_v_str}** &nbsp;·&nbsp; {_t} | {_ds} | KG: {_ks} | **{fmt_para(_f)}**")
 
     # ── KAYDET + MESAJ ────────────────────────────────────────────────────────
     st.divider()
@@ -3750,14 +3754,13 @@ elif aktif == "ozel_teklif":
             }
             _duz_id = st.session_state.get("oz2_duz_id")
             if _duz_id:
-                # Güncelle
                 db_update("teklifler", {
                     "musteri_adi": _oz_veri["musteri_adi"],
                     "satirlar": _oz_veri["satirlar"],
                     "toplam_tutar": _oz_veri["toplam_tutar"],
                     "notlar": _oz_veri["notlar"]
                 }, "id", _duz_id)
-                st.success(f"✅ Teklif güncellendi!")
+                st.success("✅ Teklif güncellendi!")
                 st.session_state.pop("oz2_duz_id", None)
             else:
                 db_insert("teklifler", _oz_veri)
@@ -3768,32 +3771,23 @@ elif aktif == "ozel_teklif":
     if _ks2.button("📱 WA Mesajı Oluştur", use_container_width=True, key="oz2_wa_olustur"):
         _msg = f"Sayın {_oz_hedef} yetkilisi,\n\nSize özel kargo fiyat teklifimiz:\n\n"
         for g in grp:
-            _c_all = []
-            _v_all = []
             for s in g.get("satirlar",[]):
                 _cv = s.get("cikis","")
                 _vv = s.get("varis","")
-                if isinstance(_cv, list): _c_all += _cv
-                elif _cv: _c_all.append(_cv)
-                if isinstance(_vv, list): _v_all += _vv
-                elif _vv: _v_all.append(_vv)
-            _c_all = list(dict.fromkeys(_c_all))
-            _v_all = list(dict.fromkeys(_v_all))
-            _msg += f"📍 {', '.join(_c_all) or '—'} → {', '.join(_v_all) or '—'}\n"
-            for s in g["satirlar"]:
+                _c_str = ", ".join(_cv) if isinstance(_cv, list) else (_cv or "—")
+                _v_str = ", ".join(_vv) if isinstance(_vv, list) else (_vv or "—")
                 _t  = ", ".join(s.get("tur",[]) or []) or "—"
                 _b1 = int(s.get("bas",0) or 0)
                 _b2 = int(s.get("bit",0) or 0)
                 _k  = int(s.get("kg",0) or 0)
                 _f  = float(s.get("fiyat",0) or 0)
-                if not _t and not _f: continue
                 _ds = f"{_b1}–{_b2} desi" if _b1 or _b2 else ""
                 _ks = f"{_k} kg" if _k else ""
+                _msg += f"📍 {_c_str} → {_v_str}\n"
                 _msg += f"  • {_t}"
                 if _ds: _msg += f" | {_ds}"
                 if _ks: _msg += f" | {_ks}"
-                _msg += f" → {fmt_para(_f)}\n"
-            _msg += "\n"
+                _msg += f" → {fmt_para(_f)}\n\n"
         if _oz_vade: _msg += f"Vade: {_oz_vade}\n"
         _msg += "\n7/24 ulaşabilirsiniz."
         st.session_state["oz2_wa_mesaj"] = _msg
@@ -3910,6 +3904,57 @@ elif aktif == "ozel_teklif":
 
     except Exception as _oz_e:
         st.error(f"Hata: {_oz_e}")
+
+    # ── ÜRÜN LİSTESİ YÖNETİMİ ────────────────────────────────────────────────
+    with st.expander("⚙️ Ürün Listesi Yönetimi"):
+        st.caption("Teklif sayfasında görünen ürün listesini buradan yönetin.")
+        _sb_oz = get_sb_client()
+
+        # Mevcut ürünleri göster
+        _mevcut_urunler = _oz_urun_listesi()
+        for _ui, _un in enumerate(_mevcut_urunler):
+            _uc1, _uc2, _uc3, _uc4 = st.columns([4,1,1,1])
+            _uc1.caption(f"**{_un}**")
+            if _ui > 0 and _uc2.button("▲", key=f"oz_urun_up_{_ui}"):
+                try:
+                    _r1 = _sb_oz.table("sistem_tanimlar").select("id,sira").eq("tip","oz_urun").eq("deger",_un).execute()
+                    _r2 = _sb_oz.table("sistem_tanimlar").select("id,sira").eq("tip","oz_urun").eq("deger",_mevcut_urunler[_ui-1]).execute()
+                    if _r1.data and _r2.data:
+                        _sb_oz.table("sistem_tanimlar").update({"sira":_r2.data[0]["sira"]}).eq("id",_r1.data[0]["id"]).execute()
+                        _sb_oz.table("sistem_tanimlar").update({"sira":_r1.data[0]["sira"]}).eq("id",_r2.data[0]["id"]).execute()
+                except: pass
+                st.rerun()
+            if _ui < len(_mevcut_urunler)-1 and _uc3.button("▼", key=f"oz_urun_dn_{_ui}"):
+                try:
+                    _r1 = _sb_oz.table("sistem_tanimlar").select("id,sira").eq("tip","oz_urun").eq("deger",_un).execute()
+                    _r2 = _sb_oz.table("sistem_tanimlar").select("id,sira").eq("tip","oz_urun").eq("deger",_mevcut_urunler[_ui+1]).execute()
+                    if _r1.data and _r2.data:
+                        _sb_oz.table("sistem_tanimlar").update({"sira":_r2.data[0]["sira"]}).eq("id",_r1.data[0]["id"]).execute()
+                        _sb_oz.table("sistem_tanimlar").update({"sira":_r1.data[0]["sira"]}).eq("id",_r2.data[0]["id"]).execute()
+                except: pass
+                st.rerun()
+            if _uc4.button("🗑️", key=f"oz_urun_sil_{_ui}"):
+                try:
+                    _sb_oz.table("sistem_tanimlar").delete().eq("tip","oz_urun").eq("deger",_un).execute()
+                    st.rerun()
+                except: pass
+
+        # Yeni ürün ekle
+        st.divider()
+        _ya1, _ya2 = st.columns([4,1])
+        _yeni_urun = _ya1.text_input("", placeholder="Yeni ürün adı...", key="oz_yeni_urun", label_visibility="collapsed")
+        if _ya2.button("➕ Ekle", key="oz_urun_ekle_btn", use_container_width=True):
+            if _yeni_urun and _yeni_urun.strip():
+                if _yeni_urun.strip() in _mevcut_urunler:
+                    st.warning("Bu ürün zaten var!")
+                else:
+                    try:
+                        _max_sira = len(_mevcut_urunler) + 1
+                        _sb_oz.table("sistem_tanimlar").insert({"tip":"oz_urun","deger":_yeni_urun.strip(),"sira":_max_sira}).execute()
+                        st.success(f"✅ '{_yeni_urun}' eklendi!")
+                        st.rerun()
+                    except:
+                        st.error("Eklenemedi — Supabase bağlantısı kontrol edin.")
 
 
 elif aktif == "excel":
