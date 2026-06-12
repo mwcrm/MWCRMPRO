@@ -4962,40 +4962,14 @@ elif aktif == "randevu":
     sayfa_log("randevu")
     import io as _rio
     st.markdown("## 📅 Randevular")
+    st.markdown("""<style>
+    div[data-testid="metric-container"] > div:first-child { font-size: 0.75rem !important; }
+    div[data-testid="metric-container"] > div:nth-child(2) { font-size: 1.1rem !important; }
+    </style>""", unsafe_allow_html=True)
 
     # ── TÜM RANDEVULARI YİKLE ────────────────────────────────────────────────
     df_rand_all = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC, randevu_saati ASC")
     bugun_str = datetime.now().strftime("%Y-%m-%d")
-
-    # ── HATIRLATMALAR ─────────────────────────────────────────────────────────
-    if not df_rand_all.empty and "randevu_tarihi" in df_rand_all.columns:
-        _yak = df_rand_all[
-            (df_rand_all["randevu_tarihi"] >= bugun_str) &
-            (~df_rand_all["sonuc"].isin(["Bitti","İptal"]) if "sonuc" in df_rand_all.columns else True)
-        ].head(5)
-        _acik = df_rand_all[
-            (df_rand_all["randevu_tarihi"] < bugun_str) &
-            (~df_rand_all["sonuc"].isin(["Bitti","İptal","Gidilmedi"]) if "sonuc" in df_rand_all.columns else True)
-        ]
-        if len(_yak) > 0 or len(_acik) > 0:
-            with st.expander(f"⚠️ Hatırlatmalar — {len(_yak)} yaklaşan · {len(_acik)} açık", expanded=True):
-                for _, _r in _yak.iterrows():
-                    _rc1,_rc2 = st.columns([5,1])
-                    _tarih_r = str(_r.get("randevu_tarihi",""))
-                    _renk = "🔴" if _tarih_r == bugun_str else "🟡"
-                    _rc1.caption(f"{_renk} **{_tarih_r} {_r.get('randevu_saati','')}** — {_r.get('musteri_adi','')} | {_r.get('temsilci','')} | {_r.get('bolge','')}")
-                    _tem_tel = str(_r.get("temsilci_tel","") or "")
-                    if _tem_tel:
-                        import re as _re_r
-                        _tw = _re_r.sub(r"[\s\-\(\)+]","",_tem_tel)
-                        if _tw.startswith("0"): _tw = "90"+_tw[1:]
-                        elif len(_tw)==10: _tw = "90"+_tw
-                        _msg_r = f"⏰ RANDEVU HATIRLATMA\nMüşteri: {_r.get('musteri_adi','')}\nTarih: {_tarih_r} {_r.get('randevu_saati','')}\nBölge: {_r.get('bolge','')}"
-                        _rc2.link_button("📱", f"https://wa.me/{_tw}?text={_msg_r.replace(' ','%20').replace(chr(10),'%0A')}", use_container_width=True)
-                if len(_acik) > 0:
-                    st.caption(f"**⚠️ Sonuç girilmemiş {len(_acik)} randevu:**")
-                    for _, _r in _acik.iterrows():
-                        st.caption(f"· {_r.get('randevu_tarihi','')} — {_r.get('musteri_adi','')} (ID: {_r.get('id','')})")
 
     # ── iki sekme ─────────────────────────────────────────────────────────────
     r_tab1, r_tab2 = st.tabs(["📋 Liste & Düzenle", "➕ Yeni Randevu"])
