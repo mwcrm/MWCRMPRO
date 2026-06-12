@@ -5021,7 +5021,7 @@ elif aktif == "randevu":
             _rapor_filtreler = ["toplam","bitti","devam","gidilmedi","bugun","hafta","ay","acik","basari","beklenen"]
 
             for _ri, (_col, _lbl, _val, _fil) in enumerate(zip(_rc_rapor, _rapor_etiketler, _rapor_degerler, _rapor_filtreler)):
-                if _ri < 9:  # son kolon (beklenen) buton olmaz
+                if _ri < 9:
                     if _col.button(f"{_lbl}\n{_val}", key=f"rp_fil_{_fil}", use_container_width=True):
                         if st.session_state.get("rp_aktif_fil") == _fil:
                             st.session_state.pop("rp_aktif_fil", None)
