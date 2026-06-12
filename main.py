@@ -4962,11 +4962,6 @@ elif aktif == "randevu":
     sayfa_log("randevu")
     import io as _rio
     st.markdown("## 📅 Randevular")
-    st.markdown("""<style>
-    [data-testid="stMetricValue"] > div { font-size: 0.8rem !important; font-weight: 600 !important; }
-    [data-testid="stMetricLabel"] > div { font-size: 0.7rem !important; }
-    [data-testid="metric-container"] { padding: 4px 8px !important; }
-    </style>""", unsafe_allow_html=True)
 
     # ── TÜM RANDEVULARI YİKLE ────────────────────────────────────────────────
     df_rand_all = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC, randevu_saati ASC")
@@ -5018,11 +5013,18 @@ elif aktif == "randevu":
                 _beklenen = _df_cari_r[_df_cari_r["firma"].isin(_mus_listesi)]["beklenen_ciro"].sum() if not _df_cari_r.empty else 0
             except: _beklenen = 0
 
-            _mc = st.columns(10)
-            for _col, _lbl, _val in zip(_mc,
-                ["Toplam","✅ Bitti","🔄 Devam","❌ Gidilmedi","📅 Bugün","📆 Bu Hafta","📆 Bu Ay","⚠️ Açık","🎯 Başarı","💰 Beklenen"],
-                [_toplam, _bitti, _devam, _gidilmedi, _bugun, _hafta, _ay, _acik_say, _basari, fmt_para(_beklenen)]):
-                _col.metric(_lbl, _val)
+            st.markdown(
+                f"Toplam: **{_toplam}** &nbsp;·&nbsp; "
+                f"✅ Bitti: **{_bitti}** &nbsp;·&nbsp; "
+                f"🔄 Devam: **{_devam}** &nbsp;·&nbsp; "
+                f"❌ Gidilmedi: **{_gidilmedi}** &nbsp;·&nbsp; "
+                f"📅 Bugün: **{_bugun}** &nbsp;·&nbsp; "
+                f"📆 Bu Hafta: **{_hafta}** &nbsp;·&nbsp; "
+                f"📆 Bu Ay: **{_ay}** &nbsp;·&nbsp; "
+                f"⚠️ Açık: **{_acik_say}** &nbsp;·&nbsp; "
+                f"🎯 Başarı: **{_basari}** &nbsp;·&nbsp; "
+                f"💰 Beklenen: **{fmt_para(_beklenen)}**"
+            )
 
             # ── SATIR SATIR LİSTE + ✏️ DÜZENLE ───────────────────────────────
             _g_cols = [c for c in ["id","randevu_tarihi","randevu_saati","musteri_adi","bolge","gorev","temsilci","sonuc"] if c in df_rand.columns]
