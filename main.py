@@ -3274,6 +3274,394 @@ elif aktif == "teklif":
             st.error(f"Hata: {_e}")
 
 
+elif aktif == "ozel_teklif":
+    sayfa_log("ozel_teklif")
+    import json as _ozj, re as _ozre
+
+    st.markdown("## ⭐ Özel Teklif")
+
+    _OZ_URUN_VARSAYILAN = ["Koli","Sandık","Top","Çuval","Kasa","Palet","Diğer"]
+
+    def _oz_urun_listesi():
+        _liste = _OZ_URUN_VARSAYILAN.copy()
+        try:
+            _sb = get_sb_client()
+            if _sb:
+                import json as _oj
+                _r = _sb.table("kullanici_tercih").select("deger").eq("kullanici","__oz_urun__").eq("anahtar","ekstra_urunler").execute()
+                if _r.data:
+                    _ekstra = _oj.loads(_r.data[0]["deger"])
+                    for _d in _ekstra:
+                        if _d not in _liste: _liste.append(_d)
+        except: pass
+        return _liste
+
+    def _oz_urun_kaydet(liste):
+        try:
+            import json as _oj
+            _sb = get_sb_client()
+            if _sb:
+                _ekstra = [x for x in liste if x not in _OZ_URUN_VARSAYILAN]
+                _sb.table("kullanici_tercih").upsert({
+                    "kullanici":"__oz_urun__","anahtar":"ekstra_urunler",
+                    "deger":_oj.dumps(_ekstra,ensure_ascii=False)
+                },on_conflict="kullanici,anahtar").execute()
+                return True
+        except: pass
+        return False
+
+    _OZ_URUN = _oz_urun_listesi()
+
+    _OZ_ILLER = ["İstanbul","Ankara","İzmir","Bursa","Antalya","Adana","Konya",
+        "Gaziantep","Mersin","Kayseri","Eskişehir","Diyarbakır","Samsun","Trabzon",
+        "Erzurum","Şanlıurfa","Manisa","Balıkesir","Tekirdağ","Kocaeli","Sakarya",
+        "Denizli","Muğla","Hatay","Malatya","Kahramanmaraş","Van","Elazığ","Aydın",
+        "Edirne","Çanakkale","Isparta","Bolu","Düzce","Yalova","Kırklareli",
+        "Karaman","Burdur","Rize","Giresun","Artvin","Mardin","Batman","Zonguldak",
+        "Sinop","Kastamonu","Karabük","Ordu","Sivas","Erzincan","Tokat","Çorum"]
+
+    # ── MÜŞTERİ ──────────────────────────────────────────────────────────────
+    _oz_dfm = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
+    _ozcol1, _ozcol2 = st.columns([2,4])
+    _oz_fil = _ozcol1.selectbox("Filtre:", ["Tümü","Aktif","Hedef","Pasif"], key="oz2_fil")
+    _oz_mf  = _oz_dfm if _oz_fil=="Tümü" else _oz_dfm[_oz_dfm["durum"]==_oz_fil]
+    _oz_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['firma']} ({r['durum']})" for _,r in _oz_mf.iterrows()]
+    _oz_sec  = _ozcol2.selectbox("Müşteri:", _oz_opts, key="oz2_musteri")
+
+    _oz_mus = None; _oz_gsm=""; _oz_eml=""
+    if _oz_sec != "-- Müşteri Seçin --" and "[" in _oz_sec:
+        try:
+            _mid = int(_oz_sec.split("]")[0].replace("[","").strip())
+            _mr  = _oz_dfm[_oz_dfm["id"]==_mid]
+            if not _mr.empty:
+                _oz_mus = _mr.iloc[0]
+                _oz_gsm = str(_oz_mus.get("gsm","") or "")
+                _oz_eml = str(_oz_mus.get("email","") or "")
+                _ci1,_ci2,_ci3 = st.columns(3)
+                _ci1.info(f"GSM: {_oz_gsm or 'Yok'}")
+                _ci2.info(f"Email: {_oz_eml or 'Yok'}")
+                _ci3.info(f"{_oz_mus.get('il','')} | {_oz_mus.get('durum','')}")
+        except: pass
+
+    _tb1,_tb2,_tb3 = st.columns(3)
+    _oz_fdef = str(_oz_mus["firma"]) if _oz_mus is not None else ""
+    if "oz2_duz_musteri" in st.session_state:
+        _oz_fdef = st.session_state.pop("oz2_duz_musteri")
+        st.session_state["oz2_hedef"] = _oz_fdef
+    elif "oz2_hedef" not in st.session_state or st.session_state.get("oz2_son_sec") != _oz_sec:
+        st.session_state["oz2_hedef"] = _oz_fdef
+        st.session_state["oz2_son_sec"] = _oz_sec
+    _oz_hedef = _tb1.text_input("Hedef Müşteri", key="oz2_hedef")
+    _oz_vade  = _tb2.text_input("Vade", placeholder="30 gün, peşin...", key="oz2_vade")
+    _oz_not   = _tb3.text_area("Not", height=68, key="oz2_not")
+    _mc1,_mc2 = st.columns(2)
+    _oz_wa_no = _mc1.text_input("WhatsApp No", value=_oz_gsm, key="oz2_wa")
+    _oz_email = _mc2.text_input("Email", value=_oz_eml, key="oz2_email")
+
+    st.divider()
+
+    # ── VERİ YAPISI ───────────────────────────────────────────────────────────
+    if "oz2_grp" not in st.session_state:
+        st.session_state["oz2_grp"] = [
+            {"satirlar": [
+                {"cikis":[], "varis":[], "tur":["Koli"], "bas":0, "bit":5, "kg":0, "fiyat":0}
+            ]}
+        ]
+    grp = st.session_state["oz2_grp"]
+
+    if st.button("➕ Yeni Grup Ekle", type="primary", key="oz2_grp_ekle"):
+        grp.append({"satirlar":[
+            {"cikis":[],"varis":[],"tur":["Koli"],"bas":0,"bit":5,"kg":0,"fiyat":0}
+        ]})
+        st.rerun()
+
+    _CW = [1.8, 1.8, 1.8, 0.9, 0.9, 0.7, 1.2, 0.4]
+
+    for gi, g in enumerate(grp):
+        st.markdown(f"---\n**Grup {gi+1}**")
+
+        _bh = st.columns(_CW)
+        for _txt,_col in zip(["Çıkış İlleri","Varış İlleri","Tür","Baş Desi","Bit Desi","KG","Fiyat ₺",""],_bh):
+            _col.caption(f"**{_txt}**")
+
+        satirlar = g.get("satirlar", [])
+        new_satirlar = []
+
+        for si, s in enumerate(satirlar):
+            _rc = st.columns(_CW)
+
+            _cikis_def = s.get("cikis","")
+            _cikis_def_list = _cikis_def if isinstance(_cikis_def, list) else ([_cikis_def] if _cikis_def and _cikis_def in _OZ_ILLER else [])
+            _cikis = _rc[0].multiselect("", _OZ_ILLER,
+                default=_cikis_def_list,
+                key=f"oz2_c_{gi}_{si}", label_visibility="collapsed")
+
+            _varis_def = s.get("varis","")
+            _varis_def_list = _varis_def if isinstance(_varis_def, list) else ([_varis_def] if _varis_def and _varis_def in _OZ_ILLER else [])
+            _varis = _rc[1].multiselect("", _OZ_ILLER,
+                default=_varis_def_list,
+                key=f"oz2_v_{gi}_{si}", label_visibility="collapsed")
+
+            _tur_saved = s.get("tur",[]) or []
+            _tur_listesi = _OZ_URUN.copy()
+            for _tx in _tur_saved:
+                if _tx and _tx not in _tur_listesi: _tur_listesi.append(_tx)
+            _tur_def = [x for x in _tur_saved if x]
+            if not _tur_def and _tur_listesi: _tur_def = [_tur_listesi[0]]
+            _tur = _rc[2].multiselect("", _tur_listesi,
+                default=_tur_def,
+                key=f"oz2_tur_{gi}_{si}", label_visibility="collapsed")
+
+            _bas = _rc[3].number_input("", min_value=0.0, step=1.0,
+                value=float(s.get("bas",0) or 0),
+                key=f"oz2_bas_{gi}_{si}", label_visibility="collapsed", format="%.0f")
+            _bit = _rc[4].number_input("", min_value=0.0, step=1.0,
+                value=float(s.get("bit",0) or 0),
+                key=f"oz2_bit_{gi}_{si}", label_visibility="collapsed", format="%.0f")
+            _kg  = _rc[5].number_input("", min_value=0.0, step=1.0,
+                value=float(s.get("kg",0) or 0),
+                key=f"oz2_kg_{gi}_{si}", label_visibility="collapsed", format="%.0f")
+            _fiy = _rc[6].number_input("", min_value=0.0, step=1.0,
+                value=float(s.get("fiyat",0) or 0),
+                key=f"oz2_fiy_{gi}_{si}", label_visibility="collapsed", format="%.0f")
+
+            _sil = _rc[7].button("➖", key=f"oz2_ssil_{gi}_{si}")
+            if not _sil or len(satirlar) <= 1:
+                new_satirlar.append({"cikis":_cikis,"varis":_varis,"tur":_tur,
+                    "bas":_bas,"bit":_bit,"kg":_kg,"fiyat":_fiy})
+            else:
+                satirlar.pop(si)
+                g["satirlar"] = satirlar
+                st.rerun()
+
+        g["satirlar"] = new_satirlar
+
+        _ba1, _ba2 = st.columns([1.2, 1.5])
+        if _ba1.button("➕ Satır Ekle", key=f"oz2_sekle_{gi}", use_container_width=True):
+            g["satirlar"].append({"cikis":[],"varis":[],"tur":["Koli"],"bas":0,"bit":0,"kg":0,"fiyat":0})
+            st.rerun()
+        if _ba2.button("🗑️ Grubu Sil", key=f"oz2_gsil_{gi}", use_container_width=True) and len(grp) > 1:
+            grp.pop(gi); st.rerun()
+
+    st.session_state["oz2_grp"] = grp
+
+    # ── MESAJ FONKSİYONU ─────────────────────────────────────────────────────
+    def _oz_mesaj_olustur(_grp, _hedef, _vade):
+        _msg = f"Sayın {_hedef} yetkilisi,\n\nSize özel kargo fiyat teklifimiz:\n\n"
+        for _g in _grp:
+            _c_all, _v_all = [], []
+            for _s in _g.get("satirlar",[]):
+                _cv = _s.get("cikis","")
+                _vv = _s.get("varis","")
+                if isinstance(_cv, list): _c_all += _cv
+                elif _cv: _c_all.append(_cv)
+                if isinstance(_vv, list): _v_all += _vv
+                elif _vv: _v_all.append(_vv)
+            _c_all = list(dict.fromkeys(_c_all))
+            _v_all = list(dict.fromkeys(_v_all))
+            _urun_satirlar = []
+            for _s in _g.get("satirlar",[]):
+                _tt = ", ".join(_s.get("tur",[]) or []) or ""
+                _b1 = int(_s.get("bas",0) or 0)
+                _b2 = int(_s.get("bit",0) or 0)
+                _kk = int(_s.get("kg",0) or 0)
+                _ff = float(_s.get("fiyat",0) or 0)
+                if not _tt and not _ff: continue
+                _ds = f"{_b1}–{_b2} desi" if _b1 or _b2 else ""
+                _ks = f"{_kk} kg" if _kk else ""
+                _satir = f"  • {_tt}"
+                if _ds: _satir += f" | {_ds}"
+                if _ks: _satir += f" | {_ks}"
+                _satir += f" → {fmt_para(_ff)}"
+                _urun_satirlar.append(_satir)
+            if not _c_all and not _v_all and not _urun_satirlar: continue
+            _msg += f"*{', '.join(_c_all) or '—'} → {', '.join(_v_all) or '—'}*\n"
+            _msg += "\n".join(_urun_satirlar) + "\n\n"
+        if _vade: _msg += f"Vade: {_vade}\n"
+        _msg += "\n7/24 ulaşabilirsiniz."
+        return _msg
+
+    # ── ÖZET ─────────────────────────────────────────────────────────────────
+    st.divider()
+    st.markdown("### 📋 Özet")
+    for _og in grp:
+        _c_all2, _v_all2 = [], []
+        for _s in _og.get("satirlar",[]):
+            _cv = _s.get("cikis","")
+            _vv = _s.get("varis","")
+            if isinstance(_cv, list): _c_all2 += _cv
+            elif _cv: _c_all2.append(_cv)
+            if isinstance(_vv, list): _v_all2 += _vv
+            elif _vv: _v_all2.append(_vv)
+        _c_all2 = list(dict.fromkeys(_c_all2))
+        _v_all2 = list(dict.fromkeys(_v_all2))
+        _has = any(_s.get("tur") or float(_s.get("fiyat",0) or 0) for _s in _og.get("satirlar",[]))
+        if not _c_all2 and not _v_all2 and not _has: continue
+        st.markdown(f"**{', '.join(_c_all2) or '—'} → {', '.join(_v_all2) or '—'}**")
+        for _os in _og.get("satirlar",[]):
+            _ott = ", ".join(_os.get("tur",[]) or []) or ""
+            _ob1 = int(_os.get("bas",0) or 0)
+            _ob2 = int(_os.get("bit",0) or 0)
+            _okk = int(_os.get("kg",0) or 0)
+            _off = float(_os.get("fiyat",0) or 0)
+            if not _ott and not _off: continue
+            _ods = f"{_ob1}–{_ob2} desi" if _ob1 or _ob2 else "—"
+            _oks = f"{_okk} kg" if _okk else "—"
+            st.caption(f"&nbsp;&nbsp; • {_ott} | {_ods} | KG: {_oks} | **{fmt_para(_off)}**")
+
+    # ── KAYDET + MESAJ ────────────────────────────────────────────────────────
+    st.divider()
+    _ks1, _ks2 = st.columns(2)
+    if _ks1.button("💾 Teklifi Kaydet", use_container_width=True, type="primary", key="oz2_kaydet"):
+        if not _oz_hedef:
+            st.warning("Müşteri adı boş!")
+        else:
+            _oz_veri = {
+                "musteri_id": int(_oz_mus["id"]) if _oz_mus is not None else 0,
+                "musteri_adi": _oz_hedef,
+                "satirlar": _ozj.dumps({"tip":"ozel","grp":grp}, ensure_ascii=False),
+                "toplam_tutar": sum(float(s.get("fiyat",0) or 0) for g in grp for s in g.get("satirlar",[])),
+                "olusturan": st.session_state["kullanici"],
+                "notlar": f"Vade:{_oz_vade} | Not:{_oz_not}"
+            }
+            _duz_id = st.session_state.get("oz2_duz_id")
+            if _duz_id:
+                db_update("teklifler",{
+                    "musteri_adi":_oz_veri["musteri_adi"],
+                    "satirlar":_oz_veri["satirlar"],
+                    "toplam_tutar":_oz_veri["toplam_tutar"],
+                    "notlar":_oz_veri["notlar"]
+                },"id",_duz_id)
+                st.success("✅ Teklif güncellendi!")
+                st.session_state.pop("oz2_duz_id",None)
+            else:
+                db_insert("teklifler", _oz_veri)
+                st.success("✅ Kaydedildi!")
+            st.session_state["oz2_wa_mesaj"] = _oz_mesaj_olustur(grp, _oz_hedef, _oz_vade)
+            st.session_state.pop("oz2_grp",None)
+            st.rerun()
+
+    if _ks2.button("📱 WA Mesajı Oluştur", use_container_width=True, key="oz2_wa_olustur"):
+        st.session_state["oz2_wa_mesaj"] = _oz_mesaj_olustur(grp, _oz_hedef, _oz_vade)
+        st.rerun()
+
+    if st.session_state.get("oz2_wa_mesaj"):
+        _wtxt = st.text_area("WA Mesajı:", value=st.session_state["oz2_wa_mesaj"], height=220, key="oz2_wa_txt")
+        _wno  = _ozre.sub(r"[\s\-\(\)+]","", _oz_wa_no)
+        if _wno.startswith("0") and len(_wno)==11: _wno = "90"+_wno[1:]
+        elif len(_wno)==10: _wno = "90"+_wno
+        if len(_wno)==12 and _wno.isdigit():
+            from urllib.parse import quote as _ozq
+            st.link_button("📱 WhatsApp'ta Aç", f"https://wa.me/{_wno}?text={_ozq(_wtxt,safe='')}", use_container_width=True, type="primary")
+            if st.button("✅ WA Gönderildi Kaydet", use_container_width=True, key="oz2_wa_log"):
+                db_insert("islem_kaydi",{
+                    "musteri_id": int(_oz_mus["id"]) if _oz_mus is not None else 0,
+                    "musteri_adi": _oz_hedef, "islem_turu": "WhatsApp Teklif",
+                    "icerik": _wtxt, "gonderim_bilgisi": _wno,
+                    "olusturan": st.session_state["kullanici"]
+                })
+                st.success("✅ Kaydedildi!")
+        else:
+            st.warning("Geçerli WA numarası girin.")
+
+    # ── KAYITLI TEKLİFLER ────────────────────────────────────────────────────
+    with st.expander("📋 Kayıtlı Özel Teklifler"):
+        try:
+            _oz_df_tek = db_read("teklifler", order_col="tarih")
+            if not _oz_df_tek.empty and "satirlar" in _oz_df_tek.columns:
+                _oz_df_tek2 = _oz_df_tek[_oz_df_tek["satirlar"].str.contains('"tip": "ozel"', na=False) |
+                                          _oz_df_tek["satirlar"].str.contains('"tip":"ozel"', na=False)]
+            else:
+                _oz_df_tek2 = pd.DataFrame()
+
+            if _oz_df_tek2.empty:
+                st.info("Henüz kayıtlı özel teklif yok.")
+            else:
+                _oz_tek_opts = ["-- Teklif Seçin --"] + [
+                    f"[{int(r['id'])}] {r.get('musteri_adi','')} | {str(r.get('tarih',''))[:10]}"
+                    for _,r in _oz_df_tek2.iterrows()]
+                _oz_tek_sec = st.selectbox("Teklif Seç:", _oz_tek_opts, key="oz2_tek_sec")
+
+                if _oz_tek_sec != "-- Teklif Seçin --" and "[" in _oz_tek_sec:
+                    _oz_tid = int(_oz_tek_sec.split("]")[0].replace("[","").strip())
+                    _oz_trow = _oz_df_tek2[_oz_df_tek2["id"]==_oz_tid].iloc[0]
+                    st.caption(f"📅 {str(_oz_trow.get('tarih',''))[:16]} · 👤 {_oz_trow.get('olusturan','')} · 📝 {_oz_trow.get('notlar','')}")
+                    try:
+                        _oz_data = _ozj.loads(_oz_trow.get("satirlar","{}"))
+                        _oz_grp_k = _oz_data.get("grp",[])
+                        _bh2 = st.columns([1.5,1.5,1.8,0.9,0.9,0.7,1.2])
+                        for _txt,_col in zip(["Çıkış","Varış","Tür","Baş D","Bit D","KG","Fiyat ₺"],_bh2):
+                            _col.caption(f"**{_txt}**")
+                        for _og2 in _oz_grp_k:
+                            for _os2 in _og2.get("satirlar",[]):
+                                _sr = st.columns([1.5,1.5,1.8,0.9,0.9,0.7,1.2])
+                                _cv2 = _os2.get("cikis","")
+                                _vv2 = _os2.get("varis","")
+                                _sr[0].caption(", ".join(_cv2) if isinstance(_cv2,list) else (_cv2 or "—"))
+                                _sr[1].caption(", ".join(_vv2) if isinstance(_vv2,list) else (_vv2 or "—"))
+                                _sr[2].caption(", ".join(_os2.get("tur",[]) or []) or "—")
+                                _sr[3].caption(str(int(_os2.get("bas",0) or 0)))
+                                _sr[4].caption(str(int(_os2.get("bit",0) or 0)))
+                                _sr[5].caption(str(int(_os2.get("kg",0) or 0)))
+                                _sr[6].caption(fmt_para(float(_os2.get("fiyat",0) or 0)))
+                    except: pass
+
+                    _eak1,_eak2,_eak3 = st.columns(3)
+                    if _eak1.button("✏️ Düzenle", key="oz2_duzenle_btn", use_container_width=True, type="primary"):
+                        try:
+                            _oz_data2 = _ozj.loads(_oz_trow.get("satirlar","{}"))
+                            st.session_state["oz2_grp"] = _oz_data2.get("grp",[])
+                            st.session_state["oz2_duz_id"] = _oz_tid
+                            st.session_state["oz2_duz_musteri"] = str(_oz_trow.get("musteri_adi",""))
+                            st.session_state.pop("oz2_hedef",None)
+                            st.session_state.pop("oz2_son_sec",None)
+                            st.rerun()
+                        except Exception as _oe: st.error(f"Hata: {_oe}")
+                    with _eak2.expander("📝 Not Güncelle"):
+                        _oz_yn = st.text_area("Not:",value=str(_oz_trow.get("notlar","")),height=70,key=f"oz2_not_up_{_oz_tid}")
+                        if st.button("💾 Kaydet",key=f"oz2_not_btn_{_oz_tid}",use_container_width=True):
+                            db_update("teklifler",{"notlar":_oz_yn},"id",_oz_tid)
+                            st.success("✅"); st.rerun()
+                    if _eak3.button("🗑️ Sil",key="oz2_tek_sil",use_container_width=True):
+                        _sb_d=get_sb_client()
+                        if _sb_d: _sb_d.table("teklifler").delete().eq("id",_oz_tid).execute()
+                        st.success("🗑️ Silindi!"); st.rerun()
+                    if st.session_state.get("oz2_duz_id") == _oz_tid:
+                        st.info("⚠️ Düzenleme modu aktif — yukarıda değişiklik yapıp kaydedin.")
+                        if st.button("❌ İptal", key="oz2_duz_iptal"):
+                            st.session_state.pop("oz2_duz_id",None)
+                            st.session_state.pop("oz2_grp",None)
+                            st.rerun()
+        except Exception as _oz_e: st.error(f"Hata: {_oz_e}")
+
+    with st.expander("⚙️ Ürün Listesi Yönetimi"):
+        st.caption("Varsayılan ürünlere ek olarak yeni ürün ekleyebilirsiniz.")
+        _tam_liste = _oz_urun_listesi()
+        _ekstra_liste = [x for x in _tam_liste if x not in _OZ_URUN_VARSAYILAN]
+        st.markdown("**Varsayılan** (değiştirilemez):")
+        st.caption(" · ".join(_OZ_URUN_VARSAYILAN))
+        if _ekstra_liste:
+            st.markdown("**Ekstra ürünler:**")
+            for _ui,_un in enumerate(_ekstra_liste):
+                _uc1,_uc2 = st.columns([5,1])
+                _uc1.caption(f"🔹 {_un}")
+                if _uc2.button("🗑️",key=f"oz_urun_sil_{_ui}"):
+                    _ekstra_liste.remove(_un)
+                    _oz_urun_kaydet(_OZ_URUN_VARSAYILAN+_ekstra_liste); st.rerun()
+        st.divider()
+        _ya1,_ya2 = st.columns([4,1])
+        _yeni_urun = _ya1.text_input("",placeholder="Yeni ürün adı...",key="oz_yeni_urun",label_visibility="collapsed")
+        if _ya2.button("➕ Ekle",key="oz_urun_ekle_btn",use_container_width=True):
+            if _yeni_urun and _yeni_urun.strip():
+                if _yeni_urun.strip() in _tam_liste:
+                    st.warning("Bu ürün zaten var!")
+                else:
+                    _ekstra_liste.append(_yeni_urun.strip())
+                    if _oz_urun_kaydet(_OZ_URUN_VARSAYILAN+_ekstra_liste):
+                        st.success(f"✅ '{_yeni_urun}' eklendi!"); st.rerun()
+                    else: st.error("Kaydedilemedi!")
+
+
 elif aktif == "excel":
     sayfa_log("excel")
     import io
