@@ -3749,26 +3749,53 @@ elif aktif == "ozel_teklif":
 
     # ── MESAJ YARDIMCI FONKSİYONU ─────────────────────────────────────────────
     def _oz_mesaj_olustur(_grp, _hedef, _vade):
+        """Her grup için *Çıkış → Varış* başlık, altında • ürün satırları"""
         _msg = f"Sayın {_hedef} yetkilisi,\n\nSize özel kargo fiyat teklifimiz:\n\n"
         for _g in _grp:
+            # Grubun çıkış/varış illerini topla (boş satırlar hariç)
+            _c_set = list(dict.fromkeys([
+                ", ".join(_s["cikis"]) if isinstance(_s.get("cikis"), list) else (_s.get("cikis") or "")
+                for _s in _g.get("satirlar",[]) if _s.get("cikis")
+            ]))
+            _v_set = list(dict.fromkeys([
+                ", ".join(_s["varis"]) if isinstance(_s.get("varis"), list) else (_s.get("varis") or "")
+                for _s in _g.get("satirlar",[]) if _s.get("varis")
+            ]))
+            # Tüm çıkış ve varış illerini düzleştir
+            _c_all, _v_all = [], []
             for _s in _g.get("satirlar",[]):
-                _cv2 = _s.get("cikis","")
-                _vv2 = _s.get("varis","")
-                _cs2 = ", ".join(_cv2) if isinstance(_cv2, list) else (_cv2 or "")
-                _vs2 = ", ".join(_vv2) if isinstance(_vv2, list) else (_vv2 or "")
-                _tt2 = ", ".join(_s.get("tur",[]) or []) or ""
-                _b12 = int(_s.get("bas",0) or 0)
-                _b22 = int(_s.get("bit",0) or 0)
-                _kk2 = int(_s.get("kg",0) or 0)
-                _ff2 = float(_s.get("fiyat",0) or 0)
-                if not _cs2 and not _vs2 and not _tt2 and not _ff2: continue
-                _ds2 = f"{_b12}–{_b22} desi" if _b12 or _b22 else ""
-                _ks2 = f"{_kk2} kg" if _kk2 else ""
-                _msg += f"📍 {_cs2} → {_vs2}\n"
-                _msg += f"  • {_tt2}"
-                if _ds2: _msg += f" | {_ds2}"
-                if _ks2: _msg += f" | {_ks2}"
-                _msg += f" → {fmt_para(_ff2)}\n\n"
+                _cv = _s.get("cikis","")
+                _vv = _s.get("varis","")
+                if isinstance(_cv, list): _c_all += _cv
+                elif _cv: _c_all.append(_cv)
+                if isinstance(_vv, list): _v_all += _vv
+                elif _vv: _v_all.append(_vv)
+            _c_all = list(dict.fromkeys(_c_all))
+            _v_all = list(dict.fromkeys(_v_all))
+
+            # Ürün satırları
+            _urun_satirlar = []
+            for _s in _g.get("satirlar",[]):
+                _tt = ", ".join(_s.get("tur",[]) or []) or ""
+                _b1 = int(_s.get("bas",0) or 0)
+                _b2 = int(_s.get("bit",0) or 0)
+                _kk = int(_s.get("kg",0) or 0)
+                _ff = float(_s.get("fiyat",0) or 0)
+                if not _tt and not _ff: continue
+                _ds = f"{_b1}–{_b2} desi" if _b1 or _b2 else ""
+                _ks = f"{_kk} kg" if _kk else ""
+                _satir = f"  • {_tt}"
+                if _ds: _satir += f" | {_ds}"
+                if _ks: _satir += f" | {_ks}"
+                _satir += f" → {fmt_para(_ff)}"
+                _urun_satirlar.append(_satir)
+
+            if not _c_all and not _v_all and not _urun_satirlar: continue
+
+            _baslik = f"*{', '.join(_c_all) or '—'} → {', '.join(_v_all) or '—'}*"
+            _msg += _baslik + "\n"
+            _msg += "\n".join(_urun_satirlar) + "\n\n"
+
         if _vade: _msg += f"Vade: {_vade}\n"
         _msg += "\n7/24 ulaşabilirsiniz."
         return _msg
@@ -3777,20 +3804,34 @@ elif aktif == "ozel_teklif":
     st.divider()
     st.markdown("### 📋 Özet")
     for _og in grp:
+        _c_all2, _v_all2 = [], []
+        for _s in _og.get("satirlar",[]):
+            _cv = _s.get("cikis","")
+            _vv = _s.get("varis","")
+            if isinstance(_cv, list): _c_all2 += _cv
+            elif _cv: _c_all2.append(_cv)
+            if isinstance(_vv, list): _v_all2 += _vv
+            elif _vv: _v_all2.append(_vv)
+        _c_all2 = list(dict.fromkeys(_c_all2))
+        _v_all2 = list(dict.fromkeys(_v_all2))
+
+        _baslik2 = f"**{', '.join(_c_all2) or '—'} → {', '.join(_v_all2) or '—'}**"
+        _has_urun = any(
+            _s.get("tur") or float(_s.get("fiyat",0) or 0)
+            for _s in _og.get("satirlar",[])
+        )
+        if not _c_all2 and not _v_all2 and not _has_urun: continue
+        st.markdown(_baslik2)
         for _os in _og.get("satirlar",[]):
-            _ocv = _os.get("cikis","")
-            _ovv = _os.get("varis","")
-            _ocs = ", ".join(_ocv) if isinstance(_ocv, list) else (_ocv or "")
-            _ovs = ", ".join(_ovv) if isinstance(_ovv, list) else (_ovv or "")
             _ott = ", ".join(_os.get("tur",[]) or []) or ""
             _ob1 = int(_os.get("bas",0) or 0)
             _ob2 = int(_os.get("bit",0) or 0)
             _okk = int(_os.get("kg",0) or 0)
             _off = float(_os.get("fiyat",0) or 0)
-            if not _ocs and not _ovs and not _ott and not _off: continue
+            if not _ott and not _off: continue
             _ods = f"{_ob1}–{_ob2} desi" if _ob1 or _ob2 else "—"
             _oks = f"{_okk} kg" if _okk else "—"
-            st.caption(f"**{_ocs} → {_ovs}** &nbsp;·&nbsp; {_ott} | {_ods} | KG: {_oks} | **{fmt_para(_off)}**")
+            st.caption(f"&nbsp;&nbsp; • {_ott} | {_ods} | KG: {_oks} | **{fmt_para(_off)}**")
 
     # ── KAYDET + MESAJ ────────────────────────────────────────────────────────
     st.divider()
