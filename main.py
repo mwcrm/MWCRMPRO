@@ -5026,41 +5026,60 @@ elif aktif == "randevu":
                 f"💰 Beklenen: **{fmt_para(_beklenen)}**"
             )
 
-            # ── SATIR SATIR LİSTE + ✏️ DÜZENLE ───────────────────────────────
-            _g_cols = [c for c in ["id","randevu_tarihi","randevu_saati","musteri_adi","bolge","gorev","temsilci","sonuc"] if c in df_rand.columns]
+            # Ciro bilgilerini cari kartlardan çek
+            try:
+                _df_cari_join = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+                _ciro_map = {}
+                if not _df_cari_join.empty:
+                    for _, _cr in _df_cari_join.iterrows():
+                        _ciro_map[str(_cr.get("firma",""))] = {
+                            "hedef": float(_cr.get("beklenen_ciro",0) or 0),
+                            "gercek": float(_cr.get("gerceklesen_ciro",0) or 0)
+                        }
+            except: _ciro_map = {}
 
+            # ── SATIR SATIR LİSTE + ✏️ DÜZENLE ───────────────────────────────
             # Başlık
             st.markdown("""<div style='background:#1f6feb22;border-radius:6px;padding:4px 0;margin-bottom:2px'>""", unsafe_allow_html=True)
-            _hcols = st.columns([0.5,1.2,0.8,2,1.5,1.5,1.5,1.2,0.4])
-            for _ht, _hc in zip(["ID","📅 Tarih","⏰ Saat","🏢 Müşteri","📍 Bölge","📋 Görev","👤 Temsilci","🎯 Sonuç",""],_hcols):
+            _hcols = st.columns([0.4,1.1,1.8,1.3,1.3,1.1,1.1,1.1,1.1,0.4])
+            for _ht, _hc in zip(["ID","📅 Tarih","🏢 Müşteri","📍 Bölge","📋 Görev","🎯 Sonuç","💰 Hedef","✅ Gerçek","📊 Fark",""],_hcols):
                 _hc.markdown(f"<span style='font-size:0.8rem;font-weight:700;color:#1f6feb'>{_ht}</span>", unsafe_allow_html=True)
             st.markdown("</div>", unsafe_allow_html=True)
 
             for _, row in df_rand.iterrows():
                 _rid = int(row.get("id",0) or 0)
-                _rc = st.columns([0.5,1.2,0.8,2,1.5,1.5,1.5,1.2,0.4])
+                _rc = st.columns([0.4,1.1,1.8,1.3,1.3,1.1,1.1,1.1,1.1,0.4])
                 _tarih_r = str(row.get("randevu_tarihi",""))
                 try:
-                    _fark = (pd.to_datetime(_tarih_r).date() - datetime.now().date()).days
-                    if _fark == 0:   _renk = "🔴"
-                    elif _fark <= 5 and _fark > 0: _renk = "🟡"
-                    elif _fark > 5:  _renk = "🟢"
-                    else:            _renk = "⚫"
+                    _gun_fark = (pd.to_datetime(_tarih_r).date() - datetime.now().date()).days
+                    if _gun_fark == 0:             _renk = "🔴"
+                    elif 0 < _gun_fark <= 5:       _renk = "🟡"
+                    elif _gun_fark > 5:             _renk = "🟢"
+                    else:                           _renk = "⚫"
                 except: _renk = ""
 
+                # Ciro bilgileri
+                _musteri_adi = str(row.get("musteri_adi","") or "")
+                _ciro = _ciro_map.get(_musteri_adi, {"hedef":0,"gercek":0})
+                _hedef_c = _ciro["hedef"]
+                _gercek_c = _ciro["gercek"]
+                _fark_c = _gercek_c - _hedef_c
+                _fark_renk = "🟢" if _fark_c >= 0 else "🔴"
+
                 _rc[0].markdown(f"**{_rid}**")
-                _rc[1].markdown(f"{_renk} **{_tarih_r}**")
-                _rc[2].markdown(f"{str(row.get('randevu_saati',''))[:5]}")
-                _rc[3].markdown(f"**{str(row.get('musteri_adi','') or '')}**")
-                _rc[4].markdown(f"{str(row.get('bolge','') or '')}")
-                _rc[5].markdown(f"{str(row.get('gorev','') or '')}")
-                _rc[6].markdown(f"{str(row.get('temsilci','') or '')}")
+                _rc[1].markdown(f"{_renk} {_tarih_r[5:].replace('-','.')}")
+                _rc[2].markdown(f"**{_musteri_adi}**")
+                _rc[3].markdown(str(row.get("bolge","") or ""))
+                _rc[4].markdown(str(row.get("gorev","") or ""))
                 _sonuc_r = str(row.get("sonuc","") or "")
-                _sonuc_renk = "✅" if _sonuc_r=="Bitti" else ("🔄" if _sonuc_r=="Devam Ediyor" else ("❌" if _sonuc_r=="Gidilmedi" else "🔵"))
-                _rc[7].markdown(f"{_sonuc_renk} {_sonuc_r}")
+                _sonuc_renk = "✅" if _sonuc_r=="Bitti" else ("🔄" if _sonuc_r=="Devam Ediyor" else ("❌" if _sonuc_r=="Gidilmedi" else ""))
+                _rc[5].markdown(f"{_sonuc_renk} {_sonuc_r}")
+                _rc[6].markdown(fmt_para(_hedef_c) if _hedef_c else "—")
+                _rc[7].markdown(fmt_para(_gercek_c) if _gercek_c else "—")
+                _rc[8].markdown(f"{_fark_renk} {fmt_para(abs(_fark_c))}" if _hedef_c or _gercek_c else "—")
 
                 # ✏️ kalem — tıklanınca o satır açılır
-                if _rc[8].button("✏️", key=f"rand_duz_btn_{_rid}"):
+                if _rc[9].button("✏️", key=f"rand_duz_btn_{_rid}"):
                     if st.session_state.get("rand_duz_row",{}).get("id") == _rid:
                         st.session_state.pop("rand_duz_row", None)
                     else:
