@@ -1555,8 +1555,39 @@ elif aktif == "liste":
                         hata_list.append(str(e_row))
                 try: db_read.clear()
                 except: pass
+                # ── AÇIKLAMA HÜCRESI DOLUYSA ARŞİVLE ─────────────────────────
+                _arsiv_sayi = 0
+                try:
+                    _tablo_json2 = st.session_state.get("_ls_tablo")
+                    _rows2 = _json_ls.loads(_tablo_json2) if _tablo_json2 else []
+                    for _row2 in _rows2:
+                        _rid2 = _row2.get("id")
+                        _ac2 = str(_row2.get("aciklama","") or "").strip()
+                        if not _rid2 or not _ac2 or _ac2 == "nan": continue
+                        _rid2 = int(float(str(_rid2)))
+                        if sb_liste:
+                            sb_liste.table("cari_aciklamalar").insert({
+                                "cari_id": _rid2,
+                                "cari_adi": str(_row2.get("firma","")),
+                                "aciklama": _ac2,
+                                "olusturan": st.session_state.get("kullanici",""),
+                            }).execute()
+                            sb_liste.table("cari_kartlar").update({"aciklama":""}).eq("id",_rid2).execute()
+                        else:
+                            _cx = get_conn()
+                            _cx.execute("INSERT INTO cari_aciklamalar (cari_id,cari_adi,aciklama,olusturan) VALUES (?,?,?,?)",
+                                (_rid2, str(_row2.get("firma","")), _ac2, st.session_state.get("kullanici","")))
+                            _cx.execute("UPDATE cari_kartlar SET aciklama='' WHERE id=?", (_rid2,))
+                            _cx.commit(); _cx.close()
+                        _arsiv_sayi += 1
+                except: pass
+                st.session_state.pop("_ls_tablo", None)
                 if kayit_sayi > 0:
-                    st.success(f"✅ {kayit_sayi} satır kaydedildi!")
+                    st.success(f"✅ {kayit_sayi} satır kaydedildi!" + (f" · {_arsiv_sayi} not 📨 arşivlendi!" if _arsiv_sayi > 0 else ""))
+                elif _arsiv_sayi > 0:
+                    st.success(f"✅ {_arsiv_sayi} not 📨 arşivlendi!")
+                else:
+                    st.info("Değişiklik kaydedildi.")
                 if hata_list:
                     st.error(f"Hata: {'; '.join(hata_list[:2])}")
                 st.rerun()
