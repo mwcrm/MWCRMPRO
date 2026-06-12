@@ -665,25 +665,9 @@ st.set_page_config(page_title="MWCRMPRO", layout="wide")
 
 st.markdown("""
 <style>
-/* ── GENEL BOŞLUK AZALTMA ───────────────────────────────── */
-.block-container {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.5rem !important;
-}
-h1, h2, h3, h4 {
-    margin-top: 0.2rem !important;
-    margin-bottom: 0.2rem !important;
-}
-hr {
-    margin: 0.4rem 0 !important;
-}
-.stButton>button { border-radius: 8px !important; }
-div[data-testid="stVerticalBlock"] > div {
-    gap: 0.3rem !important;
-}
-/* ── MOBİL ──────────────────────────────────────────────── */
+/* Mobil uyumluluk */
 @media (max-width: 768px) {
-    .block-container { padding: 0.3rem !important; }
+    .block-container { padding: 0.5rem !important; }
     div[data-testid="column"] { min-width: 100% !important; }
     .stButton>button { width: 100% !important; font-size: 13px !important; }
     .stDataFrame { font-size: 11px !important; }
@@ -691,6 +675,8 @@ div[data-testid="stVerticalBlock"] > div {
     h2 { font-size: 1.1rem !important; }
     h3 { font-size: 1rem !important; }
 }
+/* Genel buton iyileştirme */
+.stButton>button { border-radius: 8px !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -740,7 +726,7 @@ def parse_para(s):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "arsiv", "mesajlar", "kullanici", "admin_rapor"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "arsiv", "kullanici", "admin_rapor"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -759,7 +745,6 @@ _TAB_ETIKETLER = {
 
 def get_menu_tercihi(kullanici):
     def _temizle(liste):
-        """Duplicate'leri temizle, sıralamasını koru"""
         goruldu = []
         for t in liste:
             if t not in goruldu:
@@ -776,9 +761,16 @@ def get_menu_tercihi(kullanici):
                 if st.session_state.get("rol") == "admin":
                     tam_liste += ["kullanici","koddepo","admin_rapor"]
                 tam_liste = _temizle(tam_liste)
-                for t in tam_liste:
+                # Eksik olanları tam_liste'deki sıraya göre doğru pozisyona ekle
+                for i, t in enumerate(tam_liste):
                     if t not in kayitli:
-                        kayitli.append(t)
+                        # Önceki elemanın pozisyonundan sonraya ekle
+                        onceki = next((x for x in reversed(tam_liste[:i]) if x in kayitli), None)
+                        if onceki:
+                            pos = kayitli.index(onceki) + 1
+                        else:
+                            pos = 0
+                        kayitli.insert(pos, t)
                 kayitli = [t for t in kayitli if t in tam_liste]
                 return _temizle(kayitli)
         else:
@@ -793,9 +785,14 @@ def get_menu_tercihi(kullanici):
                 if st.session_state.get("rol") == "admin":
                     tam_liste += ["kullanici","koddepo","admin_rapor"]
                 tam_liste = _temizle(tam_liste)
-                for t in tam_liste:
+                for i, t in enumerate(tam_liste):
                     if t not in kayitli:
-                        kayitli.append(t)
+                        onceki = next((x for x in reversed(tam_liste[:i]) if x in kayitli), None)
+                        if onceki:
+                            pos = kayitli.index(onceki) + 1
+                        else:
+                            pos = 0
+                        kayitli.insert(pos, t)
                 kayitli = [t for t in kayitli if t in tam_liste]
                 return _temizle(kayitli)
     except: pass
@@ -5244,109 +5241,6 @@ elif aktif == "randevu":
                 st.info("Bu hafta randevu yok.")
 
 # ── SİSTEM MESAJLAŞMA ────────────────────────────────────────────────────────
-elif aktif == "mesajlar":
-    sayfa_log("mesajlar")
-    st.markdown("## 💬 Sistem İçi Mesajlaşma")
-
-    ben = st.session_state.get("kullanici","")
-
-    # Tüm kullanıcı listesi
-    try:
-        df_kullar = db_read("kullanicilar", extra_sql="")
-        kullar_liste = [r["kullanici_adi"] for _, r in df_kullar.iterrows() if r["kullanici_adi"] != ben]
-    except:
-        kullar_liste = []
-
-    # Aktif kullanıcılar
-    try:
-        df_aktif2 = db_read("aktif_kullanicilar", extra_sql="")
-        if not df_aktif2.empty and "son_gorulme" in df_aktif2.columns:
-            df_aktif2["son_gorulme"] = pd.to_datetime(df_aktif2["son_gorulme"], errors="coerce")
-            aktif_isimler = set(df_aktif2[
-                df_aktif2["son_gorulme"] > pd.Timestamp.now() - pd.Timedelta(minutes=5)
-            ]["kullanici"].tolist())
-        else:
-            aktif_isimler = set()
-    except:
-        aktif_isimler = set()
-
-    msg_col1, msg_col2 = st.columns([1, 2])
-
-    with msg_col1:
-        st.markdown("### 👥 Kullanıcılar")
-        if not kullar_liste:
-            st.info("Başka kullanıcı yok.")
-        for kul in kullar_liste:
-            # Okunmamış sayısı
-            try:
-                df_ok = db_read("mesajlar", extra_sql=f"WHERE alici='{ben}' AND gonderen='{kul}' AND okundu=0")
-                ok_say = len(df_ok)
-            except:
-                ok_say = 0
-
-            aktif_dot = "🟢" if kul in aktif_isimler else "⚫"
-            etiket = f"{aktif_dot} {kul}"
-            if ok_say > 0:
-                etiket += f" 🔴{ok_say}"
-
-            if st.button(etiket, key=f"msg_kul_{kul}", use_container_width=True):
-                st.session_state["msg_alici"] = kul
-                # Okundu olarak işaretle
-                try:
-                    sb_m = get_sb_client()
-                    if sb_m:
-                        sb_m.table("mesajlar").update({"okundu": 1}).eq("alici", ben).eq("gonderen", kul).execute()
-                except: pass
-                st.rerun()
-
-    with msg_col2:
-        alici = st.session_state.get("msg_alici", "")
-        if not alici:
-            st.info("Sol taraftan bir kullanıcı seçin.")
-        else:
-            aktif_dot2 = "🟢 Çevrimiçi" if alici in aktif_isimler else "⚫ Çevrimdışı"
-            st.markdown(f"### 💬 {alici} — {aktif_dot2}")
-
-            # Mesaj geçmişi
-            try:
-                df_mesajlar = db_read("mesajlar", extra_sql=f"WHERE (gonderen='{ben}' AND alici='{alici}') OR (gonderen='{alici}' AND alici='{ben}') ORDER BY tarih ASC")
-            except:
-                df_mesajlar = pd.DataFrame()
-
-            # Mesaj baloncukları
-            mesaj_html = "<div style='height:350px;overflow-y:auto;border:1px solid #eee;border-radius:8px;padding:10px;background:#fafafa;'>"
-            if df_mesajlar.empty:
-                mesaj_html += "<p style='color:#aaa;text-align:center;margin-top:50px'>Henüz mesaj yok</p>"
-            else:
-                for _, msg in df_mesajlar.iterrows():
-                    gond = str(msg.get("gonderen",""))
-                    metin = str(msg.get("mesaj",""))
-                    zaman = str(msg.get("tarih",""))[:16]
-                    if gond == ben:
-                        mesaj_html += f"<div style='text-align:right;margin:5px 0'><span style='background:#1f6feb;color:white;padding:8px 12px;border-radius:16px 16px 4px 16px;display:inline-block;max-width:80%'>{metin}</span><br><small style='color:#aaa'>{zaman}</small></div>"
-                    else:
-                        mesaj_html += f"<div style='text-align:left;margin:5px 0'><span style='background:#e9ecef;color:#333;padding:8px 12px;border-radius:16px 16px 16px 4px;display:inline-block;max-width:80%'>{metin}</span><br><small style='color:#aaa'>{zaman}</small></div>"
-            mesaj_html += "</div>"
-            st.markdown(mesaj_html, unsafe_allow_html=True)
-
-            # Mesaj gönder
-            with st.form("mesaj_gonder_form", clear_on_submit=True):
-                yeni_mesaj = st.text_input("Mesajınız:", placeholder="Mesaj yazın...", key="yeni_mesaj_input")
-                gc1, gc2 = st.columns([4,1])
-                if gc2.form_submit_button("📤 Gönder", use_container_width=True, type="primary"):
-                    if yeni_mesaj.strip():
-                        db_insert("mesajlar", {
-                            "gonderen": ben,
-                            "alici": alici,
-                            "mesaj": yeni_mesaj.strip(),
-                            "okundu": 0
-                        })
-                        st.rerun()
-
-            if st.button("🔄 Yenile", use_container_width=True):
-                st.rerun()
-
-# ── ADMİN RAPOR TASARIM ──────────────────────────────────────────────────────
 elif aktif == "admin_rapor":
     sayfa_log("admin_rapor")
 
