@@ -3802,126 +3802,98 @@ elif aktif == "analiz":
                 _bek = float(_ar.get('bek_ciro',0) or 0)
                 _ger = float(_ar.get('ger_ciro',0) or 0)
 
-                # ── KART BAŞLIĞI (her zaman açık) ────────────────────────────
-                st.markdown(f"""
-<div style='background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;margin:8px 0'>
-<span style='font-size:18px;font-weight:700'>{_pot_ic} {_firma_goster}</span>
-&nbsp;&nbsp;
-<span style='color:#64748b;font-size:13px'>📅 {_tarih_str or "—"}</span>
-&nbsp;&nbsp;
-<span style='color:#64748b;font-size:13px'>📋 {_ar.get("sonuc","—") or "—"}</span>
-&nbsp;&nbsp;
-<span style='color:#64748b;font-size:13px'>🎯 {_ar.get("potansiyel","—") or "—"} potansiyel</span>
-&nbsp;&nbsp;
-<span style='color:#0ea5e9;font-size:13px'>💰 Beklenen: <b>{_bek:,.0f} ₺</b></span>
-&nbsp;&nbsp;
-<span style='color:#10b981;font-size:13px'>✅ Gerçekleşen: <b>{_ger:,.0f} ₺</b></span>
+                # ── KART (tümü açık, expander yok) ──────────────────────
+                try:
+                    _rak_list2 = _aj.loads(_ar.get("rakip","[]") or "[]")
+                    _rak_str2 = ", ".join([f"{r.get('firma','')} ({r.get('fiyat','?')}₺)" for r in _rak_list2 if r.get('firma')]) or "—"
+                except: _rak_str2 = "—"
+
+                _not_html = f"<div style='background:#eff6ff;border-left:4px solid #3b82f6;padding:8px 12px;margin-top:8px;border-radius:4px;font-size:13px'>📝 <b>Not:</b> {_ar.get('not_alan','')}</div>" if _ar.get("not_alan") else ""
+
+                st.markdown(f"""<div style='background:#ffffff;border:2px solid #e2e8f0;border-radius:12px;padding:20px;margin:10px 0'>
+<div style='padding-bottom:12px;margin-bottom:14px;border-bottom:2px solid #f1f5f9'>
+  <span style='font-size:20px;font-weight:800'>{_pot_ic} {_firma_goster}</span>&nbsp;&nbsp;
+  <span style='background:#dbeafe;color:#1d4ed8;padding:2px 10px;border-radius:20px;font-size:12px'>📅 {_tarih_str or "—"}</span>&nbsp;
+  <span style='background:#dcfce7;color:#166534;padding:2px 10px;border-radius:20px;font-size:12px'>📋 {_ar.get("sonuc","—") or "—"}</span>&nbsp;
+  <span style='background:#fef9c3;color:#854d0e;padding:2px 10px;border-radius:20px;font-size:12px'>🎯 {_ar.get("potansiyel","—") or "—"}</span>&nbsp;
+  <span style='background:#e0f2fe;color:#075985;padding:2px 10px;border-radius:20px;font-size:12px'>💰 Beklenen: <b>{_bek:,.0f} ₺</b></span>&nbsp;
+  <span style='background:#f0fdf4;color:#14532d;padding:2px 10px;border-radius:20px;font-size:12px'>✅ Gerçekleşen: <b>{_ger:,.0f} ₺</b></span>
 </div>
-""", unsafe_allow_html=True)
+<div style='display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px;font-size:13px'>
+  <div>
+    <p style='margin:5px 0'><b>👤 Yetkili:</b> {_ar.get("yetkili","—") or "—"}</p>
+    <p style='margin:5px 0'><b>📞 İletişim:</b> {_ar.get("iletisim","—") or "—"}</p>
+    <p style='margin:5px 0'><b>🏭 Sektör:</b> {_ar.get("sektor","—") or "—"}</p>
+    <p style='margin:5px 0'><b>📌 Kaynak:</b> {_ar.get("kaynak","—") or "—"}</p>
+    <p style='margin:5px 0'><b>🏆 Karar Verici:</b> {_ar.get("karar","—") or "—"} — Süre: {_ar.get("sure","—") or "—"}</p>
+    <p style='margin:5px 0'><b>🕐 Takip Tarihi:</b> {_ar.get("takip_tar","—") or "—"}</p>
+  </div>
+  <div>
+    <p style='margin:5px 0'><b>🎯 Analiz Amacı:</b> {_ar.get("amac","—") or "—"}</p>
+    <p style='margin:5px 0'><b>👥 Müşteri Durumu:</b> {_ar.get("mdurum","—") or "—"}</p>
+    <p style='margin:5px 0'><b>📦 Teklif Türü:</b> {_ar.get("teklif_tur","—") or "—"}</p>
+    <p style='margin:5px 0'><b>🚚 Kullandığı Kargo:</b> {_ar.get("kargo","—") or "—"}</p>
+    <p style='margin:5px 0'><b>🧾 Fatura:</b> {_ar.get("fatura","—") or "—"} / UA-PO: {_ar.get("uapo","—") or "—"}</p>
+    <p style='margin:5px 0'><b>💳 Vade/Ödeme:</b> {_ar.get("odeme","—") or "—"} — Pazarlık: {_ar.get("pazarlik","—") or "—"}</p>
+  </div>
+  <div>
+    <p style='margin:5px 0'><b>💬 Müşteri Beklentisi:</b> {_ar.get("beklenti","—") or "—"}</p>
+    <p style='margin:5px 0'><b>🚧 Satışa Engel:</b> {_ar.get("engel","—") or "—"}</p>
+    <p style='margin:5px 0'><b>😤 Şikayetleri:</b> {_ar.get("sik","—") or "—"}</p>
+    <p style='margin:5px 0'><b>🔄 Geçiş Sebebi:</b> {_ar.get("gecis","—") or "—"}</p>
+    <p style='margin:5px 0'><b>⚔️ Rakip Kargolar:</b> {_rak_str2}</p>
+    <p style='margin:5px 0'><b>➡️ Sonraki Adım:</b> {_ar.get("sonraki_adim","—") or "—"}</p>
+  </div>
+</div>
+{_not_html}
+</div>""", unsafe_allow_html=True)
 
-                with st.expander("📋 Detayları Gör", expanded=False):
-                    try:
-                        _rak_list2 = _aj.loads(_ar.get("rakip","[]") or "[]")
-                        _rak_str2 = ", ".join([f"{r.get('firma','')} ({r.get('fiyat','?')}₺)" for r in _rak_list2 if r.get('firma')]) or "—"
-                    except: _rak_str2 = "—"
-                    # ── DETAY BİLGİLER ──────────────────────────────────────
-                    _kc1, _kc2, _kc3 = st.columns(3)
-                    with _kc1:
-                        st.markdown("**👤 Yetkili**")
-                        st.write(_ar.get("yetkili","—"))
-                        st.markdown("**📞 İletişim**")
-                        st.write(_ar.get("iletisim","—"))
-                        st.markdown("**🏭 Sektör**")
-                        st.write(_ar.get("sektor","—"))
-                        st.markdown("**📌 Kaynak**")
-                        st.write(_ar.get("kaynak","—"))
-                    with _kc2:
-                        st.markdown("**🎯 Analiz Amacı**")
-                        st.write(_ar.get("amac","—"))
-                        st.markdown("**👥 Müşteri Durumu**")
-                        st.write(_ar.get("mdurum","—"))
-                        st.markdown("**📦 Teklif Türü**")
-                        st.write(_ar.get("teklif_tur","—"))
-                        st.markdown("**🚚 Kullandığı Kargo**")
-                        st.write(_ar.get("kargo","—"))
-                    with _kc3:
-                        st.markdown("**🧾 Faturalama**")
-                        st.write(f"{_ar.get('fatura','—')} / UA-PO: {_ar.get('uapo','—')}")
-                        st.markdown("**💳 Vade / Ödeme**")
-                        st.write(f"{_ar.get('odeme','—')} — Pazarlık: {_ar.get('pazarlik','—')}")
-                        st.markdown("**🏆 Karar Verici**")
-                        st.write(f"{_ar.get('karar','—')} — Süre: {_ar.get('sure','—')}")
-                        st.markdown("**🕐 Takip Tarihi**")
-                        st.write(_ar.get("takip_tar","—"))
+                # Tablolar
+                try:
+                    _ft2b = _aj.loads(_ar.get("fiyat_tablo","[]") or "[]")
+                    if _ft2b and any(s.get("il") and s.get("il")!="--" for s in _ft2b):
+                        st.markdown("**💰 Fiyat Tablosu:**")
+                        st.dataframe(pd.DataFrame(_ft2b), use_container_width=True, hide_index=True)
+                except: pass
+                try:
+                    _bt2b = _aj.loads(_ar.get("bolge","[]") or "[]")
+                    if _bt2b and any(s.get("il") and s.get("il")!="--" for s in _bt2b):
+                        st.markdown("**📍 Bölge Teslimat:**")
+                        st.dataframe(pd.DataFrame(_bt2b), use_container_width=True, hide_index=True)
+                except: pass
+                try:
+                    _at2b = _aj.loads(_ar.get("avm","[]") or "[]")
+                    if _at2b and any(s.get("avm") for s in _at2b):
+                        st.markdown("**🏬 AVM Teslimatları:**")
+                        st.dataframe(pd.DataFrame(_at2b), use_container_width=True, hide_index=True)
+                except: pass
 
-                    st.divider()
-
-                    # ── SAHA BİLGİSİ ────────────────────────────────────────
-                    _sc1, _sc2 = st.columns(2)
-                    with _sc1:
-                        st.markdown("**💬 Müşteri Beklentisi**")
-                        st.write(_ar.get("beklenti","—") or "—")
-                        st.markdown("**🚧 Satışa Engel**")
-                        st.write(_ar.get("engel","—") or "—")
-                        st.markdown("**😤 Şikayetleri**")
-                        st.write(_ar.get("sik","—") or "—")
-                    with _sc2:
-                        st.markdown("**🔄 Geçiş Sebebi**")
-                        st.write(_ar.get("gecis","—") or "—")
-                        st.markdown("**⚔️ Rakip Kargolar**")
-                        st.write(_rak_str2)
-                        st.markdown("**➡️ Sonraki Adım**")
-                        st.write(_ar.get("sonraki_adim","—") or "—")
-
-                    if _ar.get("not_alan"):
-                        st.divider()
-                        st.markdown("**📝 Görüşme Notu**")
-                        st.info(_ar.get("not_alan"))
-                    try:
-                        _ft2b = _aj.loads(_ar.get("fiyat_tablo","[]") or "[]")
-                        if _ft2b and any(s.get("il") and s.get("il")!="--" for s in _ft2b):
-                            st.markdown("**💰 Fiyat Tablosu:**")
-                            st.dataframe(pd.DataFrame(_ft2b), use_container_width=True, hide_index=True)
-                    except: pass
-                    try:
-                        _bt2b = _aj.loads(_ar.get("bolge","[]") or "[]")
-                        if _bt2b and any(s.get("il") and s.get("il")!="--" for s in _bt2b):
-                            st.markdown("**📍 Bölge Teslimat:**")
-                            st.dataframe(pd.DataFrame(_bt2b), use_container_width=True, hide_index=True)
-                    except: pass
-                    try:
-                        _at2b = _aj.loads(_ar.get("avm","[]") or "[]")
-                        if _at2b and any(s.get("avm") for s in _at2b):
-                            st.markdown("**🏬 AVM Teslimatları:**")
-                            st.dataframe(pd.DataFrame(_at2b), use_container_width=True, hide_index=True)
-                    except: pass
-                    # AKSİYON BUTONLARI
-                    _wbg = st.columns(4)
-                    if _wbg[0].button("✏️ Düzenle", key=f"an_gduz_{_ar.get('firma','')}", use_container_width=True):
-                        if "an_cari_sec" in st.session_state: del st.session_state["an_cari_sec"]
-                        st.session_state["an_firma_input"] = str(_ar.get("firma",""))
-                        st.session_state["an_aktif_tab"] = "duzenle"
-                        for _k3 in ["an_fiyat_satirlar","an_bolge_satirlar","an_avm_satirlar","an_rakip_satirlar"]:
-                            if _k3 in st.session_state: del st.session_state[_k3]
+                # AKSİYON BUTONLARI
+                _wbg = st.columns(4)
+                if _wbg[0].button("✏️ Düzenle", key=f"an_gduz_{_ar.get('firma','')}", use_container_width=True):
+                    if "an_cari_sec" in st.session_state: del st.session_state["an_cari_sec"]
+                    st.session_state["an_firma_input"] = str(_ar.get("firma",""))
+                    for _k3 in ["an_fiyat_satirlar","an_bolge_satirlar","an_avm_satirlar","an_rakip_satirlar"]:
+                        if _k3 in st.session_state: del st.session_state[_k3]
+                    st.rerun()
+                _tel3b = str(_ar.get("iletisim","") or "").replace(" ","").replace("-","")
+                if _tel3b and "@" not in _tel3b:
+                    if _tel3b.startswith("0"): _tel3b="90"+_tel3b[1:]
+                    _wa3b = ("Merhaba " + str(_ar.get("firma","")) + ", gorusemiz icin tesekkurler.").replace(" ","%20")
+                    _wbg[1].markdown(f"<a href='https://wa.me/{_tel3b}?text={_wa3b}' target='_blank'><button style='width:100%;padding:5px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;'>💬 WA</button></a>", unsafe_allow_html=True)
+                if _wbg[2].button("📄 Teklif", key=f"an_gtek_{_ar.get('firma','')}", use_container_width=True):
+                    st.session_state["aktif_tab"] = "teklif"
+                    st.session_state["pending_hedef_mus"] = str(_ar.get("firma",""))
+                    _an_ttur_str2 = str(_ar.get("teklif_tur","") or "")
+                    if "özel" in _an_ttur_str2.lower() or "sözleşme" in _an_ttur_str2.lower():
+                        st.session_state["global_teklif_turu"] = "🤝 Özel Anlaşma"
+                    else:
+                        st.session_state["global_teklif_turu"] = "🚀 Spot Teklif"
+                    st.rerun()
+                if _wbg[3].button("🗑 Sil", key=f"an_gsil_{_ar.get('firma','')}", use_container_width=True):
+                    if _an_sil(str(_ar.get("firma",""))):
+                        st.success("Analiz silindi!")
                         st.rerun()
-                    _tel3b = str(_ar.get("iletisim","") or "").replace(" ","").replace("-","")
-                    if _tel3b and "@" not in _tel3b:
-                        if _tel3b.startswith("0"): _tel3b="90"+_tel3b[1:]
-                        _wa3b = "Merhaba " + str(_ar.get("firma","")) + ", gorusemiz icin tesekkurler."
-                        _wbg[1].markdown("<a href='https://wa.me/"+_tel3b+"?text="+_wa3b.replace(" ","%20")+"' target='_blank'><button style='width:100%;padding:5px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;'>💬 WA</button></a>", unsafe_allow_html=True)
-                    if _wbg[2].button("📄 Teklif", key=f"an_gtek_{_ar.get('firma','')}", use_container_width=True):
-                        st.session_state["aktif_tab"] = "teklif"
-                        st.session_state["pending_hedef_mus"] = str(_ar.get("firma",""))
-                        _an_ttur_str2 = str(_ar.get("teklif_tur","") or "")
-                        if "özel" in _an_ttur_str2.lower() or "sözleşme" in _an_ttur_str2.lower():
-                            st.session_state["global_teklif_turu"] = "🤝 Özel Anlaşma"
-                        else:
-                            st.session_state["global_teklif_turu"] = "🚀 Spot Teklif"
-                        st.rerun()
-                    if _wbg[3].button("🗑 Sil", key=f"an_gsil_{_ar.get('firma','')}", use_container_width=True):
-                        if _an_sil(str(_ar.get("firma",""))):
-                            st.success("Analiz silindi!")
-                            st.rerun()
 
             # ── ÖZET METRİKLER ───────────────────────────────────────────
             st.divider()
