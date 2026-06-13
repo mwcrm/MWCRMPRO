@@ -865,9 +865,7 @@ if st.session_state.get("rol") != "admin":
 with st.sidebar:
     st.markdown("""
 <style>
-section[data-testid="stSidebar"] { padding-top: 0.5rem !important; padding-bottom: 0 !important; }
-section[data-testid="stSidebar"] > div { display: flex !important; flex-direction: column !important; height: 100% !important; }
-section[data-testid="stSidebar"] > div > div[data-testid="stVerticalBlock"] { flex: 1 !important; display: flex !important; flex-direction: column !important; }
+section[data-testid="stSidebar"] { padding-top: 0.5rem !important; }
 section[data-testid="stSidebar"] .stButton>button {
     text-align: left !important;
     justify-content: flex-start !important;
@@ -885,16 +883,9 @@ section[data-testid="stSidebar"] .stButton>button p {
     color: inherit !important;
     font-size: 12px !important;
 }
-section[data-testid="stSidebar"] .stButton>button:hover {
-    background: #f0f4ff !important;
-}
-section[data-testid="stSidebar"] .stButton>button[kind="primary"] {
-    background: #dbeafe !important;
-}
-section[data-testid="stSidebar"] .stButton>button[kind="primary"] p {
-    color: #1d4ed8 !important;
-    font-weight: 600 !important;
-}
+section[data-testid="stSidebar"] .stButton>button:hover { background: #f0f4ff !important; }
+section[data-testid="stSidebar"] .stButton>button[kind="primary"] { background: #dbeafe !important; }
+section[data-testid="stSidebar"] .stButton>button[kind="primary"] p { color: #1d4ed8 !important; font-weight: 600 !important; }
 section[data-testid="stSidebar"] .stButton { margin: 0 !important; padding: 0 !important; }
 section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div { gap: 0px !important; }
 section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] { gap: 0px !important; }
@@ -905,8 +896,9 @@ section[data-testid="stSidebar"] div[data-testid="stExpander"] > div { padding: 
 </style>
 """, unsafe_allow_html=True)
 
-    st.markdown("<div style='font-size:14px;font-weight:700;color:#1f6feb;padding:2px 4px 4px;'>🏢 MWCRMPRO</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size:14px;font-weight:700;color:#1f6feb;padding:10px 4px 10px;'>🏢 MWCRMPRO</div>", unsafe_allow_html=True)
     st.divider()
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
     # ── MENÜ LİSTESİ ──────────────────────────────────────────────────────────
     _sb_liste = get_menu_tercihi(st.session_state["kullanici"])
@@ -962,7 +954,7 @@ section[data-testid="stSidebar"] div[data-testid="stExpander"] > div { padding: 
             st.session_state["aktif_tab"] = _tab_key
             st.rerun()
 
-    st.markdown("<div style='flex:1'></div>", unsafe_allow_html=True)
+    # ── ALT BÖLÜM ─────────────────────────────────────────────────────────────
     st.divider()
 
     with st.expander("❓ Yardım"):
