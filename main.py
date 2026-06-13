@@ -2236,7 +2236,7 @@ elif aktif == "kullanici":
             "fenerbahce":    ("#ffef03","#004684","Fenerbahçe"),
             "galatasaray":   ("#e30613","#fcb514","Galatasaray"),
             "besiktas":      ("#000000","#ffffff","Beşiktaş"),
-            "trabzonspor":   ("#722f37","#003399","Trabzonspor"),
+            "trabzonspor":   ("#ffffff","#722f37","Trabzonspor"),
             "giresunspor":   ("#2d8c2d","#ffffff","Giresunspor"),
             "samsunspor":    ("#cc0000","#000000","Samsunspor"),
             "rizespor":      ("#0055a5","#008000","Rizespor"),
@@ -2267,8 +2267,8 @@ elif aktif == "kullanici":
         }
 
         # 4 büyük — önizlemeli
-        _4buyuk = ["fenerbahce","galatasaray","besiktas","trabzonspor"]
-        _tk4 = st.columns(4)
+        _4buyuk = ["fenerbahce","galatasaray","besiktas","trabzonspor","giresunspor"]
+        _tk4 = st.columns(5)
         for _tki, _tkk in enumerate(_4buyuk):
             _r1, _r2, _tad = _TUM_TAKIMLAR[_tkk]
             _aktif_tk = _mevcut.get("takim","") == _tkk
@@ -2292,29 +2292,7 @@ elif aktif == "kullanici":
                 st.session_state["_ekran_r2"] = _r2
                 st.rerun()
 
-        st.markdown("**🔍 Diğer Takımlar**")
-        _takim_ara = st.text_input("", placeholder="Takım ara... Giresunspor, Samsunspor...",
-                                    key="takim_ara", label_visibility="collapsed")
-        _diger = {k:v for k,v in _TUM_TAKIMLAR.items() if k not in _4buyuk}
-        if _takim_ara:
-            _diger = {k:v for k,v in _diger.items() if _takim_ara.lower() in v[2].lower()}
 
-        _pill_cols = st.columns(4)
-        for _pi, (_tkk, (_r1,_r2,_tad)) in enumerate(_diger.items()):
-            _aktif_d = _mevcut.get("takim","") == _tkk
-            _pill_cols[_pi % 4].markdown(
-                f"<div style='padding:4px 8px;border-radius:16px;border:1.5px solid {_r1};"
-                f"color:{_r1};font-size:11px;margin:2px 0;"
-                f"background:{'#e8f4ff' if _aktif_d else 'white'};font-weight:{'600' if _aktif_d else '400'};'>"
-                f"{'✓ ' if _aktif_d else ''}{_tad}</div>",
-                unsafe_allow_html=True
-            )
-            if _pill_cols[_pi % 4].button("Seç", key=f"takim_{_tkk}", use_container_width=True):
-                _mevcut["takim"] = _tkk
-                _ekran_kaydet(_mevcut)
-                st.session_state["_ekran_r1"] = _r1
-                st.session_state["_ekran_r2"] = _r2
-                st.rerun()
 
         if st.button("↺ Varsayılana Sıfırla", use_container_width=True, key="ekran_sifirla"):
             _ekran_kaydet({"bosluk":"normal","tema":"beyaz"})
