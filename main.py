@@ -3832,6 +3832,7 @@ elif aktif == "excel":
 <html>
 <head>
 <script src="https://cdn.jsdelivr.net/npm/hyperformula/dist/hyperformula.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
 body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: #fff; }
@@ -3902,6 +3903,10 @@ td.err { color: #dc2626 !important; }
   <button onclick="clearCell()">⌫</button>
   <button onclick="exportCSV()">📥 CSV</button>
   <button onclick="showHelp()" style="color:#7c3aed;font-weight:600;">fx ?</button>
+  <div class="sep"></div>
+  <label style="padding:3px 8px;font-size:11px;border:1px solid #16a34a;border-radius:4px;background:#f0fdf4;color:#16a34a;cursor:pointer;font-weight:500;">
+    📂 Excel Yükle <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="loadExcel(this)">
+  </label>
   <span id="hfStatus" style="margin-left:auto;font-size:10px;color:#16a34a;font-weight:500;"></span>
 </div>
 <div class="formula-bar">
@@ -3922,7 +3927,7 @@ td.err { color: #dc2626 !important; }
   <div class="ctx-sep"></div><div onclick="clearCell()">⌫ Temizle</div>
 </div>
 <script>
-const ROWS=50,COLS=26;
+const ROWS=1000,COLS=100;
 let hf,sheets=[],curSheet=0,selR=0,selC=0,editMode=false,cellFmt={};
 function colName(i){let n='';i++;while(i>0){n=String.fromCharCode(64+(i%26||26))+n;i=Math.floor((i-1)/26);}return n;}
 function fmtKey(r,c){return r+','+c;}
@@ -3931,19 +3936,13 @@ function setF(si,r,c,k,v){if(!cellFmt[si])cellFmt[si]={};const key=fmtKey(r,c);i
 function initHF(){
   const name='Sayfa 1';
   const d=Array.from({length:ROWS},()=>Array(COLS).fill(''));
-  d[0][0]='Firma';d[0][1]='İl';d[0][2]='Hedef';d[0][3]='Gerçek';d[0][4]='Fark';d[0][5]='Durum';
-  d[1]=['ABC Lojistik','İstanbul',50000,45000,'=C2-D2','=IF(E2>=0,"✅ İyi","❌ Açık")','','','','','','','','','','','','','','','','','','','',''];
-  d[2]=['XYZ Kargo','Bursa',30000,32000,'=C3-D3','=IF(E3>=0,"✅ İyi","❌ Açık")','','','','','','','','','','','','','','','','','','','',''];
-  d[3]=['DEF Taşımacılık','İzmir',70000,68000,'=C4-D4','=IF(E4>=0,"✅ İyi","❌ Açık")','','','','','','','','','','','','','','','','','','','',''];
-  d[4]=['TOPLAM','','=SUM(C2:C4)','=SUM(D2:D4)','=SUM(E2:E4)','','','','','','','','','','','','','','','','','','','','',''];
-  d[5]=['ORTALAMA','','=AVERAGE(C2:C4)','=AVERAGE(D2:D4)','','','','','','','','','','','','','','','','','','','','','',''];
+  // Boş tablo — kullanıcı istediği gibi doldurur
   try{
     hf=HyperFormula.buildFromSheets({[name]:d},{licenseKey:'gpl-v3',language:'enUS'});
     sheets=[name];
     document.getElementById('hfStatus').textContent='✅ 400+ formül aktif';
   }catch(e){document.getElementById('hfStatus').textContent='⚠️ '+e.message;}
-  for(let c=0;c<6;c++)setF(0,0,c,'bold',true);
-  setF(0,4,0,'bold',true);setF(0,5,0,'bold',true);
+  // Formatlar temiz başlar
   buildTabs();buildTable();
 }
 function getCellDisplay(si,r,c){try{const sid=hf.getSheetId(sheets[si]);const v=hf.getCellValue({sheet:sid,row:r,col:c});if(v===null||v===undefined||v==='')return'';if(typeof v==='object'&&v.type)return'#'+v.type;return String(v);}catch(e){return'';}}
@@ -4025,6 +4024,48 @@ function addSheet(){const name='Sayfa '+(sheets.length+1);hf.addSheet(name);shee
 function switchSheet(i){curSheet=i;selR=0;selC=0;buildTabs();buildTable();}
 function renameSheet(i){const n=prompt('Sayfa adı:',sheets[i]);if(n){hf.renameSheet(hf.getSheetId(sheets[i]),n);sheets[i]=n;buildTabs();}}
 function buildTabs(){const t=document.getElementById('sheetTabs');let html='<button class="tab-add" onclick="addSheet()">＋</button>';sheets.forEach((s,i)=>html+=`<div class="tab ${i===curSheet?'active':''}" onclick="switchSheet(${i})" ondblclick="renameSheet(${i})">${s}</div>`);t.innerHTML=html;}
+function loadExcel(input){
+  const file=input.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(e){
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      wb.SheetNames.forEach(sheetName=>{
+        const ws=wb.Sheets[sheetName];
+        const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+        if(!data||data.length===0)return;
+        // Maksimum boyut
+        const maxCols=Math.max(...data.map(r=>r.length),COLS);
+        // Satır sayısını ayarla
+        while(data.length<ROWS)data.push(Array(maxCols).fill(''));
+        data.forEach(r=>{while(r.length<maxCols)r.push('');});
+        // HyperFormula'ya yeni sayfa ekle
+        const uniq=sheets.includes(sheetName)?sheetName+'_'+Date.now():sheetName;
+        hf.addSheet(uniq);
+        const sid=hf.getSheetId(uniq);
+        // Veriyi işle — formüller = ile başlıyorsa formül olarak ekle
+        const hfData=data.map(row=>row.map(cell=>{
+          if(typeof cell==='string'&&cell.startsWith('='))return cell;
+          if(typeof cell==='number')return cell;
+          if(cell===''||cell===null||cell===undefined)return null;
+          return String(cell);
+        }));
+        hf.setSheetContent(sid,hfData);
+        sheets.push(uniq);
+        cellFmt[sheets.length-1]={};
+      });
+      curSheet=sheets.length-1;selR=0;selC=0;
+      buildTabs();buildTable();
+      document.getElementById('hfStatus').textContent='✅ '+wb.SheetNames.length+' sayfa yüklendi';
+    }catch(err){
+      alert('Hata: '+err.message);
+      console.error(err);
+    }
+  };
+  reader.readAsBinaryString(file);
+  input.value='';
+}
+
 function exportCSV(){const sid=hf.getSheetId(sheets[curSheet]),dims=hf.getSheetDimensions(sid);let csv='';for(let r=0;r<dims.height;r++){const row=[];for(let c=0;c<dims.width;c++){const v=hf.getCellValue({sheet:sid,row:r,col:c});row.push('"'+String(v||'').replace(/"/g,'""')+'"');}csv+=row.join(',')+'
 ';}const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);a.download=sheets[curSheet]+'.csv';a.click();}
 function showHelp(){alert('Desteklenen Formüller (400+):\n\n=SUM, =SUMIF, =SUMIFS (ÇOKETOPLA)\n=COUNTIF, =COUNTIFS (ÇOKEĞERSAY)\n=AVERAGE, =MAX, =MIN\n=VLOOKUP (DÜŞEYARA), =HLOOKUP\n=INDEX, =MATCH\n=IF (EĞER), =AND, =OR, =NOT\n=LEFT, =RIGHT, =MID, =LEN\n=TRIM, =UPPER, =LOWER\n=TODAY, =NOW, =YEAR, =MONTH\n=ROUND, =ABS, =SQRT, =POWER\n=CONCATENATE ve daha fazlası...');}
