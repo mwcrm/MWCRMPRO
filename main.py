@@ -812,7 +812,7 @@ def get_menu_tercihi(kullanici):
         if sb_m:
             res = sb_m.table("kullanici_tercih").select("deger").eq("kullanici", kullanici).eq("anahtar","menu_sirasi").execute()
             if res.data:
-                kayitli = _menu_json.loads(res.data[0]["deger"])
+                kayitli = json.loads(res.data[0]["deger"])
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
                     tam_liste += ["kullanici","admin_rapor"]
@@ -836,7 +836,7 @@ def get_menu_tercihi(kullanici):
             row = conn.execute("SELECT deger FROM kullanici_tercih WHERE kullanici=? AND anahtar='menu_sirasi'", (kullanici,)).fetchone()
             conn.close()
             if row:
-                kayitli = _menu_json.loads(row[0])
+                kayitli = json.loads(row[0])
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
                     tam_liste += ["kullanici","admin_rapor"]
@@ -864,13 +864,13 @@ def save_menu_tercihi(kullanici, sira):
             sb_m.table("kullanici_tercih").upsert({
                 "kullanici": kullanici,
                 "anahtar": "menu_sirasi",
-                "deger": _menu_json.dumps(sira)
+                "deger": json.dumps(sira)
             }, on_conflict="kullanici,anahtar").execute()
         else:
             conn = get_conn()
             conn.execute("CREATE TABLE IF NOT EXISTS kullanici_tercih (id INTEGER PRIMARY KEY AUTOINCREMENT, kullanici TEXT, anahtar TEXT, deger TEXT, UNIQUE(kullanici, anahtar))")
             conn.execute("INSERT OR REPLACE INTO kullanici_tercih (kullanici, anahtar, deger) VALUES (?,?,?)",
-                (kullanici, "menu_sirasi", _menu_json.dumps(sira)))
+                (kullanici, "menu_sirasi", json.dumps(sira)))
             conn.commit(); conn.close()
     except: pass
 
