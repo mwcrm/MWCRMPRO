@@ -663,6 +663,28 @@ def cikis():
 # ── SESSION STATE ─────────────────────────────────────────────────────────────
 st.set_page_config(page_title="MWCRMPRO", layout="wide")
 
+# ── EKRAN AYARLARI UYGULA ────────────────────────────────────────────────────
+_e_tema = st.session_state.get("_ekran_tema","")
+_e_tema2 = st.session_state.get("_ekran_tema2","")
+_e_bosluk = st.session_state.get("_ekran_bosluk","1rem")
+if _e_tema or _e_bosluk != "1rem":
+    _takim_css = ""
+    if _e_tema2:
+        _takim_css = f"""
+        section[data-testid="stSidebar"] {{ background: {_e_tema} !important; }}
+        section[data-testid="stSidebar"] .stButton>button {{ border-color: {_e_tema2} !important; }}
+        """
+    st.markdown(f"""
+<style>
+.main .block-container {{
+    padding-top: {_e_bosluk} !important;
+    padding-bottom: {_e_bosluk} !important;
+}}
+{"body, .main { background-color: " + _e_tema + " !important; }" if _e_tema and not _e_tema2 else ""}
+{_takim_css}
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown("""
 <style>
 /* Mobil uyumluluk */
@@ -1856,11 +1878,11 @@ elif aktif == "kullanici":
     )
 
     if st.session_state.get("rol") == "admin":
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5 = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları"])
     elif _surum_yetkisi:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5 = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları"])
     else:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4 = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5_ekran = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🎨 Ekran Ayarları"])
         kul_tab5 = None
 
     with kul_tab1:
@@ -2120,6 +2142,122 @@ elif aktif == "kullanici":
                         st.rerun()
                     except Exception as _e_del:
                         st.error(f"Silinemedi: {_e_del}")
+
+    with kul_tab5_ekran:
+        st.markdown("### 🎨 Ekran Ayarları")
+        _sb_ekran = get_sb_client()
+        _ekran_kul = st.session_state.get("kullanici","")
+
+        def _ekran_yukle():
+            try:
+                if _sb_ekran:
+                    _r = _sb_ekran.table("kullanici_tercih").select("deger").eq("kullanici",_ekran_kul).eq("anahtar","ekran_ayar").execute()
+                    if _r.data:
+                        import json as _ej
+                        return _ej.loads(_r.data[0]["deger"])
+            except: pass
+            return {"bosluk":"normal","tema":"beyaz"}
+
+        def _ekran_kaydet(ayar):
+            try:
+                import json as _ej
+                if _sb_ekran:
+                    _sb_ekran.table("kullanici_tercih").upsert({
+                        "kullanici":_ekran_kul,"anahtar":"ekran_ayar",
+                        "deger":_ej.dumps(ayar,ensure_ascii=False)
+                    },on_conflict="kullanici,anahtar").execute()
+                    return True
+            except: pass
+            return False
+
+        _mevcut = _ekran_yukle()
+
+        # ── SAYFA BOŞLUĞU ───────────────────────────────────────────────────
+        st.markdown("#### 📐 Sayfa Boşluğu")
+        _bosluk_opts = ["dar","normal","genis"]
+        _bosluk_etiket = {"dar":"Dar","normal":"Normal","genis":"Geniş"}
+        _b_cols = st.columns(3)
+        for _bi, _bk in enumerate(_bosluk_opts):
+            _aktif_b = _mevcut.get("bosluk","normal") == _bk
+            if _b_cols[_bi].button(
+                _bosluk_etiket[_bk],
+                key=f"bosluk_{_bk}",
+                use_container_width=True,
+                type="primary" if _aktif_b else "secondary"
+            ):
+                _mevcut["bosluk"] = _bk
+                _ekran_kaydet(_mevcut)
+                # CSS uygula
+                _bosluk_css = {"dar":"0.3rem","normal":"1rem","genis":"3rem"}
+                st.session_state["_ekran_bosluk"] = _bosluk_css[_bk]
+                st.rerun()
+
+        st.divider()
+
+        # ── ARKA PLAN ────────────────────────────────────────────────────────
+        st.markdown("#### 🎨 Arka Plan Rengi")
+        _temalar = {
+            "beyaz":    ("#ffffff","Beyaz"),
+            "acik_mavi":("#e8f4ff","Açık Mavi"),
+            "gri":      ("#f1f5f9","Gri"),
+            "yesil":    ("#f0fdf4","Açık Yeşil"),
+            "krem":     ("#fff7ed","Krem"),
+            "koyu":     ("#1e293b","Koyu"),
+        }
+        _t_cols = st.columns(6)
+        for _ti, (_tk, (_tren, _tad)) in enumerate(_temalar.items()):
+            _aktif_t = _mevcut.get("tema","beyaz") == _tk
+            _t_cols[_ti].markdown(
+                f"<div onclick='' style='cursor:pointer;text-align:center;'>"
+                f"<div style='width:36px;height:36px;border-radius:6px;background:{_tren};"
+                f"border:{"2px solid #3b82f6" if _aktif_t else "0.5px solid #cbd5e1"};"
+                f"margin:0 auto 4px;'></div>"
+                f"<span style='font-size:10px;'>{_tad}</span></div>",
+                unsafe_allow_html=True
+            )
+            if _t_cols[_ti].button("●", key=f"tema_{_tk}", use_container_width=True, help=_tad):
+                _mevcut["tema"] = _tk
+                _ekran_kaydet(_mevcut)
+                st.session_state["_ekran_tema"] = _tren
+                st.rerun()
+
+        st.divider()
+
+        # ── TAKIM TEMALARI ───────────────────────────────────────────────────
+        st.markdown("#### ⚽ Takım Teması")
+        _takimlar = {
+            "fenerbahce":  ("#ffef03","#004684","Fenerbahçe"),
+            "galatasaray": ("#e30613","#fcb514","Galatasaray"),
+            "besiktas":    ("#000000","#ffffff","Beşiktaş"),
+            "trabzonspor": ("#722f37","#003399","Trabzonspor"),
+        }
+        _tk_cols = st.columns(4)
+        for _tki, (_tkk, (_r1,_r2,_tad)) in enumerate(_takimlar.items()):
+            _aktif_tk = _mevcut.get("takim","") == _tkk
+            _tk_cols[_tki].markdown(
+                f"<div style='text-align:center;'>"
+                f"<div style='width:44px;height:44px;border-radius:8px;"
+                f"background:linear-gradient(135deg,{_r1} 50%,{_r2} 50%);"
+                f"border:{"2px solid #3b82f6" if _aktif_tk else "0.5px solid #cbd5e1"};"
+                f"margin:0 auto 4px;'></div>"
+                f"<span style='font-size:11px;'>{_tad}</span></div>",
+                unsafe_allow_html=True
+            )
+            if _tk_cols[_tki].button("Seç", key=f"takim_{_tkk}", use_container_width=True):
+                _mevcut["takim"] = _tkk
+                _mevcut["tema"] = _tkk
+                _ekran_kaydet(_mevcut)
+                st.session_state["_ekran_tema"] = _r1
+                st.session_state["_ekran_tema2"] = _r2
+                st.rerun()
+
+        st.divider()
+        if st.button("↺ Varsayılana Sıfırla", use_container_width=True, key="ekran_sifirla"):
+            _ekran_kaydet({"bosluk":"normal","tema":"beyaz"})
+            st.session_state.pop("_ekran_tema", None)
+            st.session_state.pop("_ekran_tema2", None)
+            st.session_state.pop("_ekran_bosluk", None)
+            st.rerun()
 
     if kul_tab5 and (st.session_state.get("rol") == "admin" or _surum_yetkisi):
         with kul_tab5:
