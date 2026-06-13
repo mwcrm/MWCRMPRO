@@ -1897,101 +1897,6 @@ elif aktif == "liste":
 
 
 
-    # ── AŞAMA BAZLI SAYFALAR ─────────────────────────────────────────────────
-    st.markdown("### 📂 Aşama Sayfaları")
-    secili_asama_sayfa = st.selectbox("Aşama Seç:", tum_asama_opts, key="asama_sayfa_sec")
-    df_asama = df[df["islem_asamasi"]==secili_asama_sayfa].copy() if not df.empty else pd.DataFrame()
-    df_asama = df_asama.reset_index(drop=True)
-    st.markdown(f"**{secili_asama_sayfa} — {len(df_asama)} kayıt**")
-
-    if df_asama.empty:
-        st.info(f"Bu aşamada kayıt yok.")
-        if st.button("➕ Bu Aşamaya Kart Ekle", use_container_width=True, type="primary", key="asama_yeni_btn"):
-            st.session_state["aktif_tab"] = "yeni"
-            st.session_state["varsayilan_asama"] = secili_asama_sayfa; st.rerun()
-    else:
-        df_asama_edit = df_asama.copy()
-        df_asama_edit.insert(0, "Seç", False)
-        _asama_key = f"aed_{secili_asama_sayfa[:10].replace(' ','_')}"
-
-        edited_asama = st.data_editor(
-            df_asama_edit,
-            use_container_width=True,
-            num_rows="fixed",
-            column_config=col_config,
-            column_order=col_order,
-            key=_asama_key
-        )
-        # Her render'da kaydet
-        try:
-            st.session_state[f"_as_tablo_{_asama_key}"] = edited_asama[col_order[1:]].to_json(orient="records", force_ascii=False)
-        except: pass
-
-        secili_asama_df = edited_asama[edited_asama["Seç"]==True]
-        secili_asama_idler = secili_asama_df["id"].tolist() if not secili_asama_df.empty else []
-
-        aa1,aa2,aa3 = st.columns(3)
-        with aa1:
-            if st.button("💾 Kaydet", key=f"asv_{_asama_key}", use_container_width=True, type="primary"):
-                _tj = st.session_state.get(f"_as_tablo_{_asama_key}")
-                ks = 0
-                if _tj:
-                    _arows = _json_ls.loads(_tj)
-                    for row in _arows:
-                        rid = row.get("id")
-                        if not rid or str(rid) in ["nan","None",""]: continue
-                        try:
-                            rid = int(float(str(rid)))
-                            gd = {
-                                "firma":str(row.get("firma","") or ""),
-                                "yetkili":str(row.get("yetkili","") or ""),
-                                "gsm":str(row.get("gsm","") or ""),
-                                "sabit":str(row.get("sabit","") or ""),
-                                "email":str(row.get("email","") or ""),
-                                "il":str(row.get("il","") or ""),
-                                "ilce":str(row.get("ilce","") or ""),
-                                "durum":str(row.get("durum","") or ""),
-                                "temsilci":str(row.get("temsilci","") or ""),
-                                "islem_asamasi":str(row.get("islem_asamasi","") or ""),
-                                "aciklama":str(row.get("aciklama","") or ""),
-                            }
-                            if sb_liste:
-                                try: sb_liste.table("cari_kartlar").update(gd).eq("id",rid).execute()
-                                except:
-                                    g2={k:v for k,v in gd.items() if k!="aciklama"}
-                                    sb_liste.table("cari_kartlar").update(g2).eq("id",rid).execute()
-                            else:
-                                conn_a=get_conn()
-                                sets=", ".join([f"{k}=?" for k in gd])
-                                conn_a.execute(f"UPDATE cari_kartlar SET {sets} WHERE id=?",list(gd.values())+[rid])
-                                conn_a.commit(); conn_a.close()
-                            ks += 1
-                        except: pass
-                try: db_read.clear()
-                except: pass
-                st.session_state.pop(f"_as_tablo_{_asama_key}", None)
-                st.success(f"✅ {ks} kaydedildi!"); st.rerun()
-
-        with aa2:
-            hedef_asama = st.selectbox("→ Taşı:", tum_asama_opts, key=f"tasi_{_asama_key}")
-            if st.button("🔄 Seçilileri Taşı", key=f"tasibtn_{_asama_key}", use_container_width=True):
-                if secili_asama_idler:
-                    for rid in secili_asama_idler:
-                        try:
-                            if sb_liste: sb_liste.table("cari_kartlar").update({"islem_asamasi":hedef_asama}).eq("id",int(rid)).execute()
-                            else: db_update("cari_kartlar",{"islem_asamasi":hedef_asama},"id",int(rid))
-                        except: pass
-                    try: db_read.clear()
-                    except: pass
-                    st.success(f"✅ {len(secili_asama_idler)} → {hedef_asama}"); st.rerun()
-                else:
-                    st.warning("Önce Seç kolonunu işaretleyin!")
-
-        with aa3:
-            if st.button("➕ Bu Aşamaya Ekle", key=f"aaekle_{_asama_key}", use_container_width=True):
-                st.session_state["aktif_tab"] = "yeni"
-                st.session_state["varsayilan_asama"] = secili_asama_sayfa; st.rerun()
-
     st.divider()
 
     # ── SAYFA RAPORU ─────────────────────────────────────────────────────────
@@ -4873,7 +4778,7 @@ elif aktif == "randevu":
     bugun_str = datetime.now().strftime("%Y-%m-%d")
 
     # ── iki sekme ─────────────────────────────────────────────────────────────
-    r_tab1, r_tab2 = st.tabs(["📋 Liste & Düzenle", "➕ Yeni Randevu"])
+    r_tab1, r_tab2, r_tab3 = st.tabs(["📋 Liste & Düzenle", "➕ Yeni Randevu", "📂 Aşama Sayfaları"])
 
     with r_tab1:
         # Filtreler
@@ -5138,6 +5043,123 @@ elif aktif == "randevu":
                             "icerik":f"Temsilci: {rand_temsilci} | Tarih: {rand_tarih} {rand_saat} | Bölge: {rand_bolge}",
                             "gonderim_bilgisi":_tw3,"olusturan":st.session_state.get("kullanici","")})
                     st.rerun()
+
+    with r_tab3:
+        import json as _json_ls_r
+        st.markdown("### 📂 Aşama Sayfaları")
+
+        # Cari verileri yükle
+        _sb_as = get_sb_client()
+        try:
+            if _sb_as:
+                _res_as = _sb_as.table("cari_kartlar").select("*").neq("silindi",1).order("tarih",desc=True).execute()
+                _df_as = pd.DataFrame(_res_as.data) if _res_as.data else pd.DataFrame()
+            else:
+                raise Exception()
+        except:
+            _df_as = db_read("cari_kartlar", extra_sql="WHERE silindi=0 OR silindi='0' OR silindi IS NULL ORDER BY tarih DESC")
+
+        _tum_asama_r = _tanimlar_yukle("asama")
+        _tum_durum_r = _tanimlar_yukle("durum")
+        if not _df_as.empty and "islem_asamasi" in _df_as.columns:
+            for _da in _df_as["islem_asamasi"].dropna().unique():
+                if str(_da).strip() and str(_da) not in ["nan",""] and _da not in _tum_asama_r:
+                    _tum_asama_r.append(str(_da))
+
+        _col_config_r = {
+            "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
+            "id":            st.column_config.NumberColumn("ID", disabled=True),
+            "tarih":         None, "olusturan": None, "silindi": None,
+            "beklenen_ciro": None, "gerceklesen_ciro": None,
+            "adres":         None, "aciklama":   None,
+            "firma":         st.column_config.TextColumn("Firma"),
+            "yetkili":       st.column_config.TextColumn("Yetkili"),
+            "gsm":           st.column_config.TextColumn("GSM"),
+            "sabit":         st.column_config.TextColumn("S. Tel"),
+            "email":         st.column_config.TextColumn("Email"),
+            "il":            st.column_config.TextColumn("İl"),
+            "ilce":          st.column_config.TextColumn("İlçe"),
+            "durum":         st.column_config.SelectboxColumn("Durum", options=_tum_durum_r),
+            "temsilci":      st.column_config.TextColumn("Temsilci"),
+            "islem_asamasi": st.column_config.SelectboxColumn("Aşama", options=_tum_asama_r),
+        }
+        _col_order_r = ["Seç","id","firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi"]
+
+        _secili_asama = st.selectbox("Aşama Seç:", _tum_asama_r, key="asama_sayfa_sec")
+        _df_asama = _df_as[_df_as["islem_asamasi"]==_secili_asama].copy() if not _df_as.empty else pd.DataFrame()
+        _df_asama = _df_asama.reset_index(drop=True)
+        st.markdown(f"**{_secili_asama} — {len(_df_asama)} kayıt**")
+
+        if _df_asama.empty:
+            st.info("Bu aşamada kayıt yok.")
+            if st.button("➕ Bu Aşamaya Kart Ekle", use_container_width=True, type="primary", key="asama_yeni_btn"):
+                st.session_state["aktif_tab"] = "yeni"
+                st.session_state["varsayilan_asama"] = _secili_asama; st.rerun()
+        else:
+            _df_asama_edit = _df_asama.copy()
+            _df_asama_edit.insert(0, "Seç", False)
+            _asama_key_r = f"aed_r_{_secili_asama[:10].replace(' ','_')}"
+
+            _edited_asama = st.data_editor(
+                _df_asama_edit,
+                use_container_width=True,
+                num_rows="fixed",
+                column_config=_col_config_r,
+                column_order=_col_order_r,
+                key=_asama_key_r
+            )
+            try:
+                st.session_state[f"_as_tablo_{_asama_key_r}"] = _edited_asama[[c for c in _col_order_r[1:] if c in _edited_asama.columns]].to_json(orient="records", force_ascii=False)
+            except: pass
+
+            _secili_asama_df = _edited_asama[_edited_asama["Seç"]==True]
+            _secili_asama_idler = _secili_asama_df["id"].tolist() if not _secili_asama_df.empty else []
+
+            _aa1, _aa2, _aa3 = st.columns(3)
+            with _aa1:
+                if st.button("💾 Kaydet", key=f"asv_r_{_asama_key_r}", use_container_width=True, type="primary"):
+                    _tj = st.session_state.get(f"_as_tablo_{_asama_key_r}")
+                    _ks = 0
+                    if _tj:
+                        _arows = _json_ls_r.loads(_tj)
+                        for _row in _arows:
+                            _rid = _row.get("id")
+                            if not _rid or str(_rid) in ["nan","None",""]: continue
+                            try:
+                                _rid = int(float(str(_rid)))
+                                _gd = {k: str(_row.get(k,"") or "") for k in ["firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi"]}
+                                if _sb_as:
+                                    _sb_as.table("cari_kartlar").update(_gd).eq("id",_rid).execute()
+                                else:
+                                    _cn=get_conn(); _sets=", ".join([f"{k}=?" for k in _gd])
+                                    _cn.execute(f"UPDATE cari_kartlar SET {_sets} WHERE id=?",list(_gd.values())+[_rid])
+                                    _cn.commit(); _cn.close()
+                                _ks += 1
+                            except: pass
+                    try: db_read.clear()
+                    except: pass
+                    st.success(f"✅ {_ks} kaydedildi!"); st.rerun()
+
+            with _aa2:
+                _hedef_asama = st.selectbox("→ Taşı:", _tum_asama_r, key=f"tasi_r_{_asama_key_r}")
+                if st.button("🔄 Seçilileri Taşı", key=f"tasibtn_r_{_asama_key_r}", use_container_width=True):
+                    if _secili_asama_idler:
+                        for _rid in _secili_asama_idler:
+                            try:
+                                if _sb_as: _sb_as.table("cari_kartlar").update({"islem_asamasi":_hedef_asama}).eq("id",int(_rid)).execute()
+                                else: db_update("cari_kartlar",{"islem_asamasi":_hedef_asama},"id",int(_rid))
+                            except: pass
+                        try: db_read.clear()
+                        except: pass
+                        st.success(f"✅ {len(_secili_asama_idler)} → {_hedef_asama}"); st.rerun()
+                    else:
+                        st.warning("Önce Seç kolonunu işaretleyin!")
+
+            with _aa3:
+                if st.button("➕ Bu Aşamaya Ekle", key=f"aaekle_r_{_asama_key_r}", use_container_width=True):
+                    st.session_state["aktif_tab"] = "yeni"
+                    st.session_state["varsayilan_asama"] = _secili_asama; st.rerun()
+
 
 
 elif aktif == "admin_rapor":
