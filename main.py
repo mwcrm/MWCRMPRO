@@ -683,8 +683,10 @@ section[data-testid="stSidebar"] div[style*="font-size:15px"], section[data-test
     st.markdown(f"""
 <style>
 .main .block-container {{
-    padding-top: {_e_bosluk} !important;
-    padding-bottom: {_e_bosluk} !important;
+    padding-top: {st.session_state.get("_ekran_bosluk","32px")} !important;
+    padding-bottom: {st.session_state.get("_ekran_altbosluk","32px")} !important;
+    padding-left: {st.session_state.get("_ekran_yanbosluk","16px")} !important;
+    padding-right: {st.session_state.get("_ekran_yanbosluk","16px")} !important;
 }}
 {_bg_css}
 {_takim_css}
@@ -2179,24 +2181,94 @@ elif aktif == "kullanici":
         _mevcut = _ekran_yukle()
 
         # ── SAYFA BOŞLUĞU ───────────────────────────────────────────────────
-        st.markdown("#### 📐 Sayfa Boşluğu")
-        _bosluk_opts = ["dar","normal","genis"]
-        _bosluk_etiket = {"dar":"Dar","normal":"Normal","genis":"Geniş"}
-        _b_cols = st.columns(3)
-        for _bi, _bk in enumerate(_bosluk_opts):
-            _aktif_b = _mevcut.get("bosluk","normal") == _bk
-            if _b_cols[_bi].button(
-                _bosluk_etiket[_bk],
-                key=f"bosluk_{_bk}",
-                use_container_width=True,
-                type="primary" if _aktif_b else "secondary"
-            ):
-                _mevcut["bosluk"] = _bk
-                _ekran_kaydet(_mevcut)
-                # CSS uygula
-                _bosluk_css = {"dar":"0.3rem","normal":"1rem","genis":"3rem"}
-                st.session_state["_ekran_bosluk"] = _bosluk_css[_bk]
-                st.rerun()
+        # ── EKRAN ANALİZİ + BOŞLUK AYARI ────────────────────────────────────
+        st.markdown("#### 🖥️ Ekran Analizi & Boşluk Ayarı")
+
+        # Mevcut px değerlerini session'dan al
+        _ust_px  = st.session_state.get("_ust_px", 32)
+        _alt_px  = st.session_state.get("_alt_px", 32)
+        _yan_px  = st.session_state.get("_yan_px", 16)
+
+        # Ekran bilgi kartları — JS ile dolduruluyor
+        st.markdown(f"""
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+  <div style="background:var(--color-background-secondary);border-radius:8px;padding:10px;border:0.5px solid var(--color-border-tertiary);text-align:center;">
+    <div style="font-size:10px;color:gray;margin-bottom:4px;">Ekran Genişliği</div>
+    <div style="font-size:16px;font-weight:500;" id="sw_val">—</div>
+    <div style="font-size:10px;color:gray;">px</div>
+  </div>
+  <div style="background:var(--color-background-secondary);border-radius:8px;padding:10px;border:0.5px solid var(--color-border-tertiary);text-align:center;">
+    <div style="font-size:10px;color:gray;margin-bottom:4px;">Ekran Yüksekliği</div>
+    <div style="font-size:16px;font-weight:500;" id="sh_val">—</div>
+    <div style="font-size:10px;color:gray;">px</div>
+  </div>
+  <div style="background:var(--color-background-secondary);border-radius:8px;padding:10px;border:0.5px solid var(--color-border-tertiary);text-align:center;">
+    <div style="font-size:10px;color:gray;margin-bottom:4px;">Üst Boşluk</div>
+    <div style="font-size:16px;font-weight:500;" id="pt_val">{_ust_px}</div>
+    <div style="font-size:10px;color:gray;">px</div>
+  </div>
+  <div style="background:var(--color-background-secondary);border-radius:8px;padding:10px;border:0.5px solid var(--color-border-tertiary);text-align:center;">
+    <div style="font-size:10px;color:gray;margin-bottom:4px;">Alt Boşluk</div>
+    <div style="font-size:16px;font-weight:500;" id="pb_val">{_alt_px}</div>
+    <div style="font-size:10px;color:gray;">px</div>
+  </div>
+</div>
+
+<!-- Görsel temsil -->
+<div style="border:0.5px solid var(--color-border-tertiary);border-radius:8px;overflow:hidden;margin-bottom:12px;">
+  <div style="background:#1f6feb;height:4px;"></div>
+  <div id="top_vis" style="background:#e8f4ff;display:flex;align-items:center;justify-content:center;font-size:11px;color:#1f6feb;height:{_ust_px}px;min-height:16px;transition:height 0.2s;">
+    ↕ üst: <b id="top_lbl" style="margin-left:4px;">{_ust_px}px</b>
+  </div>
+  <div style="background:white;padding:8px 14px;font-size:12px;border-top:0.5px solid #eee;border-bottom:0.5px solid #eee;">📊 İçerik alanı</div>
+  <div id="bot_vis" style="background:#e8f4ff;display:flex;align-items:center;justify-content:center;font-size:11px;color:#1f6feb;height:{_alt_px}px;min-height:16px;transition:height 0.2s;">
+    ↕ alt: <b id="bot_lbl" style="margin-left:4px;">{_alt_px}px</b>
+  </div>
+  <div style="background:#f0f2f6;height:4px;"></div>
+</div>
+<script>
+document.getElementById('sw_val').textContent = window.screen.width;
+document.getElementById('sh_val').textContent = window.screen.height;
+function updateTop(v){{
+  document.getElementById('top_lbl').textContent=v+'px';
+  document.getElementById('top_vis').style.height=Math.max(16,parseInt(v))+'px';
+  document.getElementById('pt_val').textContent=v;
+}}
+function updateBot(v){{
+  document.getElementById('bot_lbl').textContent=v+'px';
+  document.getElementById('bot_vis').style.height=Math.max(16,parseInt(v))+'px';
+  document.getElementById('pb_val').textContent=v;
+}}
+</script>
+""", unsafe_allow_html=True)
+
+        # Sliderlar
+        _yeni_ust = st.slider("⬆️ Üst Boşluk (px)", 0, 100, _ust_px, key="slider_ust")
+        _yeni_alt = st.slider("⬇️ Alt Boşluk (px)", 0, 100, _alt_px, key="slider_alt")
+        _yeni_yan = st.slider("↔️ Yan Boşluk (px)", 0, 100, _yan_px, key="slider_yan")
+
+        _bs1, _bs2 = st.columns(2)
+        if _bs1.button("💾 Boşlukları Kaydet", use_container_width=True, type="primary", key="bosluk_kaydet"):
+            st.session_state["_ust_px"] = _yeni_ust
+            st.session_state["_alt_px"] = _yeni_alt
+            st.session_state["_yan_px"] = _yeni_yan
+            st.session_state["_ekran_bosluk"] = f"{_yeni_ust}px"
+            st.session_state["_ekran_altbosluk"] = f"{_yeni_alt}px"
+            st.session_state["_ekran_yanbosluk"] = f"{_yeni_yan}px"
+            _mevcut["ust_px"] = _yeni_ust
+            _mevcut["alt_px"] = _yeni_alt
+            _mevcut["yan_px"] = _yeni_yan
+            _ekran_kaydet(_mevcut)
+            st.success("✅ Kaydedildi!")
+            st.rerun()
+        if _bs2.button("↺ Sıfırla", use_container_width=True, key="bosluk_sifirla"):
+            st.session_state["_ust_px"] = 32
+            st.session_state["_alt_px"] = 32
+            st.session_state["_yan_px"] = 16
+            st.session_state["_ekran_bosluk"] = "32px"
+            st.session_state["_ekran_altbosluk"] = "32px"
+            st.session_state["_ekran_yanbosluk"] = "16px"
+            st.rerun()
 
         st.divider()
 
