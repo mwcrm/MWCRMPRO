@@ -1638,437 +1638,6 @@ elif aktif == "liste":
                 st.success("✅ Silindi!"); st.rerun()
 
     st.divider()
-
-    # ── 📨 NOT ARŞİVİ — tıkla aç ─────────────────────────────────────────────
-    st.markdown("#### 📨 Firma Not Arşivi")
-    st.caption("Açıklama sütununa yaz → Kaydet → not arşivlenir. Aşağıdan firmayı seç → notlarını gör.")
-
-    # Not olan firmaları getir
-    _df_notlu = pd.DataFrame()
-    if sb_liste:
-        try:
-            _rn = sb_liste.table("cari_aciklamalar").select("cari_id, cari_adi").execute()
-            if _rn.data:
-                import collections as _col
-                _sayac = _col.Counter([(r["cari_id"], r["cari_adi"]) for r in _rn.data])
-                _df_notlu = pd.DataFrame([
-                    {"cari_id": k[0], "firma": k[1], "not_sayi": v}
-                    for k, v in _sayac.items()
-                ]).sort_values("not_sayi", ascending=False)
-        except:
-            pass
-
-    if _df_notlu.empty:
-        st.info("Henüz arşivlenmiş not yok. Açıklama sütununa yaz ve kaydet.")
-    else:
-        # Firma seç
-        _firma_opts = [f"📨{r['not_sayi']}  {r['firma']}" for _, r in _df_notlu.iterrows()]
-        _sec = st.selectbox("Firma seç:", _firma_opts, key="not_arsiv_sec")
-        _sec_idx = _firma_opts.index(_sec)
-        _sec_cari_id = int(_df_notlu.iloc[_sec_idx]["cari_id"])
-        _sec_firma = str(_df_notlu.iloc[_sec_idx]["firma"])
-
-        # Seçili firmanın notlarını çek
-        try:
-            _rnotlar = sb_liste.table("cari_aciklamalar").select("*").eq("cari_id", _sec_cari_id).order("tarih", desc=True).execute()
-            _df_notlar = pd.DataFrame(_rnotlar.data) if _rnotlar.data else pd.DataFrame()
-        except:
-            _df_notlar = pd.DataFrame()
-
-        st.markdown(f"**{_sec_firma} — {len(_df_notlar)} not:**")
-
-        if not _df_notlar.empty:
-            for _, _nr in _df_notlar.iterrows():
-                _nid   = _nr.get("id", 0)
-                _ntarih = str(_nr.get("tarih",""))[:16]
-                _nkim  = str(_nr.get("olusturan",""))
-                _nmetin = str(_nr.get("aciklama",""))
-                _nozet = _nmetin[:60] + ("..." if len(_nmetin)>60 else "")
-                with st.expander(f"📅 {_ntarih}  👤 {_nkim}  —  {_nozet}"):
-                    st.markdown(
-                        f"<div style='background:#f0f4ff;border-left:4px solid #1f6feb;"
-                        f"padding:12px 16px;border-radius:6px;line-height:1.7'>"
-                        f"{_nmetin.replace(chr(10),'<br>')}"
-                        f"</div>",
-                        unsafe_allow_html=True
-                    )
-                    if st.button("🗑️ Sil", key=f"narsil_{_nid}"):
-                        try:
-                            sb_liste.table("cari_aciklamalar").delete().eq("id", int(_nid)).execute()
-                            st.rerun()
-                        except: pass
-
-    st.divider()
-
-    # ── AŞAMA & DURUM YÖNETİMİ — Supabase'e kayıtlı ─────────────────────────
-    with st.expander("⚙️ Aşama & Durum Yönetimi"):
-        import json as _ydj
-
-        def _sb_tercih_yukle(anahtar):
-            try:
-                _sb = get_sb_client()
-                if _sb:
-                    r = _sb.table("kullanici_tercih").select("deger") \
-                        .eq("kullanici","__sistem__").eq("anahtar",anahtar).execute()
-                    if r.data: return _ydj.loads(r.data[0]["deger"])
-            except: pass
-            return []
-
-        def _sb_tercih_kaydet(anahtar, liste):
-            try:
-                _sb = get_sb_client()
-                if _sb:
-                    _sb.table("kullanici_tercih").upsert({
-                        "kullanici":"__sistem__","anahtar":anahtar,
-                        "deger":_ydj.dumps(liste,ensure_ascii=False)
-                    }, on_conflict="kullanici,anahtar").execute()
-                    return True
-            except: pass
-            return False
-
-        yc1, yc2 = st.columns(2)
-
-        # ── AŞAMA YÖNETİMİ ────────────────────────────────────────────────────
-        with yc1:
-            st.markdown("**🔄 Aşama Yönetimi**")
-
-            _mevcut_asamalar = _tanimlar_yukle("asama")
-
-            # Yeni aşama ekle
-            _ya1, _ya2 = st.columns([3,1])
-            _yeni_a = _ya1.text_input("", key="yeni_asama_ekle",
-                placeholder="Yeni aşama adı...", label_visibility="collapsed")
-            if _ya2.button("➕ Ekle", key="asama_ekle_sb", use_container_width=True):
-                if _yeni_a and _yeni_a.strip():
-                    if _yeni_a.strip() in _mevcut_asamalar:
-                        st.warning("Bu aşama zaten var!")
-                    elif _tanim_ekle("asama", _yeni_a.strip()):
-                        st.success(f"✅ '{_yeni_a}' eklendi!")
-                        st.rerun()
-                    else:
-                        st.error("Eklenemedi!")
-
-            st.caption("Tüm aşamalar — sırala:")
-            for _ai, _a in enumerate(_mevcut_asamalar):
-                _adet = len(df[df["islem_asamasi"]==_a]) if not df.empty and "islem_asamasi" in df.columns else 0
-                _ac1, _ac2, _ac3, _ac4, _ac5 = st.columns([3,1,1,1,1])
-                _ac1.caption(f"{'🔹' if _adet>0 else '⬜'} **{_a}** ({_adet})")
-
-                # Sırala ▲▼
-                if _ai > 0:
-                    if _ac2.button("▲", key=f"asm_up_{_ai}", help="Yukarı"):
-                        try:
-                            _sb_s = get_sb_client()
-                            if _sb_s:
-                                # Sıra değerlerini al
-                                _r1 = _sb_s.table("sistem_tanimlar").select("id,sira").eq("tip","asama").eq("deger",_a).execute()
-                                _r2 = _sb_s.table("sistem_tanimlar").select("id,sira").eq("tip","asama").eq("deger",_mevcut_asamalar[_ai-1]).execute()
-                                if _r1.data and _r2.data:
-                                    _s1, _s2 = _r1.data[0]["sira"], _r2.data[0]["sira"]
-                                    _sb_s.table("sistem_tanimlar").update({"sira":_s2}).eq("id",_r1.data[0]["id"]).execute()
-                                    _sb_s.table("sistem_tanimlar").update({"sira":_s1}).eq("id",_r2.data[0]["id"]).execute()
-                        except: pass
-                        st.rerun()
-                else:
-                    _ac2.caption("")
-
-                if _ai < len(_mevcut_asamalar)-1:
-                    if _ac3.button("▼", key=f"asm_dn_{_ai}", help="Aşağı"):
-                        try:
-                            _sb_s = get_sb_client()
-                            if _sb_s:
-                                _r1 = _sb_s.table("sistem_tanimlar").select("id,sira").eq("tip","asama").eq("deger",_a).execute()
-                                _r2 = _sb_s.table("sistem_tanimlar").select("id,sira").eq("tip","asama").eq("deger",_mevcut_asamalar[_ai+1]).execute()
-                                if _r1.data and _r2.data:
-                                    _s1, _s2 = _r1.data[0]["sira"], _r2.data[0]["sira"]
-                                    _sb_s.table("sistem_tanimlar").update({"sira":_s2}).eq("id",_r1.data[0]["id"]).execute()
-                                    _sb_s.table("sistem_tanimlar").update({"sira":_s1}).eq("id",_r2.data[0]["id"]).execute()
-                        except: pass
-                        st.rerun()
-                else:
-                    _ac3.caption("")
-
-                if _ac4.button("✏️", key=f"asm_duz_{_ai}", help="Düzenle"):
-                    st.session_state[f"asm_edit_{_a}"] = True
-
-                if _adet == 0:
-                    if _ac5.button("🗑️", key=f"asm_sil_{_ai}", help="Sil"):
-                        if _tanim_sil("asama", _a):
-                            st.rerun()
-                else:
-                    _ac5.caption("—")
-
-                if st.session_state.get(f"asm_edit_{_a}"):
-                    with st.form(f"asm_form_{_a}"):
-                        _yeni_asm = st.text_input("Yeni ad:", value=_a, key=f"asm_inp_{_a}")
-                        _f1, _f2 = st.columns(2)
-                        if _f1.form_submit_button("💾 Kaydet", use_container_width=True):
-                            if _yeni_asm and _yeni_asm.strip() != _a:
-                                if _tanim_guncelle("asama", _a, _yeni_asm.strip()):
-                                    st.session_state.pop(f"asm_edit_{_a}", None)
-                                    st.success(f"✅ '{_a}' → '{_yeni_asm}' güncellendi!")
-                                    st.rerun()
-                        if _f2.form_submit_button("İptal", use_container_width=True):
-                            st.session_state.pop(f"asm_edit_{_a}", None)
-                            st.rerun()
-
-        # ── DURUM YÖNETİMİ ────────────────────────────────────────────────────
-        with yc2:
-            st.markdown("**📊 Durum Yönetimi**")
-
-            _mevcut_durumlar = _tanimlar_yukle("durum")
-
-            # Yeni durum ekle
-            _yd1, _yd2 = st.columns([3,1])
-            _yeni_d = _yd1.text_input("", key="yeni_durum_ekle",
-                placeholder="Yeni durum adı...", label_visibility="collapsed")
-            if _yd2.button("➕ Ekle", key="durum_ekle_sb", use_container_width=True):
-                if _yeni_d and _yeni_d.strip():
-                    if _yeni_d.strip() in _mevcut_durumlar:
-                        st.warning("Bu durum zaten var!")
-                    elif _tanim_ekle("durum", _yeni_d.strip()):
-                        st.success(f"✅ '{_yeni_d}' eklendi!")
-                        st.rerun()
-                    else:
-                        st.error("Eklenemedi!")
-
-            st.caption("Tüm durumlar — sırala:")
-            for _di, _d in enumerate(_mevcut_durumlar):
-                _dadet = len(df[df["durum"]==_d]) if not df.empty and "durum" in df.columns else 0
-                _dc1, _dc2, _dc3, _dc4, _dc5 = st.columns([3,1,1,1,1])
-                _dc1.caption(f"{'🔹' if _dadet>0 else '⬜'} **{_d}** ({_dadet})")
-
-                # Sırala ▲▼
-                if _di > 0:
-                    if _dc2.button("▲", key=f"dur_up_{_di}", help="Yukarı"):
-                        try:
-                            _sb_sd = get_sb_client()
-                            if _sb_sd:
-                                _r1 = _sb_sd.table("sistem_tanimlar").select("id,sira").eq("tip","durum").eq("deger",_d).execute()
-                                _r2 = _sb_sd.table("sistem_tanimlar").select("id,sira").eq("tip","durum").eq("deger",_mevcut_durumlar[_di-1]).execute()
-                                if _r1.data and _r2.data:
-                                    _s1, _s2 = _r1.data[0]["sira"], _r2.data[0]["sira"]
-                                    _sb_sd.table("sistem_tanimlar").update({"sira":_s2}).eq("id",_r1.data[0]["id"]).execute()
-                                    _sb_sd.table("sistem_tanimlar").update({"sira":_s1}).eq("id",_r2.data[0]["id"]).execute()
-                        except: pass
-                        st.rerun()
-                else:
-                    _dc2.caption("")
-
-                if _di < len(_mevcut_durumlar)-1:
-                    if _dc3.button("▼", key=f"dur_dn_{_di}", help="Aşağı"):
-                        try:
-                            _sb_sd = get_sb_client()
-                            if _sb_sd:
-                                _r1 = _sb_sd.table("sistem_tanimlar").select("id,sira").eq("tip","durum").eq("deger",_d).execute()
-                                _r2 = _sb_sd.table("sistem_tanimlar").select("id,sira").eq("tip","durum").eq("deger",_mevcut_durumlar[_di+1]).execute()
-                                if _r1.data and _r2.data:
-                                    _s1, _s2 = _r1.data[0]["sira"], _r2.data[0]["sira"]
-                                    _sb_sd.table("sistem_tanimlar").update({"sira":_s2}).eq("id",_r1.data[0]["id"]).execute()
-                                    _sb_sd.table("sistem_tanimlar").update({"sira":_s1}).eq("id",_r2.data[0]["id"]).execute()
-                        except: pass
-                        st.rerun()
-                else:
-                    _dc3.caption("")
-
-                if _dc4.button("✏️", key=f"dur_duz_{_di}", help="Düzenle"):
-                    st.session_state[f"dur_edit_{_d}"] = True
-
-                if _dadet == 0:
-                    if _dc5.button("🗑️", key=f"dur_sil_{_di}", help="Sil"):
-                        if _tanim_sil("durum", _d):
-                            st.rerun()
-                else:
-                    _dc5.caption("—")
-
-                if st.session_state.get(f"dur_edit_{_d}"):
-                    with st.form(f"dur_form_{_d}"):
-                        _yeni_dur = st.text_input("Yeni ad:", value=_d, key=f"dur_inp_{_d}")
-                        _f1, _f2 = st.columns(2)
-                        if _f1.form_submit_button("💾 Kaydet", use_container_width=True):
-                            if _yeni_dur and _yeni_dur.strip() != _d:
-                                if _tanim_guncelle("durum", _d, _yeni_dur.strip()):
-                                    st.session_state.pop(f"dur_edit_{_d}", None)
-                                    st.success(f"✅ '{_d}' → '{_yeni_dur}' güncellendi!")
-                                    st.rerun()
-                        if _f2.form_submit_button("İptal", use_container_width=True):
-                            st.session_state.pop(f"dur_edit_{_d}", None)
-                            st.rerun()
-
-
-
-    st.divider()
-
-    # ── SAYFA RAPORU ─────────────────────────────────────────────────────────
-    with st.expander("📊 Rapor & Durum Yönetimi", expanded=True):
-
-        # ── VERİ HAZIRLA — silinmiş kayıtlar hariç ──────────────────────────
-        _df_r = df.copy()
-        # silindi=1 olanları çıkar
-        if "silindi" in _df_r.columns:
-            _df_r = _df_r[~_df_r["silindi"].astype(str).isin(["1","True"])]
-
-        # ── ÜST METRİKLER ────────────────────────────────────────────────────
-        rm1,rm2,rm3,rm4 = st.columns(4)
-        rm1.metric("Toplam", len(_df_r))
-        rm2.metric("Beklenen", fmt_para(_df_r["beklenen_ciro"].sum()) if "beklenen_ciro" in _df_r.columns else "—")
-        rm3.metric("Gerçekleşen", fmt_para(_df_r["gerceklesen_ciro"].sum()) if "gerceklesen_ciro" in _df_r.columns else "—")
-        rm4.metric("Filtrede", len(df_f))
-
-        st.divider()
-
-        # ── DURUM YÖNETİMİ — Supabase'e kaydet ─────────────────────────────
-        _sb_r = get_sb_client()
-
-        def _durum_yukle():
-            try:
-                if _sb_r:
-                    _res = _sb_r.table("kullanici_tercih").select("deger")                         .eq("kullanici","__sistem__").eq("anahtar","ekstra_durumlar").execute()
-                    if _res.data:
-                        import json as _jd
-                        return _jd.loads(_res.data[0]["deger"])
-            except: pass
-            return []
-
-        def _durum_kaydet(liste):
-            try:
-                import json as _jd
-                _veri = _jd.dumps(liste, ensure_ascii=False)
-                if _sb_r:
-                    _sb_r.table("kullanici_tercih").upsert({
-                        "kullanici":"__sistem__",
-                        "anahtar":"ekstra_durumlar",
-                        "deger":_veri
-                    }, on_conflict="kullanici,anahtar").execute()
-            except: pass
-
-        _ekstra_durumlar = _durum_yukle()
-        _varsayilan = ["Aktif","Hedef","Pasif"]
-        _tum_durumlar = _varsayilan.copy()
-        for _d in _ekstra_durumlar:
-            if _d not in _tum_durumlar:
-                _tum_durumlar.append(_d)
-
-        # ── AŞAMA + DURUM TABLOLARI ──────────────────────────────────────────
-        col_asama, col_durum = st.columns(2)
-
-        with col_asama:
-            st.markdown("**🔄 Aşama Dağılımı**")
-            if "islem_asamasi" in _df_r.columns:
-                _adf = _df_r[
-                    _df_r["islem_asamasi"].notna() &
-                    (_df_r["islem_asamasi"].astype(str).str.strip() != "") &
-                    (_df_r["islem_asamasi"].astype(str) != "nan")
-                ].groupby("islem_asamasi").agg(
-                    Firma=("firma","count"),
-                    Beklenen=("beklenen_ciro","sum"),
-                    Gerceklesen=("gerceklesen_ciro","sum")
-                ).reset_index().sort_values("Firma", ascending=False)
-
-                if not _adf.empty:
-                    _adf["Başarı%"] = _adf.apply(
-                        lambda r: f"%{r['Gerceklesen']/r['Beklenen']*100:.0f}"
-                        if r["Beklenen"]>0 else "—", axis=1)
-                    _adf["Beklenen"]    = _adf["Beklenen"].apply(fmt_para)
-                    _adf["Gerceklesen"] = _adf["Gerceklesen"].apply(fmt_para)
-                    st.dataframe(
-                        _adf.rename(columns={"islem_asamasi":"Aşama","Firma":"Firma"}),
-                        use_container_width=True, hide_index=True
-                    )
-                else:
-                    st.caption("Henüz aşama verisi yok")
-
-        with col_durum:
-            st.markdown("**📊 Durum Dağılımı**")
-            if "durum" in _df_r.columns:
-                _ddf = _df_r[
-                    _df_r["durum"].notna() &
-                    (_df_r["durum"].astype(str).str.strip() != "") &
-                    (_df_r["durum"].astype(str) != "nan")
-                ].groupby("durum").agg(
-                    Firma=("firma","count"),
-                    Beklenen=("beklenen_ciro","sum"),
-                    Gerceklesen=("gerceklesen_ciro","sum")
-                ).reset_index().sort_values("Firma", ascending=False)
-
-                if not _ddf.empty:
-                    _ddf["Beklenen"]    = _ddf["Beklenen"].apply(fmt_para)
-                    _ddf["Gerceklesen"] = _ddf["Gerceklesen"].apply(fmt_para)
-                    st.dataframe(
-                        _ddf.rename(columns={"durum":"Durum","Firma":"Firma"}),
-                        use_container_width=True, hide_index=True
-                    )
-                else:
-                    st.caption("Henüz durum verisi yok")
-
-            # Durum ekle/sil
-            st.markdown("**⚙️ Durum Ekle / Sil:**")
-            _dc1, _dc2 = st.columns([3,1])
-            _yeni_d = _dc1.text_input("", placeholder="VIP, Potansiyel...", key="yeni_durum_inp", label_visibility="collapsed")
-            if _dc2.button("➕", key="durum_ekle_btn", use_container_width=True):
-                if _yeni_d and _yeni_d.strip() and _yeni_d.strip() not in _tum_durumlar:
-                    _ekstra_durumlar.append(_yeni_d.strip())
-                    _durum_kaydet(_ekstra_durumlar)
-                    st.success(f"✅ '{_yeni_d}' eklendi!")
-                    st.rerun()
-                elif _yeni_d.strip() in _tum_durumlar:
-                    st.warning("Bu durum zaten var!")
-
-            # Mevcut durumları listele
-            for _d in _tum_durumlar:
-                _adet = len(_df_r[_df_r["durum"].astype(str)==_d]) if "durum" in _df_r.columns else 0
-                if _adet > 0:  # VERİ OLANLAR
-                    _lc1, _lc2 = st.columns([4,1])
-                    _lc1.caption(f"🔹 **{_d}** — {_adet} firma")
-                    if _d not in _varsayilan:
-                        if _lc2.button("🗑️", key=f"dsil_{_d}", help="Sil (önce veri silinmeli)"):
-                            st.warning(f"'{_d}' durumunda {_adet} firma var, önce firmalar başka duruma taşınmalı!")
-                    else:
-                        _lc2.caption("—")
-                # VERİ OLMAYANLAR — ekstra ise silinebilir
-                elif _d in _ekstra_durumlar:
-                    _lc1, _lc2 = st.columns([4,1])
-                    _lc1.caption(f"⬜ {_d} — 0 firma")
-                    if _lc2.button("🗑️", key=f"dsil_{_d}"):
-                        _ekstra_durumlar.remove(_d)
-                        _durum_kaydet(_ekstra_durumlar)
-                        st.rerun()
-
-        st.divider()
-
-        # ── TEMSİLCİ + İL ────────────────────────────────────────────────────
-        _tc1, _tc2 = st.columns(2)
-        with _tc1:
-            st.markdown("**👤 Temsilci:**")
-            if "temsilci" in _df_r.columns:
-                _tdf = _df_r[
-                    _df_r["temsilci"].notna() &
-                    (_df_r["temsilci"].astype(str).str.strip() != "") &
-                    (_df_r["temsilci"].astype(str) != "nan")
-                ].groupby("temsilci").agg(Firma=("firma","count")).reset_index().sort_values("Firma",ascending=False).head(10)
-                if not _tdf.empty:
-                    st.dataframe(_tdf.rename(columns={"temsilci":"Temsilci","Firma":"Firma"}),
-                                 use_container_width=True, hide_index=True)
-        with _tc2:
-            st.markdown("**🗺️ İl:**")
-            if "il" in _df_r.columns:
-                _idf = _df_r[
-                    _df_r["il"].notna() &
-                    (_df_r["il"].astype(str).str.strip() != "") &
-                    (_df_r["il"].astype(str) != "nan")
-                ].groupby("il").agg(Firma=("firma","count")).reset_index().sort_values("Firma",ascending=False).head(10)
-                if not _idf.empty:
-                    st.dataframe(_idf.rename(columns={"il":"İl","Firma":"Firma"}),
-                                 use_container_width=True, hide_index=True)
-
-        # ── EXCEL ─────────────────────────────────────────────────────────────
-        _buf_rp = __import__("io").BytesIO()
-        df.to_excel(_buf_rp, index=False); _buf_rp.seek(0)
-        st.download_button("📥 Excel'e Aktar", data=_buf_rp,
-            file_name=f"cari_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-            use_container_width=True, key="liste_excel_indir")
-
-
 # ── ARŞİV ─────────────────────────────────────────────────────────────────────
 elif aktif == "arsiv":
     sayfa_log("arsiv")
@@ -4778,7 +4347,7 @@ elif aktif == "randevu":
     bugun_str = datetime.now().strftime("%Y-%m-%d")
 
     # ── iki sekme ─────────────────────────────────────────────────────────────
-    r_tab1, r_tab2, r_tab3 = st.tabs(["📋 Liste & Düzenle", "➕ Yeni Randevu", "📂 Aşama Sayfaları"])
+    r_tab1, r_tab2, r_tab3, r_tab4 = st.tabs(["📋 Liste & Düzenle", "➕ Yeni Randevu", "📂 Aşama Sayfaları", "⚙️ Yönetim"])
 
     with r_tab1:
         # Filtreler
@@ -5159,6 +4728,491 @@ elif aktif == "randevu":
                 if st.button("➕ Bu Aşamaya Ekle", key=f"aaekle_r_{_asama_key_r}", use_container_width=True):
                     st.session_state["aktif_tab"] = "yeni"
                     st.session_state["varsayilan_asama"] = _secili_asama; st.rerun()
+
+
+    with r_tab4:
+        st.markdown("### ⚙️ Yönetim Araçları")
+
+        _yt_sec = st.radio("", [
+            "⚙️ Aşama & Durum Yönetimi",
+            "📊 Rapor & Durum Yönetimi",
+            "📨 Firma Not Arşivi"
+        ], horizontal=True, key="yt_sec", label_visibility="collapsed")
+
+        st.divider()
+
+        if _yt_sec == "⚙️ Aşama & Durum Yönetimi":
+            # Cari verileri yükle
+            _sb_yt = get_sb_client()
+            try:
+                if _sb_yt:
+                    _res_yt = _sb_yt.table("cari_kartlar").select("*").neq("silindi",1).execute()
+                    df = pd.DataFrame(_res_yt.data) if _res_yt.data else pd.DataFrame()
+                else:
+                    raise Exception()
+            except:
+                df = db_read("cari_kartlar", extra_sql="WHERE silindi=0 OR silindi='0' OR silindi IS NULL")
+            sb_liste = _sb_yt
+            tum_asama_opts = _tanimlar_yukle("asama")
+            tum_durum_opts = _tanimlar_yukle("durum")
+            if not df.empty:
+                if "islem_asamasi" in df.columns:
+                    for _da in df["islem_asamasi"].dropna().unique():
+                        if str(_da).strip() and str(_da) not in ["nan",""] and _da not in tum_asama_opts:
+                            tum_asama_opts.append(str(_da))
+                if "durum" in df.columns:
+                    for _dd in df["durum"].dropna().unique():
+                        if str(_dd).strip() and str(_dd) not in ["nan",""] and _dd not in tum_durum_opts:
+                            tum_durum_opts.append(str(_dd))
+            
+            # ── AŞAMA & DURUM YÖNETİMİ — Supabase'e kayıtlı ─────────────────────────
+            import json as _ydj
+            
+            def _sb_tercih_yukle(anahtar):
+                try:
+                    _sb = get_sb_client()
+                    if _sb:
+                        r = _sb.table("kullanici_tercih").select("deger") \
+                            .eq("kullanici","__sistem__").eq("anahtar",anahtar).execute()
+                        if r.data: return _ydj.loads(r.data[0]["deger"])
+                except: pass
+                return []
+            
+            def _sb_tercih_kaydet(anahtar, liste):
+                try:
+                    _sb = get_sb_client()
+                    if _sb:
+                        _sb.table("kullanici_tercih").upsert({
+                            "kullanici":"__sistem__","anahtar":anahtar,
+                            "deger":_ydj.dumps(liste,ensure_ascii=False)
+                        }, on_conflict="kullanici,anahtar").execute()
+                        return True
+                except: pass
+                return False
+            
+            yc1, yc2 = st.columns(2)
+            
+            # ── AŞAMA YÖNETİMİ ────────────────────────────────────────────────────
+            with yc1:
+                st.markdown("**🔄 Aşama Yönetimi**")
+            
+                _mevcut_asamalar = _tanimlar_yukle("asama")
+            
+                # Yeni aşama ekle
+                _ya1, _ya2 = st.columns([3,1])
+                _yeni_a = _ya1.text_input("", key="yeni_asama_ekle",
+                    placeholder="Yeni aşama adı...", label_visibility="collapsed")
+                if _ya2.button("➕ Ekle", key="asama_ekle_sb", use_container_width=True):
+                    if _yeni_a and _yeni_a.strip():
+                        if _yeni_a.strip() in _mevcut_asamalar:
+                            st.warning("Bu aşama zaten var!")
+                        elif _tanim_ekle("asama", _yeni_a.strip()):
+                            st.success(f"✅ '{_yeni_a}' eklendi!")
+                            st.rerun()
+                        else:
+                            st.error("Eklenemedi!")
+            
+                st.caption("Tüm aşamalar — sırala:")
+                for _ai, _a in enumerate(_mevcut_asamalar):
+                    _adet = len(df[df["islem_asamasi"]==_a]) if not df.empty and "islem_asamasi" in df.columns else 0
+                    _ac1, _ac2, _ac3, _ac4, _ac5 = st.columns([3,1,1,1,1])
+                    _ac1.caption(f"{'🔹' if _adet>0 else '⬜'} **{_a}** ({_adet})")
+            
+                    # Sırala ▲▼
+                    if _ai > 0:
+                        if _ac2.button("▲", key=f"asm_up_{_ai}", help="Yukarı"):
+                            try:
+                                _sb_s = get_sb_client()
+                                if _sb_s:
+                                    # Sıra değerlerini al
+                                    _r1 = _sb_s.table("sistem_tanimlar").select("id,sira").eq("tip","asama").eq("deger",_a).execute()
+                                    _r2 = _sb_s.table("sistem_tanimlar").select("id,sira").eq("tip","asama").eq("deger",_mevcut_asamalar[_ai-1]).execute()
+                                    if _r1.data and _r2.data:
+                                        _s1, _s2 = _r1.data[0]["sira"], _r2.data[0]["sira"]
+                                        _sb_s.table("sistem_tanimlar").update({"sira":_s2}).eq("id",_r1.data[0]["id"]).execute()
+                                        _sb_s.table("sistem_tanimlar").update({"sira":_s1}).eq("id",_r2.data[0]["id"]).execute()
+                            except: pass
+                            st.rerun()
+                    else:
+                        _ac2.caption("")
+            
+                    if _ai < len(_mevcut_asamalar)-1:
+                        if _ac3.button("▼", key=f"asm_dn_{_ai}", help="Aşağı"):
+                            try:
+                                _sb_s = get_sb_client()
+                                if _sb_s:
+                                    _r1 = _sb_s.table("sistem_tanimlar").select("id,sira").eq("tip","asama").eq("deger",_a).execute()
+                                    _r2 = _sb_s.table("sistem_tanimlar").select("id,sira").eq("tip","asama").eq("deger",_mevcut_asamalar[_ai+1]).execute()
+                                    if _r1.data and _r2.data:
+                                        _s1, _s2 = _r1.data[0]["sira"], _r2.data[0]["sira"]
+                                        _sb_s.table("sistem_tanimlar").update({"sira":_s2}).eq("id",_r1.data[0]["id"]).execute()
+                                        _sb_s.table("sistem_tanimlar").update({"sira":_s1}).eq("id",_r2.data[0]["id"]).execute()
+                            except: pass
+                            st.rerun()
+                    else:
+                        _ac3.caption("")
+            
+                    if _ac4.button("✏️", key=f"asm_duz_{_ai}", help="Düzenle"):
+                        st.session_state[f"asm_edit_{_a}"] = True
+            
+                    if _adet == 0:
+                        if _ac5.button("🗑️", key=f"asm_sil_{_ai}", help="Sil"):
+                            if _tanim_sil("asama", _a):
+                                st.rerun()
+                    else:
+                        _ac5.caption("—")
+            
+                    if st.session_state.get(f"asm_edit_{_a}"):
+                        with st.form(f"asm_form_{_a}"):
+                            _yeni_asm = st.text_input("Yeni ad:", value=_a, key=f"asm_inp_{_a}")
+                            _f1, _f2 = st.columns(2)
+                            if _f1.form_submit_button("💾 Kaydet", use_container_width=True):
+                                if _yeni_asm and _yeni_asm.strip() != _a:
+                                    if _tanim_guncelle("asama", _a, _yeni_asm.strip()):
+                                        st.session_state.pop(f"asm_edit_{_a}", None)
+                                        st.success(f"✅ '{_a}' → '{_yeni_asm}' güncellendi!")
+                                        st.rerun()
+                            if _f2.form_submit_button("İptal", use_container_width=True):
+                                st.session_state.pop(f"asm_edit_{_a}", None)
+                                st.rerun()
+            
+            # ── DURUM YÖNETİMİ ────────────────────────────────────────────────────
+            with yc2:
+                st.markdown("**📊 Durum Yönetimi**")
+            
+                _mevcut_durumlar = _tanimlar_yukle("durum")
+            
+                # Yeni durum ekle
+                _yd1, _yd2 = st.columns([3,1])
+                _yeni_d = _yd1.text_input("", key="yeni_durum_ekle",
+                    placeholder="Yeni durum adı...", label_visibility="collapsed")
+                if _yd2.button("➕ Ekle", key="durum_ekle_sb", use_container_width=True):
+                    if _yeni_d and _yeni_d.strip():
+                        if _yeni_d.strip() in _mevcut_durumlar:
+                            st.warning("Bu durum zaten var!")
+                        elif _tanim_ekle("durum", _yeni_d.strip()):
+                            st.success(f"✅ '{_yeni_d}' eklendi!")
+                            st.rerun()
+                        else:
+                            st.error("Eklenemedi!")
+            
+                st.caption("Tüm durumlar — sırala:")
+                for _di, _d in enumerate(_mevcut_durumlar):
+                    _dadet = len(df[df["durum"]==_d]) if not df.empty and "durum" in df.columns else 0
+                    _dc1, _dc2, _dc3, _dc4, _dc5 = st.columns([3,1,1,1,1])
+                    _dc1.caption(f"{'🔹' if _dadet>0 else '⬜'} **{_d}** ({_dadet})")
+            
+                    # Sırala ▲▼
+                    if _di > 0:
+                        if _dc2.button("▲", key=f"dur_up_{_di}", help="Yukarı"):
+                            try:
+                                _sb_sd = get_sb_client()
+                                if _sb_sd:
+                                    _r1 = _sb_sd.table("sistem_tanimlar").select("id,sira").eq("tip","durum").eq("deger",_d).execute()
+                                    _r2 = _sb_sd.table("sistem_tanimlar").select("id,sira").eq("tip","durum").eq("deger",_mevcut_durumlar[_di-1]).execute()
+                                    if _r1.data and _r2.data:
+                                        _s1, _s2 = _r1.data[0]["sira"], _r2.data[0]["sira"]
+                                        _sb_sd.table("sistem_tanimlar").update({"sira":_s2}).eq("id",_r1.data[0]["id"]).execute()
+                                        _sb_sd.table("sistem_tanimlar").update({"sira":_s1}).eq("id",_r2.data[0]["id"]).execute()
+                            except: pass
+                            st.rerun()
+                    else:
+                        _dc2.caption("")
+            
+                    if _di < len(_mevcut_durumlar)-1:
+                        if _dc3.button("▼", key=f"dur_dn_{_di}", help="Aşağı"):
+                            try:
+                                _sb_sd = get_sb_client()
+                                if _sb_sd:
+                                    _r1 = _sb_sd.table("sistem_tanimlar").select("id,sira").eq("tip","durum").eq("deger",_d).execute()
+                                    _r2 = _sb_sd.table("sistem_tanimlar").select("id,sira").eq("tip","durum").eq("deger",_mevcut_durumlar[_di+1]).execute()
+                                    if _r1.data and _r2.data:
+                                        _s1, _s2 = _r1.data[0]["sira"], _r2.data[0]["sira"]
+                                        _sb_sd.table("sistem_tanimlar").update({"sira":_s2}).eq("id",_r1.data[0]["id"]).execute()
+                                        _sb_sd.table("sistem_tanimlar").update({"sira":_s1}).eq("id",_r2.data[0]["id"]).execute()
+                            except: pass
+                            st.rerun()
+                    else:
+                        _dc3.caption("")
+            
+                    if _dc4.button("✏️", key=f"dur_duz_{_di}", help="Düzenle"):
+                        st.session_state[f"dur_edit_{_d}"] = True
+            
+                    if _dadet == 0:
+                        if _dc5.button("🗑️", key=f"dur_sil_{_di}", help="Sil"):
+                            if _tanim_sil("durum", _d):
+                                st.rerun()
+                    else:
+                        _dc5.caption("—")
+            
+                    if st.session_state.get(f"dur_edit_{_d}"):
+                        with st.form(f"dur_form_{_d}"):
+                            _yeni_dur = st.text_input("Yeni ad:", value=_d, key=f"dur_inp_{_d}")
+                            _f1, _f2 = st.columns(2)
+                            if _f1.form_submit_button("💾 Kaydet", use_container_width=True):
+                                if _yeni_dur and _yeni_dur.strip() != _d:
+                                    if _tanim_guncelle("durum", _d, _yeni_dur.strip()):
+                                        st.session_state.pop(f"dur_edit_{_d}", None)
+                                        st.success(f"✅ '{_d}' → '{_yeni_dur}' güncellendi!")
+                                        st.rerun()
+                            if _f2.form_submit_button("İptal", use_container_width=True):
+                                st.session_state.pop(f"dur_edit_{_d}", None)
+                                st.rerun()
+            
+            
+            
+            st.divider()
+            
+        elif _yt_sec == "📊 Rapor & Durum Yönetimi":
+            _sb_yt2 = get_sb_client()
+            try:
+                if _sb_yt2:
+                    _res_yt2 = _sb_yt2.table("cari_kartlar").select("*").neq("silindi",1).execute()
+                    df = pd.DataFrame(_res_yt2.data) if _res_yt2.data else pd.DataFrame()
+                else:
+                    raise Exception()
+            except:
+                df = db_read("cari_kartlar", extra_sql="WHERE silindi=0 OR silindi='0' OR silindi IS NULL")
+            sb_liste = _sb_yt2
+            tum_asama_opts = _tanimlar_yukle("asama")
+            tum_durum_opts = _tanimlar_yukle("durum")
+            df_f = df.copy()
+
+            # ── SAYFA RAPORU ─────────────────────────────────────────────────────────
+
+            # ── VERİ HAZIRLA — silinmiş kayıtlar hariç ──────────────────────────
+            _df_r = df.copy()
+            # silindi=1 olanları çıkar
+            if "silindi" in _df_r.columns:
+                _df_r = _df_r[~_df_r["silindi"].astype(str).isin(["1","True"])]
+
+            # ── ÜST METRİKLER ────────────────────────────────────────────────────
+            rm1,rm2,rm3,rm4 = st.columns(4)
+            rm1.metric("Toplam", len(_df_r))
+            rm2.metric("Beklenen", fmt_para(_df_r["beklenen_ciro"].sum()) if "beklenen_ciro" in _df_r.columns else "—")
+            rm3.metric("Gerçekleşen", fmt_para(_df_r["gerceklesen_ciro"].sum()) if "gerceklesen_ciro" in _df_r.columns else "—")
+            rm4.metric("Filtrede", len(df_f))
+
+            st.divider()
+
+            # ── DURUM YÖNETİMİ — Supabase'e kaydet ─────────────────────────────
+            _sb_r = get_sb_client()
+
+            def _durum_yukle():
+                try:
+                    if _sb_r:
+                        _res = _sb_r.table("kullanici_tercih").select("deger")                         .eq("kullanici","__sistem__").eq("anahtar","ekstra_durumlar").execute()
+                        if _res.data:
+                            import json as _jd
+                            return _jd.loads(_res.data[0]["deger"])
+                except: pass
+                return []
+
+            def _durum_kaydet(liste):
+                try:
+                    import json as _jd
+                    _veri = _jd.dumps(liste, ensure_ascii=False)
+                    if _sb_r:
+                        _sb_r.table("kullanici_tercih").upsert({
+                            "kullanici":"__sistem__",
+                            "anahtar":"ekstra_durumlar",
+                            "deger":_veri
+                        }, on_conflict="kullanici,anahtar").execute()
+                except: pass
+
+            _ekstra_durumlar = _durum_yukle()
+            _varsayilan = ["Aktif","Hedef","Pasif"]
+            _tum_durumlar = _varsayilan.copy()
+            for _d in _ekstra_durumlar:
+                if _d not in _tum_durumlar:
+                    _tum_durumlar.append(_d)
+
+            # ── AŞAMA + DURUM TABLOLARI ──────────────────────────────────────────
+            col_asama, col_durum = st.columns(2)
+
+            with col_asama:
+                st.markdown("**🔄 Aşama Dağılımı**")
+                if "islem_asamasi" in _df_r.columns:
+                    _adf = _df_r[
+                        _df_r["islem_asamasi"].notna() &
+                        (_df_r["islem_asamasi"].astype(str).str.strip() != "") &
+                        (_df_r["islem_asamasi"].astype(str) != "nan")
+                    ].groupby("islem_asamasi").agg(
+                        Firma=("firma","count"),
+                        Beklenen=("beklenen_ciro","sum"),
+                        Gerceklesen=("gerceklesen_ciro","sum")
+                    ).reset_index().sort_values("Firma", ascending=False)
+
+                    if not _adf.empty:
+                        _adf["Başarı%"] = _adf.apply(
+                            lambda r: f"%{r['Gerceklesen']/r['Beklenen']*100:.0f}"
+                            if r["Beklenen"]>0 else "—", axis=1)
+                        _adf["Beklenen"]    = _adf["Beklenen"].apply(fmt_para)
+                        _adf["Gerceklesen"] = _adf["Gerceklesen"].apply(fmt_para)
+                        st.dataframe(
+                            _adf.rename(columns={"islem_asamasi":"Aşama","Firma":"Firma"}),
+                            use_container_width=True, hide_index=True
+                        )
+                    else:
+                        st.caption("Henüz aşama verisi yok")
+
+            with col_durum:
+                st.markdown("**📊 Durum Dağılımı**")
+                if "durum" in _df_r.columns:
+                    _ddf = _df_r[
+                        _df_r["durum"].notna() &
+                        (_df_r["durum"].astype(str).str.strip() != "") &
+                        (_df_r["durum"].astype(str) != "nan")
+                    ].groupby("durum").agg(
+                        Firma=("firma","count"),
+                        Beklenen=("beklenen_ciro","sum"),
+                        Gerceklesen=("gerceklesen_ciro","sum")
+                    ).reset_index().sort_values("Firma", ascending=False)
+
+                    if not _ddf.empty:
+                        _ddf["Beklenen"]    = _ddf["Beklenen"].apply(fmt_para)
+                        _ddf["Gerceklesen"] = _ddf["Gerceklesen"].apply(fmt_para)
+                        st.dataframe(
+                            _ddf.rename(columns={"durum":"Durum","Firma":"Firma"}),
+                            use_container_width=True, hide_index=True
+                        )
+                    else:
+                        st.caption("Henüz durum verisi yok")
+
+                # Durum ekle/sil
+                st.markdown("**⚙️ Durum Ekle / Sil:**")
+                _dc1, _dc2 = st.columns([3,1])
+                _yeni_d = _dc1.text_input("", placeholder="VIP, Potansiyel...", key="yeni_durum_inp", label_visibility="collapsed")
+                if _dc2.button("➕", key="durum_ekle_btn", use_container_width=True):
+                    if _yeni_d and _yeni_d.strip() and _yeni_d.strip() not in _tum_durumlar:
+                        _ekstra_durumlar.append(_yeni_d.strip())
+                        _durum_kaydet(_ekstra_durumlar)
+                        st.success(f"✅ '{_yeni_d}' eklendi!")
+                        st.rerun()
+                    elif _yeni_d.strip() in _tum_durumlar:
+                        st.warning("Bu durum zaten var!")
+
+                # Mevcut durumları listele
+                for _d in _tum_durumlar:
+                    _adet = len(_df_r[_df_r["durum"].astype(str)==_d]) if "durum" in _df_r.columns else 0
+                    if _adet > 0:  # VERİ OLANLAR
+                        _lc1, _lc2 = st.columns([4,1])
+                        _lc1.caption(f"🔹 **{_d}** — {_adet} firma")
+                        if _d not in _varsayilan:
+                            if _lc2.button("🗑️", key=f"dsil_{_d}", help="Sil (önce veri silinmeli)"):
+                                st.warning(f"'{_d}' durumunda {_adet} firma var, önce firmalar başka duruma taşınmalı!")
+                        else:
+                            _lc2.caption("—")
+                    # VERİ OLMAYANLAR — ekstra ise silinebilir
+                    elif _d in _ekstra_durumlar:
+                        _lc1, _lc2 = st.columns([4,1])
+                        _lc1.caption(f"⬜ {_d} — 0 firma")
+                        if _lc2.button("🗑️", key=f"dsil_{_d}"):
+                            _ekstra_durumlar.remove(_d)
+                            _durum_kaydet(_ekstra_durumlar)
+                            st.rerun()
+
+            st.divider()
+
+            # ── TEMSİLCİ + İL ────────────────────────────────────────────────────
+            _tc1, _tc2 = st.columns(2)
+            with _tc1:
+                st.markdown("**👤 Temsilci:**")
+                if "temsilci" in _df_r.columns:
+                    _tdf = _df_r[
+                        _df_r["temsilci"].notna() &
+                        (_df_r["temsilci"].astype(str).str.strip() != "") &
+                        (_df_r["temsilci"].astype(str) != "nan")
+                    ].groupby("temsilci").agg(Firma=("firma","count")).reset_index().sort_values("Firma",ascending=False).head(10)
+                    if not _tdf.empty:
+                        st.dataframe(_tdf.rename(columns={"temsilci":"Temsilci","Firma":"Firma"}),
+                                     use_container_width=True, hide_index=True)
+            with _tc2:
+                st.markdown("**🗺️ İl:**")
+                if "il" in _df_r.columns:
+                    _idf = _df_r[
+                        _df_r["il"].notna() &
+                        (_df_r["il"].astype(str).str.strip() != "") &
+                        (_df_r["il"].astype(str) != "nan")
+                    ].groupby("il").agg(Firma=("firma","count")).reset_index().sort_values("Firma",ascending=False).head(10)
+                    if not _idf.empty:
+                        st.dataframe(_idf.rename(columns={"il":"İl","Firma":"Firma"}),
+                                     use_container_width=True, hide_index=True)
+
+            # ── EXCEL ─────────────────────────────────────────────────────────────
+            _buf_rp = __import__("io").BytesIO()
+            df.to_excel(_buf_rp, index=False); _buf_rp.seek(0)
+            st.download_button("📥 Excel'e Aktar", data=_buf_rp,
+                file_name=f"cari_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                use_container_width=True, key="liste_excel_indir")
+
+
+
+        elif _yt_sec == "📨 Firma Not Arşivi":
+            _sb_yt3 = get_sb_client()
+            sb_liste = _sb_yt3
+
+            # ── 📨 NOT ARŞİVİ — tıkla aç ─────────────────────────────────────────────
+            st.markdown("#### 📨 Firma Not Arşivi")
+            st.caption("Açıklama sütununa yaz → Kaydet → not arşivlenir. Aşağıdan firmayı seç → notlarını gör.")
+
+            # Not olan firmaları getir
+            _df_notlu = pd.DataFrame()
+            if sb_liste:
+                try:
+                    _rn = sb_liste.table("cari_aciklamalar").select("cari_id, cari_adi").execute()
+                    if _rn.data:
+                        import collections as _col
+                        _sayac = _col.Counter([(r["cari_id"], r["cari_adi"]) for r in _rn.data])
+                        _df_notlu = pd.DataFrame([
+                            {"cari_id": k[0], "firma": k[1], "not_sayi": v}
+                            for k, v in _sayac.items()
+                        ]).sort_values("not_sayi", ascending=False)
+                except:
+                    pass
+
+            if _df_notlu.empty:
+                st.info("Henüz arşivlenmiş not yok. Açıklama sütununa yaz ve kaydet.")
+            else:
+                # Firma seç
+                _firma_opts = [f"📨{r['not_sayi']}  {r['firma']}" for _, r in _df_notlu.iterrows()]
+                _sec = st.selectbox("Firma seç:", _firma_opts, key="not_arsiv_sec")
+                _sec_idx = _firma_opts.index(_sec)
+                _sec_cari_id = int(_df_notlu.iloc[_sec_idx]["cari_id"])
+                _sec_firma = str(_df_notlu.iloc[_sec_idx]["firma"])
+
+                # Seçili firmanın notlarını çek
+                try:
+                    _rnotlar = sb_liste.table("cari_aciklamalar").select("*").eq("cari_id", _sec_cari_id).order("tarih", desc=True).execute()
+                    _df_notlar = pd.DataFrame(_rnotlar.data) if _rnotlar.data else pd.DataFrame()
+                except:
+                    _df_notlar = pd.DataFrame()
+
+                st.markdown(f"**{_sec_firma} — {len(_df_notlar)} not:**")
+
+                if not _df_notlar.empty:
+                    for _, _nr in _df_notlar.iterrows():
+                        _nid   = _nr.get("id", 0)
+                        _ntarih = str(_nr.get("tarih",""))[:16]
+                        _nkim  = str(_nr.get("olusturan",""))
+                        _nmetin = str(_nr.get("aciklama",""))
+                        _nozet = _nmetin[:60] + ("..." if len(_nmetin)>60 else "")
+                        with st.expander(f"📅 {_ntarih}  👤 {_nkim}  —  {_nozet}"):
+                            st.markdown(
+                                f"<div style='background:#f0f4ff;border-left:4px solid #1f6feb;"
+                                f"padding:12px 16px;border-radius:6px;line-height:1.7'>"
+                                f"{_nmetin.replace(chr(10),'<br>')}"
+                                f"</div>",
+                                unsafe_allow_html=True
+                            )
+                            if st.button("🗑️ Sil", key=f"narsil_{_nid}"):
+                                try:
+                                    sb_liste.table("cari_aciklamalar").delete().eq("id", int(_nid)).execute()
+                                    st.rerun()
+                                except: pass
+
+            st.divider()
+
 
 
 
