@@ -3805,7 +3805,9 @@ elif aktif == "analiz":
 
             for _, _ar in _df_f2.iterrows():
                 _pot_ic = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(str(_ar.get("potansiyel","")),"-")
-                _exp_t = f"{_pot_ic} **{_ar.get('firma','?')}** · {str(_ar.get('tarih',''))[:10]} · {_ar.get('sonuc','')} · {_ar.get('potansiyel','')} potansiyel"
+                _tarih_val = _ar.get("tarih","")
+                _tarih_str = str(_tarih_val)[:10] if _tarih_val and str(_tarih_val) not in ["None","nan",""] else ""
+                _exp_t = f"{_pot_ic} **{_ar.get('firma','?')}**" + (f" · {_tarih_str}" if _tarih_str else "") + f" · {_ar.get('sonuc','') or '—'} · {_ar.get('potansiyel','') or '—'} potansiyel"
                 with st.expander(_exp_t):
                     _em1,_em2,_em3,_em4 = st.columns(4)
                     _em1.metric("Potansiyel", _ar.get("potansiyel","—"))
@@ -4355,6 +4357,7 @@ elif aktif == "analiz":
 
             st.divider()
             _ob1, _ob2 = st.columns(2)
+            _ob1, _ob2, _ob3, _ob4 = st.columns(4)
             if _ob1.button("✅ Onayla & Kaydet", type="primary", use_container_width=True, key="an_onay"):
                 _ok, _ = _an_upsert(_secili_firma, _ov)
                 if _ok:
@@ -4370,6 +4373,26 @@ elif aktif == "analiz":
                 st.session_state.pop("an_onizleme", None)
                 st.session_state.pop("an_onizleme_veri", None)
                 st.rerun()
+            if _ob3.button("📄 Teklif Oluştur", use_container_width=True, key="an_onay_teklif"):
+                _ok2, _ = _an_upsert(_secili_firma, _ov)
+                if _ok2:
+                    try: db_read.clear()
+                    except: pass
+                st.session_state.pop("an_onizleme", None)
+                st.session_state.pop("an_onizleme_veri", None)
+                st.session_state["aktif_tab"] = "teklif"
+                st.session_state["pending_hedef_mus"] = _secili_firma
+                _an_ttur_vals2 = _ov.get("teklif_tur","")
+                if "özel" in str(_an_ttur_vals2).lower() or "sözleşme" in str(_an_ttur_vals2).lower():
+                    st.session_state["global_teklif_turu"] = "🤝 Özel Anlaşma"
+                else:
+                    st.session_state["global_teklif_turu"] = "🚀 Spot Teklif"
+                st.rerun()
+            _an_tel2 = str(_ov.get("iletisim","") or "").replace(" ","").replace("-","")
+            if _an_tel2 and "@" not in _an_tel2:
+                if _an_tel2.startswith("0"): _an_tel2 = "90" + _an_tel2[1:]
+                _wa2 = ("Merhaba " + _secili_firma + ", gorusemiz icin tesekkurler.").replace(" ","%20")
+                _ob4.markdown(f"<a href='https://wa.me/{_an_tel2}?text={_wa2}' target='_blank'><button style='width:100%;padding:6px;font-size:12px;border:none;background:#25d366;color:white;border-radius:6px;cursor:pointer;'>💬 WhatsApp</button></a>", unsafe_allow_html=True)
 
         if _cari_btn:
             _var_mi = not _df_cari_an[_df_cari_an["firma"].str.lower()==_secili_firma.lower()].empty
