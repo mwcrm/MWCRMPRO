@@ -869,37 +869,38 @@ section[data-testid="stSidebar"] { padding-top: 0.5rem !important; }
 section[data-testid="stSidebar"] .stButton>button {
     text-align: left !important;
     justify-content: flex-start !important;
-    padding: 8px 12px !important;
+    padding: 10px 14px !important;
     font-size: 13px !important;
     border-radius: 6px !important;
     margin: 0 !important;
-    border: 1px solid #e2e8f0 !important;
-    background: var(--background-color) !important;
-    box-shadow: none !important;
+    border: 1.5px solid #cbd5e1 !important;
+    background: #ffffff !important;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06) !important;
     width: 100% !important;
 }
 section[data-testid="stSidebar"] .stButton>button p {
     text-align: left !important;
     color: inherit !important;
     font-size: 13px !important;
-    font-weight: 400 !important;
+    font-weight: 500 !important;
 }
 section[data-testid="stSidebar"] .stButton>button:hover {
-    background: #f8fafc !important;
-    border-color: #cbd5e1 !important;
+    background: #f1f5f9 !important;
+    border-color: #94a3b8 !important;
 }
 section[data-testid="stSidebar"] .stButton>button[kind="primary"] {
     background: #dbeafe !important;
-    border-color: #93c5fd !important;
+    border-color: #3b82f6 !important;
+    box-shadow: 0 1px 3px rgba(59,130,246,0.2) !important;
 }
 section[data-testid="stSidebar"] .stButton>button[kind="primary"] p {
     color: #1d4ed8 !important;
     font-weight: 600 !important;
 }
 section[data-testid="stSidebar"] .stButton { margin: 0 !important; padding: 0 !important; }
-section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div { gap: 3px !important; }
-section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] { gap: 3px !important; }
-section[data-testid="stSidebar"] hr { margin: 6px 0 !important; }
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div { gap: 4px !important; }
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] { gap: 4px !important; }
+section[data-testid="stSidebar"] hr { margin: 8px 0 !important; }
 section[data-testid="stSidebar"] div[data-testid="stExpander"] { margin: 0 !important; }
 section[data-testid="stSidebar"] div[data-testid="stExpander"] > div { padding: 0 !important; }
 </style>
