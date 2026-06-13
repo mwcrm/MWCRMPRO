@@ -869,12 +869,12 @@ section[data-testid="stSidebar"] { padding-top: 0.5rem !important; }
 section[data-testid="stSidebar"] .stButton>button {
     text-align: left !important;
     justify-content: flex-start !important;
-    padding: 7px 10px !important;
+    padding: 8px 12px !important;
     font-size: 13px !important;
-    border-radius: 4px !important;
+    border-radius: 6px !important;
     margin: 0 !important;
-    border: none !important;
-    background: transparent !important;
+    border: 1px solid #e2e8f0 !important;
+    background: var(--background-color) !important;
     box-shadow: none !important;
     width: 100% !important;
 }
@@ -884,14 +884,23 @@ section[data-testid="stSidebar"] .stButton>button p {
     font-size: 13px !important;
     font-weight: 400 !important;
 }
-section[data-testid="stSidebar"] .stButton>button:hover { background: #f0f4ff !important; }
-section[data-testid="stSidebar"] .stButton>button[kind="primary"] { background: #dbeafe !important; }
-section[data-testid="stSidebar"] .stButton>button[kind="primary"] p { color: #1d4ed8 !important; font-weight: 600 !important; }
+section[data-testid="stSidebar"] .stButton>button:hover {
+    background: #f8fafc !important;
+    border-color: #cbd5e1 !important;
+}
+section[data-testid="stSidebar"] .stButton>button[kind="primary"] {
+    background: #dbeafe !important;
+    border-color: #93c5fd !important;
+}
+section[data-testid="stSidebar"] .stButton>button[kind="primary"] p {
+    color: #1d4ed8 !important;
+    font-weight: 600 !important;
+}
 section[data-testid="stSidebar"] .stButton { margin: 0 !important; padding: 0 !important; }
-section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div { gap: 0px !important; }
-section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] { gap: 0px !important; }
-section[data-testid="stSidebar"] hr { margin: 4px 0 !important; }
-section[data-testid="stSidebar"] div[data-testid="stExpander"] { border: none !important; box-shadow: none !important; margin: 0 !important; }
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div { gap: 3px !important; }
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] { gap: 3px !important; }
+section[data-testid="stSidebar"] hr { margin: 6px 0 !important; }
+section[data-testid="stSidebar"] div[data-testid="stExpander"] { margin: 0 !important; }
 section[data-testid="stSidebar"] div[data-testid="stExpander"] > div { padding: 0 !important; }
 </style>
 """, unsafe_allow_html=True)
