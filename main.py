@@ -176,8 +176,14 @@ def db_query(sql, params=None):
         except Exception as e:
             pass
     # SQLite fallback
-    df = pd.read_sql(sql, conn)
-    return df
+    try:
+        conn = get_conn()
+        df = pd.read_sql(sql, conn, params=params)
+        conn.close()
+        return df
+    except Exception as e:
+        st.error(f"db_query hatası: {e}")
+        return pd.DataFrame()
 
 def sb_insert(table, data):
     """INSERT — Supabase veya SQLite"""
@@ -236,6 +242,7 @@ def sb_select(table, filters=None, order=None, limit=None):
             pass
     # SQLite fallback
     try:
+        conn = get_conn()
         sql = f"SELECT * FROM {table}"
         if filters:
             where = " AND ".join([f"{k}=?" for k in filters.keys()])
@@ -243,6 +250,7 @@ def sb_select(table, filters=None, order=None, limit=None):
             df = pd.read_sql(sql, conn, params=list(filters.values()))
         else:
             df = pd.read_sql(sql, conn)
+        conn.close()
         return df
     except:
         return pd.DataFrame()
@@ -1364,7 +1372,7 @@ elif aktif == "liste":
     for i, (_ad, _sayi) in enumerate(_d_veri):
         _em = _DURUM_EMOJI.get(_ad, "🔹")
         if _d_cols[i].button(f"{_em} {_ad}\n{_sayi}", key=f"dur_btn_{i}", use_container_width=True):
-            st.session_state["fil_durum"] = "Tümü" if _ad == "Toplam" else _ad
+            st.session_state["pending_fil_durum"] = "Tümü" if _ad == "Toplam" else _ad
             st.rerun()
 
     # Aşama satırı
@@ -1374,13 +1382,19 @@ elif aktif == "liste":
         for i, (_an, _ac) in enumerate(_a_veri):
             _em2 = _ASAMA_EMOJI.get(_an, "🔸")
             if _a_cols[i].button(f"{_em2} {_an}\n{_ac}", key=f"asm_btn_{i}", use_container_width=True):
-                st.session_state["fil_asama"] = _an
+                st.session_state["pending_fil_asama"] = _an
                 st.rerun()
 
     # ── FİLTRE TEK SATIR ─────────────────────────────────────────────────────
     _fc = st.columns([1.3, 1.3, 1.8, 1.8, 1.3, 0.4, 0.8])
-    filtre_asama = _fc[0].selectbox("", ["Aşama: Tümü"]+tum_asama_opts, key="fil_asama", label_visibility="collapsed")
-    filtre_durum = _fc[1].selectbox("", ["Durum: Tümü"]+tum_durum_opts, key="fil_durum", label_visibility="collapsed")
+    _p_asama = st.session_state.pop("pending_fil_asama", None)
+    _asama_opts_full = ["Aşama: Tümü"]+tum_asama_opts
+    _asama_idx = _asama_opts_full.index(_p_asama) if _p_asama and _p_asama in _asama_opts_full else 0
+    filtre_asama = _fc[0].selectbox("", _asama_opts_full, index=_asama_idx, key="fil_asama", label_visibility="collapsed")
+    _p_durum = st.session_state.pop("pending_fil_durum", None)
+    _durum_opts_full = ["Durum: Tümü"]+tum_durum_opts
+    _durum_idx = _durum_opts_full.index(_p_durum) if _p_durum and _p_durum in _durum_opts_full else 0
+    filtre_durum = _fc[1].selectbox("", _durum_opts_full, index=_durum_idx, key="fil_durum", label_visibility="collapsed")
 
     df_f = df.copy()
     if filtre_asama != "Aşama: Tümü": df_f = df_f[df_f["islem_asamasi"]==filtre_asama]
@@ -1444,7 +1458,7 @@ elif aktif == "liste":
                 st.session_state["aktif_tab"] = "yeni"; st.rerun()
             if ab2.button("📄 Teklif", key=f"kt_{kart_id}", use_container_width=True, type="primary"):
                 st.session_state["aktif_tab"] = "teklif"
-                st.session_state["hedef_mus"] = str(kart_row.get("firma",""))
+                st.session_state["pending_hedef_mus"] = str(kart_row.get("firma",""))
                 st.session_state["son_secili_id"] = None; st.rerun()
             if ab3.button("📅 Randevu", key=f"kr_{kart_id}", use_container_width=True, type="primary"):
                 st.session_state["aktif_tab"] = "randevu"
@@ -2815,11 +2829,14 @@ elif aktif == "teklif":
         except Exception as _e: st.error(f"Seçim hatası: {_e}")
 
     _firma_def = str(secili_musteri["firma"]) if secili_musteri is not None else ""
-    if "hedef_mus" not in st.session_state or st.session_state.get("son_secili_id") != _secim:
-        st.session_state["hedef_mus"] = _firma_def
-        st.session_state["son_secili_id"] = _secim
+    _pending_hm = st.session_state.pop("pending_hedef_mus", None)
+    if _pending_hm is not None:
+        _firma_def = _pending_hm
+    elif "hedef_mus" in st.session_state and st.session_state.get("son_secili_id") == _secim:
+        _firma_def = st.session_state["hedef_mus"]
+    st.session_state["son_secili_id"] = _secim
 
-    hedef_musteri = _tr[3].text_input("", key="hedef_mus", placeholder="Müşteri Adı", label_visibility="collapsed")
+    hedef_musteri = _tr[3].text_input("", value=_firma_def, key="hedef_mus", placeholder="Müşteri Adı", label_visibility="collapsed")
     vade          = _tr[4].text_input("", placeholder="Vade...", key="vade", label_visibility="collapsed")
     gsm_manuel    = _tr[5].text_input("", value=gsm_kayitli, placeholder="05xxxxxxxxx", key="gsm_manuel", label_visibility="collapsed")
     email_manuel  = _tr[6].text_input("", value=email_kayitli, placeholder="Email", key="email_manuel", label_visibility="collapsed")
@@ -3164,12 +3181,11 @@ elif aktif == "ozel_teklif":
     _oz_fdef = str(_oz_mus["firma"]) if _oz_mus is not None else ""
     if "oz2_duz_musteri" in st.session_state:
         _oz_fdef = st.session_state.pop("oz2_duz_musteri")
-        st.session_state["oz2_hedef"] = _oz_fdef
-    elif "oz2_hedef" not in st.session_state or st.session_state.get("oz2_son_sec") != _oz_sec:
-        st.session_state["oz2_hedef"] = _oz_fdef
-        st.session_state["oz2_son_sec"] = _oz_sec
+    elif "oz2_hedef" in st.session_state and st.session_state.get("oz2_son_sec") == _oz_sec:
+        _oz_fdef = st.session_state["oz2_hedef"]
+    st.session_state["oz2_son_sec"] = _oz_sec
 
-    _oz_hedef = _ozr[3].text_input("", key="oz2_hedef", placeholder="Hedef Müşteri", label_visibility="collapsed")
+    _oz_hedef = _ozr[3].text_input("", value=_oz_fdef, key="oz2_hedef", placeholder="Hedef Müşteri", label_visibility="collapsed")
     _oz_vade  = _ozr[4].text_input("", placeholder="Vade...", key="oz2_vade", label_visibility="collapsed")
     _oz_not   = _ozr[5].text_input("", placeholder="Not...", key="oz2_not", label_visibility="collapsed")
     _oz_wa_no = _ozr[6].text_input("", value=_oz_gsm, placeholder="05xxxxxxxxx", key="oz2_wa", label_visibility="collapsed")
@@ -3726,18 +3742,18 @@ elif aktif == "analiz":
         import re as _re2
         _txt2 = _hizli_not.lower()
         _km2 = _re2.search(r"(\d+)\s*koli", _txt2)
-        if _km2: st.session_state["an_koli_adet"] = _km2.group(1)
+        if _km2: st.session_state["pending_an_koli_adet"] = _km2.group(1)
         _pm2 = _re2.search(r"(\d+)\s*palet", _txt2)
-        if _pm2: st.session_state["an_pal_adet"] = _pm2.group(1)
+        if _pm2: st.session_state["pending_an_pal_adet"] = _pm2.group(1)
         for _k2 in ["aras","yurtiçi","mng","sürat","ptt","dhl","ups","horoz"]:
             if _k2 in _txt2:
-                st.session_state["an_kargo"] = [_k2.capitalize()]
+                st.session_state["pending_an_kargo"] = [_k2.capitalize()]
         _fm2 = _re2.search(r"(\d+[\.,]?\d*)\s*₺?[/]?\s*desi", _txt2)
         if _fm2:
             _fs_list = st.session_state.get("an_fiyat_satirlar", [{"il":"","urun":"koli","min":"","max":"","adet":"","musteri":"","biz":""}])
             _fs_list[0]["musteri"] = _fm2.group(1)
             st.session_state["an_fiyat_satirlar"] = _fs_list
-        if "faturasız" in _txt2: st.session_state["an_fatura"] = "faturasız"
+        if "faturasız" in _txt2: st.session_state["pending_an_fatura"] = "faturasız"
         if "avm" in _txt2:
             st.session_state["an_avm_satirlar"] = [{"avm":"(nottan eklendi)","sehir":"--","urun":"","saat":""}]
         st.success("✅ Otomatik dolduruldu!"); st.rerun()
@@ -3785,8 +3801,8 @@ elif aktif == "analiz":
         _an_kd_max = _ud2.text_input("Koli max desi", value=_mv("kd_max",""), key="an_kd_max", placeholder="max")
         _an_pd_min = _ud3.text_input("Palet min desi", value=_mv("pd_min",""), key="an_pd_min", placeholder="min")
         _an_pd_max = _ud4.text_input("Palet max desi", value=_mv("pd_max",""), key="an_pd_max", placeholder="max")
-        _an_koli_adet = _ud5.text_input("Aylık koli", value=_mv("koli_adet",""), key="an_koli_adet", placeholder="adet")
-        _an_pal_adet = _ud6.text_input("Aylık palet", value=_mv("pal_adet",""), key="an_pal_adet", placeholder="adet")
+        _an_koli_adet = _ud5.text_input("Aylık koli", value=st.session_state.pop("pending_an_koli_adet", None) or _mv("koli_adet",""), key="an_koli_adet", placeholder="adet")
+        _an_pal_adet = _ud6.text_input("Aylık palet", value=st.session_state.pop("pending_an_pal_adet", None) or _mv("pal_adet",""), key="an_pal_adet", placeholder="adet")
         _an_koli_kg = _ud7.text_input("Ort. kg", value=_mv("koli_kg",""), key="an_koli_kg", placeholder="kg")
         try:
             _td2 = int(_an_koli_adet or 0)*(int(_an_koli_kg or 0)*3 or 10)+int(_an_pal_adet or 0)*300
@@ -3798,7 +3814,7 @@ elif aktif == "analiz":
     with st.expander("🚚 Mevcut Kargo & Fiyat", expanded=False):
         _kc1,_kc2 = st.columns([3,1])
         _kargo_list = ["Aras","Yurtiçi","MNG","Sürat","PTT","Fedex","DHL","UPS","Horoz","Diğer"]
-        _an_kargo = _kc1.multiselect("Çalıştığı kargo", _kargo_list, default=_mv_list("kargo"), key="an_kargo")
+        _an_kargo = _kc1.multiselect("Çalıştığı kargo", _kargo_list, default=st.session_state.pop("pending_an_kargo", None) or _mv_list("kargo"), key="an_kargo")
         _an_aylik_odeme = _kc2.text_input("Aylık toplam ödeme (₺)", value=str(int(_mv("aylik_odeme",0) or 0)) if _mv("aylik_odeme",0) else "", key="an_aylik_odeme")
         st.markdown("<small style='color:#64748b;'>İl | Ürün | Min–Max desi | Adet | Müşteri ödüyor ₺ | Bizim teklifimiz ₺</small>", unsafe_allow_html=True)
         _def_fiyat = _mv_json("fiyat_tablo") or [{"il":"","urun":"koli","min":"","max":"","adet":"","musteri":"","biz":""}]
@@ -3824,7 +3840,9 @@ elif aktif == "analiz":
         _uapo_list = ["UA — gönderici öder","PO — alıcı öder","karma","bilinmiyor"]
         _paz_list = ["inebilir","zorlu","inmez","bilinmiyor"]
         _kd1,_kd2,_kd3,_kd4 = st.columns(4)
-        _an_fatura = _kd1.selectbox("Faturalama", _fatura_list, index=_fatura_list.index(_mv("fatura","faturalı")) if _mv("fatura","faturalı") in _fatura_list else 0, key="an_fatura")
+        _pending_fatura = st.session_state.pop("pending_an_fatura", None)
+        _fatura_default = _pending_fatura if _pending_fatura in _fatura_list else _mv("fatura","faturalı") if _mv("fatura","faturalı") in _fatura_list else "faturalı"
+        _an_fatura = _kd1.selectbox("Faturalama", _fatura_list, index=_fatura_list.index(_fatura_default), key="an_fatura")
         _an_uapo = _kd2.selectbox("UA / PO", _uapo_list, index=_uapo_list.index(_mv("uapo","UA — gönderici öder")) if _mv("uapo","UA — gönderici öder") in _uapo_list else 0, key="an_uapo")
         _an_odeme = _kd3.multiselect("Vade / Ödeme", ["nakit","havale","çek","30 gün","45 gün","60 gün","90 gün"], default=_mv_list("odeme"), key="an_odeme")
         _an_pazarlik = _kd4.selectbox("Pazarlık", _paz_list, index=_paz_list.index(_mv("pazarlik","inebilir")) if _mv("pazarlik","inebilir") in _paz_list else 0, key="an_pazarlik")
@@ -4073,7 +4091,9 @@ elif aktif == "analiz":
                 # AKSİYON
                 _wb = st.columns(4)
                 if _wb[0].button("✏️ Düzenle", key=f"an_duz_{_ar.get('firma','')}", use_container_width=True):
-                    st.session_state["an_cari_sec"] = "-- Yeni / Manuel Yaz --"
+                    # Widget'a bağlı key doğrudan atanamaz — önce sil, rerun'da sıfırlanır
+                    if "an_cari_sec" in st.session_state:
+                        del st.session_state["an_cari_sec"]
                     st.session_state["an_firma_input"] = str(_ar.get("firma",""))
                     for _k3 in ["an_fiyat_satirlar","an_bolge_satirlar","an_avm_satirlar","an_rakip_satirlar"]:
                         if _k3 in st.session_state: del st.session_state[_k3]
