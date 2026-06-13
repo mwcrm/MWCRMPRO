@@ -4805,97 +4805,53 @@ elif aktif == "randevu":
                         }
             except: _ciro_map = {}
 
-            # ── SATIR SATIR LİSTE — HTML TABLO ───────────────────────────────
-            _tablo_html = """
-<table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;">
-<colgroup>
-  <col style="width:44px"><col style="width:60px"><col style="width:auto">
-  <col style="width:70px"><col style="width:88px">
-  <col style="width:88px"><col style="width:90px"><col style="width:90px"><col style="width:36px">
-</colgroup>
-<thead>
-<tr style="background:#f0f6ff;border-bottom:2px solid #bfdbfe;">
-  <th style="padding:10px 8px;text-align:left;font-weight:600;color:#1d4ed8;font-size:11px;">ID</th>
-  <th style="padding:10px 8px;text-align:left;font-weight:600;color:#1d4ed8;font-size:11px;">Tarih</th>
-  <th style="padding:10px 8px;text-align:left;font-weight:600;color:#1d4ed8;font-size:11px;">Müşteri / Bölge</th>
-  <th style="padding:10px 8px;text-align:center;font-weight:600;color:#1d4ed8;font-size:11px;">Görev</th>
-  <th style="padding:10px 8px;text-align:center;font-weight:600;color:#1d4ed8;font-size:11px;">Sonuç</th>
-  <th style="padding:10px 8px;text-align:right;font-weight:600;color:#1d4ed8;font-size:11px;">Hedef</th>
-  <th style="padding:10px 8px;text-align:right;font-weight:600;color:#1d4ed8;font-size:11px;">Gerçekleşen</th>
-  <th style="padding:10px 8px;text-align:right;font-weight:600;color:#1d4ed8;font-size:11px;">Fark</th>
-  <th style="padding:10px 8px;"></th>
-</tr>
-</thead>
-<tbody>
-"""
-            for _ri, (_, row) in enumerate(df_rand.iterrows()):
-                _rid = int(row.get("id",0) or 0)
-                _tarih_r = str(row.get("randevu_tarihi",""))
-                try:
-                    _gun_fark = (pd.to_datetime(_tarih_r).date() - datetime.now().date()).days
-                    if _gun_fark == 0:        _renk = "🔴"
-                    elif 0 < _gun_fark <= 5:  _renk = "🟡"
-                    elif _gun_fark > 5:       _renk = "🟢"
-                    else:                     _renk = "⚫"
-                except: _renk = "⚫"
+            # ── SATIR SATIR LİSTE — st.dataframe (sürüklenebilir) ───────────
+            _df_goster = pd.DataFrame([{
+                "ID": int(r.get("id",0) or 0),
+                "Tarih": str(r.get("randevu_tarihi",""))[5:].replace("-","."),
+                "Müşteri": str(r.get("musteri_adi","") or ""),
+                "Bölge": str(r.get("bolge","") or ""),
+                "Görev": str(r.get("gorev","") or ""),
+                "Sonuç": str(r.get("sonuc","") or ""),
+                "Hedef ₺": float(_ciro_map.get(str(r.get("musteri_adi","")),{"hedef":0})["hedef"]),
+                "Gerçek ₺": float(_ciro_map.get(str(r.get("musteri_adi","")),{"gercek":0})["gercek"]),
+                "Fark ₺": float(_ciro_map.get(str(r.get("musteri_adi","")),{"gercek":0})["gercek"]) - float(_ciro_map.get(str(r.get("musteri_adi","")),{"hedef":0})["hedef"]),
+            } for _,r in df_rand.iterrows()])
 
-                _musteri_adi = str(row.get("musteri_adi","") or "")
-                _bolge = str(row.get("bolge","") or "").replace(" - ", " · ")
-                _gorev = str(row.get("gorev","") or "")
-                _sonuc_r = str(row.get("sonuc","") or "")
-                _ciro = _ciro_map.get(_musteri_adi, {"hedef":0,"gercek":0})
-                _hedef_c = _ciro["hedef"]
-                _gercek_c = _ciro["gercek"]
-                _fark_c = _gercek_c - _hedef_c
+            st.dataframe(
+                _df_goster,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "ID":       st.column_config.NumberColumn("ID", width="small"),
+                    "Tarih":    st.column_config.TextColumn("Tarih", width="small"),
+                    "Müşteri":  st.column_config.TextColumn("Müşteri", width="large"),
+                    "Bölge":    st.column_config.TextColumn("Bölge"),
+                    "Görev":    st.column_config.TextColumn("Görev", width="small"),
+                    "Sonuç":    st.column_config.TextColumn("Sonuç", width="small"),
+                    "Hedef ₺":  st.column_config.NumberColumn("Hedef ₺", format="%.0f ₺"),
+                    "Gerçek ₺": st.column_config.NumberColumn("Gerçek ₺", format="%.0f ₺"),
+                    "Fark ₺":   st.column_config.NumberColumn("Fark ₺", format="%.0f ₺"),
+                },
+                key="rand_df_goster"
+            )
 
-                if _sonuc_r == "Bitti":          _s_bg="#dcfce7"; _s_col="#15803d"; _s_ic="✅"
-                elif _sonuc_r == "Devam Ediyor": _s_bg="#fef9c3"; _s_col="#92400e"; _s_ic="🔄"
-                elif _sonuc_r == "Gidilmedi":    _s_bg="#fee2e2"; _s_col="#b91c1c"; _s_ic="❌"
-                elif _sonuc_r == "İptal":        _s_bg="#f1f5f9"; _s_col="#64748b"; _s_ic="🚫"
-                else:                            _s_bg="#f1f5f9"; _s_col="#64748b"; _s_ic="—"
-
-                _fark_col = "#dc2626" if _fark_c < 0 else "#16a34a"
-                _fark_ic  = "▼" if _fark_c < 0 else "▲"
-                _zebra = "background:#fafbfc;" if _ri%2==1 else ""
-
-                _tablo_html += f"""
-<tr style="border-bottom:0.5px solid #e2e8f0;{_zebra}">
-  <td style="padding:9px 8px;font-size:12px;font-weight:600;color:#1e293b;">{_rid}</td>
-  <td style="padding:9px 8px;white-space:nowrap;font-size:11px;color:#64748b;">{_renk} {_tarih_r[5:].replace('-','.')}</td>
-  <td style="padding:9px 8px;">
-    <div style="font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#1e293b;">{_musteri_adi}</div>
-    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">{_bolge}</div>
-  </td>
-  <td style="padding:9px 8px;text-align:center;font-size:11px;color:#475569;">{_gorev}</td>
-  <td style="padding:9px 8px;text-align:center;"><span style="background:{_s_bg};color:{_s_col};padding:3px 8px;border-radius:10px;font-size:10px;font-weight:600;white-space:nowrap;">{_s_ic} {_sonuc_r}</span></td>
-  <td style="padding:9px 8px;text-align:right;font-size:11px;white-space:nowrap;color:#1e293b;">{fmt_para(_hedef_c) if _hedef_c else '—'}</td>
-  <td style="padding:9px 8px;text-align:right;font-size:11px;white-space:nowrap;color:#1e293b;">{fmt_para(_gercek_c) if _gercek_c else '—'}</td>
-  <td style="padding:9px 8px;text-align:right;font-size:11px;white-space:nowrap;color:{_fark_col};font-weight:500;">{(_fark_ic + ' ' + fmt_para(abs(_fark_c))) if (_hedef_c or _gercek_c) else '—'}</td>
-  <td style="padding:9px 8px;text-align:center;font-size:13px;" id="edit_{_rid}">✏️</td>
-</tr>"""
-
-            _tablo_html += "</tbody></table>"
-            st.markdown(_tablo_html, unsafe_allow_html=True)
-
-            # Düzenle butonu — ayrı kolonla çöz
-            _edit_cols = st.columns([10, 1])
-            for _, row in df_rand.iterrows():
-                _rid = int(row.get("id",0) or 0)
-
-            # Tıklanabilir düzenle — selectbox ile
-            _edit_sec = st.selectbox("✏️ Düzenlenecek randevu:", ["—"] + [f"[{int(r['id'])}] {r['musteri_adi']} — {str(r.get('randevu_tarihi',''))[:10]}" for _,r in df_rand.iterrows()], key="rand_edit_sec", label_visibility="collapsed")
+            # Düzenle — selectbox ile
+            _edit_sec = st.selectbox("✏️ Düzenlenecek randevu seç:", ["—"] + [f"[{int(r['id'])}] {r['musteri_adi']} — {str(r.get('randevu_tarihi',''))[:10]}" for _,r in df_rand.iterrows()], key="rand_edit_sec", label_visibility="collapsed")
             if _edit_sec != "—":
                 _edit_id = int(_edit_sec.split("]")[0].replace("[","").strip())
-                if st.session_state.get("rand_duz_row",{}).get("id") != _edit_id:
-                    _edit_row = df_rand[df_rand["id"]==_edit_id]
-                    if not _edit_row.empty:
-                        st.session_state["rand_duz_row"] = _edit_row.iloc[0].to_dict()
-                        st.rerun()
+                _edit_row = df_rand[df_rand["id"]==_edit_id]
+                if not _edit_row.empty:
+                    st.session_state["rand_duz_row"] = _edit_row.iloc[0].to_dict()
 
-                # Düzenleme formu — sadece seçili satır için açılır
-                if st.session_state.get("rand_duz_row",{}).get("id") == _rid:
-                    row_d = st.session_state["rand_duz_row"]
-                    with st.form(f"rand_duz_form_{_rid}"):
+            if False:  # eski döngü placeholder — form aşağıda
+                _tablo_html = ""
+            # Düzenleme formu
+            if st.session_state.get("rand_duz_row"):
+                _edit_id = st.session_state["rand_duz_row"].get("id")
+                _rid = _edit_id
+                row_d = st.session_state["rand_duz_row"]
+                with st.form(f"rand_duz_form_{_rid}"):
                         dd1,dd2,dd3,dd4 = st.columns(4)
                         d_tarih    = dd1.text_input("Tarih:", value=str(row_d.get("randevu_tarihi","")))
                         d_saat     = dd2.text_input("Saat:", value=str(row_d.get("randevu_saati","")))
