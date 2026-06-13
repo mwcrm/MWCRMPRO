@@ -1449,6 +1449,22 @@ elif aktif == "liste":
                 ger = float(kart_row.get("gerceklesen_ciro",0) or 0)
                 st.metric("Beklenen",     fmt_para(bek))
                 st.metric("Gerçekleşen",  fmt_para(ger), delta=fmt_para(ger-bek))
+            # Analiz var mı kontrol et
+            try:
+                _an_check = None
+                _sb_ck = get_sb_client()
+                if _sb_ck:
+                    _an_r2 = _sb_ck.table("musteri_analiz").select("sonuc,potansiyel,teklif_tur,bek_ciro").eq("firma", str(kart_row.get("firma",""))).execute()
+                    if _an_r2.data: _an_check = _an_r2.data[0]
+                else:
+                    _cn2 = get_conn()
+                    _an_rw = _cn2.execute("SELECT sonuc,potansiyel,teklif_tur,bek_ciro FROM musteri_analiz WHERE firma=?", (str(kart_row.get("firma","")),)).fetchone()
+                    _cn2.close()
+                    if _an_rw: _an_check = {"sonuc":_an_rw[0],"potansiyel":_an_rw[1],"teklif_tur":_an_rw[2],"bek_ciro":_an_rw[3]}
+            except: _an_check = None
+            if _an_check:
+                _pot_ic2 = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(str(_an_check.get("potansiyel","")),"-")
+                st.info(f"🔍 **Analiz Mevcut:** {_pot_ic2} {_an_check.get('potansiyel','?')} potansiyel · Sonuç: {_an_check.get('sonuc','?')} · Teklif: {_an_check.get('teklif_tur','?')} · Beklenen Ciro: {float(_an_check.get('bek_ciro',0) or 0):,.0f} ₺")
             ab1,ab2,ab3,ab4 = st.columns(4)
             if ab1.button("✏️ Düzenle", key=f"kd_{kart_id}", use_container_width=True):
                 d2 = {str(k):(None if str(v) in ["nan","None","NaT"] else v) for k,v in kart_row.items()}
@@ -2794,7 +2810,21 @@ elif aktif == "teklif":
     sayfa_log("teklif")
     import json, re, io
 
-    st.markdown("## 📄 Spot Teklif")
+    # ── TEKLİF TÜRÜ ────────────────────────────────────────────────────────
+    _ttur_col1, _ttur_col2 = st.columns([1,3])
+    _teklif_turu = _ttur_col1.radio(
+        "Teklif Türü:",
+        ["🚀 Spot Teklif", "🤝 Özel Anlaşma"],
+        horizontal=True,
+        key="global_teklif_turu"
+    )
+    _is_ozel = "Özel" in _teklif_turu
+    if _is_ozel:
+        st.markdown("## 🤝 Özel Anlaşma Teklifi")
+        _ttur_col2.info("💡 Özel anlaşma: sözleşmeli, vadeye özel, hacme göre kademeli fiyat.")
+    else:
+        st.markdown("## 🚀 Spot Teklif")
+        _ttur_col2.info("⚡ Spot teklif: tek seferlik, anlık fiyat.")
 
     # ── TEK SATIR: FİLTRE + MÜŞTERİ + BİLGİLER ──────────────────────────────
     _df_cari_tek = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
@@ -2978,15 +3008,29 @@ elif aktif == "teklif":
             st.warning("Müşteri adı boş!")
         else:
             kullanici_log_kaydet("TEKLİF_KAYDET","teklif",f"Müşteri: {hedef_musteri}")
+            _tt_kayit = "Özel Anlaşma" if st.session_state.get("global_teklif_turu","").startswith("🤝") else "Spot"
             db_insert("teklifler",{
                 "musteri_id": int(secili_musteri["id"]) if secili_musteri is not None else 0,
                 "musteri_adi": hedef_musteri,
-                "satirlar": json.dumps({"hesap":hesap_sonuclar,"teklif":teklif_sonuclar},ensure_ascii=False),
+                "satirlar": json.dumps({"hesap":hesap_sonuclar,"teklif":teklif_sonuclar,"teklif_turu":_tt_kayit},ensure_ascii=False),
                 "toplam_tutar": toplam_tutar,
                 "olusturan": st.session_state["kullanici"],
-                "notlar": f"Vade:{vade}"
+                "notlar": f"Teklif Türü: {_tt_kayit} | Vade:{vade}"
             })
-            st.success("✅ Teklif kaydedildi!")
+            # Analiz kaydında da teklif_verildi güncelle
+            try:
+                _an_mevcut = None
+                sb_tmp = get_sb_client()
+                if sb_tmp:
+                    _an_r = sb_tmp.table("musteri_analiz").select("id").eq("firma", hedef_musteri).execute()
+                    if _an_r.data:
+                        sb_tmp.table("musteri_analiz").update({"sonuc":"teklif verildi","teklif_tur":_tt_kayit}).eq("firma", hedef_musteri).execute()
+                else:
+                    conn_tmp = get_conn()
+                    conn_tmp.execute("UPDATE musteri_analiz SET sonuc='teklif verildi', teklif_tur=? WHERE firma=?", (_tt_kayit, hedef_musteri))
+                    conn_tmp.commit(); conn_tmp.close()
+            except: pass
+            st.success(f"✅ {_tt_kayit} teklifi kaydedildi!")
 
     teklif_ozet_str = "\n".join([
         f"- {t['cikis_il']} → {t['varis_il']} ({t['km']} km): {t['tur']} | {t['bas_desi']}–{t['bit_desi']} desi | {t['buyuk']} kg | {fmt_para(t['tutar'])}"
@@ -3994,6 +4038,35 @@ elif aktif == "analiz":
         _ok, _ = _an_upsert(_secili_firma, _veri_an)
         if _ok:
             _eylem = "güncellendi" if _duzenle_mod else "kaydedildi"
+            # Cari listede yoksa otomatik ekle / varsa ciro güncelle
+            try:
+                _cari_mevcut = _df_cari_an[_df_cari_an["firma"].str.lower()==_secili_firma.lower()]
+                if _cari_mevcut.empty:
+                    db_insert("cari_kartlar", {
+                        "firma": _secili_firma,
+                        "yetkili": _an_yetkili or "",
+                        "gsm": _an_iletisim if "@" not in (_an_iletisim or "") else "",
+                        "email": _an_iletisim if "@" in (_an_iletisim or "") else "",
+                        "il": "", "durum": "Hedef", "islem_asamasi": "İlk Temas",
+                        "beklenen_ciro": float((_an_bek_ciro or "0").replace(".","").replace(",",".")) if _an_bek_ciro else 0,
+                        "gerceklesen_ciro": float((_an_ger_ciro or "0").replace(".","").replace(",",".")) if _an_ger_ciro else 0,
+                        "olusturan": st.session_state.get("kullanici",""), "silindi": 0
+                    })
+                    st.info(f"📋 {_secili_firma} cari listeye otomatik eklendi.")
+                else:
+                    # Varsa ciro güncelle
+                    _cid2 = int(_cari_mevcut.iloc[0]["id"])
+                    _upd = {}
+                    if _an_bek_ciro:
+                        try: _upd["beklenen_ciro"] = float(_an_bek_ciro.replace(".","").replace(",","."))
+                        except: pass
+                    if _an_ger_ciro:
+                        try: _upd["gerceklesen_ciro"] = float(_an_ger_ciro.replace(".","").replace(",","."))
+                        except: pass
+                    if _upd:
+                        db_update("cari_kartlar", _upd, "id", _cid2)
+            except Exception as _ce:
+                pass  # Sessizce geç, kayıt yine de tamamlandı
             st.success(f"✅ **{_secili_firma}** analizi başarıyla {_eylem}!")
             st.balloons()
             try: db_read.clear()
@@ -4019,6 +4092,13 @@ elif aktif == "analiz":
 
     if _teklif_btn:
         st.session_state["aktif_tab"] = "teklif"
+        st.session_state["pending_hedef_mus"] = _secili_firma
+        # Form'daki teklif türünü taşı
+        _an_ttur_vals = _an_ttur if '_an_ttur' in dir() else []
+        if any("özel" in t.lower() or "sözleşme" in t.lower() for t in _an_ttur_vals):
+            st.session_state["global_teklif_turu"] = "🤝 Özel Anlaşma"
+        else:
+            st.session_state["global_teklif_turu"] = "🚀 Spot Teklif"
         st.rerun()
 
     # ── TÜM ANALİZLER LİSTESİ ─────────────────────────────────────────────────
@@ -4047,6 +4127,11 @@ elif aktif == "analiz":
                 _em2.metric("Beklenen Ciro", f"{float(_ar.get('bek_ciro',0) or 0):,.0f} ₺")
                 _em3.metric("Gerçekleşen", f"{float(_ar.get('ger_ciro',0) or 0):,.0f} ₺")
                 _em4.metric("Sonuç", _ar.get("sonuc","—"))
+                # Rakip özeti
+                try:
+                    _rak_list = _aj.loads(_ar.get("rakip","[]") or "[]")
+                    _rak_str = ", ".join([f"{r.get('firma','')} ({r.get('fiyat','?')}₺)" for r in _rak_list if r.get('firma')]) or "—"
+                except: _rak_str = "—"
                 st.markdown(f"""
 | Alan | Değer |
 |---|---|
@@ -4055,6 +4140,8 @@ elif aktif == "analiz":
 | **İletişim** | {_ar.get("iletisim","—")} |
 | **Sektör** | {_ar.get("sektor","—")} |
 | **Analiz Amacı** | {_ar.get("amac","—")} |
+| **Müşteri Durumu** | {_ar.get("mdurum","—")} |
+| **Teklif Türü** | {_ar.get("teklif_tur","—")} |
 | **Kaynak** | {_ar.get("kaynak","—")} |
 | **Kargo** | {_ar.get("kargo","—")} |
 | **Fatura / UA/PO** | {_ar.get("fatura","—")} / {_ar.get("uapo","—")} |
@@ -4064,6 +4151,7 @@ elif aktif == "analiz":
 | **Engel** | {_ar.get("engel","—")} |
 | **Şikayetleri** | {_ar.get("sik","—")} |
 | **Geçiş Sebebi** | {_ar.get("gecis","—")} |
+| **Rakip Kargolar** | {_rak_str} |
 | **Sonraki Adım** | {_ar.get("sonraki_adim","—")} |
 | **Takip Tarihi** | {_ar.get("takip_tar","—")} |
 | **Temsilci** | {_ar.get("olusturan","—")} |
@@ -4105,6 +4193,13 @@ elif aktif == "analiz":
                     _wb[1].markdown("<a href='https://wa.me/"+_tel3+"?text="+_wa3.replace(" ","%20")+"' target='_blank'><button style='width:100%;padding:5px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;'>💬 WA</button></a>", unsafe_allow_html=True)
                 if _wb[2].button("📄 Teklif", key=f"an_tek_{_ar.get('firma','')}", use_container_width=True):
                     st.session_state["aktif_tab"] = "teklif"
+                    st.session_state["pending_hedef_mus"] = str(_ar.get("firma",""))
+                    # Analiz teklif türünü teklif sayfasına taşı
+                    _an_ttur_str = str(_ar.get("teklif_tur","") or "")
+                    if "özel" in _an_ttur_str.lower() or "sözleşme" in _an_ttur_str.lower():
+                        st.session_state["global_teklif_turu"] = "🤝 Özel Anlaşma"
+                    else:
+                        st.session_state["global_teklif_turu"] = "🚀 Spot Teklif"
                     st.rerun()
                 if _wb[3].button("🗑 Sil", key=f"an_sil_{_ar.get('firma','')}", use_container_width=True):
                     if _an_sil(str(_ar.get("firma",""))):
