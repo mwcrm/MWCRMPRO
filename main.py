@@ -904,6 +904,13 @@ section[data-testid="stSidebar"] hr { margin: 8px 0 !important; }
 section[data-testid="stSidebar"] div[data-testid="stExpander"] { margin: 0 !important; }
 section[data-testid="stSidebar"] div[data-testid="stExpander"] > div { padding: 0 !important; }
 #MainMenu { visibility: hidden !important; }
+.main .block-container {
+    padding-top: 0.3rem !important;
+    padding-bottom: 0.3rem !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+}
+div[data-testid="stVerticalBlock"] > div { gap: 0.3rem !important; }
 footer { visibility: hidden !important; }
 header { visibility: hidden !important; }
 div[data-testid="stToolbar"] { display: none !important; }
