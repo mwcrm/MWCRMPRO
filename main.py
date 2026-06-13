@@ -3630,6 +3630,9 @@ elif aktif == "analiz":
 
     st.markdown("## 🔍 Müşteri Görüşme Analizi")
 
+    # ── ANA TABLAR ────────────────────────────────────────────────────────────
+    _an_tab1, _an_tab2 = st.tabs(["📋 Geçmiş Analizler", "✏️ Yeni / Düzenle"])
+
     # ── DB FONKSİYONLARI ──────────────────────────────────────────────────────
     def _an_upsert(firma, veri):
         """Firma başına 1 analiz — varsa güncelle, yoksa ekle"""
@@ -3729,8 +3732,156 @@ elif aktif == "analiz":
             return True
         except: return False
 
-    # ── MÜŞTERI SEÇİMİ — cari listeden ya da manuel ───────────────────────────
-    st.markdown("### Hangi müşteri için analiz?")
+    with _an_tab1:
+        # ── GEÇMİŞ ANALİZLER ─────────────────────────────────────────────────
+        _df_tum_tab = _an_getir_tumü(limit=500)
+        if _df_tum_tab.empty:
+            st.info("📭 Henüz hiç analiz kaydedilmedi. 'Yeni / Düzenle' sekmesinden ilk analizinizi ekleyin.")
+        else:
+            _fa1,_fa2,_fa3,_fa4 = st.columns(4)
+            _ff2 = _fa1.text_input("🔍 Firma ara", key="an_gecmis_ff", placeholder="firma adı...")
+            _fs3 = _fa2.selectbox("Sonuç", ["Tümü","takip edilecek","teklif verildi","anlaşma yapıldı","beklemede","ilgisiz","randevu verildi"], key="an_gecmis_fs")
+            _fp2 = _fa3.selectbox("Potansiyel", ["Tümü","çok yüksek","yüksek","orta","düşük","çok düşük"], key="an_gecmis_fp")
+            _ft3 = _fa4.selectbox("Teklif Türü", ["Tümü","spot","özel anlaşma","sözleşme","dönemsel"], key="an_gecmis_ft")
+            _df_f2 = _df_tum_tab.copy()
+            if _ff2: _df_f2 = _df_f2[_df_f2["firma"].str.contains(_ff2, case=False, na=False)]
+            if _fs3 != "Tümü": _df_f2 = _df_f2[_df_f2["sonuc"]==_fs3]
+            if _fp2 != "Tümü": _df_f2 = _df_f2[_df_f2["potansiyel"]==_fp2]
+            if _ft3 != "Tümü": _df_f2 = _df_f2[_df_f2["teklif_tur"].str.contains(_ft3, case=False, na=False)]
+
+            # Özet metrikler
+            _sm1,_sm2,_sm3,_sm4,_sm5 = st.columns(5)
+            _sm1.metric("Toplam", len(_df_f2))
+            _sm2.metric("Yüksek Potansiyel", len(_df_f2[_df_f2["potansiyel"].isin(["yüksek","çok yüksek"])]) if "potansiyel" in _df_f2.columns else 0)
+            _sm3.metric("Takip Bekleyen", len(_df_f2[_df_f2["sonuc"]=="takip edilecek"]) if "sonuc" in _df_f2.columns else 0)
+            _sm4.metric("Teklif Verildi", len(_df_f2[_df_f2["sonuc"]=="teklif verildi"]) if "sonuc" in _df_f2.columns else 0)
+            try: _sm5.metric("Toplam Beklenen Ciro", f"{_df_f2['bek_ciro'].sum():,.0f} ₺")
+            except: _sm5.metric("Toplam Beklenen Ciro", "—")
+
+            st.caption(f"**{len(_df_f2)}** analiz gösteriliyor")
+            st.divider()
+
+            for _, _ar in _df_f2.iterrows():
+                _pot_ic = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(str(_ar.get("potansiyel","")),"-")
+                _exp_t = f"{_pot_ic} **{_ar.get('firma','?')}** · {str(_ar.get('tarih',''))[:10]} · {_ar.get('sonuc','')} · {_ar.get('potansiyel','')} potansiyel"
+                with st.expander(_exp_t):
+                    _em1,_em2,_em3,_em4 = st.columns(4)
+                    _em1.metric("Potansiyel", _ar.get("potansiyel","—"))
+                    _em2.metric("Beklenen Ciro", f"{float(_ar.get('bek_ciro',0) or 0):,.0f} ₺")
+                    _em3.metric("Gerçekleşen", f"{float(_ar.get('ger_ciro',0) or 0):,.0f} ₺")
+                    _em4.metric("Sonuç", _ar.get("sonuc","—"))
+                    try:
+                        _rak_list2 = _aj.loads(_ar.get("rakip","[]") or "[]")
+                        _rak_str2 = ", ".join([f"{r.get('firma','')} ({r.get('fiyat','?')}₺)" for r in _rak_list2 if r.get('firma')]) or "—"
+                    except: _rak_str2 = "—"
+                    st.markdown(f"""
+| Alan | Değer |
+|---|---|
+| **Firma** | {_ar.get("firma","—")} |
+| **Yetkili** | {_ar.get("yetkili","—")} |
+| **İletişim** | {_ar.get("iletisim","—")} |
+| **Sektör** | {_ar.get("sektor","—")} |
+| **Analiz Amacı** | {_ar.get("amac","—")} |
+| **Müşteri Durumu** | {_ar.get("mdurum","—")} |
+| **Teklif Türü** | {_ar.get("teklif_tur","—")} |
+| **Kaynak** | {_ar.get("kaynak","—")} |
+| **Kargo** | {_ar.get("kargo","—")} |
+| **Fatura / UA/PO** | {_ar.get("fatura","—")} / {_ar.get("uapo","—")} |
+| **Vade/Ödeme** | {_ar.get("odeme","—")} · Pazarlık: {_ar.get("pazarlik","—")} |
+| **Beklenti** | {_ar.get("beklenti","—")} |
+| **Karar Verici** | {_ar.get("karar","—")} · Süre: {_ar.get("sure","—")} |
+| **Engel** | {_ar.get("engel","—")} |
+| **Şikayetleri** | {_ar.get("sik","—")} |
+| **Geçiş Sebebi** | {_ar.get("gecis","—")} |
+| **Rakip Kargolar** | {_rak_str2} |
+| **Sonraki Adım** | {_ar.get("sonraki_adim","—")} |
+| **Takip Tarihi** | {_ar.get("takip_tar","—")} |
+| **Temsilci** | {_ar.get("olusturan","—")} |
+""")
+                    if _ar.get("not_alan"):
+                        st.info(f"📝 **Not:** {_ar.get('not_alan')}")
+                    try:
+                        _ft2b = _aj.loads(_ar.get("fiyat_tablo","[]") or "[]")
+                        if _ft2b and any(s.get("il") and s.get("il")!="--" for s in _ft2b):
+                            st.markdown("**💰 Fiyat Tablosu:**")
+                            st.dataframe(pd.DataFrame(_ft2b), use_container_width=True, hide_index=True)
+                    except: pass
+                    try:
+                        _bt2b = _aj.loads(_ar.get("bolge","[]") or "[]")
+                        if _bt2b and any(s.get("il") and s.get("il")!="--" for s in _bt2b):
+                            st.markdown("**📍 Bölge Teslimat:**")
+                            st.dataframe(pd.DataFrame(_bt2b), use_container_width=True, hide_index=True)
+                    except: pass
+                    try:
+                        _at2b = _aj.loads(_ar.get("avm","[]") or "[]")
+                        if _at2b and any(s.get("avm") for s in _at2b):
+                            st.markdown("**🏬 AVM Teslimatları:**")
+                            st.dataframe(pd.DataFrame(_at2b), use_container_width=True, hide_index=True)
+                    except: pass
+                    # AKSİYON BUTONLARI
+                    _wbg = st.columns(4)
+                    if _wbg[0].button("✏️ Düzenle", key=f"an_gduz_{_ar.get('firma','')}", use_container_width=True):
+                        if "an_cari_sec" in st.session_state: del st.session_state["an_cari_sec"]
+                        st.session_state["an_firma_input"] = str(_ar.get("firma",""))
+                        st.session_state["an_aktif_tab"] = "duzenle"
+                        for _k3 in ["an_fiyat_satirlar","an_bolge_satirlar","an_avm_satirlar","an_rakip_satirlar"]:
+                            if _k3 in st.session_state: del st.session_state[_k3]
+                        st.rerun()
+                    _tel3b = str(_ar.get("iletisim","") or "").replace(" ","").replace("-","")
+                    if _tel3b and "@" not in _tel3b:
+                        if _tel3b.startswith("0"): _tel3b="90"+_tel3b[1:]
+                        _wa3b = "Merhaba " + str(_ar.get("firma","")) + ", gorusemiz icin tesekkurler."
+                        _wbg[1].markdown("<a href='https://wa.me/"+_tel3b+"?text="+_wa3b.replace(" ","%20")+"' target='_blank'><button style='width:100%;padding:5px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;'>💬 WA</button></a>", unsafe_allow_html=True)
+                    if _wbg[2].button("📄 Teklif", key=f"an_gtek_{_ar.get('firma','')}", use_container_width=True):
+                        st.session_state["aktif_tab"] = "teklif"
+                        st.session_state["pending_hedef_mus"] = str(_ar.get("firma",""))
+                        _an_ttur_str2 = str(_ar.get("teklif_tur","") or "")
+                        if "özel" in _an_ttur_str2.lower() or "sözleşme" in _an_ttur_str2.lower():
+                            st.session_state["global_teklif_turu"] = "🤝 Özel Anlaşma"
+                        else:
+                            st.session_state["global_teklif_turu"] = "🚀 Spot Teklif"
+                        st.rerun()
+                    if _wbg[3].button("🗑 Sil", key=f"an_gsil_{_ar.get('firma','')}", use_container_width=True):
+                        if _an_sil(str(_ar.get("firma",""))):
+                            st.success("Analiz silindi!")
+                            st.rerun()
+
+            # Grafikler
+            st.divider()
+            st.markdown("### 📊 İstatistikler")
+            _gc1,_gc2 = st.columns(2)
+            with _gc1:
+                st.markdown("**Potansiyel Dağılımı**")
+                st.bar_chart(_df_f2["potansiyel"].value_counts())
+            with _gc2:
+                st.markdown("**Görüşme Sonuçları**")
+                st.bar_chart(_df_f2["sonuc"].value_counts())
+            _gc3,_gc4 = st.columns(2)
+            with _gc3:
+                st.markdown("**Sektör Dağılımı**")
+                st.bar_chart(_df_f2["sektor"].value_counts().head(8))
+            with _gc4:
+                st.markdown("**En Çok Rakip Kargo**")
+                try:
+                    _kg_all2 = []
+                    for _k4b in _df_f2["kargo"].dropna():
+                        _kg_all2.extend([x.strip() for x in str(_k4b).split(",")])
+                    if _kg_all2: st.bar_chart(pd.Series(_kg_all2).value_counts())
+                except: pass
+
+            # Excel dışa aktar
+            try:
+                _exp_buf = io.BytesIO()
+                _df_f2.to_excel(_exp_buf, index=False); _exp_buf.seek(0)
+                st.download_button("📥 Tüm Analizleri Excel'e Aktar", data=_exp_buf,
+                    file_name=f"musteri_analizleri_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                    use_container_width=True)
+            except: pass
+
+    with _an_tab2:
+        # ── YENİ / DÜZENLE FORMU ─────────────────────────────────────────────
+        # ── MÜŞTERI SEÇİMİ — cari listeden ya da manuel ───────────────────────────
+        st.markdown("### Hangi müşteri için analiz?")
     _df_cari_an = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
     _mac1, _mac2 = st.columns([3, 1])
     _cari_opts_an = ["-- Yeni / Manuel Yaz --"] + [f"[{int(r['id'])}] {r['firma']}" for _,r in _df_cari_an.iterrows()]
@@ -4101,141 +4252,7 @@ elif aktif == "analiz":
             st.session_state["global_teklif_turu"] = "🚀 Spot Teklif"
         st.rerun()
 
-    # ── TÜM ANALİZLER LİSTESİ ─────────────────────────────────────────────────
-    st.divider()
-    st.markdown("### 📋 Tüm Müşteri Analizleri")
-    _df_tum = _an_getir_tumü(limit=500)
-    if _df_tum.empty:
-        st.info("Henüz analiz kaydedilmedi.")
-    else:
-        _fa1,_fa2,_fa3 = st.columns(3)
-        _ff = _fa1.text_input("Firma ara", key="an_ff", placeholder="firma adı...")
-        _fs2 = _fa2.selectbox("Sonuç", ["Tümü","takip edilecek","teklif verildi","anlaşma yapıldı","beklemede","ilgisiz"], key="an_fs")
-        _fp = _fa3.selectbox("Potansiyel", ["Tümü","çok yüksek","yüksek","orta","düşük","çok düşük"], key="an_fp")
-        _df_f = _df_tum.copy()
-        if _ff: _df_f = _df_f[_df_f["firma"].str.contains(_ff, case=False, na=False)]
-        if _fs2 != "Tümü": _df_f = _df_f[_df_f["sonuc"]==_fs2]
-        if _fp != "Tümü": _df_f = _df_f[_df_f["potansiyel"]==_fp]
-        st.caption(f"{len(_df_f)} analiz")
-
-        for _, _ar in _df_f.iterrows():
-            _pot_ic = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(str(_ar.get("potansiyel","")),"-")
-            _exp_t = f"{_pot_ic} **{_ar.get('firma','?')}** · {str(_ar.get('tarih',''))[:10]} · {_ar.get('sonuc','')} · {_ar.get('potansiyel','')} potansiyel"
-            with st.expander(_exp_t):
-                _em1,_em2,_em3,_em4 = st.columns(4)
-                _em1.metric("Potansiyel", _ar.get("potansiyel","—"))
-                _em2.metric("Beklenen Ciro", f"{float(_ar.get('bek_ciro',0) or 0):,.0f} ₺")
-                _em3.metric("Gerçekleşen", f"{float(_ar.get('ger_ciro',0) or 0):,.0f} ₺")
-                _em4.metric("Sonuç", _ar.get("sonuc","—"))
-                # Rakip özeti
-                try:
-                    _rak_list = _aj.loads(_ar.get("rakip","[]") or "[]")
-                    _rak_str = ", ".join([f"{r.get('firma','')} ({r.get('fiyat','?')}₺)" for r in _rak_list if r.get('firma')]) or "—"
-                except: _rak_str = "—"
-                st.markdown(f"""
-| Alan | Değer |
-|---|---|
-| **Firma** | {_ar.get("firma","—")} |
-| **Yetkili** | {_ar.get("yetkili","—")} |
-| **İletişim** | {_ar.get("iletisim","—")} |
-| **Sektör** | {_ar.get("sektor","—")} |
-| **Analiz Amacı** | {_ar.get("amac","—")} |
-| **Müşteri Durumu** | {_ar.get("mdurum","—")} |
-| **Teklif Türü** | {_ar.get("teklif_tur","—")} |
-| **Kaynak** | {_ar.get("kaynak","—")} |
-| **Kargo** | {_ar.get("kargo","—")} |
-| **Fatura / UA/PO** | {_ar.get("fatura","—")} / {_ar.get("uapo","—")} |
-| **Vade/Ödeme** | {_ar.get("odeme","—")} · Pazarlık: {_ar.get("pazarlik","—")} |
-| **Beklenti** | {_ar.get("beklenti","—")} |
-| **Karar Verici** | {_ar.get("karar","—")} · Süre: {_ar.get("sure","—")} |
-| **Engel** | {_ar.get("engel","—")} |
-| **Şikayetleri** | {_ar.get("sik","—")} |
-| **Geçiş Sebebi** | {_ar.get("gecis","—")} |
-| **Rakip Kargolar** | {_rak_str} |
-| **Sonraki Adım** | {_ar.get("sonraki_adim","—")} |
-| **Takip Tarihi** | {_ar.get("takip_tar","—")} |
-| **Temsilci** | {_ar.get("olusturan","—")} |
-""")
-                if _ar.get("not_alan"):
-                    st.info(f"📝 **Not:** {_ar.get('not_alan')}")
-                try:
-                    _ft2 = _aj.loads(_ar.get("fiyat_tablo","[]") or "[]")
-                    if _ft2 and any(s.get("il") and s.get("il")!="--" for s in _ft2):
-                        st.markdown("**💰 Fiyat Tablosu:**")
-                        st.dataframe(pd.DataFrame(_ft2), use_container_width=True, hide_index=True)
-                except: pass
-                try:
-                    _bt2 = _aj.loads(_ar.get("bolge","[]") or "[]")
-                    if _bt2 and any(s.get("il") and s.get("il")!="--" for s in _bt2):
-                        st.markdown("**📍 Bölge Teslimat:**")
-                        st.dataframe(pd.DataFrame(_bt2), use_container_width=True, hide_index=True)
-                except: pass
-                try:
-                    _at2 = _aj.loads(_ar.get("avm","[]") or "[]")
-                    if _at2 and any(s.get("avm") for s in _at2):
-                        st.markdown("**🏬 AVM Teslimatları:**")
-                        st.dataframe(pd.DataFrame(_at2), use_container_width=True, hide_index=True)
-                except: pass
-                # AKSİYON
-                _wb = st.columns(4)
-                if _wb[0].button("✏️ Düzenle", key=f"an_duz_{_ar.get('firma','')}", use_container_width=True):
-                    # Widget'a bağlı key doğrudan atanamaz — önce sil, rerun'da sıfırlanır
-                    if "an_cari_sec" in st.session_state:
-                        del st.session_state["an_cari_sec"]
-                    st.session_state["an_firma_input"] = str(_ar.get("firma",""))
-                    for _k3 in ["an_fiyat_satirlar","an_bolge_satirlar","an_avm_satirlar","an_rakip_satirlar"]:
-                        if _k3 in st.session_state: del st.session_state[_k3]
-                    st.rerun()
-                _tel3 = str(_ar.get("iletisim","") or "").replace(" ","").replace("-","")
-                if _tel3 and "@" not in _tel3:
-                    if _tel3.startswith("0"): _tel3="90"+_tel3[1:]
-                    _wa3 = "Merhaba " + str(_ar.get("firma","")) + ", gorusemiz icin tesekkurler."
-                    _wb[1].markdown("<a href='https://wa.me/"+_tel3+"?text="+_wa3.replace(" ","%20")+"' target='_blank'><button style='width:100%;padding:5px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;'>💬 WA</button></a>", unsafe_allow_html=True)
-                if _wb[2].button("📄 Teklif", key=f"an_tek_{_ar.get('firma','')}", use_container_width=True):
-                    st.session_state["aktif_tab"] = "teklif"
-                    st.session_state["pending_hedef_mus"] = str(_ar.get("firma",""))
-                    # Analiz teklif türünü teklif sayfasına taşı
-                    _an_ttur_str = str(_ar.get("teklif_tur","") or "")
-                    if "özel" in _an_ttur_str.lower() or "sözleşme" in _an_ttur_str.lower():
-                        st.session_state["global_teklif_turu"] = "🤝 Özel Anlaşma"
-                    else:
-                        st.session_state["global_teklif_turu"] = "🚀 Spot Teklif"
-                    st.rerun()
-                if _wb[3].button("🗑 Sil", key=f"an_sil_{_ar.get('firma','')}", use_container_width=True):
-                    if _an_sil(str(_ar.get("firma",""))):
-                        st.success("Analiz silindi!")
-                        st.rerun()
-
-    # İSTATİSTİKLER
-    if not _df_tum.empty:
-        st.divider()
-        st.markdown("### 📊 İstatistikler")
-        _s1,_s2,_s3,_s4,_s5 = st.columns(5)
-        _s1.metric("Toplam Analiz", len(_df_tum))
-        _s2.metric("Yüksek Potansiyel", len(_df_tum[_df_tum["potansiyel"].isin(["yüksek","çok yüksek"])]))
-        _s3.metric("Takip Bekleyen", len(_df_tum[_df_tum["sonuc"]=="takip edilecek"]))
-        _s4.metric("Anlaşma Yapılan", len(_df_tum[_df_tum["sonuc"]=="anlaşma yapıldı"]))
-        try: _s5.metric("Toplam Beklenen Ciro", f"{_df_tum['bek_ciro'].sum():,.0f} ₺")
-        except: pass
-        _ic1,_ic2 = st.columns(2)
-        with _ic1:
-            st.markdown("**Potansiyel Dağılımı**")
-            st.bar_chart(_df_tum["potansiyel"].value_counts())
-        with _ic2:
-            st.markdown("**Görüşme Sonuçları**")
-            st.bar_chart(_df_tum["sonuc"].value_counts())
-        _ic3,_ic4 = st.columns(2)
-        with _ic3:
-            st.markdown("**Sektör Dağılımı**")
-            st.bar_chart(_df_tum["sektor"].value_counts().head(8))
-        with _ic4:
-            st.markdown("**En Çok Rakip Kargo**")
-            try:
-                _kg_all = []
-                for _k4 in _df_tum["kargo"].dropna():
-                    _kg_all.extend([x.strip() for x in str(_k4).split(",")])
-                if _kg_all: st.bar_chart(pd.Series(_kg_all).value_counts())
-            except: pass
+    # (eski liste ve istatistikler tab1'e taşındı)
 
 elif aktif == "whatsapp":
     import requests as _wa_req
