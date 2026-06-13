@@ -1235,7 +1235,7 @@ elif aktif == "liste":
                 st.rerun()
 
     # ── FİLTRE TEK SATIR ─────────────────────────────────────────────────────
-    _fc = st.columns([1.3, 1.3, 1.8, 2.5, 1.3, 0.4])
+    _fc = st.columns([1.3, 1.3, 1.8, 1.8, 1.3, 0.4, 0.8])
     filtre_asama = _fc[0].selectbox("", ["Aşama: Tümü"]+tum_asama_opts, key="fil_asama", label_visibility="collapsed")
     filtre_durum = _fc[1].selectbox("", ["Durum: Tümü"]+tum_durum_opts, key="fil_durum", label_visibility="collapsed")
 
@@ -1265,7 +1265,7 @@ elif aktif == "liste":
         if _fc[5].button("❌", key="kart_sec_temizle", use_container_width=True, help="Temizle"):
             st.session_state["kart_sec_reset"] = True
             st.rerun()
-    st.caption(f"**{len(df_f)} kayıt**")
+    _fc[6].markdown(f"<small style='color:gray'>{len(df_f)} kayıt</small>", unsafe_allow_html=True)
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
         try:
             kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
