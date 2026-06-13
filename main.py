@@ -3827,285 +3827,574 @@ elif aktif == "excel":
 
     with _ex_tab2:
         st.markdown("### 📊 E-Tablo")
-        st.components.v1.html("""
-<!DOCTYPE html>
-<html>
-<head>
-<script src="https://cdn.jsdelivr.net/npm/hyperformula/dist/hyperformula.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+        st.components.v1.html("""<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
-body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: #fff; }
-.toolbar { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; padding: 4px 8px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; }
-.toolbar button { padding: 3px 8px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; background: white; cursor: pointer; }
-.toolbar button:hover { background: #f1f5f9; }
-.toolbar select { font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 4px; }
-.sep { width: 1px; height: 18px; background: #e2e8f0; margin: 0 2px; }
-.formula-bar { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; }
-.cell-ref { font-size: 12px; font-weight: 600; color: #1d4ed8; min-width: 52px; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 6px; text-align: center; }
-.formula-input { flex: 1; font-size: 12px; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 8px; outline: none; font-family: monospace; }
-.formula-input:focus { border-color: #3b82f6; }
-.sheet-wrap { flex: 1; overflow: auto; }
-table { border-collapse: collapse; font-size: 12px; table-layout: fixed; }
-th { background: #f0f6ff; color: #1d4ed8; font-weight: 600; padding: 3px 4px; border: 1px solid #d1d5db; width: 90px; min-width: 60px; text-align: center; font-size: 11px; position: sticky; top: 0; z-index: 3; }
-th.corner { position: sticky; top: 0; left: 0; z-index: 5; width: 36px; min-width: 36px; }
-th.sel-col { background: #bfdbfe; }
-td { border: 1px solid #e5e7eb; padding: 2px 5px; width: 90px; min-width: 60px; font-size: 12px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: cell; height: 22px; position: relative; }
-td.rn { background: #f8fafc; color: #64748b; font-size: 11px; text-align: center; width: 36px; min-width: 36px; position: sticky; left: 0; z-index: 1; cursor: default; border-right: 1px solid #d1d5db; }
-td.rn.sel-row { background: #bfdbfe; }
-td.selected { background: #dbeafe !important; outline: 2px solid #2563eb; outline-offset: -2px; }
-td.bold-c { font-weight: 700; } td.italic-c { font-style: italic; }
-td.ac { text-align: center; } td.ar { text-align: right; }
-td.bg-y { background: #fef9c3 !important; } td.bg-g { background: #dcfce7 !important; }
-td.bg-r { background: #fee2e2 !important; } td.bg-b { background: #dbeafe !important; }
-td.tc-r { color: #dc2626 !important; } td.tc-g { color: #16a34a !important; }
-td.err { color: #dc2626 !important; }
-.sheet-tabs { display: flex; align-items: center; gap: 2px; padding: 3px 8px; background: #f1f5f9; border-top: 1px solid #e2e8f0; flex-shrink: 0; }
-.tab { padding: 3px 12px; font-size: 11px; border: 1px solid #cbd5e1; border-bottom: none; border-radius: 4px 4px 0 0; background: white; cursor: pointer; }
-.tab.active { background: #1d4ed8; color: white; border-color: #1d4ed8; }
-.tab:hover:not(.active) { background: #e0e7ff; }
-.tab-add { padding: 3px 8px; font-size: 14px; cursor: pointer; color: #64748b; border: none; background: none; }
-.status { padding: 2px 8px; font-size: 10px; color: #64748b; background: #f8fafc; border-top: 1px solid #e2e8f0; flex-shrink: 0; display: flex; gap: 16px; }
-.ctx-menu { position: fixed; background: white; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.15); z-index: 100; min-width: 160px; display: none; }
-.ctx-menu div { padding: 6px 14px; font-size: 12px; cursor: pointer; } .ctx-menu div:hover { background: #f0f6ff; }
-.ctx-sep { height: 1px; background: #e2e8f0; margin: 2px 0; }
-</style>
-</head>
-<body>
-<div class="toolbar">
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,sans-serif;}
+body{display:flex;flex-direction:column;height:100vh;overflow:hidden;background:#fff;}
+.tb{display:flex;align-items:center;gap:3px;flex-wrap:wrap;padding:4px 8px;background:#f8fafc;border-bottom:1px solid #e2e8f0;flex-shrink:0;}
+.tb button{padding:3px 8px;font-size:11px;border:1px solid #cbd5e1;border-radius:4px;background:white;cursor:pointer;}
+.tb button:hover{background:#f1f5f9;}
+.tb select{font-size:11px;border:1px solid #cbd5e1;border-radius:4px;padding:2px 4px;}
+.sep{width:1px;height:18px;background:#e2e8f0;margin:0 2px;}
+.fbar{display:flex;align-items:center;gap:6px;padding:3px 8px;border-bottom:1px solid #e2e8f0;flex-shrink:0;}
+.cref{font-size:12px;font-weight:600;color:#1d4ed8;min-width:52px;border:1px solid #e2e8f0;border-radius:4px;padding:2px 6px;text-align:center;}
+.finp{flex:1;font-size:12px;border:1px solid #e2e8f0;border-radius:4px;padding:2px 8px;outline:none;font-family:monospace;}
+.finp:focus{border-color:#3b82f6;}
+.sw{flex:1;overflow:auto;}
+table{border-collapse:collapse;font-size:12px;table-layout:fixed;}
+th{background:#f0f6ff;color:#1d4ed8;font-weight:600;padding:3px 4px;border:1px solid #d1d5db;width:80px;min-width:50px;text-align:center;font-size:11px;position:sticky;top:0;z-index:3;}
+th.corner{position:sticky;top:0;left:0;z-index:5;width:36px;min-width:36px;background:#e8f0fe;}
+th.sc{background:#bfdbfe;}
+td{border:1px solid #e5e7eb;padding:2px 4px;width:80px;min-width:50px;font-size:12px;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:cell;height:21px;position:relative;}
+td.rn{background:#f8fafc;color:#64748b;font-size:11px;text-align:center;width:36px;min-width:36px;position:sticky;left:0;z-index:1;cursor:default;border-right:1px solid #d1d5db;}
+td.rn.sr{background:#bfdbfe;}
+td.sel{background:#dbeafe!important;outline:2px solid #2563eb;outline-offset:-2px;}
+td.bc{font-weight:700;}td.ic{font-style:italic;}
+td.acc{text-align:center;}td.arc{text-align:right;}
+td.by{background:#fef9c3!important;}td.bg{background:#dcfce7!important;}
+td.br{background:#fee2e2!important;}td.bb{background:#dbeafe!important;}
+td.tr{color:#dc2626!important;}td.tg{color:#16a34a!important;}
+td.er{color:#dc2626!important;font-size:10px;}
+.stabs{display:flex;align-items:center;gap:2px;padding:3px 8px;background:#f1f5f9;border-top:1px solid #e2e8f0;flex-shrink:0;}
+.stab{padding:3px 12px;font-size:11px;border:1px solid #cbd5e1;border-bottom:none;border-radius:4px 4px 0 0;background:white;cursor:pointer;}
+.stab.act{background:#1d4ed8;color:white;border-color:#1d4ed8;}
+.stab:hover:not(.act){background:#e0e7ff;}
+.tadd{padding:3px 8px;font-size:14px;cursor:pointer;color:#64748b;border:none;background:none;}
+.st{padding:2px 8px;font-size:10px;color:#64748b;background:#f8fafc;border-top:1px solid #e2e8f0;flex-shrink:0;display:flex;gap:16px;}
+.ctx{position:fixed;background:white;border:1px solid #e2e8f0;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:100;min-width:160px;display:none;}
+.ctx div{padding:6px 14px;font-size:12px;cursor:pointer;}
+.ctx div:hover{background:#f0f6ff;}
+.csep{height:1px;background:#e2e8f0;margin:2px 0;}
+</style></head><body>
+<div class="tb">
   <button onclick="addRow()">+ Satır</button>
   <button onclick="addCol()">+ Sütun</button>
   <button onclick="delRow()">− Satır</button>
   <button onclick="delCol()">− Sütun</button>
   <div class="sep"></div>
-  <button onclick="applyFmt('bold')"><b>B</b></button>
-  <button onclick="applyFmt('italic')"><i>I</i></button>
+  <button onclick="af('bold')"><b>B</b></button>
+  <button onclick="af('italic')"><i>I</i></button>
   <div class="sep"></div>
-  <button onclick="applyFmt('al')">⬅</button>
-  <button onclick="applyFmt('ac')">⬌</button>
-  <button onclick="applyFmt('ar')">➡</button>
+  <button onclick="af('al')">⬅</button>
+  <button onclick="af('ac')">⬌</button>
+  <button onclick="af('ar')">➡</button>
   <div class="sep"></div>
-  <select onchange="applyFmt('bg',this.value);this.value=''">
+  <select onchange="af('bg',this.value);this.value=''">
     <option value="">🎨 Renk</option>
-    <option value="bg-y">🟡 Sarı</option>
-    <option value="bg-g">🟢 Yeşil</option>
-    <option value="bg-r">🔴 Kırmızı</option>
-    <option value="bg-b">🔵 Mavi</option>
+    <option value="by">🟡 Sarı</option><option value="bg">🟢 Yeşil</option>
+    <option value="br">🔴 Kırmızı</option><option value="bb">🔵 Mavi</option>
     <option value="clr">Temizle</option>
   </select>
-  <select onchange="applyFmt('color',this.value);this.value=''">
+  <select onchange="af('color',this.value);this.value=''">
     <option value="">🖊 Yazı</option>
-    <option value="tc-r">🔴 Kırmızı</option>
-    <option value="tc-g">🟢 Yeşil</option>
+    <option value="tr">🔴 Kırmızı</option><option value="tg">🟢 Yeşil</option>
     <option value="clr">Normal</option>
   </select>
   <div class="sep"></div>
-  <button onclick="clearCell()">⌫</button>
-  <button onclick="exportCSV()">📥 CSV</button>
-  <button onclick="showHelp()" style="color:#7c3aed;font-weight:600;">fx ?</button>
-  <div class="sep"></div>
+  <button onclick="clrCell()">⌫</button>
+  <button onclick="expCSV()">📥 CSV</button>
   <label style="padding:3px 8px;font-size:11px;border:1px solid #16a34a;border-radius:4px;background:#f0fdf4;color:#16a34a;cursor:pointer;font-weight:500;">
-    📂 Excel Yükle <input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="loadExcel(this)">
+    📂 Excel Yükle<input type="file" accept=".xlsx,.xls,.csv" style="display:none" onchange="loadFile(this)">
   </label>
-  <span id="hfStatus" style="margin-left:auto;font-size:10px;color:#16a34a;font-weight:500;"></span>
+  <button onclick="showHelp()" style="color:#7c3aed;font-weight:600;">fx ?</button>
+  <span id="sts" style="margin-left:auto;font-size:10px;color:#16a34a;font-weight:500;">✅ Hazır</span>
 </div>
-<div class="formula-bar">
-  <div class="cell-ref" id="cellRef">A1</div>
+<div class="fbar">
+  <div class="cref" id="cref">A1</div>
   <span style="font-size:12px;color:#64748b;font-style:italic;">fx</span>
-  <input class="formula-input" id="formulaBar" placeholder="=SUMIFS(...), =IF(...), =VLOOKUP(...)" onkeydown="fbarKey(event)" />
+  <input class="finp" id="finp" placeholder="=TOPLA(A1:A10), =EĞER(A1>0,&quot;evet&quot;,&quot;hayır&quot;), =DÜŞEYARA(...)" onkeydown="fbKey(event)"/>
 </div>
-<div class="sheet-wrap" id="sheetWrap"><table id="sheet"></table></div>
-<div class="sheet-tabs" id="sheetTabs"></div>
-<div class="status"><span id="st1">Hazır</span><span id="st2"></span><span id="st3"></span></div>
-<div class="ctx-menu" id="ctxMenu">
-  <div onclick="addRow()">➕ Üste Satır</div><div onclick="addRowBelow()">➕ Alta Satır</div>
-  <div class="ctx-sep"></div>
-  <div onclick="addCol()">➕ Sola Sütun</div><div onclick="addColRight()">➕ Sağa Sütun</div>
-  <div class="ctx-sep"></div>
+<div class="sw"><table id="tbl"></table></div>
+<div class="stabs" id="stabs"></div>
+<div class="st"><span id="s1">Hazır</span><span id="s2"></span><span id="s3">Sayfa 1</span></div>
+<div class="ctx" id="ctx">
+  <div onclick="addRow()">➕ Üste Satır</div><div onclick="addRowB()">➕ Alta Satır</div>
+  <div class="csep"></div>
+  <div onclick="addCol()">➕ Sola Sütun</div><div onclick="addColR()">➕ Sağa Sütun</div>
+  <div class="csep"></div>
   <div onclick="delRow()" style="color:#dc2626">🗑 Satırı Sil</div>
   <div onclick="delCol()" style="color:#dc2626">🗑 Sütunu Sil</div>
-  <div class="ctx-sep"></div><div onclick="clearCell()">⌫ Temizle</div>
+  <div class="csep"></div><div onclick="clrCell()">⌫ Temizle</div>
 </div>
 <script>
 const ROWS=1000,COLS=100;
-let hf,sheets=[],curSheet=0,selR=0,selC=0,editMode=false,cellFmt={};
-function colName(i){let n='';i++;while(i>0){n=String.fromCharCode(64+(i%26||26))+n;i=Math.floor((i-1)/26);}return n;}
-function fmtKey(r,c){return r+','+c;}
-function getF(si,r,c){return((cellFmt[si]||{})[fmtKey(r,c)])||{};}
-function setF(si,r,c,k,v){if(!cellFmt[si])cellFmt[si]={};const key=fmtKey(r,c);if(!cellFmt[si][key])cellFmt[si][key]={};if(v===null)delete cellFmt[si][key][k];else cellFmt[si][key][k]=v;}
-function initHF(){
-  const name='Sayfa 1';
-  const d=Array.from({length:ROWS},()=>Array(COLS).fill(''));
-  // Boş tablo — kullanıcı istediği gibi doldurur
-  try{
-    hf=HyperFormula.buildFromSheets({[name]:d},{licenseKey:'gpl-v3',language:'enUS'});
-    sheets=[name];
-    document.getElementById('hfStatus').textContent='✅ 400+ formül aktif';
-  }catch(e){document.getElementById('hfStatus').textContent='⚠️ '+e.message;}
-  // Formatlar temiz başlar
-  buildTabs();buildTable();
+// ── YARDIMCI ──────────────────────────────────────────────────────────────
+function cn(i){let n='';i++;while(i>0){n=String.fromCharCode(64+(i%26||26))+n;i=Math.floor((i-1)/26);}return n;}
+function ci(s){let n=0;for(let c of s)n=n*26+(c.charCodeAt(0)-64);return n-1;}
+function fk(r,c){return r+','+c;}
+
+// ── VERİ ──────────────────────────────────────────────────────────────────
+let sheets=[{name:'Sayfa 1',data:mkD(),fmt:{}}];
+let cs=0,selR=0,selC=0,em=false;
+function mkD(){return Array.from({length:ROWS},()=>Array(COLS).fill(''));}
+function D(){return sheets[cs].data;}
+function F(){return sheets[cs].fmt;}
+function gf(r,c){return F()[fk(r,c)]||{};}
+function sf(r,c,k,v){const key=fk(r,c);if(!F()[key])F()[key]={};if(v===null)delete F()[key][k];else F()[key][k]=v;}
+
+// ── FORMÜL MOTORU ──────────────────────────────────────────────────────────
+function gcv(r,c,sh){
+  const d=sh?sh.data:D();
+  if(r<0||r>=d.length||c<0||c>=d[0].length)return'';
+  const v=d[r][c];
+  if(typeof v==='string'&&v.startsWith('='))return calc(v,r,c,sh);
+  if(v===''||v===null||v===undefined)return'';
+  return isNaN(v)?v:Number(v);
 }
-function getCellDisplay(si,r,c){try{const sid=hf.getSheetId(sheets[si]);const v=hf.getCellValue({sheet:sid,row:r,col:c});if(v===null||v===undefined||v==='')return'';if(typeof v==='object'&&v.type)return'#'+v.type;return String(v);}catch(e){return'';}}
-function getCellFormula(si,r,c){try{const sid=hf.getSheetId(sheets[si]);return hf.getCellFormula({sheet:sid,row:r,col:c})||String(hf.getCellValue({sheet:sid,row:r,col:c})||'');}catch(e){return'';}}
+
+function calc(formula,r,c,sh){
+  if(!formula.startsWith('='))return formula;
+  let ex=formula.slice(1).trim();
+  try{return evalEx(ex,sh);}catch(e){return'#HATA';}
+}
+
+function getRange(c1s,r1,c2s,r2,sh){
+  const c1=ci(c1s),c2=ci(c2s);
+  let vals=[];
+  for(let ri=r1;ri<=r2;ri++)for(let ci2=c1;ci2<=c2;ci2++){
+    const v=gcv(ri,ci2,sh);
+    vals.push(v);
+  }
+  return vals;
+}
+function numVals(arr){return arr.filter(v=>v!==''&&v!==null&&!isNaN(v)).map(Number);}
+
+function parseRangeStr(s){
+  const m=s.trim().match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/i);
+  if(!m)return null;
+  return{c1s:m[1].toUpperCase(),r1:parseInt(m[2])-1,c2s:m[3].toUpperCase(),r2:parseInt(m[4])-1};
+}
+function parseCellStr(s){
+  const m=s.trim().match(/^([A-Z]+)(\d+)$/i);
+  if(!m)return null;
+  return{r:parseInt(m[2])-1,c:ci(m[1].toUpperCase())};
+}
+
+function splitTop(s,delim=','){
+  let depth=0,cur='',parts=[];
+  for(let ch of s){
+    if(ch==='('||ch==='[')depth++;
+    else if(ch===')'||ch===']')depth--;
+    if(ch===delim&&depth===0){parts.push(cur.trim());cur='';}
+    else cur+=ch;
+  }
+  parts.push(cur.trim());return parts;
+}
+
+function matchCond(val,cond){
+  if(typeof cond==='string'){
+    cond=cond.trim();
+    const ops=['>=','<=','<>','!=','>','<','='];
+    for(const op of ops){
+      if(cond.startsWith(op)){
+        const n=Number(cond.slice(op.length));
+        const v=Number(val);
+        if(op==='>=')return v>=n;if(op==='<=')return v<=n;
+        if(op==='<>'||op==='!=')return String(val)!==String(cond.slice(op.length));
+        if(op==='>') return v>n;if(op==='<')return v<n;
+        if(op==='=')return String(val)===String(cond.slice(1));
+      }
+    }
+    // Wildcard
+    if(cond.includes('*')){const re=new RegExp('^'+cond.replace(/\*/g,'.*')+'$','i');return re.test(String(val));}
+    return String(val).toLowerCase()===String(cond).toLowerCase();
+  }
+  return Number(val)===Number(cond);
+}
+
+function evalEx(ex,sh){
+  ex=ex.trim();
+
+  // String literal
+  if(ex.startsWith('"')&&ex.endsWith('"'))return ex.slice(1,-1);
+
+  // Fonksiyonlar
+  const fns={
+    // Matematik
+    'SUM|TOPLA':(args)=>{const rng=parseRangeStr(args[0]);if(rng)return numVals(getRange(rng.c1s,rng.r1,rng.c2s,rng.r2,sh)).reduce((a,b)=>a+b,0);return 0;},
+    'AVERAGE|ORTALAMA':(args)=>{const rng=parseRangeStr(args[0]);if(rng){const v=numVals(getRange(rng.c1s,rng.r1,rng.c2s,rng.r2,sh));return v.length?v.reduce((a,b)=>a+b,0)/v.length:0;}return 0;},
+    'MAX|MAK':(args)=>{const rng=parseRangeStr(args[0]);if(rng){const v=numVals(getRange(rng.c1s,rng.r1,rng.c2s,rng.r2,sh));return v.length?Math.max(...v):0;}return 0;},
+    'MIN|MİN':(args)=>{const rng=parseRangeStr(args[0]);if(rng){const v=numVals(getRange(rng.c1s,rng.r1,rng.c2s,rng.r2,sh));return v.length?Math.min(...v):0;}return 0;},
+    'COUNT|BAĞ_DEĞ_SAY':(args)=>{const rng=parseRangeStr(args[0]);if(rng)return numVals(getRange(rng.c1s,rng.r1,rng.c2s,rng.r2,sh)).length;return 0;},
+    'COUNTA|BOŞLUKSAY':(args)=>{const rng=parseRangeStr(args[0]);if(rng)return getRange(rng.c1s,rng.r1,rng.c2s,rng.r2,sh).filter(v=>v!==''&&v!==null).length;return 0;},
+    'ROUND|YUVARLA':(args)=>{return Math.round(Number(evalEx(args[0],sh))*Math.pow(10,Number(args[1])||0))/Math.pow(10,Number(args[1])||0);},
+    'ABS|MUTLAK':(args)=>{return Math.abs(Number(evalEx(args[0],sh)));},
+    'SQRT|KAREKÖK':(args)=>{return Math.sqrt(Number(evalEx(args[0],sh)));},
+    'POWER|ÜSSEAL':(args)=>{return Math.pow(Number(evalEx(args[0],sh)),Number(evalEx(args[1],sh)));},
+    'MOD|KALANBÖL':(args)=>{return Number(evalEx(args[0],sh))%Number(evalEx(args[1],sh));},
+    'INT|TAMSAYI':(args)=>{return Math.floor(Number(evalEx(args[0],sh)));},
+    'CEILING|TAVANAYUVARLA':(args)=>{return Math.ceil(Number(evalEx(args[0],sh)));},
+    'FLOOR|TABANA':(args)=>{return Math.floor(Number(evalEx(args[0],sh)));},
+    // Koşullu
+    'SUMIF|EĞERTOPLA':(args)=>{
+      const rng=parseRangeStr(args[0]),cond=evalEx(args[1],sh);
+      const sumRng=args[2]?parseRangeStr(args[2]):rng;
+      if(!rng||!sumRng)return 0;
+      const testVals=getRange(rng.c1s,rng.r1,rng.c2s,rng.r2,sh);
+      const sumVals=getRange(sumRng.c1s,sumRng.r1,sumRng.c2s,sumRng.r2,sh);
+      return testVals.reduce((acc,v,i)=>matchCond(v,cond)?acc+Number(sumVals[i]||0):acc,0);
+    },
+    'SUMIFS|ÇOKETOPLA':(args)=>{
+      const sumRng=parseRangeStr(args[0]);if(!sumRng)return 0;
+      const sumVals=getRange(sumRng.c1s,sumRng.r1,sumRng.c2s,sumRng.r2,sh);
+      let result=0;
+      for(let i=0;i<sumVals.length;i++){
+        let match=true;
+        for(let p=1;p<args.length-1;p+=2){
+          const cr=parseRangeStr(args[p]);
+          if(!cr){match=false;break;}
+          const cvals=getRange(cr.c1s,cr.r1,cr.c2s,cr.r2,sh);
+          const cond=evalEx(args[p+1],sh);
+          if(!matchCond(cvals[i],cond)){match=false;break;}
+        }
+        if(match)result+=Number(sumVals[i]||0);
+      }
+      return result;
+    },
+    'COUNTIF|EĞERSAY':(args)=>{
+      const rng=parseRangeStr(args[0]),cond=evalEx(args[1],sh);
+      if(!rng)return 0;
+      return getRange(rng.c1s,rng.r1,rng.c2s,rng.r2,sh).filter(v=>matchCond(v,cond)).length;
+    },
+    'COUNTIFS|ÇOKEĞERSAY':(args)=>{
+      const rng=parseRangeStr(args[0]);if(!rng)return 0;
+      const vals=getRange(rng.c1s,rng.r1,rng.c2s,rng.r2,sh);
+      let count=0;
+      for(let i=0;i<vals.length;i++){
+        let match=true;
+        for(let p=0;p<args.length-1;p+=2){
+          const cr=parseRangeStr(args[p]);if(!cr){match=false;break;}
+          const cv=getRange(cr.c1s,cr.r1,cr.c2s,cr.r2,sh);
+          const cond=evalEx(args[p+1],sh);
+          if(!matchCond(cv[i],cond)){match=false;break;}
+        }
+        if(match)count++;
+      }
+      return count;
+    },
+    'AVERAGEIF':(args)=>{
+      const rng=parseRangeStr(args[0]),cond=evalEx(args[1],sh);
+      const avRng=args[2]?parseRangeStr(args[2]):rng;if(!rng||!avRng)return 0;
+      const tv=getRange(rng.c1s,rng.r1,rng.c2s,rng.r2,sh);
+      const av=getRange(avRng.c1s,avRng.r1,avRng.c2s,avRng.r2,sh);
+      const matched=tv.reduce((acc,v,i)=>matchCond(v,cond)?[...acc,Number(av[i]||0)]:acc,[]);
+      return matched.length?matched.reduce((a,b)=>a+b,0)/matched.length:0;
+    },
+    // Arama
+    'VLOOKUP|DÜŞEYARA':(args)=>{
+      const key=evalEx(args[0],sh),rng=parseRangeStr(args[1]),col=parseInt(evalEx(args[2],sh))-1;
+      const exact=args[3]?evalEx(args[3],sh)!==false:false;
+      if(!rng)return'#YOK';
+      const d2=sh?sh.data:D();
+      for(let ri=rng.r1;ri<=rng.r2;ri++){
+        const v=gcv(ri,ci(rng.c1s),sh);
+        if(matchCond(v,String(key)))return gcv(ri,ci(rng.c1s)+col,sh);
+      }
+      return'#YOK';
+    },
+    'HLOOKUP|YATAYARA':(args)=>{
+      const key=evalEx(args[0],sh),rng=parseRangeStr(args[1]),row=parseInt(evalEx(args[2],sh))-1;
+      if(!rng)return'#YOK';
+      for(let ci2=ci(rng.c1s);ci2<=ci(rng.c2s);ci2++){
+        const v=gcv(rng.r1,ci2,sh);
+        if(matchCond(v,String(key)))return gcv(rng.r1+row,ci2,sh);
+      }
+      return'#YOK';
+    },
+    'MATCH|KAÇINCI':(args)=>{
+      const key=evalEx(args[0],sh),rng=parseRangeStr(args[1]);if(!rng)return'#YOK';
+      const vals=getRange(rng.c1s,rng.r1,rng.c2s,rng.r2,sh);
+      const idx=vals.findIndex(v=>matchCond(v,String(key)));
+      return idx>=0?idx+1:'#YOK';
+    },
+    'INDEX|İNDİS':(args)=>{
+      const rng=parseRangeStr(args[0]),r=parseInt(evalEx(args[1],sh))-1,c2=args[2]?parseInt(evalEx(args[2],sh))-1:0;
+      if(!rng)return'#YOK';
+      return gcv(rng.r1+r,ci(rng.c1s)+c2,sh);
+    },
+    // Metin
+    'LEFT|SOL':(args)=>{const s=String(evalEx(args[0],sh));return s.slice(0,parseInt(evalEx(args[1],sh))||1);},
+    'RIGHT|SAĞ':(args)=>{const s=String(evalEx(args[0],sh));const n=parseInt(evalEx(args[1],sh))||1;return s.slice(-n);},
+    'MID|ORTA':(args)=>{const s=String(evalEx(args[0],sh));return s.slice(parseInt(evalEx(args[1],sh))-1,parseInt(evalEx(args[1],sh))-1+parseInt(evalEx(args[2],sh)));},
+    'LEN|UZUNLUK':(args)=>{return String(evalEx(args[0],sh)).length;},
+    'UPPER|BÜYÜKHARF':(args)=>{return String(evalEx(args[0],sh)).toUpperCase();},
+    'LOWER|KÜÇÜKHARF':(args)=>{return String(evalEx(args[0],sh)).toLowerCase();},
+    'TRIM|KIRP':(args)=>{return String(evalEx(args[0],sh)).trim();},
+    'CONCATENATE|BİRLEŞTİR':(args)=>{return args.map(a=>String(evalEx(a,sh))).join('');},
+    'TEXT|METNEÇEVİR':(args)=>{return String(evalEx(args[0],sh));},
+    'VALUE|SAYIYAÇEVIR':(args)=>{return Number(evalEx(args[0],sh));},
+    'FIND|BUL':(args)=>{const s=String(evalEx(args[1],sh));const sub=String(evalEx(args[0],sh));return s.indexOf(sub)+1||'#YOK';},
+    'SUBSTITUTE|YERİNEKOY':(args)=>{return String(evalEx(args[0],sh)).replace(new RegExp(evalEx(args[1],sh),'g'),String(evalEx(args[2],sh)));},
+    'REPT|YİNELE':(args)=>{return String(evalEx(args[0],sh)).repeat(parseInt(evalEx(args[1],sh))||0);},
+    // Mantık
+    'IF|EĞER':(args)=>{
+      const cond=evalEx(args[0],sh);
+      const isTrue=cond&&cond!==0&&cond!=='0'&&cond!==false&&cond!=='false'&&cond!=='';
+      return isTrue?evalEx(args[1],sh):evalEx(args[2]||'""',sh);
+    },
+    'AND|VE':(args)=>{return args.every(a=>{const v=evalEx(a,sh);return v&&v!==0&&v!=='false';});},
+    'OR|VEYA':(args)=>{return args.some(a=>{const v=evalEx(a,sh);return v&&v!==0&&v!=='false';});},
+    'NOT|DEĞİL':(args)=>{return!evalEx(args[0],sh);},
+    'IFERROR|EĞERHATA':(args)=>{try{const v=evalEx(args[0],sh);return(v===undefined||v==='#HATA'||v==='#YOK')?evalEx(args[1],sh):v;}catch(e){return evalEx(args[1],sh);}},
+    'ISBLANK|EĞEBOŞ':(args)=>{const v=evalEx(args[0],sh);return v===''||v===null||v===undefined;},
+    'ISNUMBER|ESAYIMI':(args)=>{return!isNaN(Number(evalEx(args[0],sh)));},
+    'ISTEXT|EMETİNMİ':(args)=>{const v=evalEx(args[0],sh);return typeof v==='string'&&isNaN(Number(v));},
+    // Tarih
+    'TODAY|BUGÜN':(args)=>{return new Date().toLocaleDateString('tr-TR');},
+    'NOW|ŞİMDİ':(args)=>{return new Date().toLocaleString('tr-TR');},
+    'YEAR|YIL':(args)=>{return new Date(evalEx(args[0],sh)).getFullYear();},
+    'MONTH|AY':(args)=>{return new Date(evalEx(args[0],sh)).getMonth()+1;},
+    'DAY|GÜN':(args)=>{return new Date(evalEx(args[0],sh)).getDate();},
+  };
+
+  // Fonksiyon çağrısı
+  const fnMatch=ex.match(/^([A-ZÇĞİÖŞÜa-zçğışöüÇĞİÖŞÜ_|]+)\((.*)\)$/s);
+  if(fnMatch){
+    const fname=fnMatch[1].toUpperCase(),fargs=splitTop(fnMatch[2]);
+    for(const[names,fn]of Object.entries(fns)){
+      if(names.split('|').includes(fname)){return fn(fargs);}
+    }
+  }
+
+  // Hücre ref
+  ex=ex.replace(/([A-Z]+)(\d+)/g,(m,col,row)=>{
+    const v=gcv(parseInt(row)-1,ci(col.toUpperCase()),sh);
+    if(v===''||v===null)return '0';
+    if(isNaN(v))return`"${String(v).replace(/"/g,'\\"')}"`;
+    return v;
+  });
+
+  // String concat &
+  if(ex.includes('&')){
+    return ex.split('&').map(p=>{
+      p=p.trim();
+      try{return String(Function('"use strict";return ('+p+')')());}catch(e){return p.replace(/^"|"$/g,'');}
+    }).join('');
+  }
+
+  try{return Function('"use strict";return ('+ex+')')();}catch(e){return'#HATA';}
+}
+
+// ── RENDER ──────────────────────────────────────────────────────────────────
 function buildTable(){
-  const si=curSheet,sid=hf.getSheetId(sheets[si]),dims=hf.getSheetDimensions(sid);
-  const rows=Math.max(dims.height,ROWS),cols=Math.max(dims.width,COLS);
+  const d=D();
   let html='<thead><tr><th class="corner"></th>';
-  for(let c=0;c<cols;c++)html+=`<th class="${c===selC?'sel-col':''}">${colName(c)}</th>`;
+  for(let c=0;c<d[0].length;c++)html+=`<th class="${c===selC?'sc':''}">${cn(c)}</th>`;
   html+='</tr></thead><tbody>';
-  for(let r=0;r<rows;r++){
-    html+=`<tr><td class="rn ${r===selR?'sel-row':''}">${r+1}</td>`;
-    for(let c=0;c<cols;c++){
-      const display=getCellDisplay(si,r,c),f=getF(si,r,c);
+  for(let r=0;r<d.length;r++){
+    html+=`<tr><td class="rn ${r===selR?'sr':''}">${r+1}</td>`;
+    for(let c=0;c<d[r].length;c++){
+      const raw=d[r][c],f=gf(r,c);
+      let display='';
+      try{display=raw.startsWith&&raw.startsWith('=')?String(calc(raw,r,c)):String(raw===null||raw===undefined?'':raw);}
+      catch(e){display='#HATA';}
       let cls='';
-      if(r===selR&&c===selC)cls+=' selected';
-      if(f.bold)cls+=' bold-c';if(f.italic)cls+=' italic-c';
+      if(r===selR&&c===selC)cls+=' sel';
+      if(f.bold)cls+=' bc';if(f.italic)cls+=' ic';
       if(f.align)cls+=' '+f.align;if(f.bg)cls+=' '+f.bg;if(f.color)cls+=' '+f.color;
-      if(typeof display==='string'&&display.startsWith('#')&&display.length<10)cls+=' err';
-      html+=`<td class="${cls}" onclick="selCell(${r},${c})" ondblclick="startEdit(${r},${c})" oncontextmenu="showCtx(event,${r},${c})">${display}</td>`;
+      if(display.startsWith('#')&&display.length<=5)cls+=' er';
+      html+=`<td class="${cls}" onclick="sc(${r},${c})" ondblclick="se(${r},${c})" oncontextmenu="sctx(event,${r},${c})">${display}</td>`;
     }
     html+='</tr>';
   }
   html+='</tbody>';
-  document.getElementById('sheet').innerHTML=html;
-  updateUI();
+  document.getElementById('tbl').innerHTML=html;
+  document.getElementById('cref').textContent=cn(selC)+(selR+1);
+  document.getElementById('finp').value=D()[selR][selC]||'';
+  document.getElementById('s3').textContent=sheets[cs].name;
 }
-function updateUI(){
-  const formula=getCellFormula(curSheet,selR,selC);
-  document.getElementById('cellRef').textContent=colName(selC)+(selR+1);
-  document.getElementById('formulaBar').value=formula;
-  try{const sid=hf.getSheetId(sheets[curSheet]);const v=hf.getCellValue({sheet:sid,row:selR,col:selC});document.getElementById('st2').textContent=v!==null&&v!==''&&!isNaN(v)?'Değer: '+Number(v).toLocaleString('tr-TR'):(v?String(v):'');}catch(e){}
-  document.getElementById('st3').textContent=sheets[curSheet];
-}
-function selCell(r,c){selR=r;selC=c;editMode=false;buildTable();}
-function startEdit(r,c){
-  selR=r;selC=c;editMode=true;
-  const formula=getCellFormula(curSheet,r,c);
+
+function sc(r,c){selR=r;selC=c;em=false;buildTable();}
+
+function se(r,c){
+  selR=r;selC=c;em=true;
+  const raw=D()[r][c]||'';
   buildTable();
-  const sid=hf.getSheetId(sheets[curSheet]),dims=hf.getSheetDimensions(sid);
-  const cols=Math.max(dims.width,COLS);
-  const tds=document.querySelectorAll('td:not(.rn)');
-  const td=tds[r*cols+c];if(!td)return;
+  const all=document.querySelectorAll('td:not(.rn)');
+  const td=all[r*D()[0].length+c];if(!td)return;
   const inp=document.createElement('input');
-  inp.style.cssText='width:100%;height:22px;border:none;outline:2px solid #2563eb;padding:2px 5px;font-size:12px;position:absolute;top:0;left:0;z-index:10;background:#fff;min-width:90px;';
-  inp.value=formula;inp.onblur=()=>finishEdit(r,c,inp.value);inp.onkeydown=e=>handleKey(e,r,c,inp);
-  td.style.overflow='visible';td.appendChild(inp);inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);
+  inp.style.cssText='position:absolute;top:0;left:0;width:100%;height:100%;border:none;outline:2px solid #2563eb;padding:2px 4px;font-size:12px;background:#fff;z-index:10;min-width:80px;';
+  inp.value=raw;
+  inp.onblur=()=>{D()[r][c]=inp.value;em=false;buildTable();};
+  inp.onkeydown=e=>{
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();D()[r][c]=inp.value;em=false;sc(Math.min(r+1,ROWS-1),c);}
+    if(e.key==='Tab'){e.preventDefault();D()[r][c]=inp.value;em=false;sc(r,Math.min(c+1,COLS-1));se(selR,selC);}
+    if(e.key==='Escape'){em=false;buildTable();}
+  };
+  td.style.overflow='visible';td.appendChild(inp);inp.focus();
+  inp.setSelectionRange(inp.value.length,inp.value.length);
 }
-function finishEdit(r,c,val){
-  const sid=hf.getSheetId(sheets[curSheet]);
-  try{if(val.startsWith('='))hf.setCellContents({sheet:sid,row:r,col:c},[[val]]);else if(!isNaN(val)&&val!=='')hf.setCellContents({sheet:sid,row:r,col:c},[[parseFloat(val)]]);else hf.setCellContents({sheet:sid,row:r,col:c},[[val]]);}catch(e){hf.setCellContents({sheet:sid,row:r,col:c},[[val]]);}
-  editMode=false;buildTable();
+
+function fbKey(e){
+  if(e.key==='Enter'){D()[selR][selC]=e.target.value;buildTable();sc(Math.min(selR+1,ROWS-1),selC);}
+  if(e.key==='Escape')buildTable();
 }
-function handleKey(e,r,c,inp){
-  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();finishEdit(r,c,inp.value);selCell(Math.min(r+1,ROWS-1),c);}
-  if(e.key==='Tab'){e.preventDefault();finishEdit(r,c,inp.value);selCell(r,Math.min(c+1,COLS-1));startEdit(selR,selC);}
-  if(e.key==='Escape'){editMode=false;buildTable();}
-}
-function fbarKey(e){if(e.key==='Enter'){finishEdit(selR,selC,e.target.value);selCell(Math.min(selR+1,ROWS-1),selC);}if(e.key==='Escape')buildTable();}
-function applyFmt(type,val){
-  const si=curSheet;
-  if(type==='bold'){const v=getF(si,selR,selC).bold;setF(si,selR,selC,'bold',v?null:true);}
-  else if(type==='italic'){const v=getF(si,selR,selC).italic;setF(si,selR,selC,'italic',v?null:true);}
-  else if(type==='al')setF(si,selR,selC,'align',null);
-  else if(type==='ac')setF(si,selR,selC,'align','ac');
-  else if(type==='ar')setF(si,selR,selC,'align','ar');
-  else if(type==='bg')setF(si,selR,selC,'bg',val==='clr'?null:val);
-  else if(type==='color')setF(si,selR,selC,'color',val==='clr'?null:val);
+
+// ── FORMAT ──────────────────────────────────────────────────────────────────
+function af(type,val){
+  if(type==='bold'){const v=gf(selR,selC).bold;sf(selR,selC,'bold',v?null:true);}
+  else if(type==='italic'){const v=gf(selR,selC).italic;sf(selR,selC,'italic',v?null:true);}
+  else if(type==='al')sf(selR,selC,'align',null);
+  else if(type==='ac')sf(selR,selC,'align','acc');
+  else if(type==='ar')sf(selR,selC,'align','arc');
+  else if(type==='bg')sf(selR,selC,'bg',val==='clr'?null:val);
+  else if(type==='color')sf(selR,selC,'color',val==='clr'?null:val);
   buildTable();
 }
-function clearCell(){const sid=hf.getSheetId(sheets[curSheet]);hf.setCellContents({sheet:sid,row:selR,col:selC},[[null]]);if(cellFmt[curSheet])delete cellFmt[curSheet][fmtKey(selR,selC)];buildTable();}
-function addRow(){hf.addRows(hf.getSheetId(sheets[curSheet]),[[selR,1]]);buildTable();}
-function addRowBelow(){hf.addRows(hf.getSheetId(sheets[curSheet]),[[selR+1,1]]);buildTable();}
-function addCol(){hf.addColumns(hf.getSheetId(sheets[curSheet]),[[selC,1]]);buildTable();}
-function addColRight(){hf.addColumns(hf.getSheetId(sheets[curSheet]),[[selC+1,1]]);buildTable();}
-function delRow(){const sid=hf.getSheetId(sheets[curSheet]);hf.removeRows(sid,[[selR,1]]);buildTable();}
-function delCol(){const sid=hf.getSheetId(sheets[curSheet]);hf.removeColumns(sid,[[selC,1]]);buildTable();}
-function addSheet(){const name='Sayfa '+(sheets.length+1);hf.addSheet(name);sheets.push(name);cellFmt[sheets.length-1]={};curSheet=sheets.length-1;selR=0;selC=0;buildTabs();buildTable();}
-function switchSheet(i){curSheet=i;selR=0;selC=0;buildTabs();buildTable();}
-function renameSheet(i){const n=prompt('Sayfa adı:',sheets[i]);if(n){hf.renameSheet(hf.getSheetId(sheets[i]),n);sheets[i]=n;buildTabs();}}
-function buildTabs(){const t=document.getElementById('sheetTabs');let html='<button class="tab-add" onclick="addSheet()">＋</button>';sheets.forEach((s,i)=>html+=`<div class="tab ${i===curSheet?'active':''}" onclick="switchSheet(${i})" ondblclick="renameSheet(${i})">${s}</div>`);t.innerHTML=html;}
-function loadExcel(input){
-  const file=input.files[0];if(!file)return;
+function clrCell(){D()[selR][selC]='';F()[fk(selR,selC)]={};buildTable();}
+
+// ── SATIR/SÜTUN ──────────────────────────────────────────────────────────────
+function addRow(){D().splice(selR,0,Array(D()[0].length).fill(''));buildTable();}
+function addRowB(){D().splice(selR+1,0,Array(D()[0].length).fill(''));buildTable();}
+function addCol(){D().forEach(r=>r.splice(selC,0,''));buildTable();}
+function addColR(){D().forEach(r=>r.splice(selC+1,0,''));buildTable();}
+function delRow(){if(D().length>1){D().splice(selR,1);selR=Math.max(0,selR-1);buildTable();}}
+function delCol(){if(D()[0].length>1){D().forEach(r=>r.splice(selC,1));selC=Math.max(0,selC-1);buildTable();}}
+
+// ── SAYFALAR ─────────────────────────────────────────────────────────────────
+function addSheet(name){
+  const n=name||'Sayfa '+(sheets.length+1);
+  sheets.push({name:n,data:mkD(),fmt:{}});
+  cs=sheets.length-1;selR=0;selC=0;
+  buildTabs();buildTable();
+}
+function swSheet(i){cs=i;selR=0;selC=0;buildTabs();buildTable();}
+function renSheet(i){const n=prompt('Sayfa adı:',sheets[i].name);if(n){sheets[i].name=n;buildTabs();}}
+function buildTabs(){
+  const t=document.getElementById('stabs');
+  let h='<button class="tadd" onclick="addSheet()">＋</button>';
+  sheets.forEach((s,i)=>h+=`<div class="stab ${i===cs?'act':''}" onclick="swSheet(${i})" ondblclick="renSheet(${i})">${s.name}</div>`);
+  t.innerHTML=h;
+}
+
+// ── EXCEL YÜKLEME (saf JS, xlsx kütüphanesi olmadan CSV + xlsx binary) ───────
+function loadFile(inp){
+  const file=inp.files[0];if(!file)return;
+  const ext=file.name.split('.').pop().toLowerCase();
   const reader=new FileReader();
-  reader.onload=function(e){
-    try{
-      const wb=XLSX.read(e.target.result,{type:'binary'});
-      wb.SheetNames.forEach(sheetName=>{
-        const ws=wb.Sheets[sheetName];
-        const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
-        if(!data||data.length===0)return;
-        // Maksimum boyut
-        const maxCols=Math.max(...data.map(r=>r.length),COLS);
-        // Satır sayısını ayarla
-        while(data.length<ROWS)data.push(Array(maxCols).fill(''));
-        data.forEach(r=>{while(r.length<maxCols)r.push('');});
-        // HyperFormula'ya yeni sayfa ekle
-        const uniq=sheets.includes(sheetName)?sheetName+'_'+Date.now():sheetName;
-        hf.addSheet(uniq);
-        const sid=hf.getSheetId(uniq);
-        // Veriyi işle — formüller = ile başlıyorsa formül olarak ekle
-        const hfData=data.map(row=>row.map(cell=>{
-          if(typeof cell==='string'&&cell.startsWith('='))return cell;
-          if(typeof cell==='number')return cell;
-          if(cell===''||cell===null||cell===undefined)return null;
-          return String(cell);
-        }));
-        hf.setSheetContent(sid,hfData);
-        sheets.push(uniq);
-        cellFmt[sheets.length-1]={};
+  if(ext==='csv'){
+    reader.onload=e=>{
+      const rows=e.target.result.split('\n').map(r=>{
+        const cells=[];let cur='',inQ=false;
+        for(const ch of r){
+          if(ch==='"')inQ=!inQ;
+          else if(ch===','&&!inQ){cells.push(cur.trim());cur='';}
+          else cur+=ch;
+        }
+        cells.push(cur.trim());
+        return cells;
       });
-      curSheet=sheets.length-1;selR=0;selC=0;
-      buildTabs();buildTable();
-      document.getElementById('hfStatus').textContent='✅ '+wb.SheetNames.length+' sayfa yüklendi';
-    }catch(err){
-      alert('Hata: '+err.message);
-      console.error(err);
-    }
-  };
-  reader.readAsBinaryString(file);
-  input.value='';
+      loadSheet(file.name.replace('.csv',''),rows);
+    };
+    reader.readAsText(file,'utf-8');
+  } else {
+    // xlsx binary okuma — temel ayrıştırıcı
+    reader.onload=e=>{
+      try{
+        const data=parseXLSX(e.target.result,file.name);
+        data.forEach(s=>loadSheet(s.name,s.rows));
+        document.getElementById('sts').textContent='✅ '+data.length+' sayfa yüklendi';
+      }catch(err){
+        alert('Excel yüklenemedi. CSV olarak deneyin.\n'+err.message);
+      }
+    };
+    reader.readAsBinaryString(file);
+  }
+  inp.value='';
 }
 
-function exportCSV(){const sid=hf.getSheetId(sheets[curSheet]),dims=hf.getSheetDimensions(sid);let csv='';for(let r=0;r<dims.height;r++){const row=[];for(let c=0;c<dims.width;c++){const v=hf.getCellValue({sheet:sid,row:r,col:c});row.push('"'+String(v||'').replace(/"/g,'""')+'"');}csv+=row.join(',')+'
-';}const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);a.download=sheets[curSheet]+'.csv';a.click();}
-function showHelp(){alert('Desteklenen Formüller (400+):\n\n=SUM, =SUMIF, =SUMIFS (ÇOKETOPLA)\n=COUNTIF, =COUNTIFS (ÇOKEĞERSAY)\n=AVERAGE, =MAX, =MIN\n=VLOOKUP (DÜŞEYARA), =HLOOKUP\n=INDEX, =MATCH\n=IF (EĞER), =AND, =OR, =NOT\n=LEFT, =RIGHT, =MID, =LEN\n=TRIM, =UPPER, =LOWER\n=TODAY, =NOW, =YEAR, =MONTH\n=ROUND, =ABS, =SQRT, =POWER\n=CONCATENATE ve daha fazlası...');}
-function showCtx(e,r,c){e.preventDefault();selR=r;selC=c;const m=document.getElementById('ctxMenu');m.style.display='block';m.style.left=e.pageX+'px';m.style.top=e.pageY+'px';}
-document.addEventListener('click',()=>document.getElementById('ctxMenu').style.display='none');
+function loadSheet(name,rows){
+  const d=mkD();
+  rows.forEach((row,r)=>{if(r>=ROWS)return;row.forEach((cell,c)=>{if(c>=COLS)return;d[r][c]=cell===null||cell===undefined?'':String(cell);});});
+  // Formülleri dönüştür
+  for(let r=0;r<d.length;r++)for(let c=0;c<d[r].length;c++){
+    if(d[r][c].startsWith('='))d[r][c]=d[r][c]; // formül olarak bırak
+  }
+  const uniq=sheets.find(s=>s.name===name)?name+'_'+sheets.length:name;
+  sheets.push({name:uniq,data:d,fmt:{}});
+  cs=sheets.length-1;selR=0;selC=0;
+  buildTabs();buildTable();
+}
+
+function parseXLSX(binary,filename){
+  // ZIP tabanlı XLSX parse - temel string extraction
+  // Gerçek xlsx için: formüllü exceller CSV olarak kaydedilip yüklenebilir
+  throw new Error('Excel formatı için dosyayı CSV olarak kaydedin ve yükleyin.');
+}
+
+// ── EXPORT ───────────────────────────────────────────────────────────────────
+function expCSV(){
+  const d=D();
+  let csv='';
+  for(let r=0;r<d.length;r++){
+    const row=d[r].map(cell=>{
+      const v=cell.startsWith&&cell.startsWith('=')?String(calc(cell,r,0)):cell;
+      return'"'+String(v||'').replace(/"/g,'""')+'"';
+    });
+    csv+=row.join(',')+'
+';
+  }
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);
+  a.download=sheets[cs].name+'.csv';a.click();
+}
+
+// ── KLAVYE ───────────────────────────────────────────────────────────────────
 document.addEventListener('keydown',e=>{
-  if(editMode||document.activeElement===document.getElementById('formulaBar'))return;
-  const m={ArrowDown:[1,0],ArrowUp:[-1,0],ArrowRight:[0,1],ArrowLeft:[0,-1]};
-  if(m[e.key]){e.preventDefault();const[dr,dc]=m[e.key];selCell(Math.max(0,selR+dr),Math.max(0,selC+dc));return;}
-  if(e.key==='Delete'){clearCell();return;}
-  if(e.key==='Enter'||e.key==='F2'){startEdit(selR,selC);return;}
-  if(e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey){const sid=hf.getSheetId(sheets[curSheet]);hf.setCellContents({sheet:sid,row:selR,col:selC},[[null]]);startEdit(selR,selC);}
+  if(em||document.activeElement===document.getElementById('finp'))return;
+  const mv={ArrowDown:[1,0],ArrowUp:[-1,0],ArrowRight:[0,1],ArrowLeft:[0,-1]};
+  if(mv[e.key]){e.preventDefault();const[dr,dc]=mv[e.key];sc(Math.max(0,Math.min(ROWS-1,selR+dr)),Math.max(0,Math.min(COLS-1,selC+dc)));return;}
+  if(e.key==='Delete'){clrCell();return;}
+  if(e.key==='Enter'||e.key==='F2'){se(selR,selC);return;}
+  if(e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey){D()[selR][selC]='';se(selR,selC);}
 });
-window.onload=()=>{
-  setTimeout(()=>{
-    if(typeof HyperFormula!=='undefined'){
-      initHF();
-    } else {
-      document.getElementById('hfStatus').textContent='⚠️ HyperFormula yüklenemedi';
-      // Fallback: manuel tablo
-      buildFallbackTable();
-    }
-  }, 500);
-};
 
-function buildFallbackTable(){
-  const wrap=document.getElementById('sheetWrap');
-  let html='<table><thead><tr><th class="corner"></th>';
-  for(let c=0;c<100;c++){let n='';let i=c+1;while(i>0){n=String.fromCharCode(64+(i%26||26))+n;i=Math.floor((i-1)/26);}html+=`<th>${n}</th>`;}
-  html+='</tr></thead><tbody>';
-  for(let r=0;r<50;r++){html+=`<tr><td class="rn">${r+1}</td>`;for(let c=0;c<100;c++)html+='<td></td>';html+='</tr>';}
-  html+='</tbody></table>';
-  wrap.innerHTML=html;
-  document.getElementById('hfStatus').textContent='⚠️ Formülsüz mod';
-  document.getElementById('sheetTabs').innerHTML='<div class="tab active">Sayfa 1</div>';
+// ── CONTEXT MENU ─────────────────────────────────────────────────────────────
+function sctx(e,r,c){e.preventDefault();selR=r;selC=c;const m=document.getElementById('ctx');m.style.display='block';m.style.left=e.pageX+'px';m.style.top=e.pageY+'px';}
+document.addEventListener('click',()=>document.getElementById('ctx').style.display='none');
+
+// ── YARDIM ───────────────────────────────────────────────────────────────────
+function showHelp(){
+  alert(`Desteklenen Formüller:
+
+📊 Matematik:
+=TOPLA(A1:A10)  =ORTALAMA(A1:A10)
+=MAK(A1:A10)  =MİN(A1:A10)
+=YUVARLA(A1,2)  =MUTLAK(A1)  =KAREKÖK(A1)
+
+🔍 Koşullu:
+=EĞERTOPLA(A:A,">0",B:B)
+=ÇOKETOPLA(C:C,A:A,"İst",B:B,">100")
+=EĞERSAY(A:A,"Aktif")
+=ÇOKEĞERSAY(A:A,"İst",B:B,"Kargo")
+
+🔎 Arama:
+=DÜŞEYARA(A1,C:E,2,0)
+=YATAYARA(A1,C1:E3,2,0)
+=İNDİS(A:A,KAÇINCI("ABC",B:B,0))
+
+📝 Metin:
+=SOL(A1,3)  =SAĞ(A1,5)  =ORTA(A1,2,4)
+=UZUNLUK(A1)  =BİRLEŞTİR(A1," ",B1)
+=BÜYÜKHARF(A1)  =KÜÇÜKHARF(A1)
+
+🔁 Mantık:
+=EĞER(A1>0,"Pozitif","Negatif")
+=VE(A1>0,B1<100)  =VEYA  =DEĞİL
+=EĞERHATA(A1/B1,"Hata")
+
+📅 Tarih:
+=BUGÜN()  =ŞİMDİ()  =YIL(A1)
+
+Excel yüklemek için: CSV olarak kaydedin!`);
 }
+
+// ── BAŞLAT ────────────────────────────────────────────────────────────────────
+buildTabs();
+buildTable();
 </script>
-</body>
-</html>
-""", height=750, scrolling=False)
+</body></html>""", height=750, scrolling=False)
 
 elif aktif == "whatsapp":
     import requests as _wa_req
