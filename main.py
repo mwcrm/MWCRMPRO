@@ -3687,7 +3687,9 @@ elif aktif == "analiz":
                 else:
                     r = sb.table("musteri_analiz").insert(veri).execute()
                     return True, None
-        except: pass
+        except Exception as _sb_err:
+            st.error(f"❌ Supabase kayıt hatası: {_sb_err}")
+            return False, None
         try:
             conn = get_conn()
             conn.execute("""CREATE TABLE IF NOT EXISTS musteri_analiz (
@@ -3886,11 +3888,8 @@ elif aktif == "analiz":
                             st.success("Analiz silindi!")
                             st.rerun()
 
-            # ── İSTATİSTİKLER ────────────────────────────────────────────
+            # ── ÖZET METRİKLER ───────────────────────────────────────────
             st.divider()
-            st.markdown("### 📊 Satış & Görüşme Dashboard")
-
-            # ── Üst KPI Kartları ─────────────────────────────────────────────
             _ki1,_ki2,_ki3,_ki4,_ki5,_ki6 = st.columns(6)
             _bek_top = 0; _ger_top = 0
             try: _bek_top = float(_df_f2["bek_ciro"].sum())
@@ -3905,43 +3904,7 @@ elif aktif == "analiz":
             _ki5.metric("💰 Beklenen Ciro", f"{_bek_top:,.0f} ₺")
             _ki6.metric("✅ Gerçekleşen", f"{_ger_top:,.0f} ₺", delta=f"%{_gerceklesme}")
 
-            # ── Grafikler ─────────────────────────────────────────────────────
-            _ig1,_ig2,_ig3 = st.columns(3)
-            with _ig1:
-                st.markdown("**🎯 Potansiyel Dağılımı**")
-                _pot_data = _df_f2["potansiyel"].value_counts()
-                _pot_order = ["çok yüksek","yüksek","orta","düşük","çok düşük"]
-                _pot_sorted = _pot_data.reindex([p for p in _pot_order if p in _pot_data.index])
-                st.bar_chart(_pot_sorted)
-            with _ig2:
-                st.markdown("**📊 Görüşme Sonuçları**")
-                st.bar_chart(_df_f2["sonuc"].value_counts())
-            with _ig3:
-                st.markdown("**🏭 Sektör Dağılımı**")
-                st.bar_chart(_df_f2["sektor"].value_counts().head(8))
-
-            _ig4,_ig5 = st.columns(2)
-            with _ig4:
-                st.markdown("**🚚 Rakip Kargo Analizi**")
-                try:
-                    _kg_all2 = []
-                    for _k4b in _df_f2["kargo"].dropna():
-                        _kg_all2.extend([x.strip() for x in str(_k4b).split(",")])
-                    if _kg_all2: st.bar_chart(pd.Series(_kg_all2).value_counts())
-                    else: st.caption("Veri yok")
-                except: st.caption("Veri yok")
-            with _ig5:
-                st.markdown("**📦 Teklif Türü Dağılımı**")
-                try:
-                    _tt_data = _df_f2["teklif_tur"].dropna()
-                    _tt_all = []
-                    for _ttv in _tt_data:
-                        _tt_all.extend([x.strip() for x in str(_ttv).split(",")])
-                    if _tt_all: st.bar_chart(pd.Series(_tt_all).value_counts())
-                    else: st.caption("Veri yok")
-                except: st.caption("Veri yok")
-
-            # ── Takip Takvimi ─────────────────────────────────────────────────
+            # ── Takip Bekleyenler Tablosu ─────────────────────────────────────
             try:
                 _tak_df = _df_f2[_df_f2["takip_tar"].notna() & (_df_f2["takip_tar"] != "")].copy()
                 if not _tak_df.empty:
@@ -3960,7 +3923,7 @@ elif aktif == "analiz":
                 _ciro_df["ger_ciro"] = pd.to_numeric(_ciro_df["ger_ciro"], errors="coerce").fillna(0)
                 _ciro_top = _ciro_df[_ciro_df["bek_ciro"]>0].sort_values("bek_ciro", ascending=False).head(10)
                 if not _ciro_top.empty:
-                    st.markdown("**💰 En Yüksek Beklenen Ciro (Top 10)**")
+                    st.markdown("**💰 Beklenen Ciro (Top 10)**")
                     _ciro_top.columns = ["Firma","Beklenen ₺","Gerçekleşen ₺","Potansiyel","Sonuç"]
                     st.dataframe(_ciro_top, use_container_width=True, hide_index=True)
             except: pass
