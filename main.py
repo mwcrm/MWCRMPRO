@@ -1261,11 +1261,11 @@ elif aktif == "liste":
     elif siralama_kol == "Temsilci A-Z" and "temsilci" in df_f.columns: df_f = df_f.sort_values("temsilci", ascending=True)
     df_f = df_f.reset_index(drop=True)
 
-    _fc[5].caption(f"**{len(df_f)} k**") if secili_kart == "-- Müşteri Seçin --" else None
     if secili_kart != "-- Müşteri Seçin --":
         if _fc[5].button("❌", key="kart_sec_temizle", use_container_width=True, help="Temizle"):
             st.session_state["kart_sec_reset"] = True
             st.rerun()
+    st.caption(f"**{len(df_f)} kayıt**")
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
         try:
             kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
