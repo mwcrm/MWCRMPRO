@@ -889,16 +889,14 @@ section[data-testid="stSidebar"] .stButton>button[kind="primary"] p { color: #1d
 section[data-testid="stSidebar"] .stButton { margin: 0 !important; padding: 0 !important; }
 section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div { gap: 0px !important; }
 section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] { gap: 0px !important; }
-section[data-testid="stSidebar"] .element-container { margin: 0 !important; padding: 0 !important; }
 section[data-testid="stSidebar"] hr { margin: 4px 0 !important; }
 section[data-testid="stSidebar"] div[data-testid="stExpander"] { border: none !important; box-shadow: none !important; margin: 0 !important; }
 section[data-testid="stSidebar"] div[data-testid="stExpander"] > div { padding: 0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-    st.markdown("<div style='font-size:14px;font-weight:700;color:#1f6feb;padding:10px 4px 10px;'>🏢 MWCRMPRO</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size:14px;font-weight:700;color:#1f6feb;padding:16px 8px 16px;letter-spacing:0.5px;'>🏢 MWCRMPRO</div>", unsafe_allow_html=True)
     st.divider()
-    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
     # ── MENÜ LİSTESİ ──────────────────────────────────────────────────────────
     _sb_liste = get_menu_tercihi(st.session_state["kullanici"])
