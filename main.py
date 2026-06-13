@@ -863,7 +863,31 @@ if st.session_state.get("rol") != "admin":
 
 
 with st.sidebar:
-    st.markdown("## 🏢 MWCRMPRO")
+    # Sidebar CSS — sıkışık, sola dayalı
+    st.markdown("""
+<style>
+section[data-testid="stSidebar"] .stButton>button {
+    text-align: left !important;
+    justify-content: flex-start !important;
+    padding: 6px 8px !important;
+    font-size: 12px !important;
+    border-radius: 5px !important;
+    margin-bottom: 1px !important;
+}
+section[data-testid="stSidebar"] .stButton>button p {
+    text-align: left !important;
+}
+section[data-testid="stSidebar"] .block-container {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+}
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {
+    gap: 0px !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+    st.markdown("<div style='font-size:12px;font-weight:500;color:gray;padding:2px 4px 6px;'>🏢 MWCRMPRO</div>", unsafe_allow_html=True)
     st.divider()
 
     # ── MENÜ LİSTESİ ──────────────────────────────────────────────────────────
@@ -917,9 +941,9 @@ with st.sidebar:
     # ── KULLANICI + ÇIKIŞ TEK SATIR ───────────────────────────────────────────
     _kul_col1, _kul_col2 = st.columns([3, 1])
     _kul_col1.markdown(
-        f"<div style='padding:4px 2px;'>"
-        f"<div style='font-size:13px;font-weight:500;'>👤 {st.session_state.get('kullanici','')}</div>"
-        f"<div style='font-size:11px;color:gray;'>{st.session_state.get('rol','')}</div>"
+        f"<div style='padding:2px 4px;line-height:1.4;'>"
+        f"<span style='font-size:12px;font-weight:500;'>👤 {st.session_state.get('kullanici','')}</span>"
+        f" <span style='font-size:11px;color:gray;'>· {st.session_state.get('rol','')}</span>"
         f"</div>",
         unsafe_allow_html=True
     )
