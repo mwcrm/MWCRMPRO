@@ -894,9 +894,12 @@ section[data-testid="stSidebar"] .stButton>button[kind="primary"] p {
     font-weight: 600 !important;
 }
 section[data-testid="stSidebar"] .stButton { margin: 0 !important; padding: 0 !important; }
-section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div { gap: 1px !important; }
-section[data-testid="stSidebar"] hr { margin: 6px 0 !important; }
-section[data-testid="stSidebar"] div[data-testid="stExpander"] { border: none !important; box-shadow: none !important; }
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div { gap: 0px !important; }
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] { gap: 0px !important; }
+section[data-testid="stSidebar"] .element-container { margin: 0 !important; padding: 0 !important; }
+section[data-testid="stSidebar"] hr { margin: 4px 0 !important; }
+section[data-testid="stSidebar"] div[data-testid="stExpander"] { border: none !important; box-shadow: none !important; margin: 0 !important; }
+section[data-testid="stSidebar"] div[data-testid="stExpander"] > div { padding: 0 !important; }
 </style>
 """, unsafe_allow_html=True)
 
