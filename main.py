@@ -3931,6 +3931,7 @@ elif aktif == "analiz":
                     if _k in st.session_state: del st.session_state[_k]
                 try: db_read.clear()
                 except: pass
+                st.rerun()
 
         if _cari_btn and _an_firma:
             db_insert("cari_kartlar", {
