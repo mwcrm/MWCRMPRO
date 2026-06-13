@@ -2863,20 +2863,21 @@ elif aktif == "ozel_teklif":
         "Karaman","Burdur","Rize","Giresun","Artvin","Mardin","Batman","Zonguldak",
         "Sinop","Kastamonu","Karabük","Ordu","Sivas","Erzincan","Tokat","Çorum"]
 
-    # ── MÜŞTERİ ──────────────────────────────────────────────────────────────
+    # ── MÜŞTERİ + BİLGİLER — TEK SATIR ─────────────────────────────────────
     _oz_dfm = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
     if st.session_state.get("oz2_mus_reset"):
         st.session_state.pop("oz2_mus_reset", None)
         st.session_state.pop("oz2_musteri", None)
         st.session_state.pop("oz2_hedef", None)
         st.session_state.pop("oz2_son_sec", None)
-    _ozcol1, _ozcol2, _ozcol3 = st.columns([2,4,1])
-    _oz_fil = _ozcol1.selectbox("Filtre:", ["Tümü","Aktif","Hedef","Pasif"], key="oz2_fil")
+
+    _ozr = st.columns([1, 2.5, 0.3, 1.5, 1, 1, 1, 1])
+    _oz_fil = _ozr[0].selectbox("", ["Tümü","Aktif","Hedef","Pasif"], key="oz2_fil", label_visibility="collapsed")
     _oz_mf  = _oz_dfm if _oz_fil=="Tümü" else _oz_dfm[_oz_dfm["durum"]==_oz_fil]
     _oz_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['firma']} ({r['durum']})" for _,r in _oz_mf.iterrows()]
-    _oz_sec  = _ozcol2.selectbox("Müşteri:", _oz_opts, key="oz2_musteri")
+    _oz_sec  = _ozr[1].selectbox("", _oz_opts, key="oz2_musteri", label_visibility="collapsed")
     if _oz_sec != "-- Müşteri Seçin --":
-        if _ozcol3.button("❌", key="oz2_mus_temizle", use_container_width=True, help="Temizle"):
+        if _ozr[2].button("❌", key="oz2_mus_temizle", use_container_width=True, help="Temizle"):
             st.session_state["oz2_mus_reset"] = True
             st.rerun()
 
@@ -2889,13 +2890,8 @@ elif aktif == "ozel_teklif":
                 _oz_mus = _mr.iloc[0]
                 _oz_gsm = str(_oz_mus.get("gsm","") or "")
                 _oz_eml = str(_oz_mus.get("email","") or "")
-                _ci1,_ci2,_ci3 = st.columns(3)
-                _ci1.info(f"GSM: {_oz_gsm or 'Yok'}")
-                _ci2.info(f"Email: {_oz_eml or 'Yok'}")
-                _ci3.info(f"{_oz_mus.get('il','')} | {_oz_mus.get('durum','')}")
         except: pass
 
-    _tb1,_tb2,_tb3 = st.columns(3)
     _oz_fdef = str(_oz_mus["firma"]) if _oz_mus is not None else ""
     if "oz2_duz_musteri" in st.session_state:
         _oz_fdef = st.session_state.pop("oz2_duz_musteri")
@@ -2903,12 +2899,12 @@ elif aktif == "ozel_teklif":
     elif "oz2_hedef" not in st.session_state or st.session_state.get("oz2_son_sec") != _oz_sec:
         st.session_state["oz2_hedef"] = _oz_fdef
         st.session_state["oz2_son_sec"] = _oz_sec
-    _oz_hedef = _tb1.text_input("Hedef Müşteri", key="oz2_hedef")
-    _oz_vade  = _tb2.text_input("Vade", placeholder="30 gün, peşin...", key="oz2_vade")
-    _oz_not   = _tb3.text_area("Not", height=68, key="oz2_not")
-    _mc1,_mc2 = st.columns(2)
-    _oz_wa_no = _mc1.text_input("WhatsApp No", value=_oz_gsm, key="oz2_wa")
-    _oz_email = _mc2.text_input("Email", value=_oz_eml, key="oz2_email")
+
+    _oz_hedef = _ozr[3].text_input("", key="oz2_hedef", placeholder="Hedef Müşteri", label_visibility="collapsed")
+    _oz_vade  = _ozr[4].text_input("", placeholder="Vade...", key="oz2_vade", label_visibility="collapsed")
+    _oz_not   = _ozr[5].text_input("", placeholder="Not...", key="oz2_not", label_visibility="collapsed")
+    _oz_wa_no = _ozr[6].text_input("", value=_oz_gsm, placeholder="05xxxxxxxxx", key="oz2_wa", label_visibility="collapsed")
+    _oz_email = _ozr[7].text_input("", value=_oz_eml, placeholder="Email", key="oz2_email", label_visibility="collapsed")
 
     st.divider()
 
