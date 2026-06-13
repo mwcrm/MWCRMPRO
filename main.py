@@ -1261,6 +1261,7 @@ elif aktif == "liste":
     elif siralama_kol == "Temsilci A-Z" and "temsilci" in df_f.columns: df_f = df_f.sort_values("temsilci", ascending=True)
     df_f = df_f.reset_index(drop=True)
 
+    _fc[5].caption(f"**{len(df_f)} k**") if secili_kart == "-- Müşteri Seçin --" else None
     if secili_kart != "-- Müşteri Seçin --":
         if _fc[5].button("❌", key="kart_sec_temizle", use_container_width=True, help="Temizle"):
             st.session_state["kart_sec_reset"] = True
@@ -1441,7 +1442,6 @@ elif aktif == "liste":
             st.error(f"Kart hatası: {e}")
 
     st.divider()
-    st.caption(f"**{len(df_f)} kayıt**")
 
     # ── DURUM LİSTESİ — Supabase'den yükle (col_config için) ─────────────────
     def _durum_listesi_yukle():
@@ -1506,9 +1506,8 @@ elif aktif == "liste":
 
     import json as _json_ls
 
-    # ── SAYFALAMA YOK — TÜMÜ GÖSTER ─────────────────────────────────────────
+    # ── TÜMÜ GÖSTER ──────────────────────────────────────────────────────────
     _df_sayfa = df_edit.copy()
-    st.caption(f"**{len(df_edit)} kayıt**")
 
     edited_df = st.data_editor(
         _df_sayfa,
