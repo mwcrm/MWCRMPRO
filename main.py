@@ -869,8 +869,8 @@ section[data-testid="stSidebar"] { padding-top: 0.5rem !important; }
 section[data-testid="stSidebar"] .stButton>button {
     text-align: left !important;
     justify-content: flex-start !important;
-    padding: 5px 8px !important;
-    font-size: 12px !important;
+    padding: 7px 10px !important;
+    font-size: 13px !important;
     border-radius: 4px !important;
     margin: 0 !important;
     border: none !important;
@@ -881,7 +881,8 @@ section[data-testid="stSidebar"] .stButton>button {
 section[data-testid="stSidebar"] .stButton>button p {
     text-align: left !important;
     color: inherit !important;
-    font-size: 12px !important;
+    font-size: 13px !important;
+    font-weight: 400 !important;
 }
 section[data-testid="stSidebar"] .stButton>button:hover { background: #f0f4ff !important; }
 section[data-testid="stSidebar"] .stButton>button[kind="primary"] { background: #dbeafe !important; }
