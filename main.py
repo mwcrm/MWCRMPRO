@@ -1061,15 +1061,14 @@ button[data-testid="manage-app-button"] { display: none !important; }
                     _goster.append(_t)
             mevcut_sira_m = _goster
             for idx_m, tab_key in enumerate(mevcut_sira_m):
-                _etiket = _TAB_ETIKETLER.get(tab_key, tab_key)
-                _mc1, _mc2, _mc3 = st.columns([5, 0.7, 0.7])
-                _mc1.markdown(f"<div style='font-size:11px;padding:4px 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;'>{_etiket}</div>", unsafe_allow_html=True)
-                if idx_m > 0 and _mc2.button("▲", key=f"up_{tab_key}", use_container_width=True):
+                c1, c2, c3 = st.columns([4,1,1])
+                c1.caption(_TAB_ETIKETLER.get(tab_key, tab_key))
+                if idx_m > 0 and c2.button("▲", key=f"up_{tab_key}"):
                     yeni_s = mevcut_sira_m.copy()
                     yeni_s[idx_m], yeni_s[idx_m-1] = yeni_s[idx_m-1], yeni_s[idx_m]
                     save_menu_tercihi(st.session_state["kullanici"], yeni_s)
                     st.rerun()
-                if idx_m < len(mevcut_sira_m)-1 and _mc3.button("▼", key=f"dn_{tab_key}", use_container_width=True):
+                if idx_m < len(mevcut_sira_m)-1 and c3.button("▼", key=f"dn_{tab_key}"):
                     yeni_s = mevcut_sira_m.copy()
                     yeni_s[idx_m], yeni_s[idx_m+1] = yeni_s[idx_m+1], yeni_s[idx_m]
                     save_menu_tercihi(st.session_state["kullanici"], yeni_s)
