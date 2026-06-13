@@ -738,7 +738,6 @@ _TAB_ETIKETLER = {
     "kisiler": "📞 Telefon Kişiler",
     "randevu": "📅 Randevular",
     "kullanici": "👥 Kullanıcı Yönetimi",
-    "koddepo": "💾 Kod Deposu",
     "mesajlar": "💬 Mesajlar",
     "admin_rapor": "📊 Rapor Tasarla",
 }
@@ -759,7 +758,7 @@ def get_menu_tercihi(kullanici):
                 kayitli = _menu_json.loads(res.data[0]["deger"])
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
-                    tam_liste += ["kullanici","koddepo","admin_rapor"]
+                    tam_liste += ["kullanici","admin_rapor"]
                 tam_liste = _temizle(tam_liste)
                 # Eksik olanları tam_liste'deki sıraya göre doğru pozisyona ekle
                 for i, t in enumerate(tam_liste):
@@ -783,7 +782,7 @@ def get_menu_tercihi(kullanici):
                 kayitli = _menu_json.loads(row[0])
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
-                    tam_liste += ["kullanici","koddepo","admin_rapor"]
+                    tam_liste += ["kullanici","admin_rapor"]
                 tam_liste = _temizle(tam_liste)
                 for i, t in enumerate(tam_liste):
                     if t not in kayitli:
@@ -798,7 +797,7 @@ def get_menu_tercihi(kullanici):
     except: pass
     tam_liste = _TAB_LISTESI_DEFAULT.copy()
     if st.session_state.get("rol") == "admin":
-        tam_liste += ["kullanici","koddepo","admin_rapor"]
+        tam_liste += ["kullanici","admin_rapor"]
     return _temizle(tam_liste)
 
 def save_menu_tercihi(kullanici, sira):
@@ -875,7 +874,7 @@ with st.sidebar:
     # ── MENÜ LİSTESİ ──────────────────────────────────────────────────────────
     _sb_liste = get_menu_tercihi(st.session_state["kullanici"])
     if st.session_state.get("rol") == "admin":
-        for _t in ["kullanici","koddepo","admin_rapor"]:
+        for _t in ["kullanici","admin_rapor"]:
             if _t not in _sb_liste:
                 _sb_liste.append(_t)
     # Yetki filtresi
@@ -943,7 +942,7 @@ with st.sidebar:
                     save_menu_tercihi(st.session_state["kullanici"], yeni_s)
                     st.rerun()
             if st.button("↺ Sıfırla", use_container_width=True, key="menu_sifirla"):
-                save_menu_tercihi(st.session_state["kullanici"], _TAB_LISTESI_DEFAULT.copy() + ["kullanici","koddepo","admin_rapor"])
+                save_menu_tercihi(st.session_state["kullanici"], _TAB_LISTESI_DEFAULT.copy() + ["kullanici","admin_rapor"])
                 st.rerun()
 
         with st.expander("📢 Duyuru"):
@@ -4220,106 +4219,6 @@ elif aktif == "analiz":
             st.rerun()
 
 # ── KOD DEPOSU (sadece admin) ─────────────────────────────────────────────────
-elif aktif == "koddepo":
-    sayfa_log("koddepo")
-    if st.session_state.get("rol") != "admin":
-        st.error("Bu sayfa sadece adminlere özeldir.")
-        st.stop()
-
-    st.markdown("## 💾 Kod Deposu & Sürüm Arşivi")
-    st.info("Bu bölüm sadece admin kullanıcılara görünür. Sistemin güncel kodunu ve notlarını buraya kaydedin.")
-
-    # Kod deposu tablosu
-    conn = get_conn()
-    conn.execute('''CREATE TABLE IF NOT EXISTS kod_deposu (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        surum TEXT, aciklama TEXT, kod TEXT, olusturan TEXT)''')
-    conn.commit()
-    conn.close()
-
-    # Yeni sürüm ekle
-    with st.expander("➕ Yeni Sürüm Kaydet", expanded=False):
-        kd1, kd2 = st.columns(2)
-        surum_no = kd1.text_input("Sürüm No:", placeholder="v2.1, v2.2...", key="kd_surum")
-        kd_aciklama = kd2.text_area("Açıklama (ne değişti?):", height=80, key="kd_aciklama",
-            placeholder="Örn: Teklif modülüne WhatsApp entegrasyonu eklendi, Excel aktarım düzeltildi...")
-        kd_kod = st.text_area("Kod (main.py içeriği):", height=300, key="kd_kod",
-            placeholder="main.py dosyasının içeriğini buraya yapıştırın...")
-
-        if st.button("💾 Sürümü Kaydet", use_container_width=True, type="primary"):
-            if not surum_no or not kd_aciklama:
-                st.warning("Sürüm no ve açıklama zorunlu!")
-            else:
-                db_insert("kod_deposu", {"surum": surum_no, "aciklama": kd_aciklama, "kod": kd_kod, "olusturan": st.session_state["kullanici"]})
-                st.success(f"✅ {surum_no} sürümü kaydedildi!")
-                st.rerun()
-
-    # Mevcut koddan otomatik kaydet
-    with st.expander("⚡ Mevcut main.py'yi Otomatik Kaydet"):
-        auto_surum = st.text_input("Sürüm No:", key="auto_surum", placeholder="v2.3")
-        auto_aciklama = st.text_area("Bu sürümde neler var?", height=100, key="auto_aciklama",
-            value="Yeni Kart düzenleme, Teklif modülü, Excel aktarım, Raporlama, Müşteri Analiz, Kod Deposu, Sidebar destek paneli, Footer, WhatsApp/Email entegrasyonu")
-        if st.button("⚡ main.py'yi Oku ve Kaydet", use_container_width=True):
-            if not auto_surum:
-                st.warning("Sürüm no girin!")
-            else:
-                try:
-                    with open("main.py", "r", encoding="utf-8") as mf:
-                        mevcut_kod = mf.read()
-                    db_insert("kod_deposu", {"surum": auto_surum, "aciklama": auto_aciklama, "kod": mevcut_kod, "olusturan": st.session_state["kullanici"]})
-                    st.success(f"✅ {auto_surum} — {len(mevcut_kod):,} karakter kaydedildi!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Hata: {e}")
-
-    st.divider()
-
-    # Sürüm listesi
-    try:
-        df_depo = db_read("kod_deposu", extra_sql="ORDER BY tarih DESC")
-        if not df_depo.empty:
-            st.markdown(f"### 📦 Kayıtlı Sürümler ({len(df_depo)} adet)")
-            df_depo_goster = df_depo[["id","tarih","surum","aciklama","olusturan"]].copy()
-            df_depo_goster.columns = ["ID","Tarih","Sürüm","Açıklama","Kaydeden"]
-            st.dataframe(df_depo_goster, use_container_width=True, hide_index=True)
-
-            # Sürüm indir
-            st.markdown("#### 📥 Sürüm İndir")
-            indir_id = st.number_input("İndirilecek Sürüm ID:", min_value=1, step=1, key="indir_surum_id")
-            if st.button("Kodu İndir", use_container_width=True):
-                conn2 = get_conn()
-                row = conn2.execute("SELECT surum, kod, aciklama, tarih FROM kod_deposu WHERE id=?", (indir_id,)).fetchone()
-                conn2.close()
-                if row and row[1]:
-                    st.download_button(
-                        f"⬇️ {row[0]} — main.py İndir",
-                        data=row[1].encode("utf-8"),
-                        file_name=f"main_{row[0].replace('.','_')}.py",
-                        mime="text/plain",
-                        use_container_width=True
-                    )
-                    st.markdown(f"**Açıklama:** {row[2]}")
-                    st.markdown(f"**Tarih:** {row[3]}")
-                    st.code(row[1][:2000] + ("..." if len(row[1])>2000 else ""), language="python")
-                else:
-                    st.error("Bu ID bulunamadı veya kod boş.")
-
-            # Sürüm sil
-            with st.expander("🗑️ Sürüm Sil"):
-                sil_id = st.number_input("Silinecek ID:", min_value=1, step=1, key="sil_surum_id")
-                if st.button("Sil", type="primary"):
-                    conn3 = get_conn()
-                    conn3.execute("DELETE FROM kod_deposu WHERE id=?", (sil_id,))
-                    conn3.commit(); conn3.close()
-                    st.success(f"ID {sil_id} silindi.")
-                    st.rerun()
-        else:
-            st.info("Henüz kayıtlı sürüm yok. Yukarıdan ilk sürümü kaydedin.")
-    except Exception as e:
-        st.error(f"Kod deposu hatası: {e}")
-
-# ── WHATSAPP ──────────────────────────────────────────────────────────────────
 elif aktif == "whatsapp":
     import requests as _wa_req
 
