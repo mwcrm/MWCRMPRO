@@ -905,9 +905,15 @@ section[data-testid="stSidebar"] div[data-testid="stExpander"] { margin: 0 !impo
 section[data-testid="stSidebar"] div[data-testid="stExpander"] > div { padding: 0 !important; }
 #MainMenu { visibility: hidden !important; }
 footer { visibility: hidden !important; }
-div[data-testid="stToolbar"] { visibility: hidden !important; }
-div[data-testid="manage-app-button"] { display: none !important; }
-.viewerBadge_container__1QSob { display: none !important; }
+header { visibility: hidden !important; }
+div[data-testid="stToolbar"] { display: none !important; }
+div[data-testid="stDecoration"] { display: none !important; }
+div[data-testid="stStatusWidget"] { display: none !important; }
+button[data-testid="manage-app-button"] { display: none !important; }
+.stDeployButton { display: none !important; }
+[data-testid="stBottom"] { display: none !important; }
+.styles_viewerBadge__CvC9N { display: none !important; }
+#stDecoration { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
