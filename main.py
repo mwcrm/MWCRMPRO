@@ -1234,10 +1234,10 @@ elif aktif == "liste":
                 st.session_state["fil_asama"] = _an
                 st.rerun()
 
-    # ── FİLTRE + MÜŞTERİ SEÇ + SIRALAMA — TEK SATIR ────────────────────────
-    _fc = st.columns([1.3, 1.3, 1.8, 2.5, 1.3, 0.5, 0.5, 0.5])
-    filtre_asama = _fc[0].selectbox("Aşama:", ["Aşama: Tümü"]+tum_asama_opts, key="fil_asama")
-    filtre_durum = _fc[1].selectbox("Durum:", ["Durum: Tümü"]+tum_durum_opts, key="fil_durum")
+    # ── FİLTRE TEK SATIR ─────────────────────────────────────────────────────
+    _fc = st.columns([1.3, 1.3, 1.8, 2.5, 1.3, 0.4])
+    filtre_asama = _fc[0].selectbox("", ["Aşama: Tümü"]+tum_asama_opts, key="fil_asama", label_visibility="collapsed")
+    filtre_durum = _fc[1].selectbox("", ["Durum: Tümü"]+tum_durum_opts, key="fil_durum", label_visibility="collapsed")
 
     df_f = df.copy()
     if filtre_asama != "Aşama: Tümü": df_f = df_f[df_f["islem_asamasi"]==filtre_asama]
@@ -1250,9 +1250,9 @@ elif aktif == "liste":
     if st.session_state.get("kart_sec_reset"):
         st.session_state.pop("kart_sec_reset", None)
         st.session_state.pop("kart_sec", None)
-    secili_kart = _fc[2].selectbox("Müşteri:", kart_opts, key="kart_sec")
-    ara_txt      = _fc[3].text_input("Ara:", placeholder="🔍 Firma, yetkili, il...", key="ara_liste")
-    siralama_kol = _fc[4].selectbox("Sırala:", ["Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z"], key="siralama_kol")
+    secili_kart = _fc[2].selectbox("", kart_opts, key="kart_sec", label_visibility="collapsed")
+    ara_txt      = _fc[3].text_input("", placeholder="🔍 Firma, yetkili, il...", key="ara_liste", label_visibility="collapsed")
+    siralama_kol = _fc[4].selectbox("", ["Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z"], key="siralama_kol", label_visibility="collapsed")
 
     if ara_txt: df_f = df_f[df_f.apply(lambda r: ara_txt.lower() in str(r).lower(), axis=1)]
     if siralama_kol == "Firma A-Z":      df_f = df_f.sort_values("firma", ascending=True)
@@ -1506,24 +1506,9 @@ elif aktif == "liste":
 
     import json as _json_ls
 
-    # ── SAYFALAMA — TEK SATIR ────────────────────────────────────────────────
-    _toplam_kayit = len(df_edit)
-    _sp_cols = st.columns([0.7, 0.7, 0.4, 0.4, 2])
-    _sayfa_boyutu = _sp_cols[0].selectbox("Göster:", [50, 100, 200, "Tümü"], key="sayfa_boyutu")
-    if _sayfa_boyutu == "Tümü":
-        _df_sayfa = df_edit.copy()
-        _sp_cols[4].caption(f"**{_toplam_kayit} kayıt** — tümü")
-    else:
-        _maks_sayfa = max(1, -(-_toplam_kayit // _sayfa_boyutu))
-        _sayfa_no = _sp_cols[1].number_input("Sayfa:", min_value=1, max_value=_maks_sayfa, value=1, step=1, key="sayfa_no")
-        if _sp_cols[2].button("◀", key="sayfa_geri") and _sayfa_no > 1:
-            st.session_state["sayfa_no"] = _sayfa_no - 1; st.rerun()
-        if _sp_cols[3].button("▶", key="sayfa_ileri") and _sayfa_no < _maks_sayfa:
-            st.session_state["sayfa_no"] = _sayfa_no + 1; st.rerun()
-        _baslangic = (_sayfa_no - 1) * _sayfa_boyutu
-        _bitis = _baslangic + _sayfa_boyutu
-        _df_sayfa = df_edit.iloc[_baslangic:_bitis].copy()
-        _sp_cols[4].caption(f"**{_toplam_kayit} kayıt** · {_sayfa_no}/{_maks_sayfa} · {_baslangic+1}–{min(_bitis,_toplam_kayit)}")
+    # ── SAYFALAMA YOK — TÜMÜ GÖSTER ─────────────────────────────────────────
+    _df_sayfa = df_edit.copy()
+    st.caption(f"**{len(df_edit)} kayıt**")
 
     edited_df = st.data_editor(
         _df_sayfa,
