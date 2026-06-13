@@ -3531,7 +3531,10 @@ elif aktif == "excel":
     sayfa_log("excel")
     import io
 
-    st.markdown("## 📥 Excel ile Toplu Veri Aktarımı")
+    _ex_tab1, _ex_tab2 = st.tabs(["📥 Excel Aktarım", "📊 E-Tablo"])
+
+    with _ex_tab1:
+        st.markdown("## 📥 Excel ile Toplu Veri Aktarımı")
 
     # ── ŞABLON İNDİR ──────────────────────────────────────────────────────────
     st.markdown("### 1️⃣ Şablonu İndir")
@@ -3820,6 +3823,226 @@ elif aktif == "excel":
     )
 
 # ── MUSTERİ ANALİZ ────────────────────────────────────────────────────────────
+
+
+    with _ex_tab2:
+        st.markdown("### 📊 E-Tablo")
+        st.components.v1.html("""
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdn.jsdelivr.net/npm/hyperformula/dist/hyperformula.full.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, sans-serif; }
+body { display: flex; flex-direction: column; height: 100vh; overflow: hidden; background: #fff; }
+.toolbar { display: flex; align-items: center; gap: 3px; flex-wrap: wrap; padding: 4px 8px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; }
+.toolbar button { padding: 3px 8px; font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; background: white; cursor: pointer; }
+.toolbar button:hover { background: #f1f5f9; }
+.toolbar select { font-size: 11px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 4px; }
+.sep { width: 1px; height: 18px; background: #e2e8f0; margin: 0 2px; }
+.formula-bar { display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-bottom: 1px solid #e2e8f0; flex-shrink: 0; }
+.cell-ref { font-size: 12px; font-weight: 600; color: #1d4ed8; min-width: 52px; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 6px; text-align: center; }
+.formula-input { flex: 1; font-size: 12px; border: 1px solid #e2e8f0; border-radius: 4px; padding: 2px 8px; outline: none; font-family: monospace; }
+.formula-input:focus { border-color: #3b82f6; }
+.sheet-wrap { flex: 1; overflow: auto; }
+table { border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+th { background: #f0f6ff; color: #1d4ed8; font-weight: 600; padding: 3px 4px; border: 1px solid #d1d5db; width: 90px; min-width: 60px; text-align: center; font-size: 11px; position: sticky; top: 0; z-index: 3; }
+th.corner { position: sticky; top: 0; left: 0; z-index: 5; width: 36px; min-width: 36px; }
+th.sel-col { background: #bfdbfe; }
+td { border: 1px solid #e5e7eb; padding: 2px 5px; width: 90px; min-width: 60px; font-size: 12px; color: #1e293b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: cell; height: 22px; position: relative; }
+td.rn { background: #f8fafc; color: #64748b; font-size: 11px; text-align: center; width: 36px; min-width: 36px; position: sticky; left: 0; z-index: 1; cursor: default; border-right: 1px solid #d1d5db; }
+td.rn.sel-row { background: #bfdbfe; }
+td.selected { background: #dbeafe !important; outline: 2px solid #2563eb; outline-offset: -2px; }
+td.bold-c { font-weight: 700; } td.italic-c { font-style: italic; }
+td.ac { text-align: center; } td.ar { text-align: right; }
+td.bg-y { background: #fef9c3 !important; } td.bg-g { background: #dcfce7 !important; }
+td.bg-r { background: #fee2e2 !important; } td.bg-b { background: #dbeafe !important; }
+td.tc-r { color: #dc2626 !important; } td.tc-g { color: #16a34a !important; }
+td.err { color: #dc2626 !important; }
+.sheet-tabs { display: flex; align-items: center; gap: 2px; padding: 3px 8px; background: #f1f5f9; border-top: 1px solid #e2e8f0; flex-shrink: 0; }
+.tab { padding: 3px 12px; font-size: 11px; border: 1px solid #cbd5e1; border-bottom: none; border-radius: 4px 4px 0 0; background: white; cursor: pointer; }
+.tab.active { background: #1d4ed8; color: white; border-color: #1d4ed8; }
+.tab:hover:not(.active) { background: #e0e7ff; }
+.tab-add { padding: 3px 8px; font-size: 14px; cursor: pointer; color: #64748b; border: none; background: none; }
+.status { padding: 2px 8px; font-size: 10px; color: #64748b; background: #f8fafc; border-top: 1px solid #e2e8f0; flex-shrink: 0; display: flex; gap: 16px; }
+.ctx-menu { position: fixed; background: white; border: 1px solid #e2e8f0; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.15); z-index: 100; min-width: 160px; display: none; }
+.ctx-menu div { padding: 6px 14px; font-size: 12px; cursor: pointer; } .ctx-menu div:hover { background: #f0f6ff; }
+.ctx-sep { height: 1px; background: #e2e8f0; margin: 2px 0; }
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <button onclick="addRow()">+ Satır</button>
+  <button onclick="addCol()">+ Sütun</button>
+  <button onclick="delRow()">− Satır</button>
+  <button onclick="delCol()">− Sütun</button>
+  <div class="sep"></div>
+  <button onclick="applyFmt('bold')"><b>B</b></button>
+  <button onclick="applyFmt('italic')"><i>I</i></button>
+  <div class="sep"></div>
+  <button onclick="applyFmt('al')">⬅</button>
+  <button onclick="applyFmt('ac')">⬌</button>
+  <button onclick="applyFmt('ar')">➡</button>
+  <div class="sep"></div>
+  <select onchange="applyFmt('bg',this.value);this.value=''">
+    <option value="">🎨 Renk</option>
+    <option value="bg-y">🟡 Sarı</option>
+    <option value="bg-g">🟢 Yeşil</option>
+    <option value="bg-r">🔴 Kırmızı</option>
+    <option value="bg-b">🔵 Mavi</option>
+    <option value="clr">Temizle</option>
+  </select>
+  <select onchange="applyFmt('color',this.value);this.value=''">
+    <option value="">🖊 Yazı</option>
+    <option value="tc-r">🔴 Kırmızı</option>
+    <option value="tc-g">🟢 Yeşil</option>
+    <option value="clr">Normal</option>
+  </select>
+  <div class="sep"></div>
+  <button onclick="clearCell()">⌫</button>
+  <button onclick="exportCSV()">📥 CSV</button>
+  <button onclick="showHelp()" style="color:#7c3aed;font-weight:600;">fx ?</button>
+  <span id="hfStatus" style="margin-left:auto;font-size:10px;color:#16a34a;font-weight:500;"></span>
+</div>
+<div class="formula-bar">
+  <div class="cell-ref" id="cellRef">A1</div>
+  <span style="font-size:12px;color:#64748b;font-style:italic;">fx</span>
+  <input class="formula-input" id="formulaBar" placeholder="=SUMIFS(...), =IF(...), =VLOOKUP(...)" onkeydown="fbarKey(event)" />
+</div>
+<div class="sheet-wrap" id="sheetWrap"><table id="sheet"></table></div>
+<div class="sheet-tabs" id="sheetTabs"></div>
+<div class="status"><span id="st1">Hazır</span><span id="st2"></span><span id="st3"></span></div>
+<div class="ctx-menu" id="ctxMenu">
+  <div onclick="addRow()">➕ Üste Satır</div><div onclick="addRowBelow()">➕ Alta Satır</div>
+  <div class="ctx-sep"></div>
+  <div onclick="addCol()">➕ Sola Sütun</div><div onclick="addColRight()">➕ Sağa Sütun</div>
+  <div class="ctx-sep"></div>
+  <div onclick="delRow()" style="color:#dc2626">🗑 Satırı Sil</div>
+  <div onclick="delCol()" style="color:#dc2626">🗑 Sütunu Sil</div>
+  <div class="ctx-sep"></div><div onclick="clearCell()">⌫ Temizle</div>
+</div>
+<script>
+const ROWS=50,COLS=26;
+let hf,sheets=[],curSheet=0,selR=0,selC=0,editMode=false,cellFmt={};
+function colName(i){let n='';i++;while(i>0){n=String.fromCharCode(64+(i%26||26))+n;i=Math.floor((i-1)/26);}return n;}
+function fmtKey(r,c){return r+','+c;}
+function getF(si,r,c){return((cellFmt[si]||{})[fmtKey(r,c)])||{};}
+function setF(si,r,c,k,v){if(!cellFmt[si])cellFmt[si]={};const key=fmtKey(r,c);if(!cellFmt[si][key])cellFmt[si][key]={};if(v===null)delete cellFmt[si][key][k];else cellFmt[si][key][k]=v;}
+function initHF(){
+  const name='Sayfa 1';
+  const d=Array.from({length:ROWS},()=>Array(COLS).fill(''));
+  d[0][0]='Firma';d[0][1]='İl';d[0][2]='Hedef';d[0][3]='Gerçek';d[0][4]='Fark';d[0][5]='Durum';
+  d[1]=['ABC Lojistik','İstanbul',50000,45000,'=C2-D2','=IF(E2>=0,"✅ İyi","❌ Açık")','','','','','','','','','','','','','','','','','','','',''];
+  d[2]=['XYZ Kargo','Bursa',30000,32000,'=C3-D3','=IF(E3>=0,"✅ İyi","❌ Açık")','','','','','','','','','','','','','','','','','','','',''];
+  d[3]=['DEF Taşımacılık','İzmir',70000,68000,'=C4-D4','=IF(E4>=0,"✅ İyi","❌ Açık")','','','','','','','','','','','','','','','','','','','',''];
+  d[4]=['TOPLAM','','=SUM(C2:C4)','=SUM(D2:D4)','=SUM(E2:E4)','','','','','','','','','','','','','','','','','','','','',''];
+  d[5]=['ORTALAMA','','=AVERAGE(C2:C4)','=AVERAGE(D2:D4)','','','','','','','','','','','','','','','','','','','','','',''];
+  try{
+    hf=HyperFormula.buildFromSheets({[name]:d},{licenseKey:'gpl-v3',language:'enUS'});
+    sheets=[name];
+    document.getElementById('hfStatus').textContent='✅ 400+ formül aktif';
+  }catch(e){document.getElementById('hfStatus').textContent='⚠️ '+e.message;}
+  for(let c=0;c<6;c++)setF(0,0,c,'bold',true);
+  setF(0,4,0,'bold',true);setF(0,5,0,'bold',true);
+  buildTabs();buildTable();
+}
+function getCellDisplay(si,r,c){try{const sid=hf.getSheetId(sheets[si]);const v=hf.getCellValue({sheet:sid,row:r,col:c});if(v===null||v===undefined||v==='')return'';if(typeof v==='object'&&v.type)return'#'+v.type;return String(v);}catch(e){return'';}}
+function getCellFormula(si,r,c){try{const sid=hf.getSheetId(sheets[si]);return hf.getCellFormula({sheet:sid,row:r,col:c})||String(hf.getCellValue({sheet:sid,row:r,col:c})||'');}catch(e){return'';}}
+function buildTable(){
+  const si=curSheet,sid=hf.getSheetId(sheets[si]),dims=hf.getSheetDimensions(sid);
+  const rows=Math.max(dims.height,ROWS),cols=Math.max(dims.width,COLS);
+  let html='<thead><tr><th class="corner"></th>';
+  for(let c=0;c<cols;c++)html+=`<th class="${c===selC?'sel-col':''}">${colName(c)}</th>`;
+  html+='</tr></thead><tbody>';
+  for(let r=0;r<rows;r++){
+    html+=`<tr><td class="rn ${r===selR?'sel-row':''}">${r+1}</td>`;
+    for(let c=0;c<cols;c++){
+      const display=getCellDisplay(si,r,c),f=getF(si,r,c);
+      let cls='';
+      if(r===selR&&c===selC)cls+=' selected';
+      if(f.bold)cls+=' bold-c';if(f.italic)cls+=' italic-c';
+      if(f.align)cls+=' '+f.align;if(f.bg)cls+=' '+f.bg;if(f.color)cls+=' '+f.color;
+      if(typeof display==='string'&&display.startsWith('#')&&display.length<10)cls+=' err';
+      html+=`<td class="${cls}" onclick="selCell(${r},${c})" ondblclick="startEdit(${r},${c})" oncontextmenu="showCtx(event,${r},${c})">${display}</td>`;
+    }
+    html+='</tr>';
+  }
+  html+='</tbody>';
+  document.getElementById('sheet').innerHTML=html;
+  updateUI();
+}
+function updateUI(){
+  const formula=getCellFormula(curSheet,selR,selC);
+  document.getElementById('cellRef').textContent=colName(selC)+(selR+1);
+  document.getElementById('formulaBar').value=formula;
+  try{const sid=hf.getSheetId(sheets[curSheet]);const v=hf.getCellValue({sheet:sid,row:selR,col:selC});document.getElementById('st2').textContent=v!==null&&v!==''&&!isNaN(v)?'Değer: '+Number(v).toLocaleString('tr-TR'):(v?String(v):'');}catch(e){}
+  document.getElementById('st3').textContent=sheets[curSheet];
+}
+function selCell(r,c){selR=r;selC=c;editMode=false;buildTable();}
+function startEdit(r,c){
+  selR=r;selC=c;editMode=true;
+  const formula=getCellFormula(curSheet,r,c);
+  buildTable();
+  const sid=hf.getSheetId(sheets[curSheet]),dims=hf.getSheetDimensions(sid);
+  const cols=Math.max(dims.width,COLS);
+  const tds=document.querySelectorAll('td:not(.rn)');
+  const td=tds[r*cols+c];if(!td)return;
+  const inp=document.createElement('input');
+  inp.style.cssText='width:100%;height:22px;border:none;outline:2px solid #2563eb;padding:2px 5px;font-size:12px;position:absolute;top:0;left:0;z-index:10;background:#fff;min-width:90px;';
+  inp.value=formula;inp.onblur=()=>finishEdit(r,c,inp.value);inp.onkeydown=e=>handleKey(e,r,c,inp);
+  td.style.overflow='visible';td.appendChild(inp);inp.focus();inp.setSelectionRange(inp.value.length,inp.value.length);
+}
+function finishEdit(r,c,val){
+  const sid=hf.getSheetId(sheets[curSheet]);
+  try{if(val.startsWith('='))hf.setCellContents({sheet:sid,row:r,col:c},[[val]]);else if(!isNaN(val)&&val!=='')hf.setCellContents({sheet:sid,row:r,col:c},[[parseFloat(val)]]);else hf.setCellContents({sheet:sid,row:r,col:c},[[val]]);}catch(e){hf.setCellContents({sheet:sid,row:r,col:c},[[val]]);}
+  editMode=false;buildTable();
+}
+function handleKey(e,r,c,inp){
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();finishEdit(r,c,inp.value);selCell(Math.min(r+1,ROWS-1),c);}
+  if(e.key==='Tab'){e.preventDefault();finishEdit(r,c,inp.value);selCell(r,Math.min(c+1,COLS-1));startEdit(selR,selC);}
+  if(e.key==='Escape'){editMode=false;buildTable();}
+}
+function fbarKey(e){if(e.key==='Enter'){finishEdit(selR,selC,e.target.value);selCell(Math.min(selR+1,ROWS-1),selC);}if(e.key==='Escape')buildTable();}
+function applyFmt(type,val){
+  const si=curSheet;
+  if(type==='bold'){const v=getF(si,selR,selC).bold;setF(si,selR,selC,'bold',v?null:true);}
+  else if(type==='italic'){const v=getF(si,selR,selC).italic;setF(si,selR,selC,'italic',v?null:true);}
+  else if(type==='al')setF(si,selR,selC,'align',null);
+  else if(type==='ac')setF(si,selR,selC,'align','ac');
+  else if(type==='ar')setF(si,selR,selC,'align','ar');
+  else if(type==='bg')setF(si,selR,selC,'bg',val==='clr'?null:val);
+  else if(type==='color')setF(si,selR,selC,'color',val==='clr'?null:val);
+  buildTable();
+}
+function clearCell(){const sid=hf.getSheetId(sheets[curSheet]);hf.setCellContents({sheet:sid,row:selR,col:selC},[[null]]);if(cellFmt[curSheet])delete cellFmt[curSheet][fmtKey(selR,selC)];buildTable();}
+function addRow(){hf.addRows(hf.getSheetId(sheets[curSheet]),[[selR,1]]);buildTable();}
+function addRowBelow(){hf.addRows(hf.getSheetId(sheets[curSheet]),[[selR+1,1]]);buildTable();}
+function addCol(){hf.addColumns(hf.getSheetId(sheets[curSheet]),[[selC,1]]);buildTable();}
+function addColRight(){hf.addColumns(hf.getSheetId(sheets[curSheet]),[[selC+1,1]]);buildTable();}
+function delRow(){const sid=hf.getSheetId(sheets[curSheet]);hf.removeRows(sid,[[selR,1]]);buildTable();}
+function delCol(){const sid=hf.getSheetId(sheets[curSheet]);hf.removeColumns(sid,[[selC,1]]);buildTable();}
+function addSheet(){const name='Sayfa '+(sheets.length+1);hf.addSheet(name);sheets.push(name);cellFmt[sheets.length-1]={};curSheet=sheets.length-1;selR=0;selC=0;buildTabs();buildTable();}
+function switchSheet(i){curSheet=i;selR=0;selC=0;buildTabs();buildTable();}
+function renameSheet(i){const n=prompt('Sayfa adı:',sheets[i]);if(n){hf.renameSheet(hf.getSheetId(sheets[i]),n);sheets[i]=n;buildTabs();}}
+function buildTabs(){const t=document.getElementById('sheetTabs');let html='<button class="tab-add" onclick="addSheet()">＋</button>';sheets.forEach((s,i)=>html+=`<div class="tab ${i===curSheet?'active':''}" onclick="switchSheet(${i})" ondblclick="renameSheet(${i})">${s}</div>`);t.innerHTML=html;}
+function exportCSV(){const sid=hf.getSheetId(sheets[curSheet]),dims=hf.getSheetDimensions(sid);let csv='';for(let r=0;r<dims.height;r++){const row=[];for(let c=0;c<dims.width;c++){const v=hf.getCellValue({sheet:sid,row:r,col:c});row.push('"'+String(v||'').replace(/"/g,'""')+'"');}csv+=row.join(',')+'
+';}const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);a.download=sheets[curSheet]+'.csv';a.click();}
+function showHelp(){alert('Desteklenen Formüller (400+):\n\n=SUM, =SUMIF, =SUMIFS (ÇOKETOPLA)\n=COUNTIF, =COUNTIFS (ÇOKEĞERSAY)\n=AVERAGE, =MAX, =MIN\n=VLOOKUP (DÜŞEYARA), =HLOOKUP\n=INDEX, =MATCH\n=IF (EĞER), =AND, =OR, =NOT\n=LEFT, =RIGHT, =MID, =LEN\n=TRIM, =UPPER, =LOWER\n=TODAY, =NOW, =YEAR, =MONTH\n=ROUND, =ABS, =SQRT, =POWER\n=CONCATENATE ve daha fazlası...');}
+function showCtx(e,r,c){e.preventDefault();selR=r;selC=c;const m=document.getElementById('ctxMenu');m.style.display='block';m.style.left=e.pageX+'px';m.style.top=e.pageY+'px';}
+document.addEventListener('click',()=>document.getElementById('ctxMenu').style.display='none');
+document.addEventListener('keydown',e=>{
+  if(editMode||document.activeElement===document.getElementById('formulaBar'))return;
+  const m={ArrowDown:[1,0],ArrowUp:[-1,0],ArrowRight:[0,1],ArrowLeft:[0,-1]};
+  if(m[e.key]){e.preventDefault();const[dr,dc]=m[e.key];selCell(Math.max(0,selR+dr),Math.max(0,selC+dc));return;}
+  if(e.key==='Delete'){clearCell();return;}
+  if(e.key==='Enter'||e.key==='F2'){startEdit(selR,selC);return;}
+  if(e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey){const sid=hf.getSheetId(sheets[curSheet]);hf.setCellContents({sheet:sid,row:selR,col:selC},[[null]]);startEdit(selR,selC);}
+});
+window.onload=()=>{if(typeof HyperFormula!=='undefined')initHF();else document.getElementById('hfStatus').textContent='⚠️ Bağlantı hatası';};
+</script>
+</body>
+</html>
+""", height=620, scrolling=False)
 
 elif aktif == "whatsapp":
     import requests as _wa_req
