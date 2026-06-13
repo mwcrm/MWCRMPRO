@@ -1948,7 +1948,7 @@ elif aktif == "kullanici":
 
             mv = str(k3_row.get("yetkiler","tam") or "tam")
             try:
-                mv_liste = _kj2.loads(mv) if mv!="tam" else list(TUM_MENULER.keys())
+                mv_liste = json.loads(mv) if mv!="tam" else list(TUM_MENULER.keys())
                 tam2 = mv=="tam"
             except:
                 mv_liste = list(TUM_MENULER.keys()); tam2 = True
@@ -1962,7 +1962,7 @@ elif aktif == "kullanici":
                         yeni_liste.append(k)
 
             if st.button("💾 Yetkileri Kaydet", use_container_width=True, type="primary"):
-                ystr = "tam" if tam2_cb else _kj2.dumps(yeni_liste)
+                ystr = "tam" if tam2_cb else json.dumps(yeni_liste)
                 db_update("kullanicilar",{"yetkiler":ystr},"id",k3_id)
                 try: db_read.clear()
                 except: pass
