@@ -896,8 +896,12 @@ section[data-testid="stSidebar"] div[data-testid="stExpander"] > div { padding: 
 </style>
 """, unsafe_allow_html=True)
 
-    st.markdown("<div style='font-size:14px;font-weight:700;color:#1f6feb;padding:16px 8px 16px;letter-spacing:0.5px;'>🏢 MWCRMPRO</div>", unsafe_allow_html=True)
-    st.divider()
+    st.markdown(
+        "<div style='font-size:15px;font-weight:700;color:#1f6feb;"
+        "padding:14px 10px 14px;letter-spacing:0.8px;border-bottom:2px solid #1f6feb;margin-bottom:10px;'>"
+        "🏢 MWCRMPRO</div>",
+        unsafe_allow_html=True
+    )
 
     # ── MENÜ LİSTESİ ──────────────────────────────────────────────────────────
     _sb_liste = get_menu_tercihi(st.session_state["kullanici"])
