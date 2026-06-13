@@ -3780,6 +3780,7 @@ elif aktif == "analiz":
         if _df_tum_tab.empty:
             st.info("📭 Henüz hiç analiz kaydedilmedi. 'Yeni / Düzenle' sekmesinden ilk analizinizi ekleyin.")
         else:
+            # ── FİLTRELER ────────────────────────────────────────────────────
             _fa1,_fa2,_fa3,_fa4 = st.columns(4)
             _ff2 = _fa1.text_input("🔍 Firma ara", key="an_gecmis_ff", placeholder="firma adı...")
             _fs3 = _fa2.selectbox("Sonuç", ["Tümü","takip edilecek","teklif verildi","anlaşma yapıldı","beklemede","ilgisiz","randevu verildi"], key="an_gecmis_fs")
@@ -3790,45 +3791,40 @@ elif aktif == "analiz":
             if _fs3 != "Tümü": _df_f2 = _df_f2[_df_f2["sonuc"]==_fs3]
             if _fp2 != "Tümü": _df_f2 = _df_f2[_df_f2["potansiyel"]==_fp2]
             if _ft3 != "Tümü": _df_f2 = _df_f2[_df_f2["teklif_tur"].str.contains(_ft3, case=False, na=False)]
-
-            # Özet metrikler
-            _sm1,_sm2,_sm3,_sm4,_sm5 = st.columns(5)
-            _sm1.metric("Toplam", len(_df_f2))
-            _sm2.metric("Yüksek Potansiyel", len(_df_f2[_df_f2["potansiyel"].isin(["yüksek","çok yüksek"])]) if "potansiyel" in _df_f2.columns else 0)
-            _sm3.metric("Takip Bekleyen", len(_df_f2[_df_f2["sonuc"]=="takip edilecek"]) if "sonuc" in _df_f2.columns else 0)
-            _sm4.metric("Teklif Verildi", len(_df_f2[_df_f2["sonuc"]=="teklif verildi"]) if "sonuc" in _df_f2.columns else 0)
-            try: _sm5.metric("Toplam Beklenen Ciro", f"{_df_f2['bek_ciro'].sum():,.0f} ₺")
-            except: _sm5.metric("Toplam Beklenen Ciro", "—")
-
-            st.caption(f"**{len(_df_f2)}** analiz gösteriliyor")
+            st.caption(f"**{len(_df_f2)}** analiz")
             st.divider()
 
             for _, _ar in _df_f2.iterrows():
                 _pot_ic = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(str(_ar.get("potansiyel","")),"-")
                 _tarih_val = _ar.get("tarih","")
                 _tarih_str = str(_tarih_val)[:10] if _tarih_val and str(_tarih_val) not in ["None","nan",""] else ""
-                _firma_goster = _ar.get("firma","") or "—"
-                st.divider()
-                # ── RAPOR BAŞLIĞI — açık, expander yok ──────────────────────
-                _hb1, _hb2, _hb3, _hb4, _hb5, _hb6 = st.columns(6)
-                _hb1.markdown(f"### {_pot_ic} {_firma_goster}")
-                _hb2.markdown(f"📅 **{_tarih_str or '—'}**")
-                _hb3.markdown(f"📋 **{_ar.get('sonuc','—') or '—'}**")
-                _hb4.markdown(f"🎯 **{_ar.get('potansiyel','—') or '—'}**")
-                _hb5.metric("Beklenen", f"{float(_ar.get('bek_ciro',0) or 0):,.0f} ₺")
-                _hb6.metric("Gerçekleşen", f"{float(_ar.get('ger_ciro',0) or 0):,.0f} ₺")
-                with st.expander("📂 Detayları Gör / Gizle", expanded=False):
-                    _em1,_em2,_em3,_em4 = st.columns(4)
-                    _em1.metric("Potansiyel", _ar.get("potansiyel","—"))
-                    _em2.metric("Beklenen Ciro", f"{float(_ar.get('bek_ciro',0) or 0):,.0f} ₺")
-                    _em3.metric("Gerçekleşen", f"{float(_ar.get('ger_ciro',0) or 0):,.0f} ₺")
-                    _em4.metric("Sonuç", _ar.get("sonuc","—"))
+                _firma_goster = str(_ar.get("firma","") or "").strip() or "—"
+                _bek = float(_ar.get('bek_ciro',0) or 0)
+                _ger = float(_ar.get('ger_ciro',0) or 0)
+
+                # ── KART BAŞLIĞI (her zaman açık) ────────────────────────────
+                st.markdown(f"""
+<div style='background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;margin:8px 0'>
+<span style='font-size:18px;font-weight:700'>{_pot_ic} {_firma_goster}</span>
+&nbsp;&nbsp;
+<span style='color:#64748b;font-size:13px'>📅 {_tarih_str or "—"}</span>
+&nbsp;&nbsp;
+<span style='color:#64748b;font-size:13px'>📋 {_ar.get("sonuc","—") or "—"}</span>
+&nbsp;&nbsp;
+<span style='color:#64748b;font-size:13px'>🎯 {_ar.get("potansiyel","—") or "—"} potansiyel</span>
+&nbsp;&nbsp;
+<span style='color:#0ea5e9;font-size:13px'>💰 Beklenen: <b>{_bek:,.0f} ₺</b></span>
+&nbsp;&nbsp;
+<span style='color:#10b981;font-size:13px'>✅ Gerçekleşen: <b>{_ger:,.0f} ₺</b></span>
+</div>
+""", unsafe_allow_html=True)
+
+                with st.expander("📋 Detayları Gör", expanded=False):
                     try:
                         _rak_list2 = _aj.loads(_ar.get("rakip","[]") or "[]")
                         _rak_str2 = ", ".join([f"{r.get('firma','')} ({r.get('fiyat','?')}₺)" for r in _rak_list2 if r.get('firma')]) or "—"
                     except: _rak_str2 = "—"
-
-                    # ── İLETİŞİM & KİMLİK ──────────────────────────────────
+                    # ── DETAY BİLGİLER ──────────────────────────────────────
                     _kc1, _kc2, _kc3 = st.columns(3)
                     with _kc1:
                         st.markdown("**👤 Yetkili**")
