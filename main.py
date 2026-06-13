@@ -664,23 +664,29 @@ def cikis():
 st.set_page_config(page_title="MWCRMPRO", layout="wide")
 
 # ── EKRAN AYARLARI UYGULA ────────────────────────────────────────────────────
-_e_tema = st.session_state.get("_ekran_tema","")
-_e_tema2 = st.session_state.get("_ekran_tema2","")
+_e_r1 = st.session_state.get("_ekran_r1","")
+_e_r2 = st.session_state.get("_ekran_r2","")
 _e_bosluk = st.session_state.get("_ekran_bosluk","1rem")
-if _e_tema or _e_bosluk != "1rem":
+_e_tema_bg = st.session_state.get("_ekran_tema","")
+if _e_r1 or _e_bosluk != "1rem" or _e_tema_bg:
     _takim_css = ""
-    if _e_tema2:
+    if _e_r1 and _e_r2:
         _takim_css = f"""
-        section[data-testid="stSidebar"] {{ background: {_e_tema} !important; }}
-        section[data-testid="stSidebar"] .stButton>button {{ border-color: {_e_tema2} !important; }}
-        """
+section[data-testid="stSidebar"] {{ background: {_e_r2} !important; }}
+section[data-testid="stSidebar"] .stButton>button {{ border-color: {_e_r1} !important; color: {_e_r2} !important; background: {_e_r2} !important; }}
+section[data-testid="stSidebar"] .stButton>button p {{ color: {_e_r1} !important; }}
+section[data-testid="stSidebar"] .stButton>button[kind="primary"] {{ background: {_e_r1} !important; }}
+section[data-testid="stSidebar"] .stButton>button[kind="primary"] p {{ color: {_e_r2} !important; }}
+section[data-testid="stSidebar"] div[style*="font-size:15px"], section[data-testid="stSidebar"] div[style*="font-size:14px"] {{ color: {_e_r1} !important; }}
+"""
+    _bg_css = f"body, .main {{ background-color: {_e_tema_bg} !important; }}" if _e_tema_bg and not _e_r1 else ""
     st.markdown(f"""
 <style>
 .main .block-container {{
     padding-top: {_e_bosluk} !important;
     padding-bottom: {_e_bosluk} !important;
 }}
-{"body, .main { background-color: " + _e_tema + " !important; }" if _e_tema and not _e_tema2 else ""}
+{_bg_css}
 {_takim_css}
 </style>
 """, unsafe_allow_html=True)
@@ -2225,33 +2231,91 @@ elif aktif == "kullanici":
 
         # ── TAKIM TEMALARI ───────────────────────────────────────────────────
         st.markdown("#### ⚽ Takım Teması")
-        _takimlar = {
-            "fenerbahce":  ("#ffef03","#004684","Fenerbahçe"),
-            "galatasaray": ("#e30613","#fcb514","Galatasaray"),
-            "besiktas":    ("#000000","#ffffff","Beşiktaş"),
-            "trabzonspor": ("#722f37","#003399","Trabzonspor"),
+
+        _TUM_TAKIMLAR = {
+            "fenerbahce":    ("#ffef03","#004684","Fenerbahçe"),
+            "galatasaray":   ("#e30613","#fcb514","Galatasaray"),
+            "besiktas":      ("#000000","#ffffff","Beşiktaş"),
+            "trabzonspor":   ("#722f37","#003399","Trabzonspor"),
+            "giresunspor":   ("#2d8c2d","#ffffff","Giresunspor"),
+            "samsunspor":    ("#cc0000","#000000","Samsunspor"),
+            "rizespor":      ("#0055a5","#008000","Rizespor"),
+            "kayserispor":   ("#cc9900","#cc0000","Kayserispor"),
+            "sivasspor":     ("#cc0000","#ffffff","Sivasspor"),
+            "antalyaspor":   ("#cc0000","#ffffff","Antalyaspor"),
+            "konyaspor":     ("#006600","#ffffff","Konyaspor"),
+            "bursaspor":     ("#006600","#ffffff","Bursaspor"),
+            "alanyaspor":    ("#ff6600","#006600","Alanyaspor"),
+            "kasimpasa":     ("#003399","#ffffff","Kasımpaşa"),
+            "ankaragucu":    ("#ffef03","#003399","Ankaragücü"),
+            "basaksehir":    ("#ff6600","#003399","Başakşehir"),
+            "gaziantep":     ("#cc0000","#000000","Gaziantep FK"),
+            "hatayspor":     ("#cc0000","#ffffff","Hatayspor"),
+            "adanaspor":     ("#ff6600","#ffffff","Adanaspor"),
+            "denizlispor":   ("#003399","#ffffff","Denizlispor"),
+            "boluspor":      ("#cc0000","#ffffff","Boluspor"),
+            "eyupspor":      ("#006600","#cc0000","Eyüpspor"),
+            "goztepe":       ("#cc9900","#cc0000","Göztepe"),
+            "kocaelispor":   ("#cc0000","#000000","Kocaelispor"),
+            "sakaryaspor":   ("#cc0000","#000000","Sakaryaspor"),
+            "orduspor":      ("#6600cc","#ffffff","Orduspor"),
+            "genclerbirligi":("#cc0000","#000000","Gençlerbirliği"),
+            "erzurumspor":   ("#003399","#cc0000","Erzurumspor"),
+            "malatyaspor":   ("#cc9900","#000000","Malatyaspor"),
+            "bandirmaspor":  ("#003399","#ffffff","Bandırmaspor"),
+            "izmirspor":     ("#cc0000","#ffffff","İzmirspor"),
         }
-        _tk_cols = st.columns(4)
-        for _tki, (_tkk, (_r1,_r2,_tad)) in enumerate(_takimlar.items()):
+
+        # 4 büyük — önizlemeli
+        _4buyuk = ["fenerbahce","galatasaray","besiktas","trabzonspor"]
+        _tk4 = st.columns(4)
+        for _tki, _tkk in enumerate(_4buyuk):
+            _r1, _r2, _tad = _TUM_TAKIMLAR[_tkk]
             _aktif_tk = _mevcut.get("takim","") == _tkk
-            _tk_cols[_tki].markdown(
-                f"<div style='text-align:center;'>"
-                f"<div style='width:44px;height:44px;border-radius:8px;"
-                f"background:linear-gradient(135deg,{_r1} 50%,{_r2} 50%);"
-                f"border:{"2px solid #3b82f6" if _aktif_tk else "0.5px solid #cbd5e1"};"
-                f"margin:0 auto 4px;'></div>"
-                f"<span style='font-size:11px;'>{_tad}</span></div>",
+            _border = "3px solid #3b82f6" if _aktif_tk else f"2px solid {_r1}"
+            _tk4[_tki].markdown(
+                f"<div style='border-radius:8px;overflow:hidden;border:{_border};margin-bottom:4px;'>"
+                f"<div style='background:{_r2};padding:5px 7px;color:{_r1};font-size:11px;font-weight:700;'>🏢 MWCRMPRO</div>"
+                f"<div style='background:white;padding:3px 5px;display:flex;flex-direction:column;gap:2px;'>"
+                f"<div style='background:{_r2};color:{_r1};font-size:10px;padding:3px 5px;border-radius:3px;font-weight:600;'>📋 Cari Liste</div>"
+                f"<div style='background:white;color:{_r2};font-size:10px;padding:3px 5px;border-radius:3px;border:1px solid {_r2};'>📅 Randevular</div>"
+                f"</div>"
+                f"<div style='background:{_r1};padding:3px;text-align:center;font-size:10px;font-weight:700;color:{_r2};'>{_tad}</div>"
+                f"</div>",
                 unsafe_allow_html=True
             )
-            if _tk_cols[_tki].button("Seç", key=f"takim_{_tkk}", use_container_width=True):
+            if _tk4[_tki].button("✓ Seçili" if _aktif_tk else "Seç", key=f"takim_{_tkk}",
+                                  use_container_width=True, type="primary" if _aktif_tk else "secondary"):
                 _mevcut["takim"] = _tkk
-                _mevcut["tema"] = _tkk
                 _ekran_kaydet(_mevcut)
-                st.session_state["_ekran_tema"] = _r1
-                st.session_state["_ekran_tema2"] = _r2
+                st.session_state["_ekran_r1"] = _r1
+                st.session_state["_ekran_r2"] = _r2
                 st.rerun()
 
-        st.divider()
+        st.markdown("**🔍 Diğer Takımlar**")
+        _takim_ara = st.text_input("", placeholder="Takım ara... Giresunspor, Samsunspor...",
+                                    key="takim_ara", label_visibility="collapsed")
+        _diger = {k:v for k,v in _TUM_TAKIMLAR.items() if k not in _4buyuk}
+        if _takim_ara:
+            _diger = {k:v for k,v in _diger.items() if _takim_ara.lower() in v[2].lower()}
+
+        _pill_cols = st.columns(4)
+        for _pi, (_tkk, (_r1,_r2,_tad)) in enumerate(_diger.items()):
+            _aktif_d = _mevcut.get("takim","") == _tkk
+            _pill_cols[_pi % 4].markdown(
+                f"<div style='padding:4px 8px;border-radius:16px;border:1.5px solid {_r1};"
+                f"color:{_r1};font-size:11px;margin:2px 0;"
+                f"background:{'#e8f4ff' if _aktif_d else 'white'};font-weight:{'600' if _aktif_d else '400'};'>"
+                f"{'✓ ' if _aktif_d else ''}{_tad}</div>",
+                unsafe_allow_html=True
+            )
+            if _pill_cols[_pi % 4].button("Seç", key=f"takim_{_tkk}", use_container_width=True):
+                _mevcut["takim"] = _tkk
+                _ekran_kaydet(_mevcut)
+                st.session_state["_ekran_r1"] = _r1
+                st.session_state["_ekran_r2"] = _r2
+                st.rerun()
+
         if st.button("↺ Varsayılana Sıfırla", use_container_width=True, key="ekran_sifirla"):
             _ekran_kaydet({"bosluk":"normal","tema":"beyaz"})
             st.session_state.pop("_ekran_tema", None)
