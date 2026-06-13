@@ -4079,11 +4079,33 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'||e.key==='F2'){startEdit(selR,selC);return;}
   if(e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey){const sid=hf.getSheetId(sheets[curSheet]);hf.setCellContents({sheet:sid,row:selR,col:selC},[[null]]);startEdit(selR,selC);}
 });
-window.onload=()=>{if(typeof HyperFormula!=='undefined')initHF();else document.getElementById('hfStatus').textContent='⚠️ Bağlantı hatası';};
+window.onload=()=>{
+  setTimeout(()=>{
+    if(typeof HyperFormula!=='undefined'){
+      initHF();
+    } else {
+      document.getElementById('hfStatus').textContent='⚠️ HyperFormula yüklenemedi';
+      // Fallback: manuel tablo
+      buildFallbackTable();
+    }
+  }, 500);
+};
+
+function buildFallbackTable(){
+  const wrap=document.getElementById('sheetWrap');
+  let html='<table><thead><tr><th class="corner"></th>';
+  for(let c=0;c<100;c++){let n='';let i=c+1;while(i>0){n=String.fromCharCode(64+(i%26||26))+n;i=Math.floor((i-1)/26);}html+=`<th>${n}</th>`;}
+  html+='</tr></thead><tbody>';
+  for(let r=0;r<50;r++){html+=`<tr><td class="rn">${r+1}</td>`;for(let c=0;c<100;c++)html+='<td></td>';html+='</tr>';}
+  html+='</tbody></table>';
+  wrap.innerHTML=html;
+  document.getElementById('hfStatus').textContent='⚠️ Formülsüz mod';
+  document.getElementById('sheetTabs').innerHTML='<div class="tab active">Sayfa 1</div>';
+}
 </script>
 </body>
 </html>
-""", height=620, scrolling=False)
+""", height=750, scrolling=False)
 
 elif aktif == "whatsapp":
     import requests as _wa_req
