@@ -865,8 +865,6 @@ if st.session_state.get("rol") != "admin":
 with st.sidebar:
     st.markdown("## 🏢 MWCRMPRO")
     st.caption(f"👤 {st.session_state.get('kullanici','')} | {st.session_state.get('rol','')}")
-    if st.button("🚪 Çıkış", use_container_width=True, key="sidebar_cikis"):
-        cikis()
 
     st.divider()
     st.divider()
@@ -918,6 +916,10 @@ with st.sidebar:
         if st.button("📨 Gönder", key="sidebar_wa_btn"):
             if talep.strip():
                 st.markdown(f"[👉 Gönder](https://wa.me/905400344228?text={talep.replace(' ','%20')})")
+
+    st.divider()
+    if st.button("🚪 Çıkış", use_container_width=True, key="sidebar_cikis"):
+        cikis()
 
     if st.session_state.get("rol") == "admin":
         with st.expander("🎛️ Menü Sırası"):
