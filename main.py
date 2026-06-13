@@ -3816,32 +3816,60 @@ elif aktif == "analiz":
                         _rak_list2 = _aj.loads(_ar.get("rakip","[]") or "[]")
                         _rak_str2 = ", ".join([f"{r.get('firma','')} ({r.get('fiyat','?')}₺)" for r in _rak_list2 if r.get('firma')]) or "—"
                     except: _rak_str2 = "—"
-                    st.markdown(f"""
-| Alan | Değer |
-|---|---|
-| **Firma** | {_ar.get("firma","—")} |
-| **Yetkili** | {_ar.get("yetkili","—")} |
-| **İletişim** | {_ar.get("iletisim","—")} |
-| **Sektör** | {_ar.get("sektor","—")} |
-| **Analiz Amacı** | {_ar.get("amac","—")} |
-| **Müşteri Durumu** | {_ar.get("mdurum","—")} |
-| **Teklif Türü** | {_ar.get("teklif_tur","—")} |
-| **Kaynak** | {_ar.get("kaynak","—")} |
-| **Kargo** | {_ar.get("kargo","—")} |
-| **Fatura / UA/PO** | {_ar.get("fatura","—")} / {_ar.get("uapo","—")} |
-| **Vade/Ödeme** | {_ar.get("odeme","—")} · Pazarlık: {_ar.get("pazarlik","—")} |
-| **Beklenti** | {_ar.get("beklenti","—")} |
-| **Karar Verici** | {_ar.get("karar","—")} · Süre: {_ar.get("sure","—")} |
-| **Engel** | {_ar.get("engel","—")} |
-| **Şikayetleri** | {_ar.get("sik","—")} |
-| **Geçiş Sebebi** | {_ar.get("gecis","—")} |
-| **Rakip Kargolar** | {_rak_str2} |
-| **Sonraki Adım** | {_ar.get("sonraki_adim","—")} |
-| **Takip Tarihi** | {_ar.get("takip_tar","—")} |
-| **Temsilci** | {_ar.get("olusturan","—")} |
-""")
+
+                    # ── İLETİŞİM & KİMLİK ──────────────────────────────────
+                    _kc1, _kc2, _kc3 = st.columns(3)
+                    with _kc1:
+                        st.markdown("**👤 Yetkili**")
+                        st.write(_ar.get("yetkili","—"))
+                        st.markdown("**📞 İletişim**")
+                        st.write(_ar.get("iletisim","—"))
+                        st.markdown("**🏭 Sektör**")
+                        st.write(_ar.get("sektor","—"))
+                        st.markdown("**📌 Kaynak**")
+                        st.write(_ar.get("kaynak","—"))
+                    with _kc2:
+                        st.markdown("**🎯 Analiz Amacı**")
+                        st.write(_ar.get("amac","—"))
+                        st.markdown("**👥 Müşteri Durumu**")
+                        st.write(_ar.get("mdurum","—"))
+                        st.markdown("**📦 Teklif Türü**")
+                        st.write(_ar.get("teklif_tur","—"))
+                        st.markdown("**🚚 Kullandığı Kargo**")
+                        st.write(_ar.get("kargo","—"))
+                    with _kc3:
+                        st.markdown("**🧾 Faturalama**")
+                        st.write(f"{_ar.get('fatura','—')} / UA-PO: {_ar.get('uapo','—')}")
+                        st.markdown("**💳 Vade / Ödeme**")
+                        st.write(f"{_ar.get('odeme','—')} — Pazarlık: {_ar.get('pazarlik','—')}")
+                        st.markdown("**🏆 Karar Verici**")
+                        st.write(f"{_ar.get('karar','—')} — Süre: {_ar.get('sure','—')}")
+                        st.markdown("**🕐 Takip Tarihi**")
+                        st.write(_ar.get("takip_tar","—"))
+
+                    st.divider()
+
+                    # ── SAHA BİLGİSİ ────────────────────────────────────────
+                    _sc1, _sc2 = st.columns(2)
+                    with _sc1:
+                        st.markdown("**💬 Müşteri Beklentisi**")
+                        st.write(_ar.get("beklenti","—") or "—")
+                        st.markdown("**🚧 Satışa Engel**")
+                        st.write(_ar.get("engel","—") or "—")
+                        st.markdown("**😤 Şikayetleri**")
+                        st.write(_ar.get("sik","—") or "—")
+                    with _sc2:
+                        st.markdown("**🔄 Geçiş Sebebi**")
+                        st.write(_ar.get("gecis","—") or "—")
+                        st.markdown("**⚔️ Rakip Kargolar**")
+                        st.write(_rak_str2)
+                        st.markdown("**➡️ Sonraki Adım**")
+                        st.write(_ar.get("sonraki_adim","—") or "—")
+
                     if _ar.get("not_alan"):
-                        st.info(f"📝 **Not:** {_ar.get('not_alan')}")
+                        st.divider()
+                        st.markdown("**📝 Görüşme Notu**")
+                        st.info(_ar.get("not_alan"))
                     try:
                         _ft2b = _aj.loads(_ar.get("fiyat_tablo","[]") or "[]")
                         if _ft2b and any(s.get("il") and s.get("il")!="--" for s in _ft2b):
@@ -4210,46 +4238,137 @@ elif aktif == "analiz":
         if _an_iletisim and "@" in _an_iletisim:
             _btn_c[4].markdown("<a href='mailto:" + _an_iletisim + "?subject=Teklif'><button style='width:100%;padding:6px;font-size:12px;background:#fffbeb;color:#b45309;border:1px solid #fcd34d;border-radius:6px;cursor:pointer;'>✉️ E-posta</button></a>", unsafe_allow_html=True)
 
+        # Veriyi her zaman hazırla (önizleme + kaydet için)
+        _veri_an = {
+            "yetkili": _an_yetkili or "",
+            "iletisim": _an_iletisim or "",
+            "sektor": _an_sektor or "",
+            "amac": ", ".join(_an_amac) if _an_amac else "",
+            "mdurum": _an_mdurum or "",
+            "bek_ciro": float((_an_bek_ciro or "0").replace(".","").replace(",",".")) if _an_bek_ciro else 0,
+            "ger_ciro": float((_an_ger_ciro or "0").replace(".","").replace(",",".")) if _an_ger_ciro else 0,
+            "kaynak": ", ".join(_an_kaynak) if _an_kaynak else "",
+            "kargo": ", ".join(_an_kargo) if _an_kargo else "",
+            "fatura": _an_fatura or "",
+            "uapo": _an_uapo or "",
+            "odeme": ", ".join(_an_odeme) if _an_odeme else "",
+            "pazarlik": _an_pazarlik or "",
+            "beklenti": ", ".join(_an_beklenti) if _an_beklenti else "",
+            "teklif_tur": ", ".join(_an_ttur) if _an_ttur else "",
+            "karar": _an_karar or "",
+            "sure": _an_sure or "",
+            "engel": ", ".join(_an_engel) if _an_engel else "",
+            "sik": ", ".join(_an_sik) if _an_sik else "",
+            "gecis": ", ".join(_an_gecis) if _an_gecis else "",
+            "potansiyel": _an_pot or "",
+            "sonuc": _an_sonuc or "",
+            "not_alan": _an_not or "",
+            "takip_tar": str(_an_takip) if _an_takip else "",
+            "sonraki_adim": _an_sonraki or "",
+            "bolge": _aj.dumps(st.session_state.get("an_bolge_satirlar",[]), ensure_ascii=False),
+            "avm": _aj.dumps(st.session_state.get("an_avm_satirlar",[]), ensure_ascii=False),
+            "fiyat_tablo": _aj.dumps(st.session_state.get("an_fiyat_satirlar",[]), ensure_ascii=False),
+            "rakip": _aj.dumps(st.session_state.get("an_rakip_satirlar",[]), ensure_ascii=False),
+            "olusturan": st.session_state.get("kullanici",""),
+        }
+
         if _kaydet_btn:
-            _veri_an = {
-                "yetkili": _an_yetkili or "",
-                "iletisim": _an_iletisim or "",
-                "sektor": _an_sektor or "",
-                "amac": ", ".join(_an_amac) if _an_amac else "",
-                "mdurum": _an_mdurum or "",
-                "bek_ciro": float((_an_bek_ciro or "0").replace(".","").replace(",",".")) if _an_bek_ciro else 0,
-                "ger_ciro": float((_an_ger_ciro or "0").replace(".","").replace(",",".")) if _an_ger_ciro else 0,
-                "kaynak": ", ".join(_an_kaynak) if _an_kaynak else "",
-                "kargo": ", ".join(_an_kargo) if _an_kargo else "",
-                "fatura": _an_fatura or "",
-                "uapo": _an_uapo or "",
-                "odeme": ", ".join(_an_odeme) if _an_odeme else "",
-                "pazarlik": _an_pazarlik or "",
-                "beklenti": ", ".join(_an_beklenti) if _an_beklenti else "",
-                "teklif_tur": ", ".join(_an_ttur) if _an_ttur else "",
-                "karar": _an_karar or "",
-                "sure": _an_sure or "",
-                "engel": ", ".join(_an_engel) if _an_engel else "",
-                "sik": ", ".join(_an_sik) if _an_sik else "",
-                "gecis": ", ".join(_an_gecis) if _an_gecis else "",
-                "potansiyel": _an_pot or "",
-                "sonuc": _an_sonuc or "",
-                "not_alan": _an_not or "",
-                "takip_tar": str(_an_takip) if _an_takip else "",
-                "sonraki_adim": _an_sonraki or "",
-                "bolge": _aj.dumps(st.session_state.get("an_bolge_satirlar",[]), ensure_ascii=False),
-                "avm": _aj.dumps(st.session_state.get("an_avm_satirlar",[]), ensure_ascii=False),
-                "fiyat_tablo": _aj.dumps(st.session_state.get("an_fiyat_satirlar",[]), ensure_ascii=False),
-                "rakip": _aj.dumps(st.session_state.get("an_rakip_satirlar",[]), ensure_ascii=False),
-                "olusturan": st.session_state.get("kullanici",""),
-            }
-            _ok, _ = _an_upsert(_secili_firma, _veri_an)
-            if _ok:
-                _eylem = "güncellendi" if _duzenle_mod else "kaydedildi"
-                st.success(f"✅ **{_secili_firma}** analizi başarıyla {_eylem}!")
-                st.balloons()
-                try: db_read.clear()
-                except: pass
+            st.session_state["an_onizleme"] = True
+            st.session_state["an_onizleme_veri"] = _veri_an
+
+        # ── ÖNİZLEME EKRANI ──────────────────────────────────────────────────
+        if st.session_state.get("an_onizleme"):
+            _ov = st.session_state.get("an_onizleme_veri", _veri_an)
+            st.divider()
+            st.markdown(f"## 🔎 Analiz Önizleme — **{_secili_firma}**")
+            st.caption("Aşağıdaki bilgileri incele, gerekirse yukarıdan düzenle, sonra onayla.")
+
+            # Rakip özeti
+            try:
+                _rak_on = _aj.loads(_ov.get("rakip","[]") or "[]")
+                _rak_on_str = ", ".join([f"{r.get('firma','')} ({r.get('fiyat','?')}₺)" for r in _rak_on if r.get('firma')]) or "—"
+            except: _rak_on_str = "—"
+
+            _oc1, _oc2, _oc3 = st.columns(3)
+            with _oc1:
+                st.markdown("##### 👤 Kişi & İletişim")
+                st.markdown(f"**Yetkili:** {_ov.get('yetkili','—')}")
+                st.markdown(f"**İletişim:** {_ov.get('iletisim','—')}")
+                st.markdown(f"**Sektör:** {_ov.get('sektor','—')}")
+                st.markdown(f"**Kaynak:** {_ov.get('kaynak','—')}")
+                st.markdown(f"**Karar Verici:** {_ov.get('karar','—')}")
+                st.markdown(f"**Karar Süresi:** {_ov.get('sure','—')}")
+            with _oc2:
+                st.markdown("##### 📦 Operasyon")
+                st.markdown(f"**Analiz Amacı:** {_ov.get('amac','—')}")
+                st.markdown(f"**Müşteri Durumu:** {_ov.get('mdurum','—')}")
+                st.markdown(f"**Teklif Türü:** {_ov.get('teklif_tur','—')}")
+                st.markdown(f"**Kullandığı Kargo:** {_ov.get('kargo','—')}")
+                st.markdown(f"**Faturalama:** {_ov.get('fatura','—')} / UA-PO: {_ov.get('uapo','—')}")
+                st.markdown(f"**Vade/Ödeme:** {_ov.get('odeme','—')}")
+                st.markdown(f"**Pazarlık:** {_ov.get('pazarlik','—')}")
+            with _oc3:
+                st.markdown("##### 💰 Finansal")
+                st.markdown(f"**Beklenen Ciro:** {float(_ov.get('bek_ciro',0) or 0):,.0f} ₺")
+                st.markdown(f"**Gerçekleşen Ciro:** {float(_ov.get('ger_ciro',0) or 0):,.0f} ₺")
+                st.markdown(f"**Potansiyel:** {_ov.get('potansiyel','—')}")
+                st.markdown(f"**Görüşme Sonucu:** {_ov.get('sonuc','—')}")
+                st.markdown(f"**Takip Tarihi:** {_ov.get('takip_tar','—')}")
+                st.markdown(f"**Sonraki Adım:** {_ov.get('sonraki_adim','—')}")
+
+            st.divider()
+            _os1, _os2 = st.columns(2)
+            with _os1:
+                st.markdown("##### 🎯 Saha Bilgisi")
+                st.markdown(f"**Beklenti:** {_ov.get('beklenti','—')}")
+                st.markdown(f"**Satışa Engel:** {_ov.get('engel','—')}")
+                st.markdown(f"**Şikayetleri:** {_ov.get('sik','—')}")
+            with _os2:
+                st.markdown("##### ⚔️ Rekabet")
+                st.markdown(f"**Geçiş Sebebi:** {_ov.get('gecis','—')}")
+                st.markdown(f"**Rakip Kargolar:** {_rak_on_str}")
+
+            if _ov.get("not_alan"):
+                st.divider()
+                st.markdown("##### 📝 Görüşme Notu")
+                st.info(_ov.get("not_alan"))
+
+            # Fiyat / Bölge / AVM tabloları
+            try:
+                _ft_on = _aj.loads(_ov.get("fiyat_tablo","[]") or "[]")
+                if _ft_on and any(s.get("il") and s.get("il")!="--" for s in _ft_on):
+                    st.markdown("##### 💰 Fiyat Tablosu")
+                    st.dataframe(pd.DataFrame(_ft_on), use_container_width=True, hide_index=True)
+            except: pass
+            try:
+                _bl_on = _aj.loads(_ov.get("bolge","[]") or "[]")
+                if _bl_on and any(s.get("il") and s.get("il")!="--" for s in _bl_on):
+                    st.markdown("##### 📍 Bölge Teslimat")
+                    st.dataframe(pd.DataFrame(_bl_on), use_container_width=True, hide_index=True)
+            except: pass
+            try:
+                _av_on = _aj.loads(_ov.get("avm","[]") or "[]")
+                if _av_on and any(s.get("avm") for s in _av_on):
+                    st.markdown("##### 🏬 AVM Teslimatları")
+                    st.dataframe(pd.DataFrame(_av_on), use_container_width=True, hide_index=True)
+            except: pass
+
+            st.divider()
+            _ob1, _ob2 = st.columns(2)
+            if _ob1.button("✅ Onayla & Kaydet", type="primary", use_container_width=True, key="an_onay"):
+                _ok, _ = _an_upsert(_secili_firma, _ov)
+                if _ok:
+                    st.session_state.pop("an_onizleme", None)
+                    st.session_state.pop("an_onizleme_veri", None)
+                    _eylem = "güncellendi" if _duzenle_mod else "kaydedildi"
+                    st.success(f"✅ **{_secili_firma}** analizi başarıyla {_eylem}!")
+                    st.balloons()
+                    try: db_read.clear()
+                    except: pass
+                    st.rerun()
+            if _ob2.button("✏️ Geri Dön / Düzenle", use_container_width=True, key="an_geri"):
+                st.session_state.pop("an_onizleme", None)
+                st.session_state.pop("an_onizleme_veri", None)
                 st.rerun()
 
         if _cari_btn:
