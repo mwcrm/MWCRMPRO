@@ -784,7 +784,7 @@ def parse_para(s):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -793,6 +793,7 @@ _TAB_ETIKETLER = {
     "ozel_teklif": "⭐ Özel Teklif",
     "excel": "📥 Excel Aktar",
     "kisiler": "📞 Telefon Kişiler",
+    "analiz": "🔍 Müşteri Analizi",
     "randevu": "📅 Randevular",
     "kullanici": "👥 Kullanıcı Yönetimi",
     "mesajlar": "💬 Mesajlar",
@@ -1448,6 +1449,10 @@ elif aktif == "liste":
             if ab3.button("📅 Randevu", key=f"kr_{kart_id}", use_container_width=True, type="primary"):
                 st.session_state["aktif_tab"] = "randevu"
                 st.session_state["rand_musteri_onsel"] = kart_id; st.rerun()
+            if ab4.button("🔍 Analiz", key=f"kan_{kart_id}", use_container_width=True, help="Müşteri analizlerini gör"):
+                st.session_state["aktif_tab"] = "analiz"
+                st.session_state["an_firma"] = str(kart.get("firma",""))
+                st.rerun()
             if ab4.button("🗑️ Arşive", key=f"ka_{kart_id}", use_container_width=True):
                 if sb_liste: sb_liste.table("cari_kartlar").update({"silindi":1}).eq("id",kart_id).execute()
                 else: db_update("cari_kartlar",{"silindi":1},"id",kart_id)
@@ -3558,6 +3563,405 @@ elif aktif == "excel":
                 _ekl2.button("❌ İptal", use_container_width=True, key="excel_iptal_btn")
         except Exception as e:
             st.error(f"Dosya okunamadı: {e}")
+
+elif aktif == "analiz":
+    sayfa_log("analiz")
+    import json as _aj
+
+    st.markdown("## 🔍 Müşteri Görüşme Analizi")
+
+    # Supabase'de tablo oluştur
+    def _analiz_kaydet(veri):
+        try:
+            sb = get_sb_client()
+            if sb:
+                sb.table("musteri_analiz").insert(veri).execute()
+                return True
+        except: pass
+        try:
+            conn = get_conn()
+            conn.execute("""CREATE TABLE IF NOT EXISTS musteri_analiz (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                firma TEXT, yetkili TEXT, iletisim TEXT, sektor TEXT,
+                amac TEXT, mdurum TEXT, bek_ciro REAL, ger_ciro REAL,
+                kaynak TEXT, kargo TEXT, fatura TEXT, uapo TEXT, odeme TEXT,
+                pazarlik TEXT, beklenti TEXT, teklif_tur TEXT, karar TEXT,
+                sure TEXT, engel TEXT, sik TEXT, gecis TEXT, potansiyel TEXT,
+                sonuc TEXT, not_alan TEXT, takip_tar TEXT, sonraki_adim TEXT,
+                bolge TEXT, avm TEXT, fiyat_tablo TEXT,
+                olusturan TEXT, tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )""")
+            cols = ','.join(veri.keys())
+            vals = ','.join(['?' for _ in veri])
+            conn.execute(f"INSERT INTO musteri_analiz ({cols}) VALUES ({vals})", list(veri.values()))
+            conn.commit(); conn.close()
+            return True
+        except Exception as e:
+            st.error(f"Kayıt hatası: {e}")
+            return False
+
+    def _analiz_getir(firma=None, limit=50):
+        try:
+            sb = get_sb_client()
+            if sb:
+                q = sb.table("musteri_analiz").select("*").order("tarih", desc=True).limit(limit)
+                if firma:
+                    q = q.eq("firma", firma)
+                r = q.execute()
+                return pd.DataFrame(r.data) if r.data else pd.DataFrame()
+        except: pass
+        try:
+            conn = get_conn()
+            sql = "SELECT * FROM musteri_analiz"
+            if firma: sql += f" WHERE firma='{firma}'"
+            sql += " ORDER BY tarih DESC LIMIT " + str(limit)
+            df = pd.read_sql_query(sql, conn); conn.close()
+            return df
+        except: return pd.DataFrame()
+
+    # Tab yapısı
+    _at1, _at2, _at3 = st.tabs(["📝 Yeni Analiz", "📋 Geçmiş Analizler", "📊 Özet & İstatistik"])
+
+    with _at1:
+        # HIZLI NOT
+        st.markdown("""<div style='background:#eff6ff;border:0.5px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin-bottom:12px;'>
+<b style='font-size:12px;color:#1d4ed8;'>⚡ Hızlı Not</b> — devrik yaz, eksik bırak, sistem anlar
+</div>""", unsafe_allow_html=True)
+        _hn_col1, _hn_col2 = st.columns([4,1])
+        _hizli_not = _hn_col1.text_area("", placeholder="aras kullanıyor, 500 koli ist-bursa, 8₺/desi ödüyor, fatura sorunu var, erken alım istiyor, avm var...", height=60, key="an_hizli_not", label_visibility="collapsed")
+        _auto_doldur = _hn_col2.button("⚡ Otomatik Doldur", use_container_width=True, key="an_auto_btn")
+
+        if _auto_doldur and _hizli_not:
+            _txt = _hizli_not.lower()
+            import re as _re
+            if _re.search(r'(\d+)\s*koli', _txt):
+                st.session_state['an_koli_adet'] = _re.search(r'(\d+)\s*koli', _txt).group(1)
+            if _re.search(r'(\d+)\s*palet', _txt):
+                st.session_state['an_pal_adet'] = _re.search(r'(\d+)\s*palet', _txt).group(1)
+            for _k in ['aras','yurtiçi','mng','sürat','ptt','dhl','ups','horoz']:
+                if _k in _txt:
+                    st.session_state['an_kargo_sec'] = _k.capitalize()
+            if _re.search(r'(\d+[\.,]?\d*)\s*₺?\s*[/\]?\s*desi', _txt):
+                st.session_state['an_fiyat'] = _re.search(r'(\d+[\.,]?\d*)\s*₺?\s*[/\]?\s*desi', _txt).group(1)
+            st.success("✅ Not analiz edildi, aşağıdaki alanlar dolduruldu!")
+            st.rerun()
+
+        st.divider()
+
+        # FORM — 8 bölüm tek satır mantığıyla
+        # 0. ANALİZ AMACI
+        with st.expander("🎯 Analiz Amacı & Müşteri Durumu", expanded=True):
+            _ac1, _ac2 = st.columns(2)
+            _an_amac = _ac1.multiselect("Bu analiz neden?", ["yeni müşteri kazanım","zam görüşmesi","nezaket ziyareti","erken potansiyel","kayıp müşteri geri kazanım","mevcut müşteri analizi","rakip takibi","pazar araştırması"], key="an_amac")
+            _an_mdurum = _ac2.selectbox("Müşteri durumu", ["yeni","mevcut","eski","rakip firmanın müşterisi"], key="an_mdurum")
+            _ac3, _ac4, _ac5 = st.columns(3)
+            _an_bek_ciro = _ac3.text_input("Beklenen ciro (₺/ay)", key="an_bek_ciro", placeholder="₺/ay")
+            _an_ger_ciro = _ac4.text_input("Gerçekleşen ciro (₺/ay)", key="an_ger_ciro", placeholder="₺/ay")
+            _fark_c = ""
+            try:
+                _b = float(_an_bek_ciro.replace('.','').replace(',','.') or 0)
+                _g = float(_an_ger_ciro.replace('.','').replace(',','.') or 0)
+                if _b > 0 and _g > 0:
+                    _fark_c = f"{'+'if _g>=_b else ''}{_g-_b:,.0f} ₺"
+            except: pass
+            _ac5.text_input("Fark", value=_fark_c, disabled=True, key="an_fark")
+
+        # 1. KAYNAK & MÜŞTERİ
+        with st.expander("🔍 Kaynak & Müşteri Bilgisi", expanded=True):
+            _mc1, _mc2, _mc3 = st.columns(3)
+            _an_tarih = _mc1.date_input("Görüşme tarihi", key="an_tarih")
+            _an_saat = _mc2.time_input("Saat", key="an_saat")
+            _an_temsilci = _mc3.text_input("Görüşen temsilci", key="an_temsilci", value=st.session_state.get("kullanici",""))
+            _mk1, _mk2 = st.columns([2,1])
+            _an_kaynak = _mk1.multiselect("Nereden bulundu?", ["soğuk arama","referans","linkedin","internet/forum","ziyaret","fuar","sosyal medya","eski müşteri"], key="an_kaynak")
+            _an_referans = _mk2.text_input("Referans veren", key="an_referans", placeholder="isteğe bağlı")
+            _mf1, _mf2, _mf3 = st.columns(3)
+            # Cari listeden seç veya manuel yaz
+            _df_cari_an = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
+            _cari_opts = ["-- Manuel Yaz --"] + [f"[{int(r['id'])}] {r['firma']}" for _,r in _df_cari_an.iterrows()]
+            _cari_sec = _mf1.selectbox("Cari Listeden Seç", _cari_opts, key="an_cari_sec")
+            _an_firma_default = ""
+            if _cari_sec != "-- Manuel Yaz --":
+                _cid = int(_cari_sec.split("]")[0].replace("[","").strip())
+                _crow = _df_cari_an[_df_cari_an["id"]==_cid]
+                if not _crow.empty:
+                    _an_firma_default = str(_crow.iloc[0].get("firma",""))
+            _an_firma = _mf2.text_input("Firma adı", key="an_firma", value=_an_firma_default or "", placeholder="bilinmiyorsa boş")
+            _an_firma_durum = _mf3.selectbox("Firma durumu", ["biliniyor","bilinmiyor","rakip firma"], key="an_firma_durum")
+            _mh1, _mh2, _mh3 = st.columns(3)
+            _an_yetkili = _mh1.text_input("Yetkili / Ünvan", key="an_yetkili", placeholder="Ad Soyad — Ünvan")
+            _an_iletisim = _mh2.text_input("Tel / E-posta", key="an_iletisim", placeholder="05xx / mail@...")
+            _an_sektor = _mh3.selectbox("Sektör", ["--","Tekstil","Gıda","Otomotiv","Elektronik","İnşaat","E-ticaret","AVM/Perakende","Kimya","Mobilya","Medikal","Kozmetik","Tarım","Diğer"], key="an_sektor")
+
+        # 2. ÜRÜN & HACİM
+        with st.expander("📦 Ürün, Hacim & Ölçü", expanded=False):
+            _uc1, _uc2 = st.columns([2,1])
+            _an_urun = _uc1.multiselect("Gönderi türü", ["koli","palet","parsiyel","TIR/komple","soğuk zincir","ADR/tehlikeli","ambar kargo","dış nakliye"], default=["koli"], key="an_urun")
+            _ud1,_ud2,_ud3,_ud4,_ud5,_ud6 = st.columns(6)
+            _an_kd_min = _ud1.text_input("Koli desi min", key="an_kd_min", placeholder="min")
+            _an_kd_max = _ud2.text_input("Koli desi max", key="an_kd_max", placeholder="max")
+            _an_pd_min = _ud3.text_input("Palet desi min", key="an_pd_min", placeholder="min")
+            _an_pd_max = _ud4.text_input("Palet desi max", key="an_pd_max", placeholder="max")
+            _an_koli_adet = _ud5.text_input("Aylık koli", key="an_koli_adet", placeholder="adet")
+            _an_pal_adet = _ud6.text_input("Aylık palet", key="an_pal_adet", placeholder="adet")
+            _ue1, _ue2, _ue3 = st.columns(3)
+            _an_koli_kg = _ue1.text_input("Ort. ağırlık (kg)", key="an_koli_kg", placeholder="kg")
+            try:
+                _td = int(_an_koli_adet or 0)*(int(_an_koli_kg or 0)*3 or 10) + int(_an_pal_adet or 0)*300
+                _toplam_desi_val = f"{_td:,} desi" if _td > 0 else ""
+            except: _toplam_desi_val = ""
+            _ue2.text_input("Toplam desi/ay", value=_toplam_desi_val, disabled=True, key="an_toplam_desi")
+            _an_kdesi = _ue3.multiselect("Koli yoğunluğu", ["0–5","5–10","10–20","20–50","50+"], key="an_kdesi")
+
+        # 3. KARGO & FİYAT
+        with st.expander("🚚 Mevcut Kargo & Fiyat", expanded=False):
+            _kc1, _kc2 = st.columns([3,1])
+            _an_kargo = _kc1.multiselect("Çalıştığı kargo firmaları", ["Aras","Yurtiçi","MNG","Sürat","PTT","Fedex","DHL","UPS","Horoz","Diğer"], key="an_kargo")
+            _an_aylik_odeme = _kc2.text_input("Aylık toplam ödeme (₺)", key="an_aylik_odeme", placeholder="₺/ay")
+            st.markdown("**Desi Bazlı Fiyat Tablosu** (il + ürün + desi + ödediği + teklifimiz)")
+            if "an_fiyat_satirlar" not in st.session_state:
+                st.session_state["an_fiyat_satirlar"] = [{"il":"","urun":"koli","min":"","max":"","adet":"","musteri":"","biz":""}]
+            for _fi, _fs in enumerate(st.session_state["an_fiyat_satirlar"]):
+                _fc = st.columns([1.5,0.8,0.5,0.5,0.6,0.8,0.8,0.3])
+                st.session_state["an_fiyat_satirlar"][_fi]["il"] = _fc[0].selectbox("", ["--","İstanbul","Ankara","İzmir","Bursa","Manisa","Çorlu/Çerkezköy","Konya","Kocaeli","Adana","Tüm TR"], key=f"an_fil_{_fi}", label_visibility="collapsed")
+                st.session_state["an_fiyat_satirlar"][_fi]["urun"] = _fc[1].selectbox("", ["koli","palet","parsiyel","TIR"], key=f"an_furun_{_fi}", label_visibility="collapsed")
+                st.session_state["an_fiyat_satirlar"][_fi]["min"] = _fc[2].text_input("", key=f"an_fmin_{_fi}", placeholder="min", label_visibility="collapsed")
+                st.session_state["an_fiyat_satirlar"][_fi]["max"] = _fc[3].text_input("", key=f"an_fmax_{_fi}", placeholder="max", label_visibility="collapsed")
+                st.session_state["an_fiyat_satirlar"][_fi]["adet"] = _fc[4].text_input("", key=f"an_fadet_{_fi}", placeholder="adet", label_visibility="collapsed")
+                st.session_state["an_fiyat_satirlar"][_fi]["musteri"] = _fc[5].text_input("", key=f"an_fmus_{_fi}", placeholder="ödediği ₺", label_visibility="collapsed")
+                st.session_state["an_fiyat_satirlar"][_fi]["biz"] = _fc[6].text_input("", key=f"an_fbiz_{_fi}", placeholder="teklifimiz ₺", label_visibility="collapsed")
+                if _fc[7].button("×", key=f"an_fdel_{_fi}") and len(st.session_state["an_fiyat_satirlar"]) > 1:
+                    st.session_state["an_fiyat_satirlar"].pop(_fi); st.rerun()
+            if st.button("+ Fiyat Satırı Ekle", key="an_fiyat_ekle"):
+                st.session_state["an_fiyat_satirlar"].append({"il":"","urun":"koli","min":"","max":"","adet":"","musteri":"","biz":""}); st.rerun()
+
+            _kd1,_kd2,_kd3,_kd4 = st.columns(4)
+            _an_fatura = _kd1.selectbox("Faturalama", ["faturalı","faturasız","karma","bilinmiyor"], key="an_fatura")
+            _an_uapo = _kd2.selectbox("UA / PO", ["UA — gönderici öder","PO — alıcı öder","karma","bilinmiyor"], key="an_uapo")
+            _an_odeme = _kd3.multiselect("Vade / Ödeme", ["nakit","havale","çek","30 gün","45 gün","60 gün","90 gün"], key="an_odeme")
+            _an_pazarlik = _kd4.selectbox("Fiyat pazarlık", ["inebilir","zorlu","inmez","bilinmiyor"], key="an_pazarlik")
+
+        # 4. BÖLGE & AVM
+        with st.expander("📍 Bölge, Teslimat & AVM", expanded=False):
+            st.markdown("**Bölge Teslimat Detayı**")
+            if "an_bolge_satirlar" not in st.session_state:
+                st.session_state["an_bolge_satirlar"] = [{"il":"","urun":"koli","min":"","max":"","adet":"","siklik":"haftalık","not":""}]
+            for _bi, _bs in enumerate(st.session_state["an_bolge_satirlar"]):
+                _bc = st.columns([1.5,0.8,0.5,0.5,0.6,0.8,1,0.3])
+                st.session_state["an_bolge_satirlar"][_bi]["il"] = _bc[0].selectbox("", ["--","İstanbul","Ankara","İzmir","Bursa","Manisa","Çorlu/Çerkezköy","Konya","Kocaeli","Adana","Tüm TR"], key=f"an_bil_{_bi}", label_visibility="collapsed")
+                st.session_state["an_bolge_satirlar"][_bi]["urun"] = _bc[1].selectbox("", ["koli","palet","parsiyel","TIR","karma"], key=f"an_burun_{_bi}", label_visibility="collapsed")
+                st.session_state["an_bolge_satirlar"][_bi]["min"] = _bc[2].text_input("", key=f"an_bmin_{_bi}", placeholder="min", label_visibility="collapsed")
+                st.session_state["an_bolge_satirlar"][_bi]["max"] = _bc[3].text_input("", key=f"an_bmax_{_bi}", placeholder="max", label_visibility="collapsed")
+                st.session_state["an_bolge_satirlar"][_bi]["adet"] = _bc[4].text_input("", key=f"an_badet_{_bi}", placeholder="adet", label_visibility="collapsed")
+                st.session_state["an_bolge_satirlar"][_bi]["siklik"] = _bc[5].selectbox("", ["günlük","hf. 2–3","haftalık","aylık","düzensiz"], key=f"an_bsik_{_bi}", label_visibility="collapsed")
+                st.session_state["an_bolge_satirlar"][_bi]["not"] = _bc[6].text_input("", key=f"an_bnot_{_bi}", placeholder="not / saat kısıtı", label_visibility="collapsed")
+                if _bc[7].button("×", key=f"an_bdel_{_bi}") and len(st.session_state["an_bolge_satirlar"]) > 1:
+                    st.session_state["an_bolge_satirlar"].pop(_bi); st.rerun()
+            if st.button("+ Bölge Ekle", key="an_bolge_ekle"):
+                st.session_state["an_bolge_satirlar"].append({"il":"","urun":"koli","min":"","max":"","adet":"","siklik":"haftalık","not":""}); st.rerun()
+
+            st.markdown("**AVM Teslimatları**")
+            if "an_avm_satirlar" not in st.session_state:
+                st.session_state["an_avm_satirlar"] = [{"avm":"","sehir":"","urun":"","saat":""}]
+            for _ai, _as in enumerate(st.session_state["an_avm_satirlar"]):
+                _ac = st.columns([2,1,1.5,1.5,0.3])
+                st.session_state["an_avm_satirlar"][_ai]["avm"] = _ac[0].text_input("", key=f"an_aavm_{_ai}", placeholder="AVM / mağaza adı", label_visibility="collapsed")
+                st.session_state["an_avm_satirlar"][_ai]["sehir"] = _ac[1].selectbox("", ["--","İstanbul","Ankara","İzmir","Bursa","Adana","Diğer"], key=f"an_asehir_{_ai}", label_visibility="collapsed")
+                st.session_state["an_avm_satirlar"][_ai]["urun"] = _ac[2].text_input("", key=f"an_aurun_{_ai}", placeholder="koli/palet — adet", label_visibility="collapsed")
+                st.session_state["an_avm_satirlar"][_ai]["saat"] = _ac[3].text_input("", key=f"an_asaat_{_ai}", placeholder="giriş saati kısıtı...", label_visibility="collapsed")
+                if _ac[4].button("×", key=f"an_adel_{_ai}") and len(st.session_state["an_avm_satirlar"]) > 1:
+                    st.session_state["an_avm_satirlar"].pop(_ai); st.rerun()
+            if st.button("+ AVM Ekle", key="an_avm_ekle"):
+                st.session_state["an_avm_satirlar"].append({"avm":"","sehir":"","urun":"","saat":""}); st.rerun()
+
+        # 5. BEKLENTİ & KARAR
+        with st.expander("💬 Beklenti, Öncelik & Karar", expanded=False):
+            _be1,_be2,_be3 = st.columns(3)
+            _an_beklenti = _be1.multiselect("En önemli beklenti", ["düşük fiyat","uzun vade","spot fiyat","özel anlaşma","hız/dakiklik","hizmet kalitesi","alım saati","bölge kapsamı","takip sistemi","sigorta","AVM girişi"], key="an_beklenti")
+            _an_fiyat_bek = _be2.text_input("Fiyat beklentisi", key="an_fiyat_bek", placeholder="₺/desi veya ₺/palet")
+            _an_ttur = _be3.multiselect("Teklif türü", ["spot","özel anlaşma","sözleşme","dönemsel"], key="an_ttur")
+            _bk1,_bk2,_bk3,_bk4 = st.columns(4)
+            _an_karar = _bk1.selectbox("Karar verici", ["yetkili kendisi","üst yönetim","komite","bilinmiyor"], key="an_karar")
+            _an_sure = _bk2.selectbox("Karar süresi", ["acil (bu hafta)","kısa (1 ay)","uzun (3+ ay)","belirsiz"], key="an_sure")
+            _an_rakip_once = _bk3.selectbox("Rakip önce mi verdi?", ["hayır biz ilkiz","evet","bilinmiyor"], key="an_rakip_once")
+            _an_ref = _bk4.selectbox("Referans verir mi?", ["evet","belki","hayır"], key="an_ref")
+            _an_engel = st.multiselect("Anlaşma engeli", ["fiyat","vade","rakip teklifi","karar verici","bölge eksikliği","güven","alışkanlık"], key="an_engel")
+            _an_ozel = st.text_input("Özel istek", key="an_ozel", placeholder="varsa yaz, boş da bırakabilirsin...")
+
+        # 6. LOJİSTİK ALTYAPI
+        with st.expander("🏭 Lojistik Altyapı & Operasyon", expanded=False):
+            _la1,_la2,_la3 = st.columns(3)
+            _an_arac = _la1.selectbox("Kendi aracı", ["hayır dışarıdan","evet kendi dağıtımı","karma"], key="an_arac")
+            _an_depo = _la2.text_input("Depo lokasyonu", key="an_depo", placeholder="isteğe bağlı")
+            _an_saha = _la3.multiselect("Saha ihtiyacı", ["araç (noktaya)","personel/kurye","depo hizmeti","istif/paketleme"], key="an_saha")
+            _an_ozel_kargo = st.multiselect("Özel kargo kullanımı", ["ambar kargo","dış nakliye","deniz yolu","hava kargo","bijimsiz","istifsizsiz"], key="an_ozel_kargo")
+
+        # 7. RAKİP & SORUN
+        with st.expander("⚔️ Rakip Analizi & Şikayetler", expanded=False):
+            st.markdown("**Rakip Firmalar**")
+            if "an_rakip_satirlar" not in st.session_state:
+                st.session_state["an_rakip_satirlar"] = [{"firma":"","fiyat":"","durum":"orta","sebep":""}]
+            for _ri, _rs in enumerate(st.session_state["an_rakip_satirlar"]):
+                _rc = st.columns([2,1,1,2,0.3])
+                st.session_state["an_rakip_satirlar"][_ri]["firma"] = _rc[0].text_input("", key=f"an_rfirma_{_ri}", placeholder="rakip firma", label_visibility="collapsed")
+                st.session_state["an_rakip_satirlar"][_ri]["fiyat"] = _rc[1].text_input("", key=f"an_rfiyat_{_ri}", placeholder="₺/desi", label_visibility="collapsed")
+                st.session_state["an_rakip_satirlar"][_ri]["durum"] = _rc[2].selectbox("", ["güçlü","orta","zayıf"], key=f"an_rdurum_{_ri}", label_visibility="collapsed")
+                st.session_state["an_rakip_satirlar"][_ri]["sebep"] = _rc[3].text_input("", key=f"an_rsebep_{_ri}", placeholder="tercih sebebi...", label_visibility="collapsed")
+                if _rc[4].button("×", key=f"an_rdel_{_ri}") and len(st.session_state["an_rakip_satirlar"]) > 1:
+                    st.session_state["an_rakip_satirlar"].pop(_ri); st.rerun()
+            if st.button("+ Rakip Ekle", key="an_rakip_ekle"):
+                st.session_state["an_rakip_satirlar"].append({"firma":"","fiyat":"","durum":"orta","sebep":""}); st.rerun()
+            _rs1,_rs2 = st.columns(2)
+            _an_sik = _rs1.multiselect("Şikayetleri", ["hasar","geç teslimat","fiyat yüksek","iletişim zayıf","takip yok","kayıp kargo","ambar bırakıyor","bijimsiz","araç gelmiyor","AVM girişi yok"], key="an_sik")
+            _an_gecis = _rs2.multiselect("Bize geçiş sebebi", ["fiyat avantajı","daha hızlı","kişisel ilişki","güven","takip sistemi","geniş bölge","erken alım","AVM çözümü"], key="an_gecis")
+
+        # 8. DEĞERLENDİRME & NOT
+        with st.expander("💡 Değerlendirme & Görüşme Notu", expanded=True):
+            _de1,_de2,_de3 = st.columns(3)
+            _an_potansiyel = _de1.select_slider("Potansiyel", options=["çok düşük","düşük","orta","yüksek","çok yüksek"], value="orta", key="an_pot")
+            _an_sonuc = _de2.selectbox("Görüşme sonucu", ["takip edilecek","teklif verildi","beklemede","ilgisiz","randevu verildi","anlaşma yapıldı"], key="an_sonuc")
+            _an_takip = _de3.date_input("Takip tarihi", key="an_takip_tar")
+            _an_sonraki = st.text_input("Bir sonraki adım", key="an_sonraki", placeholder="isteğe bağlı...")
+            _an_not = st.text_area("Görüşme notu", key="an_not", placeholder="devrik de yaz, kısa da... sınır yok. örn: aras sorun yaşıyor, 500 koli ist bursa, erken alım lazım...", height=100)
+
+        st.divider()
+
+        # KAYDET & AKSİYON BUTONLARI
+        _btn1,_btn2,_btn3,_btn4,_btn5 = st.columns(5)
+        _kaydet_btn = _btn1.button("💾 Analizi Kaydet", type="primary", use_container_width=True, key="an_kaydet")
+        _cari_btn = _btn2.button("+ Cari Listeye", use_container_width=True, key="an_cari")
+        _teklif_btn = _btn3.button("📄 Teklif Oluştur", use_container_width=True, key="an_teklif")
+
+        _an_tel = _an_iletisim.strip()
+        if _an_tel and not _an_tel.startswith('http'):
+            _wa_tel = _an_tel.replace(' ','').replace('-','').replace('+','').replace('(','').replace(')','')
+            if _wa_tel.startswith('0'): _wa_tel = '90' + _wa_tel[1:]
+            _btn4.markdown(f"<a href='https://wa.me/{_wa_tel}?text=Merhaba%20{_an_firma},%20görüşmemiz%20için%20teşekkürler.' target='_blank'><button style='width:100%;padding:8px;font-size:12px;border:1px solid #25d366;background:#25d366;color:white;border-radius:6px;cursor:pointer;'>💬 WhatsApp</button></a>", unsafe_allow_html=True)
+        if _an_iletisim and '@' in _an_iletisim:
+            _btn5.markdown(f"<a href='mailto:{_an_iletisim}?subject=Teklif — {_an_firma}'><button style='width:100%;padding:8px;font-size:12px;border:1px solid #f59e0b;background:#fffbeb;color:#b45309;border-radius:6px;cursor:pointer;'>✉️ E-posta</button></a>", unsafe_allow_html=True)
+
+        if _kaydet_btn:
+            _veri = {
+                "firma": _an_firma or "Bilinmiyor",
+                "yetkili": _an_yetkili,
+                "iletisim": _an_iletisim,
+                "sektor": _an_sektor,
+                "amac": ", ".join(_an_amac),
+                "mdurum": _an_mdurum,
+                "bek_ciro": float(_an_bek_ciro.replace('.','').replace(',','.') or 0),
+                "ger_ciro": float(_an_ger_ciro.replace('.','').replace(',','.') or 0),
+                "kaynak": ", ".join(_an_kaynak),
+                "kargo": ", ".join(_an_kargo),
+                "fatura": _an_fatura,
+                "uapo": _an_uapo,
+                "odeme": ", ".join(_an_odeme),
+                "pazarlik": _an_pazarlik,
+                "beklenti": ", ".join(_an_beklenti),
+                "teklif_tur": ", ".join(_an_ttur),
+                "karar": _an_karar,
+                "sure": _an_sure,
+                "engel": ", ".join(_an_engel),
+                "sik": ", ".join(_an_sik),
+                "gecis": ", ".join(_an_gecis),
+                "potansiyel": _an_potansiyel,
+                "sonuc": _an_sonuc,
+                "not_alan": _an_not,
+                "takip_tar": str(_an_takip),
+                "sonraki_adim": _an_sonraki,
+                "bolge": _aj.dumps(st.session_state.get("an_bolge_satirlar",[]), ensure_ascii=False),
+                "avm": _aj.dumps(st.session_state.get("an_avm_satirlar",[]), ensure_ascii=False),
+                "fiyat_tablo": _aj.dumps(st.session_state.get("an_fiyat_satirlar",[]), ensure_ascii=False),
+                "olusturan": st.session_state.get("kullanici",""),
+            }
+            if _analiz_kaydet(_veri):
+                st.success(f"✅ {_an_firma or 'Bilinmiyor'} analizi kaydedildi!")
+                try: db_read.clear()
+                except: pass
+            st.rerun()
+
+        if _cari_btn and _an_firma:
+            db_insert("cari_kartlar", {
+                "firma": _an_firma, "yetkili": _an_yetkili,
+                "gsm": _an_iletisim if not '@' in _an_iletisim else "",
+                "email": _an_iletisim if '@' in _an_iletisim else "",
+                "il": "", "durum": "Hedef",
+                "islem_asamasi": "İlk Temas",
+                "beklenen_ciro": float(_an_bek_ciro.replace('.','').replace(',','.') or 0),
+                "olusturan": st.session_state.get("kullanici",""), "silindi": 0
+            })
+            try: db_read.clear()
+            except: pass
+            st.success(f"✅ {_an_firma} cari listeye eklendi!")
+
+        if _teklif_btn:
+            st.session_state["aktif_tab"] = "teklif"
+            st.session_state["teklif_musteri"] = f"[analiz] {_an_firma}"
+            st.rerun()
+
+    with _at2:
+        st.markdown("#### 📋 Geçmiş Analizler")
+        _df_analiz = _analiz_getir(limit=100)
+        if _df_analiz.empty:
+            st.info("Henüz analiz kaydedilmedi.")
+        else:
+            # Filtre
+            _fa1,_fa2,_fa3 = st.columns(3)
+            _filtre_firma = _fa1.text_input("Firma ara", key="an_filtre_firma", placeholder="firma adı...")
+            _filtre_sonuc = _fa2.selectbox("Sonuç", ["Tümü","takip edilecek","teklif verildi","anlaşma yapıldı","beklemede","ilgisiz"], key="an_filtre_sonuc")
+            _filtre_pot = _fa3.selectbox("Potansiyel", ["Tümü","çok yüksek","yüksek","orta","düşük","çok düşük"], key="an_filtre_pot")
+
+            _df_f = _df_analiz.copy()
+            if _filtre_firma: _df_f = _df_f[_df_f["firma"].str.contains(_filtre_firma, case=False, na=False)]
+            if _filtre_sonuc != "Tümü": _df_f = _df_f[_df_f["sonuc"]==_filtre_sonuc]
+            if _filtre_pot != "Tümü": _df_f = _df_f[_df_f["potansiyel"]==_filtre_pot]
+
+            for _, _ar in _df_f.iterrows():
+                _pot_renk = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(_ar.get("potansiyel",""),"-")
+                with st.expander(f"{_pot_renk} {_ar.get('firma','?')} — {_ar.get('tarih','')[:10]} — {_ar.get('sonuc','')}"):
+                    _ac1,_ac2,_ac3 = st.columns(3)
+                    _ac1.metric("Potansiyel", _ar.get("potansiyel","—"))
+                    _ac2.metric("Beklenen Ciro", f"{float(_ar.get('bek_ciro',0) or 0):,.0f} ₺")
+                    _ac3.metric("Sonuç", _ar.get("sonuc","—"))
+                    st.markdown(f"""
+**Firma:** {_ar.get('firma','—')} · **Yetkili:** {_ar.get('yetkili','—')} · **Sektör:** {_ar.get('sektor','—')}
+**Kargo:** {_ar.get('kargo','—')} · **Fatura:** {_ar.get('fatura','—')} · **UA/PO:** {_ar.get('uapo','—')}
+**Beklenti:** {_ar.get('beklenti','—')} · **Engel:** {_ar.get('engel','—')}
+**Not:** {_ar.get('not_alan','—')}
+**Sonraki adım:** {_ar.get('sonraki_adim','—')} · **Takip:** {_ar.get('takip_tar','—')}
+""")
+                    _wb1,_wb2,_wb3 = st.columns(3)
+                    _tel = str(_ar.get('iletisim','') or '')
+                    if _tel and '@' not in _tel:
+                        _watel = _tel.replace(' ','').replace('-','')
+                        if _watel.startswith('0'): _watel='90'+_watel[1:]
+                        _wb1.markdown(f"<a href='https://wa.me/{_watel}' target='_blank'><button style='padding:5px 12px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;width:100%;'>💬 WhatsApp</button></a>", unsafe_allow_html=True)
+                    if _tel and '@' in _tel:
+                        _wb2.markdown(f"<a href='mailto:{_tel}'><button style='padding:5px 12px;font-size:11px;background:#fef3c7;color:#b45309;border:1px solid #f59e0b;border-radius:5px;cursor:pointer;width:100%;'>✉️ E-posta</button></a>", unsafe_allow_html=True)
+                    if _wb3.button("📄 Teklif Oluştur", key=f"an_tek_{_ar.get('id',0)}", use_container_width=True):
+                        st.session_state["aktif_tab"] = "teklif"
+                        st.rerun()
+
+    with _at3:
+        st.markdown("#### 📊 Analiz İstatistikleri")
+        _df_stat = _analiz_getir(limit=1000)
+        if _df_stat.empty:
+            st.info("Henüz analiz yok.")
+        else:
+            _s1,_s2,_s3,_s4 = st.columns(4)
+            _s1.metric("Toplam Analiz", len(_df_stat))
+            _s2.metric("Yüksek Potansiyel", len(_df_stat[_df_stat["potansiyel"].isin(["yüksek","çok yüksek"])]))
+            _s3.metric("Takip Bekleyen", len(_df_stat[_df_stat["sonuc"]=="takip edilecek"]))
+            _s4.metric("Anlaşma Yapılan", len(_df_stat[_df_stat["sonuc"]=="anlaşma yapıldı"]))
+
+            if "potansiyel" in _df_stat.columns:
+                _pot_say = _df_stat["potansiyel"].value_counts()
+                st.bar_chart(_pot_say)
+
+            if "sektor" in _df_stat.columns:
+                _sek_say = _df_stat["sektor"].value_counts().head(10)
+                st.markdown("**Sektör Dağılımı**")
+                st.bar_chart(_sek_say)
+
 
 elif aktif == "whatsapp":
     import requests as _wa_req
