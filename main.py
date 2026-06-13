@@ -664,14 +664,16 @@ def cikis():
 st.set_page_config(page_title="MWCRMPRO", layout="wide")
 
 # ── EKRAN AYARLARI UYGULA ────────────────────────────────────────────────────
-_e_r1 = st.session_state.get("_ekran_r1","")
-_e_r2 = st.session_state.get("_ekran_r2","")
-_e_bosluk = st.session_state.get("_ekran_bosluk","1rem")
+_e_r1      = st.session_state.get("_ekran_r1","")
+_e_r2      = st.session_state.get("_ekran_r2","")
 _e_tema_bg = st.session_state.get("_ekran_tema","")
-if _e_r1 or _e_bosluk != "1rem" or _e_tema_bg:
-    _takim_css = ""
-    if _e_r1 and _e_r2:
-        _takim_css = f"""
+_e_ust     = st.session_state.get("_ust_px", 32)
+_e_alt     = st.session_state.get("_alt_px", 32)
+_e_yan     = st.session_state.get("_yan_px", 16)
+
+_takim_css = ""
+if _e_r1 and _e_r2:
+    _takim_css = f"""
 section[data-testid="stSidebar"] {{ background: {_e_r2} !important; }}
 section[data-testid="stSidebar"] .stButton>button {{ border-color: {_e_r1} !important; color: {_e_r2} !important; background: {_e_r2} !important; }}
 section[data-testid="stSidebar"] .stButton>button p {{ color: {_e_r1} !important; }}
@@ -679,14 +681,15 @@ section[data-testid="stSidebar"] .stButton>button[kind="primary"] {{ background:
 section[data-testid="stSidebar"] .stButton>button[kind="primary"] p {{ color: {_e_r2} !important; }}
 section[data-testid="stSidebar"] div[style*="font-size:15px"], section[data-testid="stSidebar"] div[style*="font-size:14px"] {{ color: {_e_r1} !important; }}
 """
-    _bg_css = f"body, .main {{ background-color: {_e_tema_bg} !important; }}" if _e_tema_bg and not _e_r1 else ""
-    st.markdown(f"""
+_bg_css = f"body, .main {{ background-color: {_e_tema_bg} !important; }}" if _e_tema_bg and not _e_r1 else ""
+
+st.markdown(f"""
 <style>
 .main .block-container {{
-    padding-top: {st.session_state.get("_ekran_bosluk","32px")} !important;
-    padding-bottom: {st.session_state.get("_ekran_altbosluk","32px")} !important;
-    padding-left: {st.session_state.get("_ekran_yanbosluk","16px")} !important;
-    padding-right: {st.session_state.get("_ekran_yanbosluk","16px")} !important;
+    padding-top: {_e_ust}px !important;
+    padding-bottom: {_e_alt}px !important;
+    padding-left: {_e_yan}px !important;
+    padding-right: {_e_yan}px !important;
 }}
 {_bg_css}
 {_takim_css}
@@ -2184,7 +2187,12 @@ elif aktif == "kullanici":
         # ── EKRAN ANALİZİ + BOŞLUK AYARI ────────────────────────────────────
         st.markdown("#### 🖥️ Ekran Analizi & Boşluk Ayarı")
 
-        # Mevcut px değerlerini session'dan al
+        # Mevcut px değerlerini session veya Supabase'den al
+        if "_ust_px" not in st.session_state:
+            _kayitli_b = _mevcut.get("ust_px", 32)
+            st.session_state["_ust_px"] = int(_kayitli_b)
+            st.session_state["_alt_px"] = int(_mevcut.get("alt_px", 32))
+            st.session_state["_yan_px"] = int(_mevcut.get("yan_px", 16))
         _ust_px  = st.session_state.get("_ust_px", 32)
         _alt_px  = st.session_state.get("_alt_px", 32)
         _yan_px  = st.session_state.get("_yan_px", 16)
