@@ -2513,21 +2513,23 @@ elif aktif == "teklif":
 
     st.markdown("## 📄 Spot Teklif")
 
-    # ── MÜŞTERİ SEÇİMİ ───────────────────────────────────────────────────────
+    # ── TEK SATIR: FİLTRE + MÜŞTERİ + BİLGİLER ──────────────────────────────
     _df_cari_tek = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
 
     if st.session_state.get("tek_mus_reset"):
         st.session_state.pop("tek_mus_reset", None)
         st.session_state.pop("teklif_musteri", None)
         st.session_state.pop("hedef_mus", None)
-    _tf1, _tf2, _tf3 = st.columns([2,5,1])
-    _t_fil = _tf1.selectbox("Filtre:", ["Tümü","Aktif","Hedef","Pasif"], key="teklif_fil")
+
     _df_m  = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
+
+    _tr = st.columns([1, 2.5, 0.3, 1.5, 1, 1, 1])
+    _t_fil = _tr[0].selectbox("", ["Tümü","Aktif","Hedef","Pasif"], key="teklif_fil", label_visibility="collapsed")
     _df_mf = _df_m if _t_fil == "Tümü" else _df_m[_df_m["durum"] == _t_fil]
     _m_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['firma']} ({r['durum']})" for _,r in _df_mf.iterrows()]
-    _secim  = _tf2.selectbox("Müşteri:", _m_opts, key="teklif_musteri")
+    _secim  = _tr[1].selectbox("", _m_opts, key="teklif_musteri", label_visibility="collapsed")
     if _secim != "-- Müşteri Seçin --":
-        if _tf3.button("❌", key="tek_mus_temizle", use_container_width=True, help="Temizle"):
+        if _tr[2].button("❌", key="tek_mus_temizle", use_container_width=True, help="Temizle"):
             st.session_state["tek_mus_reset"] = True
             st.rerun()
 
@@ -2541,22 +2543,17 @@ elif aktif == "teklif":
                 secili_musteri = _mrow.iloc[0]
                 gsm_kayitli   = str(secili_musteri.get("gsm","") or "")
                 email_kayitli = str(secili_musteri.get("email","") or "")
-                _mi1,_mi2,_mi3 = st.columns(3)
-                _mi1.info(f"GSM: {gsm_kayitli or 'Yok'}")
-                _mi2.info(f"Email: {email_kayitli or 'Yok'}")
-                _mi3.info(f"{secili_musteri.get('il','')} | {secili_musteri.get('durum','')}")
         except Exception as _e: st.error(f"Seçim hatası: {_e}")
 
-    # ── TEKLİF BİLGİLERİ — tek satır ─────────────────────────────────────────
-    _tb1,_tb2,_tb3,_tb4 = st.columns(4)
     _firma_def = str(secili_musteri["firma"]) if secili_musteri is not None else ""
     if "hedef_mus" not in st.session_state or st.session_state.get("son_secili_id") != _secim:
         st.session_state["hedef_mus"] = _firma_def
         st.session_state["son_secili_id"] = _secim
-    hedef_musteri = _tb1.text_input("Müşteri Adı", key="hedef_mus")
-    vade          = _tb2.text_input("Vade", placeholder="30 gün, peşin...", key="vade")
-    gsm_manuel    = _tb3.text_input("WhatsApp No", value=gsm_kayitli, placeholder="05xxxxxxxxx", key="gsm_manuel")
-    email_manuel  = _tb4.text_input("Email", value=email_kayitli, placeholder="ornek@firma.com", key="email_manuel")
+
+    hedef_musteri = _tr[3].text_input("", key="hedef_mus", placeholder="Müşteri Adı", label_visibility="collapsed")
+    vade          = _tr[4].text_input("", placeholder="Vade...", key="vade", label_visibility="collapsed")
+    gsm_manuel    = _tr[5].text_input("", value=gsm_kayitli, placeholder="05xxxxxxxxx", key="gsm_manuel", label_visibility="collapsed")
+    email_manuel  = _tr[6].text_input("", value=email_kayitli, placeholder="Email", key="email_manuel", label_visibility="collapsed")
 
     # WA numara işle
     gsm_temiz = re.sub(r"[\s\-\(\)+]","", gsm_manuel)
