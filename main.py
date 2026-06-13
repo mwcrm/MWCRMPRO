@@ -863,31 +863,43 @@ if st.session_state.get("rol") != "admin":
 
 
 with st.sidebar:
-    # Sidebar CSS — sıkışık, sola dayalı
     st.markdown("""
 <style>
 section[data-testid="stSidebar"] .stButton>button {
     text-align: left !important;
     justify-content: flex-start !important;
-    padding: 6px 8px !important;
+    padding: 5px 6px !important;
     font-size: 12px !important;
-    border-radius: 5px !important;
-    margin-bottom: 1px !important;
+    border-radius: 4px !important;
+    margin-bottom: 0px !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: #0369a1 !important;
+    font-weight: 400 !important;
+}
+section[data-testid="stSidebar"] .stButton>button:hover {
+    background: #f0f4ff !important;
 }
 section[data-testid="stSidebar"] .stButton>button p {
     text-align: left !important;
-}
-section[data-testid="stSidebar"] .block-container {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0.5rem !important;
+    color: inherit !important;
 }
 section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {
     gap: 0px !important;
 }
+section[data-testid="stSidebar"] .stButton>button[kind="primary"] {
+    background: #dbeafe !important;
+    color: #1d4ed8 !important;
+    font-weight: 600 !important;
+}
+section[data-testid="stSidebar"] .stButton>button[kind="primary"] p {
+    color: #1d4ed8 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
-    st.markdown("<div style='font-size:12px;font-weight:500;color:gray;padding:2px 4px 6px;'>🏢 MWCRMPRO</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size:14px;font-weight:700;color:#1f6feb;padding:4px 4px 6px;'>🏢 MWCRMPRO</div>", unsafe_allow_html=True)
     st.divider()
 
     # ── MENÜ LİSTESİ ──────────────────────────────────────────────────────────
@@ -917,9 +929,34 @@ section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {
             _sb_liste_temiz.append(_t)
     _sb_liste = _sb_liste_temiz
 
+    _TAB_RENKLER = {
+        "yeni":        "#16a34a",
+        "liste":       "#0369a1",
+        "randevu":     "#1d4ed8",
+        "teklif":      "#b45309",
+        "ozel_teklif": "#7c3aed",
+        "kisiler":     "#0f766e",
+        "rapor":       "#6d28d9",
+        "excel":       "#047857",
+        "arsiv":       "#475569",
+        "kullanici":   "#be123c",
+        "admin_rapor": "#0c4a6e",
+        "mesajlar":    "#0891b2",
+    }
     for _tab_key in _sb_liste:
         _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
         _aktif_mi = st.session_state["aktif_tab"] == _tab_key
+        _renk = _TAB_RENKLER.get(_tab_key, "#374151")
+        if _aktif_mi:
+            st.markdown(
+                f"<style>div[data-testid='stSidebar'] button[kind='primary'] p {{ color: #1d4ed8 !important; }}</style>",
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                f"<style>div[data-testid='stSidebar'] button[data-testid='baseButton-secondary']:last-of-type p {{ color: {_renk} !important; }}</style>",
+                unsafe_allow_html=True
+            )
         if st.button(_etiket, use_container_width=True,
                      type="primary" if _aktif_mi else "secondary",
                      key=f"sb_{_tab_key}"):
