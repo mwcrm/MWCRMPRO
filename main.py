@@ -685,7 +685,12 @@ _bg_css = f"body, .main {{ background-color: {_e_tema_bg} !important; }}" if _e_
 
 st.markdown(f"""
 <style>
-.main .block-container {{
+/* Tüm olası selector'lar */
+.main .block-container,
+div[data-testid="stAppViewContainer"] > section > div,
+div[data-testid="stAppViewContainer"] > .main > div,
+section.main > div.block-container,
+.block-container {{
     padding-top: {_e_ust}px !important;
     padding-bottom: {_e_alt}px !important;
     padding-left: {_e_yan}px !important;
@@ -694,6 +699,26 @@ st.markdown(f"""
 {_bg_css}
 {_takim_css}
 </style>
+<script>
+(function applyPadding() {{
+    function apply() {{
+        var bc = document.querySelector('.block-container') ||
+                 document.querySelector('[data-testid="stAppViewBlockContainer"]') ||
+                 document.querySelector('section.main > div');
+        if (bc) {{
+            bc.style.setProperty('padding-top', '{_e_ust}px', 'important');
+            bc.style.setProperty('padding-bottom', '{_e_alt}px', 'important');
+            bc.style.setProperty('padding-left', '{_e_yan}px', 'important');
+            bc.style.setProperty('padding-right', '{_e_yan}px', 'important');
+        }}
+    }}
+    apply();
+    setTimeout(apply, 500);
+    setTimeout(apply, 1500);
+    var obs = new MutationObserver(apply);
+    obs.observe(document.body, {{childList:true, subtree:true}});
+}})();
+</script>
 """, unsafe_allow_html=True)
 
 st.markdown("""
