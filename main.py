@@ -865,41 +865,42 @@ if st.session_state.get("rol") != "admin":
 with st.sidebar:
     st.markdown("""
 <style>
+section[data-testid="stSidebar"] { padding-top: 0.5rem !important; }
 section[data-testid="stSidebar"] .stButton>button {
     text-align: left !important;
     justify-content: flex-start !important;
-    padding: 5px 6px !important;
+    padding: 5px 8px !important;
     font-size: 12px !important;
     border-radius: 4px !important;
-    margin-bottom: 0px !important;
+    margin: 0 !important;
     border: none !important;
     background: transparent !important;
     box-shadow: none !important;
-    color: #0369a1 !important;
-    font-weight: 400 !important;
-}
-section[data-testid="stSidebar"] .stButton>button:hover {
-    background: #f0f4ff !important;
+    width: 100% !important;
 }
 section[data-testid="stSidebar"] .stButton>button p {
     text-align: left !important;
     color: inherit !important;
+    font-size: 12px !important;
 }
-section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] {
-    gap: 0px !important;
+section[data-testid="stSidebar"] .stButton>button:hover {
+    background: #f0f4ff !important;
 }
 section[data-testid="stSidebar"] .stButton>button[kind="primary"] {
     background: #dbeafe !important;
-    color: #1d4ed8 !important;
-    font-weight: 600 !important;
 }
 section[data-testid="stSidebar"] .stButton>button[kind="primary"] p {
     color: #1d4ed8 !important;
+    font-weight: 600 !important;
 }
+section[data-testid="stSidebar"] .stButton { margin: 0 !important; padding: 0 !important; }
+section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] > div { gap: 1px !important; }
+section[data-testid="stSidebar"] hr { margin: 6px 0 !important; }
+section[data-testid="stSidebar"] div[data-testid="stExpander"] { border: none !important; box-shadow: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
-    st.markdown("<div style='font-size:14px;font-weight:700;color:#1f6feb;padding:4px 4px 6px;'>🏢 MWCRMPRO</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-size:14px;font-weight:700;color:#1f6feb;padding:2px 4px 4px;'>🏢 MWCRMPRO</div>", unsafe_allow_html=True)
     st.divider()
 
     # ── MENÜ LİSTESİ ──────────────────────────────────────────────────────────
@@ -943,20 +944,13 @@ section[data-testid="stSidebar"] .stButton>button[kind="primary"] p {
         "admin_rapor": "#0c4a6e",
         "mesajlar":    "#0891b2",
     }
+
     for _tab_key in _sb_liste:
         _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
         _aktif_mi = st.session_state["aktif_tab"] == _tab_key
         _renk = _TAB_RENKLER.get(_tab_key, "#374151")
-        if _aktif_mi:
-            st.markdown(
-                f"<style>div[data-testid='stSidebar'] button[kind='primary'] p {{ color: #1d4ed8 !important; }}</style>",
-                unsafe_allow_html=True
-            )
-        else:
-            st.markdown(
-                f"<style>div[data-testid='stSidebar'] button[data-testid='baseButton-secondary']:last-of-type p {{ color: {_renk} !important; }}</style>",
-                unsafe_allow_html=True
-            )
+        if not _aktif_mi:
+            st.markdown(f"<style>section[data-testid='stSidebar'] div[data-testid='stVerticalBlock'] > div:last-child .stButton>button p {{ color: {_renk} !important; }}</style>", unsafe_allow_html=True)
         if st.button(_etiket, use_container_width=True,
                      type="primary" if _aktif_mi else "secondary",
                      key=f"sb_{_tab_key}"):
@@ -973,24 +967,9 @@ section[data-testid="stSidebar"] .stButton>button[kind="primary"] p {
             if talep.strip():
                 st.markdown(f"[👉 Gönder](https://wa.me/905400344228?text={talep.replace(' ','%20')})")
 
-    st.divider()
-
-    # ── KULLANICI + ÇIKIŞ TEK SATIR ───────────────────────────────────────────
-    _kul_col1, _kul_col2 = st.columns([3, 1])
-    _kul_col1.markdown(
-        f"<div style='padding:2px 4px;line-height:1.4;'>"
-        f"<span style='font-size:12px;font-weight:500;'>👤 {st.session_state.get('kullanici','')}</span>"
-        f" <span style='font-size:11px;color:gray;'>· {st.session_state.get('rol','')}</span>"
-        f"</div>",
-        unsafe_allow_html=True
-    )
-    if _kul_col2.button("🚪", key="sidebar_cikis", use_container_width=True, help="Çıkış"):
-        cikis()
-
     if st.session_state.get("rol") == "admin":
         with st.expander("🎛️ Menü Sırası"):
             mevcut_sira_m = get_menu_tercihi(st.session_state["kullanici"])
-            # Duplicate temizle
             _goster = []
             for _t in mevcut_sira_m:
                 if _t not in _goster:
@@ -1034,7 +1013,6 @@ section[data-testid="stSidebar"] .stButton>button[kind="primary"] p {
                             "olusturan":st.session_state["kullanici"],"aktif":1})
                         st.success("✅ Yayınlandı!")
                     st.rerun()
-            # Mevcut duyuruları göster
             try:
                 _sb_dy = get_sb_client()
                 if _sb_dy:
@@ -1043,22 +1021,33 @@ section[data-testid="stSidebar"] .stButton>button[kind="primary"] p {
                 else:
                     _df_dy = db_read("duyurular", extra_sql="WHERE aktif=1 ORDER BY tarih DESC")
                 if not _df_dy.empty:
-                    st.markdown("**Aktif Duyurular:**")
                     for _, _dy in _df_dy.iterrows():
                         _tip = _dy.get("tip","bilgi")
-                        _renk = "#1f6feb" if _tip=="bilgi" else "#ff9800" if _tip=="uyari" else "#f44336"
+                        _renk_d = "#1f6feb" if _tip=="bilgi" else "#ff9800" if _tip=="uyari" else "#f44336"
                         st.markdown(
-                            f"<div style='border-left:4px solid {_renk};padding:6px 10px;margin:4px 0;background:#f8f9fa;border-radius:4px'>"
-                            f"<b>{_dy.get('baslik','')}</b> <small style='color:#888'>— {_tip}</small><br>"
-                            f"{_dy.get('icerik','')}</div>",
+                            f"<div style='border-left:3px solid {_renk_d};padding:4px 8px;margin:2px 0;font-size:11px;'>"
+                            f"<b>{_dy.get('baslik','')}</b><br>{_dy.get('icerik','')}</div>",
                             unsafe_allow_html=True
                         )
-                        if st.button("🗑️ Kaldır", key=f"dy_sil_{_dy.get('id',0)}"):
+                        if st.button("🗑️", key=f"dy_sil_{_dy.get('id',0)}"):
                             if _sb_dy:
                                 _sb_dy.table("duyurular").update({"aktif":0}).eq("id",int(_dy.get("id",0))).execute()
                             st.rerun()
             except: pass
 
+    st.divider()
+
+    # ── KULLANICI + ÇIKIŞ ─────────────────────────────────────────────────────
+    _kc1, _kc2 = st.columns([3, 1])
+    _kc1.markdown(
+        f"<div style='padding:2px 4px;line-height:1.5;'>"
+        f"<span style='font-size:12px;font-weight:500;'>👤 {st.session_state.get('kullanici','')}</span>"
+        f" <span style='font-size:11px;color:#64748b;'>· {st.session_state.get('rol','')}</span>"
+        f"</div>",
+        unsafe_allow_html=True
+    )
+    if _kc2.button("🚪", key="sidebar_cikis", use_container_width=True, help="Çıkış"):
+        cikis()
 # ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
 st.divider()
 aktif = st.session_state["aktif_tab"]
