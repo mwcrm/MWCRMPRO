@@ -4805,48 +4805,63 @@ elif aktif == "randevu":
                         }
             except: _ciro_map = {}
 
-            # ── SATIR SATIR LİSTE + ✏️ DÜZENLE ───────────────────────────────
-            # Başlık — rapor kolonlarıyla aynı genişlik
-            st.markdown("""<div style='background:#1f6feb22;border-radius:6px;padding:4px 0;margin-bottom:2px'>""", unsafe_allow_html=True)
-            _hcols = st.columns(_CW)
-            for _ht, _hc in zip(["ID","📅 Tarih","🏢 Müşteri","📍 Bölge","📋 Görev","🎯 Sonuç","💰 Hedef","✅ Gerçek","📊 Fark",""],_hcols):
-                _hc.markdown(f"<span style='font-size:0.8rem;font-weight:700;color:#1f6feb'>{_ht}</span>", unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
+            # ── SATIR SATIR LİSTE — B stili ──────────────────────────────────
+            # Başlık
+            _hCW = [0.3, 0.6, 3, 0.8, 1, 1, 1, 0.3]
+            _hcols = st.columns(_hCW)
+            for _ht, _hc in zip(["#","Tarih","Müşteri / Bölge","Görev","Sonuç","Hedef","Fark",""],_hcols):
+                _hc.markdown(f"<span style='font-size:11px;font-weight:700;color:#1f6feb'>{_ht}</span>", unsafe_allow_html=True)
 
-            for _, row in df_rand.iterrows():
+            for _ri, (_, row) in enumerate(df_rand.iterrows()):
                 _rid = int(row.get("id",0) or 0)
-                _rc = st.columns(_CW)
                 _tarih_r = str(row.get("randevu_tarihi",""))
                 try:
                     _gun_fark = (pd.to_datetime(_tarih_r).date() - datetime.now().date()).days
-                    if _gun_fark == 0:             _renk = "🔴"
-                    elif 0 < _gun_fark <= 5:       _renk = "🟡"
-                    elif _gun_fark > 5:             _renk = "🟢"
-                    else:                           _renk = "⚫"
-                except: _renk = ""
+                    if _gun_fark == 0:        _renk = "🔴"
+                    elif 0 < _gun_fark <= 5:  _renk = "🟡"
+                    elif _gun_fark > 5:       _renk = "🟢"
+                    else:                     _renk = "⚫"
+                except: _renk = "⚫"
 
-                # Ciro bilgileri
                 _musteri_adi = str(row.get("musteri_adi","") or "")
+                _bolge = str(row.get("bolge","") or "")
+                _gorev = str(row.get("gorev","") or "")
+                _sonuc_r = str(row.get("sonuc","") or "")
                 _ciro = _ciro_map.get(_musteri_adi, {"hedef":0,"gercek":0})
                 _hedef_c = _ciro["hedef"]
                 _gercek_c = _ciro["gercek"]
                 _fark_c = _gercek_c - _hedef_c
-                _fark_renk = "🟢" if _fark_c >= 0 else "🔴"
 
-                _rc[0].markdown(f"**{_rid}**")
-                _rc[1].markdown(f"{_renk} {_tarih_r[5:].replace('-','.')}")
-                _rc[2].markdown(f"**{_musteri_adi}**")
-                _rc[3].markdown(str(row.get("bolge","") or ""))
-                _rc[4].markdown(str(row.get("gorev","") or ""))
-                _sonuc_r = str(row.get("sonuc","") or "")
-                _sonuc_renk = "✅" if _sonuc_r=="Bitti" else ("🔄" if _sonuc_r=="Devam Ediyor" else ("❌" if _sonuc_r=="Gidilmedi" else ""))
-                _rc[5].markdown(f"{_sonuc_renk} {_sonuc_r}")
-                _rc[6].markdown(fmt_para(_hedef_c) if _hedef_c else "—")
-                _rc[7].markdown(fmt_para(_gercek_c) if _gercek_c else "—")
-                _rc[8].markdown(f"{_fark_renk} {fmt_para(abs(_fark_c))}" if _hedef_c or _gercek_c else "—")
+                # Sonuç badge rengi
+                if _sonuc_r == "Bitti":         _s_bg="#dcfce7"; _s_col="#16a34a"; _s_ic="✅"
+                elif _sonuc_r == "Devam Ediyor":_s_bg="#fef9c3"; _s_col="#b45309"; _s_ic="🔄"
+                elif _sonuc_r == "Gidilmedi":   _s_bg="#fee2e2"; _s_col="#dc2626"; _s_ic="❌"
+                elif _sonuc_r == "İptal":       _s_bg="#f1f5f9"; _s_col="#64748b"; _s_ic="🚫"
+                else:                           _s_bg="#f1f5f9"; _s_col="#64748b"; _s_ic="—"
 
-                # ✏️ kalem — tıklanınca o satır açılır
-                if _rc[9].button("✏️", key=f"rand_duz_btn_{_rid}"):
+                _zebra = "background:var(--color-background-secondary);" if _ri%2==0 else ""
+                _rc = st.columns(_hCW)
+                _rc[0].markdown(f"<span style='font-size:11px;color:gray;'>{_rid}</span>", unsafe_allow_html=True)
+                _rc[1].markdown(f"<span style='font-size:11px;color:gray;white-space:nowrap;'>{_renk} {_tarih_r[5:].replace('-','.')}</span>", unsafe_allow_html=True)
+                _rc[2].markdown(
+                    f"<div style='font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'>{_musteri_adi}</div>"
+                    f"<div style='font-size:10px;color:gray;'>{_bolge}</div>",
+                    unsafe_allow_html=True
+                )
+                _rc[3].markdown(f"<span style='font-size:11px;'>{_gorev}</span>", unsafe_allow_html=True)
+                _rc[4].markdown(
+                    f"<span style='background:{_s_bg};color:{_s_col};padding:2px 7px;border-radius:10px;font-size:10px;white-space:nowrap;'>{_s_ic} {_sonuc_r}</span>",
+                    unsafe_allow_html=True
+                )
+                _rc[5].markdown(f"<span style='font-size:11px;white-space:nowrap;'>{fmt_para(_hedef_c) if _hedef_c else '—'}</span>", unsafe_allow_html=True)
+                _fark_col = "#dc2626" if _fark_c < 0 else "#16a34a"
+                _fark_ic = "▼" if _fark_c < 0 else "▲"
+                _rc[6].markdown(
+                    f"<span style='color:{_fark_col};font-size:11px;white-space:nowrap;'>{_fark_ic if (_hedef_c or _gercek_c) else ''} {fmt_para(abs(_fark_c)) if (_hedef_c or _gercek_c) else '—'}</span>",
+                    unsafe_allow_html=True
+                )
+
+                if _rc[7].button("✏️", key=f"rand_duz_btn_{_rid}"):
                     if st.session_state.get("rand_duz_row",{}).get("id") == _rid:
                         st.session_state.pop("rand_duz_row", None)
                     else:
