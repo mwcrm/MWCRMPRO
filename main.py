@@ -903,21 +903,6 @@ section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] { gap: 4px !
 section[data-testid="stSidebar"] hr { margin: 8px 0 !important; }
 section[data-testid="stSidebar"] div[data-testid="stExpander"] { margin: 0 !important; }
 section[data-testid="stSidebar"] div[data-testid="stExpander"] > div { padding: 0 !important; }
-/* ── SABİT LAYOUT ── */
-html, body { overflow: hidden !important; height: 100% !important; }
-.main .block-container {
-    padding-top: 0.5rem !important;
-    padding-bottom: 0 !important;
-    max-width: 100% !important;
-    height: 100vh !important;
-    overflow: hidden !important;
-}
-.main { overflow: hidden !important; height: 100vh !important; }
-section[data-testid="stMain"] { overflow: hidden !important; height: 100vh !important; }
-div[data-testid="stVerticalBlock"] { overflow: visible !important; }
-/* Tablo scroll içinde kalsın */
-div[data-testid="stDataFrame"] { overflow-y: auto !important; max-height: calc(100vh - 340px) !important; }
-/* ── */
 #MainMenu { visibility: hidden !important; }
 footer { visibility: hidden !important; }
 header { visibility: hidden !important; }
