@@ -865,7 +865,9 @@ if st.session_state.get("rol") != "admin":
 with st.sidebar:
     st.markdown("""
 <style>
-section[data-testid="stSidebar"] { padding-top: 0.5rem !important; }
+section[data-testid="stSidebar"] { padding-top: 0.5rem !important; padding-bottom: 0 !important; }
+section[data-testid="stSidebar"] > div { display: flex !important; flex-direction: column !important; height: 100% !important; }
+section[data-testid="stSidebar"] > div > div[data-testid="stVerticalBlock"] { flex: 1 !important; display: flex !important; flex-direction: column !important; }
 section[data-testid="stSidebar"] .stButton>button {
     text-align: left !important;
     justify-content: flex-start !important;
@@ -960,6 +962,7 @@ section[data-testid="stSidebar"] div[data-testid="stExpander"] > div { padding: 
             st.session_state["aktif_tab"] = _tab_key
             st.rerun()
 
+    st.markdown("<div style='flex:1'></div>", unsafe_allow_html=True)
     st.divider()
 
     with st.expander("❓ Yardım"):
