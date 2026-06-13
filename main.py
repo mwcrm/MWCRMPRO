@@ -4003,35 +4003,11 @@ elif aktif == "kisiler":
     import re as _re_kis
     st.markdown("## 📞 Telefon Kişiler & Rehber")
 
-    with st.expander("👤 Satış Temsilcisi Kartları", expanded=False):
-        df_tem = db_read("temsilciler", extra_sql="WHERE aktif=1 ORDER BY ad")
-        if not df_tem.empty:
-            st.dataframe(df_tem[["id","ad","soyad","telefon","email","bolge","unvan"]], use_container_width=True, hide_index=True)
-        st.divider()
-        st.markdown("#### ➕ Yeni Temsilci Ekle")
-        with st.form("temsilci_form"):
-            tc1, tc2, tc3 = st.columns(3)
-            t_ad    = tc1.text_input("Ad*")
-            t_soyad = tc1.text_input("Soyad")
-            t_tel   = tc2.text_input("Telefon*", placeholder="05xxxxxxxxx")
-            t_email = tc2.text_input("Email")
-            t_bolge = tc3.text_input("Bölge")
-            t_unvan = tc3.text_input("Ünvan", placeholder="Satış Temsilcisi")
-            if st.form_submit_button("💾 Kaydet", use_container_width=True):
-                if t_ad and t_tel:
-                    db_insert("temsilciler", {"ad":t_ad,"soyad":t_soyad,"telefon":t_tel,"email":t_email,"bolge":t_bolge,"unvan":t_unvan,"aktif":1})
-                    try: db_read.clear()
-                    except: pass
-                    st.success(f"✅ {t_ad} eklendi!"); st.rerun()
-                else:
-                    st.warning("Ad ve telefon zorunlu!")
-
-    st.divider()
     ben = st.session_state.get("kullanici","")
 
-    tab_rehber1, tab_rehber2, tab_rehber3, tab_rehber4, tab_rehber5 = st.tabs([
+    tab_rehber1, tab_rehber2, tab_rehber3, tab_rehber4, tab_rehber5, tab_rehber6 = st.tabs([
         "📋 Kişi Listesi", "➕ Kişi Ekle", "📥 Toplu İçe Aktar",
-        "📝 Kayıtlı Şablonlar", "📊 Mesaj Raporu"
+        "📝 Kayıtlı Şablonlar", "📊 Mesaj Raporu", "👤 Satış Temsilcileri"
     ])
 
     # Şablonları yükle (tüm tablar için)
@@ -4382,6 +4358,30 @@ elif aktif == "kisiler":
                 st.dataframe(df_mlog_all[[c for c in ["tarih","kisi_adi","sablon_adi","mesaj","gonderen"] if c in df_mlog_all.columns]], use_container_width=True, hide_index=True)
             buf_ml = io.BytesIO(); df_mlog_all.to_excel(buf_ml, index=False); buf_ml.seek(0)
             st.download_button("📥 İndir", data=buf_ml, file_name="mesaj_raporu.xlsx", use_container_width=True)
+
+    with tab_rehber6:
+        st.markdown("#### 👤 Satış Temsilcisi Kartları")
+        df_tem = db_read("temsilciler", extra_sql="WHERE aktif=1 ORDER BY ad")
+        if not df_tem.empty:
+            st.dataframe(df_tem[["id","ad","soyad","telefon","email","bolge","unvan"]], use_container_width=True, hide_index=True)
+        st.divider()
+        st.markdown("#### ➕ Yeni Temsilci Ekle")
+        with st.form("temsilci_form"):
+            tc1, tc2, tc3 = st.columns(3)
+            t_ad    = tc1.text_input("Ad*")
+            t_soyad = tc1.text_input("Soyad")
+            t_tel   = tc2.text_input("Telefon*", placeholder="05xxxxxxxxx")
+            t_email = tc2.text_input("Email")
+            t_bolge = tc3.text_input("Bölge")
+            t_unvan = tc3.text_input("Ünvan", placeholder="Satış Temsilcisi")
+            if st.form_submit_button("💾 Kaydet", use_container_width=True):
+                if t_ad and t_tel:
+                    db_insert("temsilciler", {"ad":t_ad,"soyad":t_soyad,"telefon":t_tel,"email":t_email,"bolge":t_bolge,"unvan":t_unvan,"aktif":1})
+                    try: db_read.clear()
+                    except: pass
+                    st.success(f"✅ {t_ad} eklendi!"); st.rerun()
+                else:
+                    st.warning("Ad ve telefon zorunlu!")
 
 
 elif aktif == "randevu":
