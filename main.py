@@ -864,9 +864,6 @@ if st.session_state.get("rol") != "admin":
 
 with st.sidebar:
     st.markdown("## 🏢 MWCRMPRO")
-    st.caption(f"👤 {st.session_state.get('kullanici','')} | {st.session_state.get('rol','')}")
-
-    st.divider()
     st.divider()
 
     # ── MENÜ LİSTESİ ──────────────────────────────────────────────────────────
@@ -875,7 +872,6 @@ with st.sidebar:
         for _t in ["kullanici","admin_rapor"]:
             if _t not in _sb_liste:
                 _sb_liste.append(_t)
-    # Yetki filtresi
     if st.session_state.get("rol") != "admin":
         try:
             import json as _yj
@@ -891,7 +887,6 @@ with st.sidebar:
                 _sb_liste = [t for t in _sb_liste if t in _yj.loads(_yv)]
         except: pass
 
-    # Duplicate key'leri temizle
     _sb_liste_temiz = []
     for _t in _sb_liste:
         if _t not in _sb_liste_temiz:
@@ -918,7 +913,17 @@ with st.sidebar:
                 st.markdown(f"[👉 Gönder](https://wa.me/905400344228?text={talep.replace(' ','%20')})")
 
     st.divider()
-    if st.button("🚪 Çıkış", use_container_width=True, key="sidebar_cikis"):
+
+    # ── KULLANICI + ÇIKIŞ TEK SATIR ───────────────────────────────────────────
+    _kul_col1, _kul_col2 = st.columns([3, 1])
+    _kul_col1.markdown(
+        f"<div style='padding:4px 2px;'>"
+        f"<div style='font-size:13px;font-weight:500;'>👤 {st.session_state.get('kullanici','')}</div>"
+        f"<div style='font-size:11px;color:gray;'>{st.session_state.get('rol','')}</div>"
+        f"</div>",
+        unsafe_allow_html=True
+    )
+    if _kul_col2.button("🚪", key="sidebar_cikis", use_container_width=True, help="Çıkış"):
         cikis()
 
     if st.session_state.get("rol") == "admin":
