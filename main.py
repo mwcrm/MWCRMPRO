@@ -3807,8 +3807,17 @@ elif aktif == "analiz":
                 _pot_ic = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(str(_ar.get("potansiyel","")),"-")
                 _tarih_val = _ar.get("tarih","")
                 _tarih_str = str(_tarih_val)[:10] if _tarih_val and str(_tarih_val) not in ["None","nan",""] else ""
-                _exp_t = f"{_pot_ic} **{_ar.get('firma','?')}**" + (f" · {_tarih_str}" if _tarih_str else "") + f" · {_ar.get('sonuc','') or '—'} · {_ar.get('potansiyel','') or '—'} potansiyel"
-                with st.expander(_exp_t):
+                _firma_goster = _ar.get("firma","") or "—"
+                st.divider()
+                # ── RAPOR BAŞLIĞI — açık, expander yok ──────────────────────
+                _hb1, _hb2, _hb3, _hb4, _hb5, _hb6 = st.columns(6)
+                _hb1.markdown(f"### {_pot_ic} {_firma_goster}")
+                _hb2.markdown(f"📅 **{_tarih_str or '—'}**")
+                _hb3.markdown(f"📋 **{_ar.get('sonuc','—') or '—'}**")
+                _hb4.markdown(f"🎯 **{_ar.get('potansiyel','—') or '—'}**")
+                _hb5.metric("Beklenen", f"{float(_ar.get('bek_ciro',0) or 0):,.0f} ₺")
+                _hb6.metric("Gerçekleşen", f"{float(_ar.get('ger_ciro',0) or 0):,.0f} ₺")
+                with st.expander("📂 Detayları Gör / Gizle", expanded=False):
                     _em1,_em2,_em3,_em4 = st.columns(4)
                     _em1.metric("Potansiyel", _ar.get("potansiyel","—"))
                     _em2.metric("Beklenen Ciro", f"{float(_ar.get('bek_ciro',0) or 0):,.0f} ₺")
