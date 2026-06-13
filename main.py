@@ -73,7 +73,7 @@ def get_kullanici_listesi():
     """2 dk cache'li kullanıcı listesi"""
     return db_read("kullanicilar", extra_sql="")
 
-@st.cache_data(ttl=0)
+@st.cache_data(ttl=60)
 def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
     """Supabase veya SQLite'dan DataFrame döner"""
     sb = get_sb_client()
