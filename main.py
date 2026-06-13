@@ -4807,7 +4807,7 @@ elif aktif == "randevu":
 
             # ── SATIR SATIR LİSTE — B stili ──────────────────────────────────
             # Başlık
-            _hCW = [0.3, 0.6, 3, 0.8, 1, 1, 1, 0.3]
+            _hCW = [0.25, 0.5, 3.5, 0.8, 0.9, 0.9, 0.9, 0.25]
             _hcols = st.columns(_hCW)
             for _ht, _hc in zip(["#","Tarih","Müşteri / Bölge","Görev","Sonuç","Hedef","Fark",""],_hcols):
                 _hc.markdown(f"<span style='font-size:11px;font-weight:700;color:#1f6feb'>{_ht}</span>", unsafe_allow_html=True)
