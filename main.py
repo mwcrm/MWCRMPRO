@@ -903,6 +903,11 @@ section[data-testid="stSidebar"] div[data-testid="stVerticalBlock"] { gap: 4px !
 section[data-testid="stSidebar"] hr { margin: 8px 0 !important; }
 section[data-testid="stSidebar"] div[data-testid="stExpander"] { margin: 0 !important; }
 section[data-testid="stSidebar"] div[data-testid="stExpander"] > div { padding: 0 !important; }
+#MainMenu { visibility: hidden !important; }
+footer { visibility: hidden !important; }
+div[data-testid="stToolbar"] { visibility: hidden !important; }
+div[data-testid="manage-app-button"] { display: none !important; }
+.viewerBadge_container__1QSob { display: none !important; }
 </style>
 """, unsafe_allow_html=True)
 
