@@ -3671,7 +3671,7 @@ elif aktif == "analiz":
     st.markdown("## 🔍 Müşteri Görüşme Analizi")
 
     # ── ANA TABLAR ────────────────────────────────────────────────────────────
-    _an_tab1, _an_tab2 = st.tabs(["📋 Geçmiş Analizler", "✏️ Yeni / Düzenle"])
+    _an_tab1, _an_tab2, _an_tab3 = st.tabs(["📋 Geçmiş Analizler", "✏️ Yeni / Düzenle", "📅 Takip Bekleyenler"])
 
     # ── DB FONKSİYONLARI ──────────────────────────────────────────────────────
     def _an_upsert(firma, veri):
@@ -3793,17 +3793,6 @@ elif aktif == "analiz":
             if _ft3 != "Tümü": _df_f2 = _df_f2[_df_f2["teklif_tur"].str.contains(_ft3, case=False, na=False)]
             st.caption(f"**{len(_df_f2)}** analiz")
 
-            # ── Takip Bekleyenler (kartların üstünde) ────────────────────────
-            try:
-                _tak_df = _df_f2[_df_f2["takip_tar"].notna() & (_df_f2["takip_tar"] != "") & (_df_f2["takip_tar"] != "None")].copy()
-                if not _tak_df.empty:
-                    st.markdown("##### 📅 Takip Bekleyenler")
-                    _tak_df["takip_tar"] = pd.to_datetime(_tak_df["takip_tar"], errors="coerce")
-                    _tak_df = _tak_df.dropna(subset=["takip_tar"]).sort_values("takip_tar")
-                    _tak_show = _tak_df[["firma","takip_tar","sonuc","potansiyel","olusturan"]].head(15)
-                    _tak_show.columns = ["Firma","Takip Tarihi","Sonuç","Potansiyel","Temsilci"]
-                    st.dataframe(_tak_show, use_container_width=True, hide_index=True)
-            except: pass
             st.divider()
 
             for _ar_idx, _ar in _df_f2.reset_index(drop=True).iterrows():
@@ -3945,6 +3934,45 @@ elif aktif == "analiz":
                     file_name=f"musteri_analizleri_{datetime.now().strftime('%Y%m%d')}.xlsx",
                     use_container_width=True)
             except: pass
+
+    with _an_tab3:
+        # ── TAKİP BEKLEYENLERr ───────────────────────────────────────────────
+        _df_tak_all = _an_getir_tumü(limit=500)
+        if _df_tak_all.empty:
+            st.info("Henüz analiz kaydı yok.")
+        else:
+            try:
+                _tak_df3 = _df_tak_all[_df_tak_all["takip_tar"].notna() & (_df_tak_all["takip_tar"] != "") & (_df_tak_all["takip_tar"] != "None")].copy()
+                if _tak_df3.empty:
+                    st.info("Takip tarihi girilmiş analiz bulunamadı.")
+                else:
+                    _tak_df3["takip_tar"] = pd.to_datetime(_tak_df3["takip_tar"], errors="coerce")
+                    _tak_df3 = _tak_df3.dropna(subset=["takip_tar"]).sort_values("takip_tar")
+                    from datetime import date as _date
+                    _bugun = pd.Timestamp(_date.today())
+                    _gecmis = _tak_df3[_tak_df3["takip_tar"] < _bugun]
+                    _bugun_yarin = _tak_df3[(_tak_df3["takip_tar"] >= _bugun) & (_tak_df3["takip_tar"] <= _bugun + pd.Timedelta(days=2))]
+                    _gelecek = _tak_df3[_tak_df3["takip_tar"] > _bugun + pd.Timedelta(days=2)]
+
+                    if not _bugun_yarin.empty:
+                        st.markdown("#### 🔴 Bugün / Yarın")
+                        _s = _bugun_yarin[["firma","takip_tar","sonuc","potansiyel","olusturan"]]
+                        _s.columns = ["Firma","Takip Tarihi","Sonuç","Potansiyel","Temsilci"]
+                        st.dataframe(_s, use_container_width=True, hide_index=True)
+
+                    if not _gecmis.empty:
+                        st.markdown("#### 🟠 Geçmiş (Yapılmamış)")
+                        _g = _gecmis[["firma","takip_tar","sonuc","potansiyel","olusturan"]]
+                        _g.columns = ["Firma","Takip Tarihi","Sonuç","Potansiyel","Temsilci"]
+                        st.dataframe(_g, use_container_width=True, hide_index=True)
+
+                    if not _gelecek.empty:
+                        st.markdown("#### 🟢 Yaklaşan")
+                        _y = _gelecek[["firma","takip_tar","sonuc","potansiyel","olusturan"]]
+                        _y.columns = ["Firma","Takip Tarihi","Sonuç","Potansiyel","Temsilci"]
+                        st.dataframe(_y, use_container_width=True, hide_index=True)
+            except Exception as _te:
+                st.error(f"Hata: {_te}")
 
     with _an_tab2:
         # ── YENİ / DÜZENLE FORMU ─────────────────────────────────────────────
