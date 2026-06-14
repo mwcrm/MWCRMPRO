@@ -1244,7 +1244,13 @@ if aktif == "yeni":
         ciro_col4.metric("Gerçekleşme %", f"%{yuzde:.1f}".replace(".",","))
 
         btn_label = "💾 Güncelle" if duzenle else "💾 Cari Kartı Kaydet"
-        if st.form_submit_button(btn_label):
+        _sb1, _sb2 = st.columns([2,1])
+        _kaydet_submit = _sb1.form_submit_button(btn_label, use_container_width=True)
+        if _sb2.form_submit_button("🔍 Müşteriyi Analiz Et", use_container_width=True):
+            st.session_state["aktif_tab"] = "analiz"
+            st.session_state["an_duzenle_firma"] = firma
+            st.rerun()
+        if _kaydet_submit:
             if not firma:
                 st.warning("Firma adı boş bırakılamaz!")
             elif duzenle:
