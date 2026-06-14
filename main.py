@@ -1202,7 +1202,8 @@ if aktif == "yeni":
 
     with st.form("yeni_kart_form"):
         col1, col2, col3 = st.columns(3)
-        firma    = col1.text_input("Firma Adı",  value=duzenle.get("firma","") if duzenle else "")
+        _firma_default = duzenle.get("firma","") if duzenle else st.session_state.get("analiz_donuş_firma","")
+        firma    = col1.text_input("Firma Adı",  value=_firma_default)
         yetkili  = col1.text_input("Yetkili",    value=duzenle.get("yetkili","") if duzenle else "")
         gsm      = col2.text_input("GSM",        value=fmt_tel(duzenle.get("gsm","")) if duzenle else "")
         sabit    = col2.text_input("Sabit Tel",  value=fmt_tel(duzenle.get("sabit","")) if duzenle else "")
@@ -1284,8 +1285,16 @@ if aktif == "yeni":
                 })
                 try: db_read.clear()
                 except: pass
-                st.session_state["aktif_tab"] = "liste"
-                st.session_state["kayit_mesaj"] = f"✅ '{firma}' kaydedildi!"
+                # Analizden geldiyse analiz sayfasına dön
+                _analiz_donus = st.session_state.pop("analiz_donuş_firma", None)
+                if _analiz_donus:
+                    st.session_state["aktif_tab"] = "analiz"
+                    st.session_state["an_firma_input"] = firma
+                    if "an_cari_sec" in st.session_state: del st.session_state["an_cari_sec"]
+                    st.session_state["kayit_mesaj"] = f"✅ '{firma}' kaydedildi! Analiz formuna yönlendiriliyorsunuz."
+                else:
+                    st.session_state["aktif_tab"] = "liste"
+                    st.session_state["kayit_mesaj"] = f"✅ '{firma}' kaydedildi!"
                 st.rerun()
 
     if duzenle:
@@ -4004,30 +4013,17 @@ elif aktif == "analiz":
         _mevcut_an = _an_getir_firma(_secili_firma)
         _duzenle_mod = _mevcut_an is not None
 
-        # Manuel yazılan firma — cari listede yok ve yeni analiz — kart açmaya zorla
+        # Manuel yazılan firma — cari listede yok — Yeni Kart Ekle sayfasına yönlendir
         _cari_var = not _df_cari_an[_df_cari_an["firma"].str.lower()==_secili_firma.lower()].empty
         if not _cari_var and not _duzenle_mod:
-            st.warning(f"⚠️ **{_secili_firma}** cari listede yok. Analiz yapmadan önce kart açılmalı.")
-            st.markdown("##### 🆕 Yeni Cari Kart Bilgileri")
-            _kf1,_kf2,_kf3,_kf4 = st.columns(4)
-            _kart_yetkili = _kf1.text_input("Yetkili / Ünvan", key="kart_yetkili", placeholder="Ad Soyad")
-            _kart_gsm     = _kf2.text_input("GSM", key="kart_gsm", placeholder="05xx xxx xx xx")
-            _kart_email   = _kf3.text_input("E-posta", key="kart_email", placeholder="mail@...")
-            _kart_il      = _kf4.text_input("İl", key="kart_il", placeholder="İstanbul")
-            _kf5,_kf6 = st.columns(2)
-            _kart_asama = _kf5.selectbox("İşlem Aşaması", ["İlk Temas","Görüşme Yapıldı","Teklif Verildi","Müzakere","Kazanıldı","Kaybedildi"], key="kart_asama")
-            _kart_durum = _kf6.selectbox("Durum", ["Hedef","Aktif","Pasif"], key="kart_durum")
-            _kb1,_kb2 = st.columns(2)
-            if _kb1.button("✅ Kartı Aç ve Analize Devam Et", type="primary", use_container_width=True, key="an_kart_ac"):
-                db_insert("cari_kartlar",{
-                    "firma":_secili_firma,"yetkili":_kart_yetkili or "","gsm":_kart_gsm or "",
-                    "email":_kart_email or "","il":_kart_il or "","durum":_kart_durum,
-                    "islem_asamasi":_kart_asama,"beklenen_ciro":0,
-                    "olusturan":st.session_state.get("kullanici",""),"silindi":0
-                })
-                try: db_read.clear()
-                except: pass
-                st.success(f"✅ {_secili_firma} cari listeye eklendi!")
+            st.warning(f"⚠️ **{_secili_firma}** cari listede bulunamadı.")
+            st.info("Önce yeni müşteri kartı açılmalı. Kart kaydedildikten sonra analiz formuna otomatik dönülecek.")
+            _kb1, _kb2 = st.columns(2)
+            if _kb1.button("➕ Yeni Kart Ekle", type="primary", use_container_width=True, key="an_kart_ac"):
+                # Analize dönmek için firma adını ve tab'ı sakla
+                st.session_state["analiz_donuş_firma"] = _secili_firma
+                st.session_state["duzenle_musteri"] = {"firma": _secili_firma}
+                st.session_state["aktif_tab"] = "yeni"
                 st.rerun()
             if _kb2.button("❌ İptal", use_container_width=True, key="an_kart_iptal"):
                 st.session_state.pop("an_firma_input", None)
