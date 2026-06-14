@@ -3995,229 +3995,235 @@ elif aktif == "analiz":
             try: return _aj.loads(val or "[]")
             except: return []
 
-        # ── HIZLI NOT ─────────────────────────────────────────────────────────────
-        st.markdown("""<div style='background:#eff6ff;border:0.5px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin:8px 0;'><b style='font-size:12px;color:#1d4ed8;'>⚡ Hızlı Not</b> <span style='font-size:11px;color:#64748b;'>— devrik yaz, eksik bırak, sistem anlar</span></div>""", unsafe_allow_html=True)
-        _hn1, _hn2 = st.columns([4, 1])
-        _hizli_not = _hn1.text_area("", placeholder="aras kullanıyor, 500 koli ist-bursa, 8₺/desi ödüyor, fatura sorunu var, erken alım istiyor, avm var...", height=55, key="an_hizli_not", label_visibility="collapsed")
-        if _hn2.button("⚡ Otomatik Doldur", use_container_width=True, key="an_auto_btn") and _hizli_not:
-            import re as _re2
-            _txt2 = _hizli_not.lower()
-            _km2 = _re2.search(r"(\d+)\s*koli", _txt2)
-            if _km2: st.session_state["an_koli_adet"] = _km2.group(1)
-            _pm2 = _re2.search(r"(\d+)\s*palet", _txt2)
-            if _pm2: st.session_state["an_pal_adet"] = _pm2.group(1)
-            for _k2 in ["aras","yurtiçi","mng","sürat","ptt","dhl","ups","horoz"]:
-                if _k2 in _txt2:
-                    st.session_state["an_kargo"] = [_k2.capitalize()]
-            _fm2 = _re2.search(r"(\d+[\.,]?\d*)\s*₺?[/]?\s*desi", _txt2)
-            if _fm2:
-                _fs_list = st.session_state.get("an_fiyat_satirlar", [{"il":"","urun":"koli","min":"","max":"","adet":"","musteri":"","biz":""}])
-                _fs_list[0]["musteri"] = _fm2.group(1)
-                st.session_state["an_fiyat_satirlar"] = _fs_list
-            if "faturasız" in _txt2: st.session_state["an_fatura"] = "faturasız"
-            if "avm" in _txt2:
-                st.session_state["an_avm_satirlar"] = [{"avm":"(nottan eklendi)","sehir":"--","urun":"","saat":""}]
-            st.success("✅ Otomatik dolduruldu!"); st.rerun()
+        # ── ANALİZ FORMU ──────────────────────────────────────────────────────────────
 
-        st.divider()
-
-        # ── FORM ──────────────────────────────────────────────────────────────────
-        with st.expander("🎯 Analiz Amacı & Müşteri Durumu", expanded=True):
-            _ac1,_ac2,_ac3 = st.columns(3)
-            _an_amac = _ac1.multiselect("Analiz amacı", ["yeni müşteri kazanım","zam görüşmesi","nezaket ziyareti","erken potansiyel","kayıp müşteri geri kazanım","mevcut müşteri analizi","rakip takibi","pazar araştırması"], default=_mv_list("amac"), key="an_amac")
-            _an_mdurum = _ac2.selectbox("Müşteri durumu", ["yeni","mevcut","eski","rakip firmanın müşterisi"], index=["yeni","mevcut","eski","rakip firmanın müşterisi"].index(_mv("mdurum","yeni")) if _mv("mdurum","yeni") in ["yeni","mevcut","eski","rakip firmanın müşterisi"] else 0, key="an_mdurum")
-            _an_cikti = _ac3.multiselect("Beklenen çıktı", ["teklif ver","cari listeye ekle","takibe al","randevu planla"], default=[], key="an_cikti")
-            _bc1,_bc2,_bc3 = st.columns(3)
-            _an_bek_ciro = _bc1.text_input("Beklenen ciro (₺/ay)", value=str(int(_mv("bek_ciro",0) or 0)) if _mv("bek_ciro",0) else "", key="an_bek_ciro")
-            _an_ger_ciro = _bc2.text_input("Gerçekleşen ciro (₺/ay)", value=str(int(_mv("ger_ciro",0) or 0)) if _mv("ger_ciro",0) else "", key="an_ger_ciro")
+        # Kalıcı listeler - Supabase'den veya session'dan oku
+        def _kalici_liste_oku(anahtar, varsayilan):
             try:
-                _bv2 = float((_an_bek_ciro or "0").replace(".","").replace(",","."))
-                _gv2 = float((_an_ger_ciro or "0").replace(".","").replace(",","."))
-                _fark_v2 = f"{'+'if _gv2>=_bv2 else ''}{_gv2-_bv2:,.0f} ₺" if _bv2>0 and _gv2>0 else ""
-            except: _fark_v2 = ""
-            _bc3.text_input("Fark (otomatik)", value=_fark_v2, disabled=True, key="an_fark")
-
-        with st.expander("🔍 Kaynak & Müşteri Bilgisi", expanded=True):
-            _m1,_m2,_m3 = st.columns(3)
-            _an_tarih = _m1.date_input("Görüşme tarihi", key="an_tarih")
-            _an_saat = _m2.time_input("Saat", key="an_saat")
-            _an_temsilci = _m3.text_input("Temsilci", value=_mv("olusturan", st.session_state.get("kullanici","")), key="an_temsilci")
-            _m4,_m5 = st.columns([2,1])
-            _an_kaynak = _m4.multiselect("Nereden bulundu?", ["soğuk arama","referans","linkedin","internet/forum","ziyaret","fuar","sosyal medya","eski müşteri"], default=_mv_list("kaynak"), key="an_kaynak")
-            _an_referans = _m5.text_input("Referans veren", value=_mv("yetkili",""), key="an_referans", placeholder="isteğe bağlı")
-            _m6,_m7,_m8 = st.columns(3)
-            _an_yetkili = _m6.text_input("Yetkili / Ünvan", value=_mv("yetkili",""), key="an_yetkili", placeholder="Ad Soyad — Ünvan")
-            _an_iletisim = _m7.text_input("Tel / E-posta", value=_mv("iletisim",""), key="an_iletisim", placeholder="05xx / mail@...")
-            _sektor_list = ["--","Tekstil","Gıda","Otomotiv","Elektronik","İnşaat","E-ticaret","AVM/Perakende","Kimya","Mobilya","Medikal","Kozmetik","Tarım","Diğer"]
-            _an_sektor = _m8.selectbox("Sektör", _sektor_list, index=_sektor_list.index(_mv("sektor","--")) if _mv("sektor","--") in _sektor_list else 0, key="an_sektor")
-            if _secili_cari is not None and not _an_iletisim:
-                _auto_tel = str(_secili_cari.get("gsm","") or _secili_cari.get("email","") or "")
-                if _auto_tel: st.info(f"📞 Cari listeden: {_auto_tel}")
-
-        with st.expander("📦 Ürün, Hacim & Ölçü", expanded=False):
-            _urun_list = ["koli","palet","parsiyel","TIR/komple","soğuk zincir","ADR/tehlikeli","ambar kargo","dış nakliye"]
-            _an_urun = st.multiselect("Gönderi türü", _urun_list, default=[x for x in _mv_list("amac") if x in _urun_list] or (["koli"] if not _mevcut_an else []), key="an_urun")
-            _ud1,_ud2,_ud3,_ud4,_ud5,_ud6,_ud7 = st.columns(7)
-            _an_kd_min = _ud1.text_input("Koli min desi", value=_mv("kd_min",""), key="an_kd_min", placeholder="min")
-            _an_kd_max = _ud2.text_input("Koli max desi", value=_mv("kd_max",""), key="an_kd_max", placeholder="max")
-            _an_pd_min = _ud3.text_input("Palet min desi", value=_mv("pd_min",""), key="an_pd_min", placeholder="min")
-            _an_pd_max = _ud4.text_input("Palet max desi", value=_mv("pd_max",""), key="an_pd_max", placeholder="max")
-            _an_koli_adet = _ud5.text_input("Aylık koli", value=_mv("koli_adet",""), key="an_koli_adet", placeholder="adet")
-            _an_pal_adet = _ud6.text_input("Aylık palet", value=_mv("pal_adet",""), key="an_pal_adet", placeholder="adet")
-            _an_koli_kg = _ud7.text_input("Ort. kg", value=_mv("koli_kg",""), key="an_koli_kg", placeholder="kg")
-            try:
-                _td2 = int(_an_koli_adet or 0)*(int(_an_koli_kg or 0)*3 or 10)+int(_an_pal_adet or 0)*300
-                if _td2 > 0: st.info(f"📊 Toplam desi/ay: **{_td2:,} desi**")
+                sb = get_sb_client()
+                if sb:
+                    r = sb.table("kullanici_tercih").select("deger").eq("kullanici","__sistem__").eq("anahtar", anahtar).execute()
+                    if r.data:
+                        import json as _jk; return _jk.loads(r.data[0]["deger"])
             except: pass
-            _an_kdesi = st.multiselect("Koli desi yoğunluğu", ["0–5","5–10","10–20","20–50","50+"], default=_mv_list("kdesi"), key="an_kdesi")
-            _an_pdesi = st.multiselect("Palet desi yoğunluğu", ["100–300","300–600","600–1000","1000+"], default=_mv_list("pdesi"), key="an_pdesi")
+            return st.session_state.get(f"_kal_{anahtar}", varsayilan)
 
-        with st.expander("🚚 Mevcut Kargo & Fiyat", expanded=False):
-            _kc1,_kc2 = st.columns([3,1])
-            _kargo_list = ["Aras","Yurtiçi","MNG","Sürat","PTT","Fedex","DHL","UPS","Horoz","Diğer"]
-            _an_kargo = _kc1.multiselect("Çalıştığı kargo", _kargo_list, default=_mv_list("kargo"), key="an_kargo")
-            _an_aylik_odeme = _kc2.text_input("Aylık toplam ödeme (₺)", value=str(int(_mv("aylik_odeme",0) or 0)) if _mv("aylik_odeme",0) else "", key="an_aylik_odeme")
-            st.markdown("<small style='color:#64748b;'>İl | Ürün | Min–Max desi | Adet | Müşteri ödüyor ₺ | Bizim teklifimiz ₺</small>", unsafe_allow_html=True)
-            _def_fiyat = _mv_json("fiyat_tablo") or [{"il":"","urun":"koli","min":"","max":"","adet":"","musteri":"","biz":""}]
-            if "an_fiyat_satirlar" not in st.session_state:
-                st.session_state["an_fiyat_satirlar"] = _def_fiyat
-            _il_list = ["--","İstanbul","Ankara","İzmir","Bursa","Manisa","Çorlu/Çerkezköy","Konya","Kocaeli","Adana","Tüm TR"]
-            _ur_list = ["koli","palet","parsiyel","TIR"]
-            for _fi in range(len(st.session_state["an_fiyat_satirlar"])):
-                _fs = st.session_state["an_fiyat_satirlar"][_fi]
-                _fc = st.columns([1.5,0.8,0.5,0.5,0.6,0.8,0.8,0.3])
-                st.session_state["an_fiyat_satirlar"][_fi]["il"] = _fc[0].selectbox("", _il_list, index=_il_list.index(_fs.get("il","--")) if _fs.get("il","--") in _il_list else 0, key=f"an_fil_{_fi}", label_visibility="collapsed")
-                st.session_state["an_fiyat_satirlar"][_fi]["urun"] = _fc[1].selectbox("", _ur_list, index=_ur_list.index(_fs.get("urun","koli")) if _fs.get("urun","koli") in _ur_list else 0, key=f"an_furun_{_fi}", label_visibility="collapsed")
-                st.session_state["an_fiyat_satirlar"][_fi]["min"] = _fc[2].text_input("", value=_fs.get("min",""), key=f"an_fmin_{_fi}", placeholder="min", label_visibility="collapsed")
-                st.session_state["an_fiyat_satirlar"][_fi]["max"] = _fc[3].text_input("", value=_fs.get("max",""), key=f"an_fmax_{_fi}", placeholder="max", label_visibility="collapsed")
-                st.session_state["an_fiyat_satirlar"][_fi]["adet"] = _fc[4].text_input("", value=_fs.get("adet",""), key=f"an_fadet_{_fi}", placeholder="adet", label_visibility="collapsed")
-                st.session_state["an_fiyat_satirlar"][_fi]["musteri"] = _fc[5].text_input("", value=_fs.get("musteri",""), key=f"an_fmus_{_fi}", placeholder="ödediği ₺", label_visibility="collapsed")
-                st.session_state["an_fiyat_satirlar"][_fi]["biz"] = _fc[6].text_input("", value=_fs.get("biz",""), key=f"an_fbiz_{_fi}", placeholder="teklifimiz ₺", label_visibility="collapsed")
-                if _fc[7].button("×", key=f"an_fdel_{_fi}") and len(st.session_state["an_fiyat_satirlar"])>1:
-                    st.session_state["an_fiyat_satirlar"].pop(_fi); st.rerun()
-            if st.button("+ Satır Ekle", key="an_fiyat_ekle"):
-                st.session_state["an_fiyat_satirlar"].append({"il":"","urun":"koli","min":"","max":"","adet":"","musteri":"","biz":""}); st.rerun()
-            _fatura_list = ["faturalı","faturasız","karma","bilinmiyor"]
-            _uapo_list = ["UA — gönderici öder","PO — alıcı öder","karma","bilinmiyor"]
-            _paz_list = ["inebilir","zorlu","inmez","bilinmiyor"]
-            _kd1,_kd2,_kd3,_kd4 = st.columns(4)
-            _an_fatura = _kd1.selectbox("Faturalama", _fatura_list, index=_fatura_list.index(_mv("fatura","faturalı")) if _mv("fatura","faturalı") in _fatura_list else 0, key="an_fatura")
-            _an_uapo = _kd2.selectbox("UA / PO", _uapo_list, index=_uapo_list.index(_mv("uapo","UA — gönderici öder")) if _mv("uapo","UA — gönderici öder") in _uapo_list else 0, key="an_uapo")
-            _an_odeme = _kd3.multiselect("Vade / Ödeme", ["nakit","havale","çek","30 gün","45 gün","60 gün","90 gün"], default=_mv_list("odeme"), key="an_odeme")
-            _an_pazarlik = _kd4.selectbox("Pazarlık", _paz_list, index=_paz_list.index(_mv("pazarlik","inebilir")) if _mv("pazarlik","inebilir") in _paz_list else 0, key="an_pazarlik")
+        def _kalici_liste_kaydet(anahtar, liste):
+            import json as _jk
+            st.session_state[f"_kal_{anahtar}"] = liste
+            try:
+                sb = get_sb_client()
+                if sb:
+                    mevcut = sb.table("kullanici_tercih").select("id").eq("kullanici","__sistem__").eq("anahtar",anahtar).execute()
+                    if mevcut.data:
+                        sb.table("kullanici_tercih").update({"deger":_jk.dumps(liste,ensure_ascii=False)}).eq("kullanici","__sistem__").eq("anahtar",anahtar).execute()
+                    else:
+                        sb.table("kullanici_tercih").insert({"kullanici":"__sistem__","anahtar":anahtar,"deger":_jk.dumps(liste,ensure_ascii=False)}).execute()
+            except: pass
 
-        with st.expander("📍 Bölge, Teslimat & AVM", expanded=False):
-            st.markdown("<small style='color:#64748b;'>İl | Ürün | Min–Max desi | Adet | Sıklık | Not/Saat kısıtı</small>", unsafe_allow_html=True)
-            _def_bolge = _mv_json("bolge") or [{"il":"","urun":"koli","min":"","max":"","adet":"","siklik":"haftalık","not":""}]
-            if "an_bolge_satirlar" not in st.session_state:
-                st.session_state["an_bolge_satirlar"] = _def_bolge
-            _bil_list = ["--","İstanbul","Ankara","İzmir","Bursa","Manisa","Çorlu/Çerkezköy","Konya","Kocaeli","Adana","Tüm TR"]
-            _bur_list = ["koli","palet","parsiyel","TIR","karma"]
-            _bsik_list = ["günlük","hf. 2–3","haftalık","aylık","düzensiz"]
-            for _bi in range(len(st.session_state["an_bolge_satirlar"])):
-                _bs = st.session_state["an_bolge_satirlar"][_bi]
-                _bc2 = st.columns([1.5,0.8,0.5,0.5,0.6,0.8,1,0.3])
-                st.session_state["an_bolge_satirlar"][_bi]["il"] = _bc2[0].selectbox("", _bil_list, index=_bil_list.index(_bs.get("il","--")) if _bs.get("il","--") in _bil_list else 0, key=f"an_bil_{_bi}", label_visibility="collapsed")
-                st.session_state["an_bolge_satirlar"][_bi]["urun"] = _bc2[1].selectbox("", _bur_list, index=_bur_list.index(_bs.get("urun","koli")) if _bs.get("urun","koli") in _bur_list else 0, key=f"an_burun_{_bi}", label_visibility="collapsed")
-                st.session_state["an_bolge_satirlar"][_bi]["min"] = _bc2[2].text_input("", value=_bs.get("min",""), key=f"an_bmin_{_bi}", placeholder="min", label_visibility="collapsed")
-                st.session_state["an_bolge_satirlar"][_bi]["max"] = _bc2[3].text_input("", value=_bs.get("max",""), key=f"an_bmax_{_bi}", placeholder="max", label_visibility="collapsed")
-                st.session_state["an_bolge_satirlar"][_bi]["adet"] = _bc2[4].text_input("", value=_bs.get("adet",""), key=f"an_badet_{_bi}", placeholder="adet", label_visibility="collapsed")
-                st.session_state["an_bolge_satirlar"][_bi]["siklik"] = _bc2[5].selectbox("", _bsik_list, index=_bsik_list.index(_bs.get("siklik","haftalık")) if _bs.get("siklik","haftalık") in _bsik_list else 0, key=f"an_bsik_{_bi}", label_visibility="collapsed")
-                st.session_state["an_bolge_satirlar"][_bi]["not"] = _bc2[6].text_input("", value=_bs.get("not",""), key=f"an_bnot_{_bi}", placeholder="not / saat kısıtı", label_visibility="collapsed")
-                if _bc2[7].button("×", key=f"an_bdel_{_bi}") and len(st.session_state["an_bolge_satirlar"])>1:
-                    st.session_state["an_bolge_satirlar"].pop(_bi); st.rerun()
-            if st.button("+ Bölge Ekle", key="an_bolge_ekle"):
-                st.session_state["an_bolge_satirlar"].append({"il":"","urun":"koli","min":"","max":"","adet":"","siklik":"haftalık","not":""}); st.rerun()
-            st.markdown("**AVM Teslimatları**")
-            _def_avm = _mv_json("avm") or [{"avm":"","sehir":"--","urun":"","saat":""}]
-            if "an_avm_satirlar" not in st.session_state:
-                st.session_state["an_avm_satirlar"] = _def_avm
-            _ash_list = ["--","İstanbul","Ankara","İzmir","Bursa","Adana","Diğer"]
-            for _ai in range(len(st.session_state["an_avm_satirlar"])):
-                _as2 = st.session_state["an_avm_satirlar"][_ai]
-                _ac2 = st.columns([2,1,1.5,1.5,0.3])
-                st.session_state["an_avm_satirlar"][_ai]["avm"] = _ac2[0].text_input("", value=_as2.get("avm",""), key=f"an_aavm_{_ai}", placeholder="AVM / mağaza adı", label_visibility="collapsed")
-                st.session_state["an_avm_satirlar"][_ai]["sehir"] = _ac2[1].selectbox("", _ash_list, index=_ash_list.index(_as2.get("sehir","--")) if _as2.get("sehir","--") in _ash_list else 0, key=f"an_asehir_{_ai}", label_visibility="collapsed")
-                st.session_state["an_avm_satirlar"][_ai]["urun"] = _ac2[2].text_input("", value=_as2.get("urun",""), key=f"an_aurun_{_ai}", placeholder="koli/palet — adet", label_visibility="collapsed")
-                st.session_state["an_avm_satirlar"][_ai]["saat"] = _ac2[3].text_input("", value=_as2.get("saat",""), key=f"an_asaat_{_ai}", placeholder="giriş saati kısıtı...", label_visibility="collapsed")
-                if _ac2[4].button("×", key=f"an_adel_{_ai}") and len(st.session_state["an_avm_satirlar"])>1:
-                    st.session_state["an_avm_satirlar"].pop(_ai); st.rerun()
-            if st.button("+ AVM Ekle", key="an_avm_ekle"):
-                st.session_state["an_avm_satirlar"].append({"avm":"","sehir":"--","urun":"","saat":""}); st.rerun()
+        # Kalıcı listeler
+        _kal_kaynak = _kalici_liste_oku("an_kaynak_liste", ["soğuk arama","referans","linkedin","internet","ziyaret","fuar","sosyal medya","eski müşteri"])
+        _kal_sektor = _kalici_liste_oku("an_sektor_liste", ["Tekstil","Gıda","Otomotiv","Elektronik","E-ticaret","AVM/Perakende","Kimya","Mobilya","Medikal","Kozmetik"])
+        _kal_kargo  = _kalici_liste_oku("an_kargo_liste",  ["Aras","Yurtiçi","MNG","Sürat","PTT","DHL","UPS","Horoz"])
+        _kal_avm    = _kalici_liste_oku("an_avm_liste",    ["Cevahir AVM","Forum İstanbul","Metrocity","Kanyon","Ankamall","Optimum","Korupark","Hilltown","Agora","Özdilek","Piazza","TerraCity"])
 
-        with st.expander("💬 Beklenti, Öncelik & Karar", expanded=False):
-            _be1,_be2 = st.columns(2)
-            _an_beklenti = _be1.multiselect("En önemli beklenti", ["düşük fiyat","uzun vade","spot fiyat","özel anlaşma","hız/dakiklik","hizmet kalitesi","alım saati","bölge kapsamı","takip sistemi","sigorta","AVM girişi"], default=_mv_list("beklenti"), key="an_beklenti")
-            _an_fiyat_bek = _be2.text_input("Fiyat beklentisi", value=_mv("fiyat_bek",""), key="an_fiyat_bek", placeholder="₺/desi — isteğe bağlı")
-            _bk1,_bk2,_bk3,_bk4 = st.columns(4)
-            _karar_list = ["yetkili kendisi","üst yönetim","komite","bilinmiyor"]
-            _sure_list = ["acil (bu hafta)","kısa (1 ay)","uzun (3+ ay)","belirsiz"]
-            _an_ttur = _bk1.multiselect("Teklif türü", ["spot","özel anlaşma","sözleşme","dönemsel"], default=_mv_list("teklif_tur"), key="an_ttur")
-            _an_karar = _bk2.selectbox("Karar verici", _karar_list, index=_karar_list.index(_mv("karar","yetkili kendisi")) if _mv("karar","yetkili kendisi") in _karar_list else 0, key="an_karar")
-            _an_sure = _bk3.selectbox("Karar süresi", _sure_list, index=_sure_list.index(_mv("sure","belirsiz")) if _mv("sure","belirsiz") in _sure_list else 3, key="an_sure")
-            _rakip_once_list = ["hayır biz ilkiz","evet","bilinmiyor"]
-            _an_rakip_once = _bk4.selectbox("Rakip önce mi?", _rakip_once_list, key="an_rakip_once")
-            _an_engel = st.multiselect("Anlaşma engeli", ["fiyat","vade","rakip teklifi","karar verici","bölge eksikliği","güven","alışkanlık"], default=_mv_list("engel"), key="an_engel")
-            _an_ozel = st.text_input("Özel istek", value=_mv("sonraki_adim",""), key="an_ozel", placeholder="varsa yaz, boş da bırakabilirsin...")
+        # Temsilciler - sistemdeki kullanıcılar
+        try:
+            _sb_tmp = get_sb_client()
+            if _sb_tmp:
+                _usr_r = _sb_tmp.table("kullanicilar").select("kullanici_adi").execute()
+                _temsilci_liste = [r["kullanici_adi"] for r in _usr_r.data] if _usr_r.data else [st.session_state.get("kullanici","")]
+            else:
+                _cn_tmp = get_conn()
+                _usr_rows = _cn_tmp.execute("SELECT kullanici_adi FROM kullanicilar").fetchall()
+                _cn_tmp.close()
+                _temsilci_liste = [r[0] for r in _usr_rows] if _usr_rows else [st.session_state.get("kullanici","")]
+        except: _temsilci_liste = [st.session_state.get("kullanici","")]
 
-        with st.expander("🏭 Lojistik Altyapı", expanded=False):
-            _la1,_la2 = st.columns(2)
-            _arac_list = ["hayır dışarıdan","evet kendi dağıtımı","karma"]
-            _an_arac = _la1.selectbox("Kendi aracı", _arac_list, key="an_arac")
-            _an_depo = _la2.text_input("Depo lokasyonu", value=_mv("depo",""), key="an_depo", placeholder="isteğe bağlı")
-            _la3,_la4 = st.columns(2)
-            _an_saha = _la3.multiselect("Saha ihtiyacı", ["araç (noktaya)","personel/kurye","depo hizmeti","istif/paketleme"], default=_mv_list("saha"), key="an_saha")
-            _an_ozel_kargo = _la4.multiselect("Özel kargo", ["ambar kargo","dış nakliye","deniz yolu","hava kargo","bijimsiz","istifsizsiz"], default=_mv_list("ozel_kargo"), key="an_ozel_kargo")
-
-        with st.expander("⚔️ Rakip & Şikayetler", expanded=False):
-            st.markdown("<small style='color:#64748b;'>Rakip firma | ₺/desi | Durumu | Tercih sebebi</small>", unsafe_allow_html=True)
-            _def_rakip = _mv_json("rakip") or [{"firma":"","fiyat":"","durum":"orta","sebep":""}]
-            if "an_rakip_satirlar" not in st.session_state:
-                st.session_state["an_rakip_satirlar"] = _def_rakip
-            _rd_list = ["güçlü","orta","zayıf"]
-            for _ri in range(len(st.session_state["an_rakip_satirlar"])):
-                _rs = st.session_state["an_rakip_satirlar"][_ri]
-                _rc = st.columns([2,1,1,2,0.3])
-                st.session_state["an_rakip_satirlar"][_ri]["firma"] = _rc[0].text_input("", value=_rs.get("firma",""), key=f"an_rfirma_{_ri}", placeholder="rakip firma", label_visibility="collapsed")
-                st.session_state["an_rakip_satirlar"][_ri]["fiyat"] = _rc[1].text_input("", value=_rs.get("fiyat",""), key=f"an_rfiyat_{_ri}", placeholder="₺/desi", label_visibility="collapsed")
-                st.session_state["an_rakip_satirlar"][_ri]["durum"] = _rc[2].selectbox("", _rd_list, index=_rd_list.index(_rs.get("durum","orta")) if _rs.get("durum","orta") in _rd_list else 1, key=f"an_rdurum_{_ri}", label_visibility="collapsed")
-                st.session_state["an_rakip_satirlar"][_ri]["sebep"] = _rc[3].text_input("", value=_rs.get("sebep",""), key=f"an_rsebep_{_ri}", placeholder="tercih sebebi", label_visibility="collapsed")
-                if _rc[4].button("×", key=f"an_rdel_{_ri}") and len(st.session_state["an_rakip_satirlar"])>1:
-                    st.session_state["an_rakip_satirlar"].pop(_ri); st.rerun()
-            if st.button("+ Rakip Ekle", key="an_rakip_ekle"):
-                st.session_state["an_rakip_satirlar"].append({"firma":"","fiyat":"","durum":"orta","sebep":""}); st.rerun()
-            _rs1,_rs2 = st.columns(2)
-            _an_sik = _rs1.multiselect("Şikayetleri", ["hasar","geç teslimat","fiyat yüksek","iletişim zayıf","takip yok","kayıp kargo","ambar bırakıyor","bijimsiz","araç gelmiyor","AVM girişi yok"], default=_mv_list("sik"), key="an_sik")
-            _an_gecis = _rs2.multiselect("Bize geçiş sebebi", ["fiyat avantajı","daha hızlı","kişisel ilişki","güven","takip sistemi","geniş bölge","erken alım","AVM çözümü"], default=_mv_list("gecis"), key="an_gecis")
-
-        with st.expander("💡 Değerlendirme & Görüşme Notu", expanded=True):
-            _pot_list = ["çok düşük","düşük","orta","yüksek","çok yüksek"]
-            _sonuc_list = ["takip edilecek","teklif verildi","beklemede","ilgisiz","randevu verildi","anlaşma yapıldı"]
-            _de1,_de2,_de3 = st.columns(3)
-            _an_pot = _de1.select_slider("Potansiyel", options=_pot_list, value=_mv("potansiyel","orta") if _mv("potansiyel","orta") in _pot_list else "orta", key="an_pot")
-            _an_sonuc = _de2.selectbox("Görüşme sonucu", _sonuc_list, index=_sonuc_list.index(_mv("sonuc","takip edilecek")) if _mv("sonuc","takip edilecek") in _sonuc_list else 0, key="an_sonuc")
-            _an_takip = _de3.date_input("Takip tarihi", key="an_takip_tar")
-            _an_sonraki = st.text_input("Bir sonraki adım", value=_mv("sonraki_adim",""), key="an_sonraki", placeholder="isteğe bağlı...")
-            _an_not = st.text_area("Görüşme notu", value=_mv("not_alan",""), key="an_not", placeholder="devrik de yaz, kısa da... karakter sınırı yok.", height=100)
+        # Mesai saatleri 07:00-19:00
+        import datetime as _dt
+        _saat_secenekleri = [f"{h:02d}:{m:02d}" for h in range(7,20) for m in (0,30)]
 
         st.divider()
 
-        # ── AKSİYON BUTONLARI ─────────────────────────────────────────────────────
-        _btn_c = st.columns(5)
-        _kaydet_btn = _btn_c[0].button("💾 " + ("Güncelle" if _duzenle_mod else "Kaydet"), type="primary", use_container_width=True, key="an_kaydet")
-        _cari_btn = _btn_c[1].button("+ Cari Listesi", use_container_width=True, key="an_cari")
-        _teklif_btn = _btn_c[2].button("📄 Teklif Oluştur", use_container_width=True, key="an_teklif")
+        # ── SATIR 1: Temel Bilgiler ────────────────────────────────────────────────
+        st.markdown("##### 👤 Kişi & Görüşme Bilgileri")
+        _r1c1,_r1c2,_r1c3,_r1c4,_r1c5,_r1c6 = st.columns(6)
+        _an_yetkili    = _r1c1.text_input("Yetkili / Ünvan", value=_mv("yetkili",""), key="an_yetkili", placeholder="Ad Soyad — Ünvan")
+        _an_iletisim   = _r1c2.text_input("Tel / E-posta", value=_mv("iletisim",""), key="an_iletisim", placeholder="05xx / mail@...")
+        _an_tarih      = _r1c3.date_input("Görüşme tarihi", key="an_tarih")
+        _saat_def      = _mv("saat","09:00"); _saat_def = _saat_def if _saat_def in _saat_secenekleri else "09:00"
+        _an_saat       = _r1c4.selectbox("Saat", _saat_secenekleri, index=_saat_secenekleri.index(_saat_def), key="an_saat")
+        _temsilci_def  = _mv("olusturan", st.session_state.get("kullanici",""))
+        _temsilci_idx  = _temsilci_liste.index(_temsilci_def) if _temsilci_def in _temsilci_liste else 0
+        _an_temsilci   = _r1c5.selectbox("Temsilci", _temsilci_liste, index=_temsilci_idx, key="an_temsilci")
+        _an_mdurum     = _r1c6.selectbox("Müşteri Durumu", ["yeni","mevcut","eski","rakip müşterisi"], index=["yeni","mevcut","eski","rakip müşterisi"].index(_mv("mdurum","yeni")) if _mv("mdurum","yeni") in ["yeni","mevcut","eski","rakip müşterisi"] else 0, key="an_mdurum")
 
-        _an_tel_clean = str(_an_iletisim or "").replace(" ","").replace("-","")
-        if _an_tel_clean and "@" not in _an_tel_clean:
-            if _an_tel_clean.startswith("0"): _an_tel_clean = "90" + _an_tel_clean[1:]
-            _wa_text = "Merhaba " + _secili_firma + ", gorusemiz icin tesekkurler."
-            _wa_enc = _wa_text.replace(" ", "%20")
-            _btn_c[3].markdown("<a href='https://wa.me/" + _an_tel_clean + "?text=" + _wa_enc + "' target='_blank'><button style='width:100%;padding:6px;font-size:12px;border:none;background:#25d366;color:white;border-radius:6px;cursor:pointer;'>💬 WhatsApp</button></a>", unsafe_allow_html=True)
-        if _an_iletisim and "@" in _an_iletisim:
-            _btn_c[4].markdown("<a href='mailto:" + _an_iletisim + "?subject=Teklif'><button style='width:100%;padding:6px;font-size:12px;background:#fffbeb;color:#b45309;border:1px solid #fcd34d;border-radius:6px;cursor:pointer;'>✉️ E-posta</button></a>", unsafe_allow_html=True)
+        # ── SATIR 2: Kaynak & Sektör (kalıcı, tekrar yok) ──────────────────────────
+        st.markdown("##### 🔍 Kaynak & Sektör")
+        _r2c1,_r2c2,_r2c3,_r2c4 = st.columns([2,1,2,1])
+        _an_kaynak_sec = _r2c1.selectbox("Nereden Bulundu?", ["-- Seç --"] + _kal_kaynak + ["+ Yeni Ekle"], key="an_kaynak_sec")
+        _an_kaynak_yeni = _r2c2.text_input("Yeni kaynak", key="an_kaynak_yeni", placeholder="yaz ve ekle", label_visibility="visible") if _an_kaynak_sec == "+ Yeni Ekle" else ""
+        if _an_kaynak_yeni and _an_kaynak_yeni not in _kal_kaynak:
+            _kal_kaynak.append(_an_kaynak_yeni); _kalici_liste_kaydet("an_kaynak_liste", _kal_kaynak); st.rerun()
+        _an_kaynak_val = _an_kaynak_sec if _an_kaynak_sec not in ["-- Seç --","+ Yeni Ekle"] else _mv("kaynak","")
 
-        # Veriyi her zaman hazırla (önizleme + kaydet için)
+        _an_sektor_sec = _r2c3.selectbox("Sektör", ["-- Seç --"] + _kal_sektor + ["+ Yeni Ekle"], index=(["-- Seç --"]+_kal_sektor+["+ Yeni Ekle"]).index(_mv("sektor","-- Seç --")) if _mv("sektor","") in _kal_sektor else 0, key="an_sektor_sec")
+        _an_sektor_yeni = _r2c4.text_input("Yeni sektör", key="an_sektor_yeni", placeholder="yaz ve ekle") if _an_sektor_sec == "+ Yeni Ekle" else ""
+        if _an_sektor_yeni and _an_sektor_yeni not in _kal_sektor:
+            _kal_sektor.append(_an_sektor_yeni); _kalici_liste_kaydet("an_sektor_liste", _kal_sektor); st.rerun()
+        _an_sektor = _an_sektor_sec if _an_sektor_sec not in ["-- Seç --","+ Yeni Ekle"] else _mv("sektor","")
+
+        # ── SATIR 3: Ciro & Potansiyel ─────────────────────────────────────────────
+        st.markdown("##### 💰 Ciro & Değerlendirme")
+        _r3c1,_r3c2,_r3c3,_r3c4,_r3c5,_r3c6 = st.columns(6)
+        _an_bek_ciro = _r3c1.text_input("Beklenen Ciro (₺/ay)", value=str(int(_mv("bek_ciro",0) or 0)) if _mv("bek_ciro",0) else "", key="an_bek_ciro", placeholder="₺")
+        _an_ger_ciro = _r3c2.text_input("Gerçekleşen Ciro (₺/ay)", value=str(int(_mv("ger_ciro",0) or 0)) if _mv("ger_ciro",0) else "", key="an_ger_ciro", placeholder="₺")
+        _pot_list = ["çok düşük","düşük","orta","yüksek","çok yüksek"]
+        _an_pot  = _r3c3.select_slider("Potansiyel", options=_pot_list, value=_mv("potansiyel","orta") if _mv("potansiyel","orta") in _pot_list else "orta", key="an_pot")
+        _sonuc_list = ["takip edilecek","teklif verildi","beklemede","ilgisiz","randevu verildi","anlaşma yapıldı"]
+        _an_sonuc = _r3c4.selectbox("Görüşme Sonucu", _sonuc_list, index=_sonuc_list.index(_mv("sonuc","takip edilecek")) if _mv("sonuc","takip edilecek") in _sonuc_list else 0, key="an_sonuc")
+        _an_takip = _r3c5.date_input("Takip Tarihi", key="an_takip_tar")
+        _karar_list = ["yetkili kendisi","üst yönetim","komite","bilinmiyor"]
+        _an_karar = _r3c6.selectbox("Karar Verici", _karar_list, index=_karar_list.index(_mv("karar","yetkili kendisi")) if _mv("karar","yetkili kendisi") in _karar_list else 0, key="an_karar")
+
+        # ── SATIR 4: Teklif Türü (sadece Spot veya Özel, zorunlu) ─────────────────
+        st.markdown("##### 📄 Teklif Türü")
+        _ttur_opts = ["🚀 Spot Teklif", "🤝 Özel Anlaşma"]
+        _ttur_def  = "🤝 Özel Anlaşma" if "özel" in _mv("teklif_tur","").lower() else "🚀 Spot Teklif"
+        _an_ttur_radio = st.radio("", _ttur_opts, index=_ttur_opts.index(_ttur_def), horizontal=True, key="an_ttur_radio", label_visibility="collapsed")
+        _an_ttur_val   = "özel anlaşma" if "Özel" in _an_ttur_radio else "spot"
+        if _an_ttur_val == "spot":
+            st.info("⚡ **Spot Teklif** seçildi — bu müşteri Spot Teklif ekranında değerlendirilecek. Teklif verirken hatırlatılacak.")
+        else:
+            st.info("🤝 **Özel Anlaşma** seçildi — bu müşteri Özel Anlaşma ekranında değerlendirilecek. Teklif verirken hatırlatılacak.")
+
+        # ── SATIR 5: Kargo (kalıcı, tekrar yok) ────────────────────────────────────
+        st.markdown("##### 🚚 Kullandığı Kargo & Ödeme")
+        _r5c1,_r5c2,_r5c3,_r5c4,_r5c5 = st.columns(5)
+        _an_kargo_sec  = _r5c1.selectbox("Kullandığı Kargo", ["-- Seç --"] + _kal_kargo + ["+ Yeni Ekle"], key="an_kargo_sec")
+        _an_kargo_yeni = _r5c2.text_input("Yeni kargo", key="an_kargo_yeni", placeholder="yaz ve ekle") if _an_kargo_sec == "+ Yeni Ekle" else ""
+        if _an_kargo_yeni and _an_kargo_yeni not in _kal_kargo:
+            _kal_kargo.append(_an_kargo_yeni); _kalici_liste_kaydet("an_kargo_liste", _kal_kargo); st.rerun()
+        _an_kargo_val = _an_kargo_sec if _an_kargo_sec not in ["-- Seç --","+ Yeni Ekle"] else _mv("kargo","")
+        _an_aylik_odeme = _r5c3.text_input("Aylık Kargo Ödemesi (₺)", value=str(int(_mv("aylik_odeme",0) or 0)) if _mv("aylik_odeme",0) else "", key="an_aylik_odeme", placeholder="₺/ay")
+        _fatura_list = ["faturalı","faturasız","karma","bilinmiyor"]
+        _an_fatura = _r5c4.selectbox("Faturalama", _fatura_list, index=_fatura_list.index(_mv("fatura","faturalı")) if _mv("fatura","faturalı") in _fatura_list else 0, key="an_fatura")
+        _uapo_list = ["UA — gönderici öder","PO — alıcı öder","karma","bilinmiyor"]
+        _an_uapo = _r5c5.selectbox("UA / PO", _uapo_list, index=_uapo_list.index(_mv("uapo","UA — gönderici öder")) if _mv("uapo","UA — gönderici öder") in _uapo_list else 0, key="an_uapo")
+
+        # ── SATIR 6: Hacim & Teslimat ───────────────────────────────────────────────
+        st.markdown("##### 📦 Hacim, Desi & Teslimat")
+        _r6c1,_r6c2,_r6c3,_r6c4,_r6c5,_r6c6,_r6c7 = st.columns(7)
+        _an_koli_adet = _r6c1.text_input("Aylık Koli Adedi", value=_mv("koli_adet",""), key="an_koli_adet", placeholder="adet")
+        _an_koli_desi = _r6c2.text_input("Koli Desi (ort.)", value=_mv("kd_min",""), key="an_koli_desi", placeholder="desi")
+        _an_koli_kg   = _r6c3.text_input("Koli Ağırlık (kg)", value=_mv("koli_kg",""), key="an_koli_kg", placeholder="kg")
+        _an_pal_adet  = _r6c4.text_input("Aylık Palet Adedi", value=_mv("pal_adet",""), key="an_pal_adet", placeholder="adet")
+        _an_pal_desi  = _r6c5.text_input("Palet Desi (ort.)", value=_mv("pd_min",""), key="an_pal_desi", placeholder="desi")
+        _an_pal_kg    = _r6c6.text_input("Palet Ağırlık (kg)", value=_mv("pal_kg",""), key="an_pal_kg", placeholder="kg")
+        _bsik_list = ["günlük","hf. 2–3","haftalık","aylık","düzensiz"]
+        _bsik_def = _mv("sevk_siklik","haftalık"); _bsik_def = _bsik_def if _bsik_def in _bsik_list else "haftalık"
+        _an_sevk_siklik = _r6c7.selectbox("Sevkiyat Sıklığı", _bsik_list, index=_bsik_list.index(_bsik_def), key="an_sevk_siklik")
+
+        # ── SATIR 7: İl-Ürün-Fiyat Tablosu (Bölge + Fiyat birleşik) ───────────────
+        st.markdown("##### 🗺️ Bölge & Fiyat Tablosu")
+        st.caption("İl · Ürün · Min Desi · Max Desi · Aylık Adet · Müşteri Ödüyor ₺ · Bizim Teklifimiz ₺ · Sıklık · Not")
+        _il_list  = ["--","İstanbul","Ankara","İzmir","Bursa","Manisa","Çorlu/Çerkezköy","Konya","Kocaeli","Adana","Tüm TR"]
+        _ur_list  = ["koli","palet","parsiyel","TIR"]
+        _def_fiyat = _mv_json("fiyat_tablo") or [{"il":"","urun":"koli","min":"","max":"","adet":"","musteri":"","biz":"","siklik":"haftalık","not":""}]
+        if "an_fiyat_satirlar" not in st.session_state:
+            st.session_state["an_fiyat_satirlar"] = _def_fiyat
+        for _fi in range(len(st.session_state["an_fiyat_satirlar"])):
+            _fs = st.session_state["an_fiyat_satirlar"][_fi]
+            _fc = st.columns([1.2,0.7,0.5,0.5,0.6,0.8,0.8,0.7,1,0.25])
+            st.session_state["an_fiyat_satirlar"][_fi]["il"]     = _fc[0].selectbox("", _il_list, index=_il_list.index(_fs.get("il","--")) if _fs.get("il","--") in _il_list else 0, key=f"an_fil_{_fi}", label_visibility="collapsed")
+            st.session_state["an_fiyat_satirlar"][_fi]["urun"]   = _fc[1].selectbox("", _ur_list, index=_ur_list.index(_fs.get("urun","koli")) if _fs.get("urun","koli") in _ur_list else 0, key=f"an_furun_{_fi}", label_visibility="collapsed")
+            st.session_state["an_fiyat_satirlar"][_fi]["min"]    = _fc[2].text_input("", value=_fs.get("min",""), key=f"an_fmin_{_fi}", placeholder="min", label_visibility="collapsed")
+            st.session_state["an_fiyat_satirlar"][_fi]["max"]    = _fc[3].text_input("", value=_fs.get("max",""), key=f"an_fmax_{_fi}", placeholder="max", label_visibility="collapsed")
+            st.session_state["an_fiyat_satirlar"][_fi]["adet"]   = _fc[4].text_input("", value=_fs.get("adet",""), key=f"an_fadet_{_fi}", placeholder="adet", label_visibility="collapsed")
+            st.session_state["an_fiyat_satirlar"][_fi]["musteri"]= _fc[5].text_input("", value=_fs.get("musteri",""), key=f"an_fmus_{_fi}", placeholder="müşteri ₺", label_visibility="collapsed")
+            st.session_state["an_fiyat_satirlar"][_fi]["biz"]    = _fc[6].text_input("", value=_fs.get("biz",""), key=f"an_fbiz_{_fi}", placeholder="bizim ₺", label_visibility="collapsed")
+            st.session_state["an_fiyat_satirlar"][_fi]["siklik"] = _fc[7].selectbox("", _bsik_list, index=_bsik_list.index(_fs.get("siklik","haftalık")) if _fs.get("siklik","haftalık") in _bsik_list else 0, key=f"an_fsik_{_fi}", label_visibility="collapsed")
+            st.session_state["an_fiyat_satirlar"][_fi]["not"]    = _fc[8].text_input("", value=_fs.get("not",""), key=f"an_fnot_{_fi}", placeholder="not / kısıt", label_visibility="collapsed")
+            if _fc[9].button("×", key=f"an_fdel_{_fi}") and len(st.session_state["an_fiyat_satirlar"])>1:
+                st.session_state["an_fiyat_satirlar"].pop(_fi); st.rerun()
+        if st.button("+ Bölge/Fiyat Satırı Ekle", key="an_fiyat_ekle"):
+            st.session_state["an_fiyat_satirlar"].append({"il":"","urun":"koli","min":"","max":"","adet":"","musteri":"","biz":"","siklik":"haftalık","not":""}); st.rerun()
+
+        # ── SATIR 8: AVM Teslimatları (kalıcı AVM listesi) ─────────────────────────
+        st.markdown("##### 🏬 AVM Teslimatları")
+        _def_avm = _mv_json("avm") or []
+        if "an_avm_satirlar" not in st.session_state:
+            st.session_state["an_avm_satirlar"] = _def_avm
+        _ash_list = ["--","İstanbul","Ankara","İzmir","Bursa","Manisa","Çorlu","Kocaeli","Konya","Diğer"]
+        for _ai in range(len(st.session_state["an_avm_satirlar"])):
+            _as2 = st.session_state["an_avm_satirlar"][_ai]
+            _ac2 = st.columns([2.5,1,1.5,1.5,1.5,0.3])
+            _avm_sec = _ac2[0].selectbox("", ["-- Seç --"]+_kal_avm+["+ Yeni AVM"], index=(["-- Seç --"]+_kal_avm+["+ Yeni AVM"]).index(_as2.get("avm","-- Seç --")) if _as2.get("avm") in _kal_avm else 0, key=f"an_aavm_{_ai}", label_visibility="collapsed")
+            if _avm_sec == "+ Yeni AVM":
+                _avm_yeni = _ac2[1].text_input("", key=f"an_avm_yeni_{_ai}", placeholder="AVM adı", label_visibility="collapsed")
+                if _avm_yeni and _avm_yeni not in _kal_avm:
+                    _kal_avm.append(_avm_yeni); _kalici_liste_kaydet("an_avm_liste", _kal_avm); st.rerun()
+            else:
+                st.session_state["an_avm_satirlar"][_ai]["avm"] = _avm_sec
+                _ac2[1].empty()
+            st.session_state["an_avm_satirlar"][_ai]["sehir"]= _ac2[2].selectbox("", _ash_list, index=_ash_list.index(_as2.get("sehir","--")) if _as2.get("sehir","--") in _ash_list else 0, key=f"an_asehir_{_ai}", label_visibility="collapsed")
+            st.session_state["an_avm_satirlar"][_ai]["urun"] = _ac2[3].text_input("", value=_as2.get("urun",""), key=f"an_aurun_{_ai}", placeholder="koli/palet-adet", label_visibility="collapsed")
+            st.session_state["an_avm_satirlar"][_ai]["saat"] = _ac2[4].text_input("", value=_as2.get("saat",""), key=f"an_asaat_{_ai}", placeholder="giriş saati kısıtı", label_visibility="collapsed")
+            if _ac2[5].button("×", key=f"an_adel_{_ai}") and len(st.session_state["an_avm_satirlar"])>0:
+                st.session_state["an_avm_satirlar"].pop(_ai); st.rerun()
+        if st.button("+ AVM Ekle", key="an_avm_ekle"):
+            st.session_state["an_avm_satirlar"].append({"avm":"","sehir":"--","urun":"","saat":""}); st.rerun()
+
+        # ── SATIR 9: Rakip Analizi ──────────────────────────────────────────────────
+        st.markdown("##### ⚔️ Rakip Analizi")
+        st.caption("Rakip Firma · Durum · Fiyat Avantajı · Hız · Hasar Oranı · AVM Girişi · İlişki · Diğer Sebep")
+        _def_rakip = _mv_json("rakip") or [{"firma":"","durum":"orta","fiyat_av":"","hiz":"","hasar":"","avm":"","iliski":"","sebep":""}]
+        if "an_rakip_satirlar" not in st.session_state:
+            st.session_state["an_rakip_satirlar"] = _def_rakip
+        _rd_list = ["güçlü","orta","zayıf"]
+        _yn_list = ["—","iyi","orta","kötü"]
+        for _ri in range(len(st.session_state["an_rakip_satirlar"])):
+            _rs = st.session_state["an_rakip_satirlar"][_ri]
+            _rc = st.columns([1.5,0.7,0.7,0.7,0.7,0.7,0.7,1.5,0.25])
+            st.session_state["an_rakip_satirlar"][_ri]["firma"]    = _rc[0].text_input("", value=_rs.get("firma",""), key=f"an_rfirma_{_ri}", placeholder="rakip firma", label_visibility="collapsed")
+            st.session_state["an_rakip_satirlar"][_ri]["durum"]    = _rc[1].selectbox("", _rd_list, index=_rd_list.index(_rs.get("durum","orta")) if _rs.get("durum","orta") in _rd_list else 1, key=f"an_rdurum_{_ri}", label_visibility="collapsed")
+            st.session_state["an_rakip_satirlar"][_ri]["fiyat_av"] = _rc[2].selectbox("", _yn_list, index=_yn_list.index(_rs.get("fiyat_av","—")) if _rs.get("fiyat_av","—") in _yn_list else 0, key=f"an_rfiyat_{_ri}", label_visibility="collapsed")
+            st.session_state["an_rakip_satirlar"][_ri]["hiz"]      = _rc[3].selectbox("", _yn_list, index=_yn_list.index(_rs.get("hiz","—")) if _rs.get("hiz","—") in _yn_list else 0, key=f"an_rhiz_{_ri}", label_visibility="collapsed")
+            st.session_state["an_rakip_satirlar"][_ri]["hasar"]    = _rc[4].selectbox("", _yn_list, index=_yn_list.index(_rs.get("hasar","—")) if _rs.get("hasar","—") in _yn_list else 0, key=f"an_rhasar_{_ri}", label_visibility="collapsed")
+            st.session_state["an_rakip_satirlar"][_ri]["avm"]      = _rc[5].selectbox("", _yn_list, index=_yn_list.index(_rs.get("avm","—")) if _rs.get("avm","—") in _yn_list else 0, key=f"an_ravm_{_ri}", label_visibility="collapsed")
+            st.session_state["an_rakip_satirlar"][_ri]["iliski"]   = _rc[6].selectbox("", _yn_list, index=_yn_list.index(_rs.get("iliski","—")) if _rs.get("iliski","—") in _yn_list else 0, key=f"an_riliski_{_ri}", label_visibility="collapsed")
+            st.session_state["an_rakip_satirlar"][_ri]["sebep"]    = _rc[7].text_input("", value=_rs.get("sebep",""), key=f"an_rsebep_{_ri}", placeholder="diğer tercih sebebi", label_visibility="collapsed")
+            if _rc[8].button("×", key=f"an_rdel_{_ri}") and len(st.session_state["an_rakip_satirlar"])>1:
+                st.session_state["an_rakip_satirlar"].pop(_ri); st.rerun()
+        if st.button("+ Rakip Ekle", key="an_rakip_ekle"):
+            st.session_state["an_rakip_satirlar"].append({"firma":"","durum":"orta","fiyat_av":"—","hiz":"—","hasar":"—","avm":"—","iliski":"—","sebep":""}); st.rerun()
+
+        # ── SATIR 10: Beklenti & Engel & Şikayet ───────────────────────────────────
+        st.markdown("##### 💬 Beklenti, Engel & Şikayet")
+        _r10c1,_r10c2,_r10c3 = st.columns(3)
+        _an_beklenti = _r10c1.multiselect("Müşteri Beklentisi", ["düşük fiyat","uzun vade","hız/dakiklik","hizmet kalitesi","erken alım","bölge kapsamı","takip sistemi","sigorta","AVM girişi","özel araç"], default=_mv_list("beklenti"), key="an_beklenti")
+        _an_engel    = _r10c2.multiselect("Anlaşma Engeli", ["fiyat","vade","rakip teklifi","karar verici","bölge eksikliği","güven","alışkanlık","teknik sorun"], default=_mv_list("engel"), key="an_engel")
+        _an_sik      = _r10c3.multiselect("Şikayetleri", ["hasar","geç teslimat","fiyat yüksek","iletişim zayıf","takip yok","kayıp kargo","ambar bırakıyor","araç gelmiyor","AVM girişi yok"], default=_mv_list("sik"), key="an_sik")
+
+        # ── SATIR 11: Geçiş & Ödeme & Karar ───────────────────────────────────────
+        _r11c1,_r11c2,_r11c3,_r11c4 = st.columns(4)
+        _an_gecis  = _r11c1.multiselect("Bize Geçiş Sebebi", ["fiyat avantajı","daha hızlı","kişisel ilişki","güven","takip sistemi","geniş bölge","erken alım","AVM çözümü"], default=_mv_list("gecis"), key="an_gecis")
+        _an_odeme  = _r11c2.multiselect("Vade/Ödeme", ["nakit","havale","çek","30 gün","45 gün","60 gün","90 gün"], default=_mv_list("odeme"), key="an_odeme")
+        _paz_list  = ["inebilir","zorlu","inmez","bilinmiyor"]
+        _an_pazarlik = _r11c3.selectbox("Pazarlık", _paz_list, index=_paz_list.index(_mv("pazarlik","inebilir")) if _mv("pazarlik","inebilir") in _paz_list else 0, key="an_pazarlik")
+        _sure_list = ["acil (bu hafta)","kısa (1 ay)","uzun (3+ ay)","belirsiz"]
+        _an_sure   = _r11c4.selectbox("Karar Süresi", _sure_list, index=_sure_list.index(_mv("sure","belirsiz")) if _mv("sure","belirsiz") in _sure_list else 3, key="an_sure")
+
+        # ── SATIR 12: Sonraki Adım & Not ────────────────────────────────────────────
+        st.markdown("##### 📝 Sonraki Adım & Görüşme Notu")
+        _an_sonraki_hint = "Spot teklif hazırla ve sun" if _an_ttur_val == "spot" else "Özel anlaşma şartlarını belirle ve sun"
+        _an_sonraki = st.text_input("Bir Sonraki Adım", value=_mv("sonraki_adim",""), key="an_sonraki", placeholder=_an_sonraki_hint)
+        _an_not = st.text_area("Görüşme Notu", value=_mv("not_alan",""), key="an_not", placeholder="Devrik de yaz, kısa da — karakter sınırı yok.", height=80)
+
+        st.divider()
+
+                # Veriyi her zaman hazırla (önizleme + kaydet için)
         _veri_an = {
             "yetkili": _an_yetkili or "",
             "iletisim": _an_iletisim or "",
