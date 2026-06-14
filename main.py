@@ -4029,9 +4029,23 @@ padding:10px 14px;display:flex;align-items:center;justify-content:space-between;
             _an_sonraki = st.text_input("Bir sonraki adım", value=_mv("sonraki_adim", ""), key="an_sonraki", placeholder="isteğe bağlı...")
 
         st.divider()
+        # Alt aksiyon butonları
+        _alt1, _alt2, _alt3, _alt4, _alt5 = st.columns(5)
+        _kaydet_btn2 = _alt1.button("💾 " + ("Güncelle" if _duzenle else "Kaydet"), type="primary", use_container_width=True, key="an_kaydet2")
+        _alt2.button("📄 Teklif Oluştur", use_container_width=True, key="an_teklif2", on_click=lambda: st.session_state.update({"aktif_tab":"teklif","teklif_musteri_onsel":_secili_firma}))
+        _tel_c2 = str(_an_iletisim or "").replace(" ","").replace("-","")
+        if _tel_c2 and "@" not in _tel_c2:
+            if _tel_c2.startswith("0"): _tel_c2 = "90"+_tel_c2[1:]
+            _alt3.markdown(f"<a href='https://wa.me/{_tel_c2}?text=Merhaba%20{_secili_firma}' target='_blank'><button style='width:100%;padding:6px;font-size:12px;border:none;background:#25d366;color:white;border-radius:6px;cursor:pointer;'>💬 WhatsApp</button></a>", unsafe_allow_html=True)
+        if _an_iletisim and "@" in _an_iletisim:
+            _alt4.markdown(f"<a href='mailto:{_an_iletisim}?subject=Teklif'><button style='width:100%;padding:6px;font-size:12px;background:#fffbeb;color:#b45309;border:1px solid #fcd34d;border-radius:6px;cursor:pointer;'>✉️ E-posta</button></a>", unsafe_allow_html=True)
+        if _duzenle and _alt5.button("🗑 Analizi Sil", use_container_width=True, key="an_sil_alt"):
+            if _an_sil(_secili_firma):
+                if _init_key in st.session_state: del st.session_state[_init_key]
+                st.success("Analiz silindi!"); st.rerun()
 
         # ── KAYDET ────────────────────────────────────────────────────────
-        if _kaydet_btn:
+        if _kaydet_btn or _kaydet_btn2:
             _veri = {
                 "yetkili": _an_yetkili or "", "iletisim": _an_iletisim or "", "sektor": _an_sektor or "",
                 "amac": _getsel("an_t_amac"), "mdurum": _getsel("an_t_mdurum"),
