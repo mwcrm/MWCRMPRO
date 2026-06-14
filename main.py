@@ -3579,9 +3579,28 @@ elif aktif == "analiz":
   user-select:none;transition:all 0.1s;}
 .an-tag:hover{border-color:#93c5fd;color:#1d4ed8;}
 .an-tag.on{background:#eff6ff;color:#1d4ed8;border-color:#93c5fd;}
-.an-tag.on-g{background:#f0fdf4;color:#16a34a;border-color:#86efac;}
-.an-tag.on-r{background:#fef2f2;color:#dc2626;border-color:#fca5a5;}
-.an-tag.on-y{background:#fffbeb;color:#d97706;border-color:#fcd34d;}
+/* Buton boyutlarını küçült */
+div[data-testid="stHorizontalBlock"] .stButton > button {
+  padding: 2px 8px !important;
+  font-size: 11px !important;
+  border-radius: 12px !important;
+  min-height: 28px !important;
+  line-height: 1.2 !important;
+}
+div[data-testid="stHorizontalBlock"] .stButton > button[kind="secondary"] {
+  background: white !important;
+  border: 0.5px solid #e2e8f0 !important;
+  color: #64748b !important;
+}
+div[data-testid="stHorizontalBlock"] .stButton > button[kind="secondary"]:hover {
+  border-color: #93c5fd !important;
+  color: #1d4ed8 !important;
+}
+div[data-testid="stHorizontalBlock"] .stButton > button[kind="primary"] {
+  background: #eff6ff !important;
+  border: 0.5px solid #93c5fd !important;
+  color: #1d4ed8 !important;
+}
 .an-sec{background:white;border:0.5px solid #e2e8f0;border-radius:10px;
   padding:12px 16px;margin-bottom:10px;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
 .an-stitle{font-size:10px;font-weight:600;color:#1d4ed8;text-transform:uppercase;
@@ -3795,29 +3814,24 @@ elif aktif == "analiz":
         st.info(f"🆕 **{_secili_firma}** — yeni analiz")
 
     def _multisel(key, secenekler, tek=False):
-        """Tıklanabilir etiketler — horizontal checkbox trick"""
+        """Tıklanabilir etiketler — buton olarak"""
         secilen = st.session_state.get(key, [])
-        html_parts = []
-        for s in secenekler:
-            aktif = s in secilen
-            cls = "an-tag on" if aktif else "an-tag"
-            html_parts.append(f'<span class="{cls}">{s}</span>')
-        st.markdown(f'<div class="an-tags">{"".join(html_parts)}</div>', unsafe_allow_html=True)
-        # Görünmez checkboxlar
         _cols = st.columns(len(secenekler))
         _yeni = list(secilen)
+        _degisti = False
         for i, s in enumerate(secenekler):
             with _cols[i]:
-                _checked = s in _yeni
-                if st.checkbox("​", value=_checked, key=f"{key}_{i}", label_visibility="collapsed"):
+                aktif = s in _yeni
+                _stil = "primary" if aktif else "secondary"
+                if st.button(s, key=f"{key}_{i}", type=_stil, use_container_width=True):
                     if tek:
                         _yeni = [s]
-                    elif s not in _yeni:
-                        _yeni.append(s)
-                else:
-                    if s in _yeni:
+                    elif aktif:
                         _yeni.remove(s)
-        if _yeni != secilen:
+                    else:
+                        _yeni.append(s)
+                    _degisti = True
+        if _degisti:
             st.session_state[key] = _yeni
             st.rerun()
         return _yeni
