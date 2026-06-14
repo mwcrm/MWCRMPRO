@@ -3870,7 +3870,7 @@ elif aktif == "analiz":
 
                 # AKSİYON BUTONLARI
                 _wbg = st.columns(4)
-                if _wbg[0].button("✏️ Düzenle", key=f"an_gduz_{_ar_idx}_{_ar.get('firma','')[:10]}", use_container_width=True):
+                if _wbg[0].button("✏️ Düzenle", key=f"an_gduz_{_ar_idx}", use_container_width=True):
                     if "an_cari_sec" in st.session_state: del st.session_state["an_cari_sec"]
                     st.session_state["an_firma_input"] = str(_ar.get("firma",""))
                     for _k3 in ["an_fiyat_satirlar","an_bolge_satirlar","an_avm_satirlar","an_rakip_satirlar"]:
@@ -3881,7 +3881,7 @@ elif aktif == "analiz":
                     if _tel3b.startswith("0"): _tel3b="90"+_tel3b[1:]
                     _wa3b = ("Merhaba " + str(_ar.get("firma","")) + ", gorusemiz icin tesekkurler.").replace(" ","%20")
                     _wbg[1].markdown(f"<a href='https://wa.me/{_tel3b}?text={_wa3b}' target='_blank'><button style='width:100%;padding:5px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;'>💬 WA</button></a>", unsafe_allow_html=True)
-                if _wbg[2].button("📄 Teklif", key=f"an_gtek_{_ar_idx}_{_ar.get('firma','')[:10]}", use_container_width=True):
+                if _wbg[2].button("📄 Teklif", key=f"an_gtek_{_ar_idx}", use_container_width=True):
                     st.session_state["aktif_tab"] = "teklif"
                     st.session_state["pending_hedef_mus"] = str(_ar.get("firma",""))
                     _an_ttur_str2 = str(_ar.get("teklif_tur","") or "")
@@ -3890,7 +3890,7 @@ elif aktif == "analiz":
                     else:
                         st.session_state["global_teklif_turu"] = "🚀 Spot Teklif"
                     st.rerun()
-                if _wbg[3].button("🗑 Sil", key=f"an_gsil_{_ar_idx}_{_ar.get('firma','')[:10]}", use_container_width=True):
+                if _wbg[3].button("🗑 Sil", key=f"an_gsil_{_ar_idx}", use_container_width=True):
                     if _an_sil(str(_ar.get("firma",""))):
                         st.success("Analiz silindi!")
                         st.rerun()
