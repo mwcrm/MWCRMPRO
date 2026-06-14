@@ -3794,8 +3794,7 @@ elif aktif == "analiz":
             st.caption(f"**{len(_df_f2)}** analiz")
             st.divider()
 
-            for _ar_idx, _ar in enumerate(_df_f2.iterrows()):
-                _ar_idx, _ar = _ar_idx, _ar[1]
+            for _ar_idx, _ar in _df_f2.reset_index(drop=True).iterrows():
                 _pot_ic = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(str(_ar.get("potansiyel","")),"-")
                 _tarih_val = _ar.get("tarih","")
                 _tarih_str = str(_tarih_val)[:10] if _tarih_val and str(_tarih_val) not in ["None","nan",""] else ""
