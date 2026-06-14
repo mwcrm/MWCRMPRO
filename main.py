@@ -4266,125 +4266,48 @@ elif aktif == "analiz":
             "bolge":        "[]",
         }
 
+        # ── AKSİYON BUTONLARI ────────────────────────────────────────────────────────
+        st.divider()
+        _btn1, _btn2, _btn3 = st.columns(3)
+        _kaydet_btn = _btn1.button("💾 " + ("Güncelle" if _duzenle_mod else "Kaydet"), type="primary", use_container_width=True, key="an_kaydet")
+        _cari_btn   = _btn2.button("➕ Cari Listeye Ekle", use_container_width=True, key="an_cari")
+        _teklif_btn = _btn3.button("📄 Teklif Oluştur", use_container_width=True, key="an_teklif")
+
+        # Kaydet — direkt, önizleme yok
         if _kaydet_btn:
-            st.session_state["an_onizleme"] = True
-            st.session_state["an_onizleme_veri"] = _veri_an
-
-        # ── ÖNİZLEME EKRANI ──────────────────────────────────────────────────
-        if st.session_state.get("an_onizleme"):
-            _ov = st.session_state.get("an_onizleme_veri", _veri_an)
-            st.divider()
-            st.markdown(f"## 🔎 Analiz Önizleme — **{_secili_firma}**")
-            st.caption("Aşağıdaki bilgileri incele, gerekirse yukarıdan düzenle, sonra onayla.")
-
-            # Rakip özeti
-            try:
-                _rak_on = _aj.loads(_ov.get("rakip","[]") or "[]")
-                _rak_on_str = ", ".join([f"{r.get('firma','')} ({r.get('fiyat','?')}₺)" for r in _rak_on if r.get('firma')]) or "—"
-            except: _rak_on_str = "—"
-
-            _oc1, _oc2, _oc3 = st.columns(3)
-            with _oc1:
-                st.markdown("##### 👤 Kişi & İletişim")
-                st.markdown(f"**Yetkili:** {_ov.get('yetkili','—')}")
-                st.markdown(f"**İletişim:** {_ov.get('iletisim','—')}")
-                st.markdown(f"**Sektör:** {_ov.get('sektor','—')}")
-                st.markdown(f"**Kaynak:** {_ov.get('kaynak','—')}")
-                st.markdown(f"**Karar Verici:** {_ov.get('karar','—')}")
-                st.markdown(f"**Karar Süresi:** {_ov.get('sure','—')}")
-            with _oc2:
-                st.markdown("##### 📦 Operasyon")
-                st.markdown(f"**Analiz Amacı:** {_ov.get('amac','—')}")
-                st.markdown(f"**Müşteri Durumu:** {_ov.get('mdurum','—')}")
-                st.markdown(f"**Teklif Türü:** {_ov.get('teklif_tur','—')}")
-                st.markdown(f"**Kullandığı Kargo:** {_ov.get('kargo','—')}")
-                st.markdown(f"**Faturalama:** {_ov.get('fatura','—')} / UA-PO: {_ov.get('uapo','—')}")
-                st.markdown(f"**Vade/Ödeme:** {_ov.get('odeme','—')}")
-                st.markdown(f"**Pazarlık:** {_ov.get('pazarlik','—')}")
-            with _oc3:
-                st.markdown("##### 💰 Finansal")
-                st.markdown(f"**Beklenen Ciro:** {float(_ov.get('bek_ciro',0) or 0):,.0f} ₺")
-                st.markdown(f"**Gerçekleşen Ciro:** {float(_ov.get('ger_ciro',0) or 0):,.0f} ₺")
-                st.markdown(f"**Potansiyel:** {_ov.get('potansiyel','—')}")
-                st.markdown(f"**Görüşme Sonucu:** {_ov.get('sonuc','—')}")
-                st.markdown(f"**Takip Tarihi:** {_ov.get('takip_tar','—')}")
-                st.markdown(f"**Sonraki Adım:** {_ov.get('sonraki_adim','—')}")
-
-            st.divider()
-            _os1, _os2 = st.columns(2)
-            with _os1:
-                st.markdown("##### 🎯 Saha Bilgisi")
-                st.markdown(f"**Beklenti:** {_ov.get('beklenti','—')}")
-                st.markdown(f"**Satışa Engel:** {_ov.get('engel','—')}")
-                st.markdown(f"**Şikayetleri:** {_ov.get('sik','—')}")
-            with _os2:
-                st.markdown("##### ⚔️ Rekabet")
-                st.markdown(f"**Geçiş Sebebi:** {_ov.get('gecis','—')}")
-                st.markdown(f"**Rakip Kargolar:** {_rak_on_str}")
-
-            if _ov.get("not_alan"):
-                st.divider()
-                st.markdown("##### 📝 Görüşme Notu")
-                st.info(_ov.get("not_alan"))
-
-            # Fiyat / Bölge / AVM tabloları
-            try:
-                _ft_on = _aj.loads(_ov.get("fiyat_tablo","[]") or "[]")
-                if _ft_on and any(s.get("il") and s.get("il")!="--" for s in _ft_on):
-                    st.markdown("##### 💰 Fiyat Tablosu")
-                    st.dataframe(pd.DataFrame(_ft_on), use_container_width=True, hide_index=True)
-            except: pass
-            try:
-                _bl_on = _aj.loads(_ov.get("bolge","[]") or "[]")
-                if _bl_on and any(s.get("il") and s.get("il")!="--" for s in _bl_on):
-                    st.markdown("##### 📍 Bölge Teslimat")
-                    st.dataframe(pd.DataFrame(_bl_on), use_container_width=True, hide_index=True)
-            except: pass
-            try:
-                _av_on = _aj.loads(_ov.get("avm","[]") or "[]")
-                if _av_on and any(s.get("avm") for s in _av_on):
-                    st.markdown("##### 🏬 AVM Teslimatları")
-                    st.dataframe(pd.DataFrame(_av_on), use_container_width=True, hide_index=True)
-            except: pass
-
-            st.divider()
-            _ob1, _ob2 = st.columns(2)
-            _ob1, _ob2, _ob3, _ob4 = st.columns(4)
-            if _ob1.button("✅ Onayla & Kaydet", type="primary", use_container_width=True, key="an_onay"):
-                _ok, _ = _an_upsert(_secili_firma, _ov)
+            if not _secili_firma:
+                st.error("❌ Firma seçilmedi!")
+            else:
+                _ok, _ = _an_upsert(_secili_firma, _veri_an)
                 if _ok:
-                    st.session_state.pop("an_onizleme", None)
-                    st.session_state.pop("an_onizleme_veri", None)
                     _eylem = "güncellendi" if _duzenle_mod else "kaydedildi"
+                    # Cari listede yoksa otomatik ekle
+                    try:
+                        _cari_chk = _df_cari_an[_df_cari_an["firma"].str.lower()==_secili_firma.lower()]
+                        if _cari_chk.empty:
+                            db_insert("cari_kartlar",{
+                                "firma":_secili_firma,
+                                "yetkili":_an_yetkili or "",
+                                "gsm":_an_iletisim if "@" not in (_an_iletisim or "") else "",
+                                "email":_an_iletisim if "@" in (_an_iletisim or "") else "",
+                                "il":"","durum":"Hedef","islem_asamasi":"İlk Temas",
+                                "beklenen_ciro":float((_an_bek_ciro or "0").replace(".","").replace(",",".")) if _an_bek_ciro else 0,
+                                "olusturan":st.session_state.get("kullanici",""),"silindi":0
+                            })
+                            st.info(f"📋 {_secili_firma} cari listeye otomatik eklendi.")
+                        else:
+                            _cid2 = int(_cari_chk.iloc[0]["id"]); _upd2 = {}
+                            if _an_bek_ciro:
+                                try: _upd2["beklenen_ciro"]=float(_an_bek_ciro.replace(".","").replace(",","."))
+                                except: pass
+                            if _upd2: db_update("cari_kartlar",_upd2,"id",_cid2)
+                    except: pass
                     st.success(f"✅ **{_secili_firma}** analizi başarıyla {_eylem}!")
                     st.balloons()
                     try: db_read.clear()
                     except: pass
                     st.rerun()
-            if _ob2.button("✏️ Geri Dön / Düzenle", use_container_width=True, key="an_geri"):
-                st.session_state.pop("an_onizleme", None)
-                st.session_state.pop("an_onizleme_veri", None)
-                st.rerun()
-            if _ob3.button("📄 Teklif Oluştur", use_container_width=True, key="an_onay_teklif"):
-                _ok2, _ = _an_upsert(_secili_firma, _ov)
-                if _ok2:
-                    try: db_read.clear()
-                    except: pass
-                st.session_state.pop("an_onizleme", None)
-                st.session_state.pop("an_onizleme_veri", None)
-                st.session_state["aktif_tab"] = "teklif"
-                st.session_state["pending_hedef_mus"] = _secili_firma
-                _an_ttur_vals2 = _ov.get("teklif_tur","")
-                if "özel" in str(_an_ttur_vals2).lower() or "sözleşme" in str(_an_ttur_vals2).lower():
-                    st.session_state["global_teklif_turu"] = "🤝 Özel Anlaşma"
-                else:
-                    st.session_state["global_teklif_turu"] = "🚀 Spot Teklif"
-                st.rerun()
-            _an_tel2 = str(_ov.get("iletisim","") or "").replace(" ","").replace("-","")
-            if _an_tel2 and "@" not in _an_tel2:
-                if _an_tel2.startswith("0"): _an_tel2 = "90" + _an_tel2[1:]
-                _wa2 = ("Merhaba " + _secili_firma + ", gorusemiz icin tesekkurler.").replace(" ","%20")
-                _ob4.markdown(f"<a href='https://wa.me/{_an_tel2}?text={_wa2}' target='_blank'><button style='width:100%;padding:6px;font-size:12px;border:none;background:#25d366;color:white;border-radius:6px;cursor:pointer;'>💬 WhatsApp</button></a>", unsafe_allow_html=True)
+
 
         if _cari_btn:
             _var_mi = not _df_cari_an[_df_cari_an["firma"].str.lower()==_secili_firma.lower()].empty
