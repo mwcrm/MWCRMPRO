@@ -3676,6 +3676,9 @@ elif aktif == "excel":
 elif aktif == "analiz":
     sayfa_log("analiz")
     import json as _aj
+    # Eski manuel alan key'lerini temizle
+    for _dead_key in ["an_firma_input"]:
+        st.session_state.pop(_dead_key, None)
 
     st.markdown("## 🔍 Müşteri Görüşme Analizi")
 
