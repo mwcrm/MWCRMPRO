@@ -4223,7 +4223,21 @@ elif aktif == "analiz":
 
         st.divider()
 
-        # Veriyi kayıt için hazırla
+        # Veriyi kayıt için hazırla — sadece Supabase'de var olan kolonlar
+        # Yeni alanları (koli_adet, saat vs.) not_alan içine göm, kolon hatası vermesin
+        _ek_bilgi = {
+            "saat": _an_saat or "",
+            "koli_adet": _an_koli_adet or "",
+            "koli_desi": _an_koli_desi or "",
+            "koli_kg": _an_koli_kg or "",
+            "pal_adet": _an_pal_adet or "",
+            "pal_desi": _an_pal_desi or "",
+            "pal_kg": _an_pal_kg or "",
+            "sevk_siklik": _an_sevk_siklik or "",
+            "aylik_odeme": str(_an_aylik_odeme or ""),
+        }
+        _ek_json = _aj.dumps(_ek_bilgi, ensure_ascii=False)
+
         _veri_an = {
             "yetkili":      _an_yetkili or "",
             "iletisim":     _an_iletisim or "",
@@ -4234,7 +4248,6 @@ elif aktif == "analiz":
             "ger_ciro":     float((_an_ger_ciro or "0").replace(".","").replace(",",".")) if _an_ger_ciro else 0,
             "kaynak":       _an_kaynak_val or "",
             "kargo":        _an_kargo_val or "",
-            "aylik_odeme":  float((_an_aylik_odeme or "0").replace(".","").replace(",",".")) if _an_aylik_odeme else 0,
             "fatura":       _an_fatura or "",
             "uapo":         _an_uapo or "",
             "odeme":        ", ".join(_an_odeme) if _an_odeme else "",
@@ -4248,17 +4261,9 @@ elif aktif == "analiz":
             "gecis":        ", ".join(_an_gecis) if _an_gecis else "",
             "potansiyel":   _an_pot or "",
             "sonuc":        _an_sonuc or "",
-            "not_alan":     _an_not or "",
+            "not_alan":     (_an_not or "") + (f"\n[EK:{_ek_json}]" if any(_ek_bilgi.values()) else ""),
             "takip_tar":    str(_an_takip) if _an_takip else "",
             "sonraki_adim": _an_sonraki or "",
-            "saat":         _an_saat or "",
-            "koli_adet":    _an_koli_adet or "",
-            "kd_min":       _an_koli_desi or "",
-            "koli_kg":      _an_koli_kg or "",
-            "pal_adet":     _an_pal_adet or "",
-            "pd_min":       _an_pal_desi or "",
-            "pal_kg":       _an_pal_kg or "",
-            "sevk_siklik":  _an_sevk_siklik or "",
             "olusturan":    _an_temsilci or st.session_state.get("kullanici",""),
             "fiyat_tablo":  _aj.dumps(st.session_state.get("an_fiyat_satirlar",[]), ensure_ascii=False),
             "avm":          _aj.dumps(st.session_state.get("an_avm_satirlar",[]), ensure_ascii=False),
