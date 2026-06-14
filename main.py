@@ -794,6 +794,7 @@ _TAB_ETIKETLER = {
     "excel": "📥 Excel Aktar",
     "kisiler": "📞 Telefon Kişiler",
         "analiz": "🔍 Müşteri Analizi",
+    "analiz": "🔍 Müşteri Analizi",
     "randevu": "📅 Randevular",
     "kullanici": "👥 Kullanıcı Yönetimi",
     "mesajlar": "💬 Mesajlar",
@@ -859,6 +860,13 @@ def get_menu_tercihi(kullanici):
     return _temizle(tam_liste)
 
 def save_menu_tercihi(kullanici, sira):
+    # Analiz her zaman listede olsun
+    if "analiz" not in sira:
+        try:
+            idx = sira.index("liste") + 1
+            sira.insert(idx, "analiz")
+        except: sira.append("analiz")
+
     try:
         sb_m = get_sb_client()
         if sb_m:
