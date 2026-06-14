@@ -3985,7 +3985,7 @@ elif aktif == "analiz":
 
     with _an_tab2:
         # ── YENİ / DÜZENLE FORMU ─────────────────────────────────────────────
-        # ── MÜŞTERI SEÇİMİ — cari listeden ya da manuel ───────────────────────────
+        st.session_state.pop("an_firma_input", None)  # eski manuel alan kaldırıldı
         st.markdown("### Hangi müşteri için analiz?")
         _df_cari_an = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
         _cari_opts_an = ["-- Müşteri Seç --"] + [f"[{int(r['id'])}] {r['firma']}" for _,r in _df_cari_an.iterrows()]
