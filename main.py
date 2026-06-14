@@ -3676,6 +3676,7 @@ elif aktif == "analiz":
     # ── DB FONKSİYONLARI ──────────────────────────────────────────────────────
     def _an_upsert(firma, veri):
         """Firma başına 1 analiz — varsa güncelle, yoksa ekle"""
+        veri["firma"] = firma  # her zaman firma adını ekle
         try:
             sb = get_sb_client()
             if sb:
@@ -3948,29 +3949,28 @@ elif aktif == "analiz":
                 else:
                     _tak_df3["takip_tar"] = pd.to_datetime(_tak_df3["takip_tar"], errors="coerce")
                     _tak_df3 = _tak_df3.dropna(subset=["takip_tar"]).sort_values("takip_tar")
+                    # None firma filtrele
+                    _tak_df3 = _tak_df3[_tak_df3["firma"].notna() & (_tak_df3["firma"].astype(str) != "None") & (_tak_df3["firma"].astype(str) != "")]
+                    _tak_df3["takip_tar"] = _tak_df3["takip_tar"].dt.normalize()
                     from datetime import date as _date
                     _bugun = pd.Timestamp(_date.today())
-                    _gecmis = _tak_df3[_tak_df3["takip_tar"] < _bugun]
-                    _bugun_yarin = _tak_df3[(_tak_df3["takip_tar"] >= _bugun) & (_tak_df3["takip_tar"] <= _bugun + pd.Timedelta(days=2))]
-                    _gelecek = _tak_df3[_tak_df3["takip_tar"] > _bugun + pd.Timedelta(days=2)]
+                    _gecmis     = _tak_df3[_tak_df3["takip_tar"] < _bugun]
+                    _bugun_yarin= _tak_df3[(_tak_df3["takip_tar"] >= _bugun) & (_tak_df3["takip_tar"] <= _bugun + pd.Timedelta(days=2))]
+                    _gelecek    = _tak_df3[_tak_df3["takip_tar"] > _bugun + pd.Timedelta(days=2)]
 
-                    if not _bugun_yarin.empty:
-                        st.markdown("#### 🔴 Bugün / Yarın")
-                        _s = _bugun_yarin[["firma","takip_tar","sonuc","potansiyel","olusturan"]]
+                    def _tak_goster(df, baslik):
+                        if df.empty: return
+                        st.markdown(f"#### {baslik}")
+                        _s = df[["firma","takip_tar","sonuc","potansiyel","olusturan"]].copy()
+                        _s["takip_tar"] = _s["takip_tar"].dt.strftime("%d.%m.%Y")
                         _s.columns = ["Firma","Takip Tarihi","Sonuç","Potansiyel","Temsilci"]
                         st.dataframe(_s, use_container_width=True, hide_index=True)
 
-                    if not _gecmis.empty:
-                        st.markdown("#### 🟠 Geçmiş (Yapılmamış)")
-                        _g = _gecmis[["firma","takip_tar","sonuc","potansiyel","olusturan"]]
-                        _g.columns = ["Firma","Takip Tarihi","Sonuç","Potansiyel","Temsilci"]
-                        st.dataframe(_g, use_container_width=True, hide_index=True)
-
-                    if not _gelecek.empty:
-                        st.markdown("#### 🟢 Yaklaşan")
-                        _y = _gelecek[["firma","takip_tar","sonuc","potansiyel","olusturan"]]
-                        _y.columns = ["Firma","Takip Tarihi","Sonuç","Potansiyel","Temsilci"]
-                        st.dataframe(_y, use_container_width=True, hide_index=True)
+                    _tak_goster(_bugun_yarin, "🔴 Bugün / Yarın")
+                    _tak_goster(_gecmis, "🟠 Geçmiş (Yapılmamış)")
+                    _tak_goster(_gelecek, "🟢 Yaklaşan")
+                    if _bugun_yarin.empty and _gecmis.empty and _gelecek.empty:
+                        st.info("Firma adı girilmiş takip kaydı bulunamadı.")
             except Exception as _te:
                 st.error(f"Hata: {_te}")
 
@@ -4007,19 +4007,29 @@ elif aktif == "analiz":
         # Manuel yazılan firma — cari listede yok ve yeni analiz — kart açmaya zorla
         _cari_var = not _df_cari_an[_df_cari_an["firma"].str.lower()==_secili_firma.lower()].empty
         if not _cari_var and not _duzenle_mod:
-            st.warning(f"⚠️ **{_secili_firma}** cari listede yok. Devam etmeden önce yeni bir cari kart açılmalı.")
-            _kart_ac = st.columns(2)
-            if _kart_ac[0].button("✅ Yeni Cari Kart Aç ve Devam Et", type="primary", use_container_width=True, key="an_kart_ac"):
+            st.warning(f"⚠️ **{_secili_firma}** cari listede yok. Analiz yapmadan önce kart açılmalı.")
+            st.markdown("##### 🆕 Yeni Cari Kart Bilgileri")
+            _kf1,_kf2,_kf3,_kf4 = st.columns(4)
+            _kart_yetkili = _kf1.text_input("Yetkili / Ünvan", key="kart_yetkili", placeholder="Ad Soyad")
+            _kart_gsm     = _kf2.text_input("GSM", key="kart_gsm", placeholder="05xx xxx xx xx")
+            _kart_email   = _kf3.text_input("E-posta", key="kart_email", placeholder="mail@...")
+            _kart_il      = _kf4.text_input("İl", key="kart_il", placeholder="İstanbul")
+            _kf5,_kf6 = st.columns(2)
+            _kart_asama = _kf5.selectbox("İşlem Aşaması", ["İlk Temas","Görüşme Yapıldı","Teklif Verildi","Müzakere","Kazanıldı","Kaybedildi"], key="kart_asama")
+            _kart_durum = _kf6.selectbox("Durum", ["Hedef","Aktif","Pasif"], key="kart_durum")
+            _kb1,_kb2 = st.columns(2)
+            if _kb1.button("✅ Kartı Aç ve Analize Devam Et", type="primary", use_container_width=True, key="an_kart_ac"):
                 db_insert("cari_kartlar",{
-                    "firma": _secili_firma, "yetkili": "", "gsm": "", "email": "",
-                    "il": "", "durum": "Hedef", "islem_asamasi": "İlk Temas",
-                    "beklenen_ciro": 0, "olusturan": st.session_state.get("kullanici",""), "silindi": 0
+                    "firma":_secili_firma,"yetkili":_kart_yetkili or "","gsm":_kart_gsm or "",
+                    "email":_kart_email or "","il":_kart_il or "","durum":_kart_durum,
+                    "islem_asamasi":_kart_asama,"beklenen_ciro":0,
+                    "olusturan":st.session_state.get("kullanici",""),"silindi":0
                 })
                 try: db_read.clear()
                 except: pass
-                st.success(f"✅ {_secili_firma} cari listeye eklendi, devam edebilirsin.")
+                st.success(f"✅ {_secili_firma} cari listeye eklendi!")
                 st.rerun()
-            if _kart_ac[1].button("❌ İptal", use_container_width=True, key="an_kart_iptal"):
+            if _kb2.button("❌ İptal", use_container_width=True, key="an_kart_iptal"):
                 st.session_state.pop("an_firma_input", None)
                 st.rerun()
             st.stop()
