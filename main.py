@@ -4221,7 +4221,7 @@ durumGuncelle();
 <div id="ozet_alan" style="display:none;"></div>
 </body></html>"""
 
-    st.components.v1.html(_html_form, height=3200, scrolling=True)
+    st.components.v1.html(_html_form, height=800, scrolling=True)
 
     # HTML'den gelen postMessage ile kaydet
     _form_data = st.session_state.get("an_form_data")
