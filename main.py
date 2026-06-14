@@ -3988,47 +3988,33 @@ elif aktif == "analiz":
         # ── MÜŞTERI SEÇİMİ — cari listeden ya da manuel ───────────────────────────
         st.markdown("### Hangi müşteri için analiz?")
         _df_cari_an = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
-        _mac1, _mac2 = st.columns([3, 1])
-        _cari_opts_an = ["-- Yeni / Manuel Yaz --"] + [f"[{int(r['id'])}] {r['firma']}" for _,r in _df_cari_an.iterrows()]
-        _cari_sec_an = _mac1.selectbox("Cari listeden seç", _cari_opts_an, key="an_cari_sec")
-        _an_firma_input = _mac2.text_input("veya firma adı yaz", key="an_firma_input", placeholder="Manuel yaz...")
+        _cari_opts_an = ["-- Müşteri Seç --"] + [f"[{int(r['id'])}] {r['firma']}" for _,r in _df_cari_an.iterrows()]
+        _cari_sec_an = st.selectbox("Müşteri seç", _cari_opts_an, key="an_cari_sec")
 
         # Firmayı belirle
         _secili_firma = ""
         _secili_cari = None
-        if _cari_sec_an != "-- Yeni / Manuel Yaz --" and "[" in _cari_sec_an:
+        if _cari_sec_an != "-- Müşteri Seç --" and "[" in _cari_sec_an:
             _cid = int(_cari_sec_an.split("]")[0].replace("[","").strip())
             _crow = _df_cari_an[_df_cari_an["id"]==_cid]
             if not _crow.empty:
                 _secili_cari = _crow.iloc[0]
                 _secili_firma = str(_secili_cari.get("firma",""))
-        elif _an_firma_input.strip():
-            _secili_firma = _an_firma_input.strip()
 
+        # Cari listede yok — Yeni Kart Ekle sayfasına yönlendir
         if not _secili_firma:
-            st.info("👆 Cari listeden müşteri seç **veya** sağdaki kutuya firma adı yaz.")
+            st.info("👆 Listeden müşteri seç. Yeni müşteri için önce kart açılmalı.")
+            if st.button("➕ Yeni Müşteri Kartı Ekle", type="primary", key="an_yeni_kart"):
+                st.session_state["aktif_tab"] = "yeni"
+                st.session_state.pop("duzenle_musteri", None)
+                st.rerun()
             st.stop()
 
         # Mevcut analizi yükle
         _mevcut_an = _an_getir_firma(_secili_firma)
         _duzenle_mod = _mevcut_an is not None
 
-        # Manuel yazılan firma — cari listede yok — Yeni Kart Ekle sayfasına yönlendir
-        _cari_var = not _df_cari_an[_df_cari_an["firma"].str.lower()==_secili_firma.lower()].empty
-        if not _cari_var and not _duzenle_mod:
-            st.warning(f"⚠️ **{_secili_firma}** cari listede bulunamadı.")
-            st.info("Önce yeni müşteri kartı açılmalı. Kart kaydedildikten sonra analiz formuna otomatik dönülecek.")
-            _kb1, _kb2 = st.columns(2)
-            if _kb1.button("➕ Yeni Kart Ekle", type="primary", use_container_width=True, key="an_kart_ac"):
-                # Analize dönmek için firma adını ve tab'ı sakla
-                st.session_state["analiz_donuş_firma"] = _secili_firma
-                st.session_state["duzenle_musteri"] = {"firma": _secili_firma}
-                st.session_state["aktif_tab"] = "yeni"
-                st.rerun()
-            if _kb2.button("❌ İptal", use_container_width=True, key="an_kart_iptal"):
-                st.session_state.pop("an_firma_input", None)
-                st.rerun()
-            st.stop()
+
 
         if _duzenle_mod:
             st.success(f"✅ **{_secili_firma}** için kayıtlı analiz bulundu — düzenliyorsunuz")
