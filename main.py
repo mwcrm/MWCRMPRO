@@ -3792,6 +3792,18 @@ elif aktif == "analiz":
             if _fp2 != "Tümü": _df_f2 = _df_f2[_df_f2["potansiyel"]==_fp2]
             if _ft3 != "Tümü": _df_f2 = _df_f2[_df_f2["teklif_tur"].str.contains(_ft3, case=False, na=False)]
             st.caption(f"**{len(_df_f2)}** analiz")
+
+            # ── Takip Bekleyenler (kartların üstünde) ────────────────────────
+            try:
+                _tak_df = _df_f2[_df_f2["takip_tar"].notna() & (_df_f2["takip_tar"] != "") & (_df_f2["takip_tar"] != "None")].copy()
+                if not _tak_df.empty:
+                    st.markdown("##### 📅 Takip Bekleyenler")
+                    _tak_df["takip_tar"] = pd.to_datetime(_tak_df["takip_tar"], errors="coerce")
+                    _tak_df = _tak_df.dropna(subset=["takip_tar"]).sort_values("takip_tar")
+                    _tak_show = _tak_df[["firma","takip_tar","sonuc","potansiyel","olusturan"]].head(15)
+                    _tak_show.columns = ["Firma","Takip Tarihi","Sonuç","Potansiyel","Temsilci"]
+                    st.dataframe(_tak_show, use_container_width=True, hide_index=True)
+            except: pass
             st.divider()
 
             for _ar_idx, _ar in _df_f2.reset_index(drop=True).iterrows():
@@ -3911,17 +3923,7 @@ elif aktif == "analiz":
             _ki5.metric("💰 Beklenen Ciro", f"{_bek_top:,.0f} ₺")
             _ki6.metric("✅ Gerçekleşen", f"{_ger_top:,.0f} ₺", delta=f"%{_gerceklesme}")
 
-            # ── Takip Bekleyenler Tablosu ─────────────────────────────────────
-            try:
-                _tak_df = _df_f2[_df_f2["takip_tar"].notna() & (_df_f2["takip_tar"] != "")].copy()
-                if not _tak_df.empty:
-                    st.markdown("**📅 Takip Bekleyenler**")
-                    _tak_df["takip_tar"] = pd.to_datetime(_tak_df["takip_tar"], errors="coerce")
-                    _tak_df = _tak_df.sort_values("takip_tar")
-                    _tak_show = _tak_df[["firma","takip_tar","sonuc","potansiyel","olusturan"]].head(10)
-                    _tak_show.columns = ["Firma","Takip Tarihi","Sonuç","Potansiyel","Temsilci"]
-                    st.dataframe(_tak_show, use_container_width=True, hide_index=True)
-            except: pass
+            # (takip tablosu yukarıya taşındı)
 
             # ── Ciro Tablosu ─────────────────────────────────────────────────
             try:
@@ -3967,12 +3969,32 @@ elif aktif == "analiz":
             _secili_firma = _an_firma_input.strip()
 
         if not _secili_firma:
-            st.warning("⚠️ Önce bir müşteri seç veya firma adı yaz — her müşteriye sadece 1 analiz yapılır, sonraki açılışlarda düzenlenir.")
+            st.info("👆 Cari listeden müşteri seç **veya** sağdaki kutuya firma adı yaz.")
             st.stop()
 
         # Mevcut analizi yükle
         _mevcut_an = _an_getir_firma(_secili_firma)
         _duzenle_mod = _mevcut_an is not None
+
+        # Manuel yazılan firma — cari listede yok ve yeni analiz — kart açmaya zorla
+        _cari_var = not _df_cari_an[_df_cari_an["firma"].str.lower()==_secili_firma.lower()].empty
+        if not _cari_var and not _duzenle_mod:
+            st.warning(f"⚠️ **{_secili_firma}** cari listede yok. Devam etmeden önce yeni bir cari kart açılmalı.")
+            _kart_ac = st.columns(2)
+            if _kart_ac[0].button("✅ Yeni Cari Kart Aç ve Devam Et", type="primary", use_container_width=True, key="an_kart_ac"):
+                db_insert("cari_kartlar",{
+                    "firma": _secili_firma, "yetkili": "", "gsm": "", "email": "",
+                    "il": "", "durum": "Hedef", "islem_asamasi": "İlk Temas",
+                    "beklenen_ciro": 0, "olusturan": st.session_state.get("kullanici",""), "silindi": 0
+                })
+                try: db_read.clear()
+                except: pass
+                st.success(f"✅ {_secili_firma} cari listeye eklendi, devam edebilirsin.")
+                st.rerun()
+            if _kart_ac[1].button("❌ İptal", use_container_width=True, key="an_kart_iptal"):
+                st.session_state.pop("an_firma_input", None)
+                st.rerun()
+            st.stop()
 
         if _duzenle_mod:
             st.success(f"✅ **{_secili_firma}** için kayıtlı analiz bulundu — düzenliyorsunuz")
