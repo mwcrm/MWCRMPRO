@@ -3572,18 +3572,16 @@ elif aktif == "analiz":
 
     # ── DB FONKSİYONLARI ──────────────────────────────────────────────────────
     def _an_upsert(firma, veri):
-        """Firma başına 1 analiz — varsa güncelle, yoksa ekle"""
         try:
             sb = get_sb_client()
             if sb:
                 _mevcut = sb.table("musteri_analiz").select("id").eq("firma", firma).execute()
                 if _mevcut.data:
-                    aid = _mevcut.data[0]["id"]
-                    sb.table("musteri_analiz").update(veri).eq("id", aid).execute()
-                    return True, aid
+                    sb.table("musteri_analiz").update(veri).eq("firma", firma).execute()
                 else:
-                    r = sb.table("musteri_analiz").insert(veri).execute()
-                    return True, None
+                    veri["firma"] = firma
+                    sb.table("musteri_analiz").insert(veri).execute()
+                return True
         except: pass
         try:
             conn = get_conn()
@@ -3603,17 +3601,17 @@ elif aktif == "analiz":
                 sets = ", ".join([f"{k}=?" for k in veri.keys()])
                 conn.execute(f"UPDATE musteri_analiz SET {sets} WHERE firma=?", list(veri.values())+[firma])
             else:
-                cols = ",".join(["firma"]+list(veri.keys()))
-                vals = ",".join(["?"]+["?" for _ in veri])
-                conn.execute(f"INSERT INTO musteri_analiz ({cols}) VALUES ({vals})", [firma]+list(veri.values()))
+                veri["firma"] = firma
+                cols = ",".join(veri.keys())
+                vals = ",".join(["?" for _ in veri])
+                conn.execute(f"INSERT INTO musteri_analiz ({cols}) VALUES ({vals})", list(veri.values()))
             conn.commit(); conn.close()
-            return True, None
+            return True
         except Exception as e:
             st.error(f"Kayıt hatası: {e}")
-            return False, None
+            return False
 
     def _an_getir_firma(firma):
-        """Firma adına göre analizi getir"""
         try:
             sb = get_sb_client()
             if sb:
@@ -3622,15 +3620,17 @@ elif aktif == "analiz":
         except: pass
         try:
             conn = get_conn()
-            row = conn.execute("SELECT * FROM musteri_analiz WHERE firma=?", (firma,)).fetchone()
-            conn.close()
+            cur = conn.execute("SELECT * FROM musteri_analiz WHERE firma=?", (firma,))
+            row = cur.fetchone()
             if row:
-                cols = [d[0] for d in conn.execute("PRAGMA table_info(musteri_analiz)").fetchall()]
+                cols = [d[0] for d in cur.description]
+                conn.close()
                 return dict(zip(cols, row))
+            conn.close()
         except: pass
         return None
 
-    def _an_getir_tumü(limit=200):
+    def _an_getir_tumü(limit=500):
         try:
             sb = get_sb_client()
             if sb:
@@ -3640,12 +3640,11 @@ elif aktif == "analiz":
         try:
             conn = get_conn()
             conn.execute("""CREATE TABLE IF NOT EXISTS musteri_analiz (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                firma TEXT UNIQUE, yetkili TEXT, iletisim TEXT, sektor TEXT,
-                amac TEXT, mdurum TEXT, bek_ciro REAL, ger_ciro REAL,
-                kaynak TEXT, kargo TEXT, fatura TEXT, uapo TEXT, odeme TEXT,
-                pazarlik TEXT, beklenti TEXT, teklif_tur TEXT, karar TEXT,
-                sure TEXT, engel TEXT, sik TEXT, gecis TEXT, potansiyel TEXT,
+                id INTEGER PRIMARY KEY AUTOINCREMENT, firma TEXT UNIQUE,
+                yetkili TEXT, iletisim TEXT, sektor TEXT, amac TEXT, mdurum TEXT,
+                bek_ciro REAL, ger_ciro REAL, kaynak TEXT, kargo TEXT, fatura TEXT,
+                uapo TEXT, odeme TEXT, pazarlik TEXT, beklenti TEXT, teklif_tur TEXT,
+                karar TEXT, sure TEXT, engel TEXT, sik TEXT, gecis TEXT, potansiyel TEXT,
                 sonuc TEXT, not_alan TEXT, takip_tar TEXT, sonraki_adim TEXT,
                 bolge TEXT, avm TEXT, fiyat_tablo TEXT, rakip TEXT,
                 olusturan TEXT, tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -3669,16 +3668,15 @@ elif aktif == "analiz":
             return True
         except: return False
 
-    # ── MÜŞTERI SEÇİMİ — cari listeden ya da manuel ───────────────────────────
-    st.markdown("### Hangi müşteri için analiz?")
+    # ── MÜŞTERİ SEÇİMİ ────────────────────────────────────────────────────────
     _df_cari_an = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
     _mac1, _mac2 = st.columns([3, 1])
     _cari_opts_an = ["-- Yeni / Manuel Yaz --"] + [f"[{int(r['id'])}] {r['firma']}" for _,r in _df_cari_an.iterrows()]
     _cari_sec_an = _mac1.selectbox("Cari listeden seç", _cari_opts_an, key="an_cari_sec")
-    _an_firma_input = _mac2.text_input("veya firma adı yaz", key="an_firma_input", placeholder="Manuel yaz...",
+    _an_firma_input = _mac2.text_input("veya firma adı yaz", key="an_firma_input",
+        placeholder="Manuel yaz...",
         value=st.session_state.pop("an_duzenle_firma", ""))
 
-    # Firmayı belirle
     _secili_firma = ""
     _secili_cari = None
     if _cari_sec_an != "-- Yeni / Manuel Yaz --" and "[" in _cari_sec_an:
@@ -3691,10 +3689,9 @@ elif aktif == "analiz":
         _secili_firma = _an_firma_input.strip()
 
     if not _secili_firma:
-        st.warning("⚠️ Önce bir müşteri seç veya firma adı yaz — her müşteriye sadece 1 analiz yapılır, sonraki açılışlarda düzenlenir.")
+        st.warning("⚠️ Önce bir müşteri seç veya firma adı yaz — her müşteriye sadece 1 analiz yapılır.")
         st.stop()
 
-    # Mevcut analizi yükle
     _mevcut_an = _an_getir_firma(_secili_firma)
     _duzenle_mod = _mevcut_an is not None
 
@@ -3704,310 +3701,535 @@ elif aktif == "analiz":
         st.info(f"🆕 **{_secili_firma}** için yeni analiz oluşturuyorsunuz")
 
     def _mv(key, default=""):
-        """Mevcut analiz verisini getir"""
-        if _mevcut_an and _mevcut_an.get(key):
-            return _mevcut_an[key]
+        if _mevcut_an and _mevcut_an.get(key): return _mevcut_an[key]
         return default
 
-    def _mv_list(key):
-        val = _mv(key, "")
-        if not val: return []
-        return [x.strip() for x in str(val).split(",") if x.strip()]
+    # ── HTML FORM ─────────────────────────────────────────────────────────────
+    _auto_tel = ""
+    if _secili_cari is not None:
+        _auto_tel = str(_secili_cari.get("gsm","") or _secili_cari.get("email","") or "")
 
-    def _mv_json(key):
-        val = _mv(key, "[]")
-        try: return _aj.loads(val or "[]")
-        except: return []
+    _mevcut_json = _aj.dumps(_mevcut_an or {}, ensure_ascii=False, default=str)
 
-    # ── HIZLI NOT ─────────────────────────────────────────────────────────────
-    st.markdown("""<div style='background:#eff6ff;border:0.5px solid #bfdbfe;border-radius:8px;padding:10px 14px;margin:8px 0;'><b style='font-size:12px;color:#1d4ed8;'>⚡ Hızlı Not</b> <span style='font-size:11px;color:#64748b;'>— devrik yaz, eksik bırak, sistem anlar</span></div>""", unsafe_allow_html=True)
-    _hn1, _hn2 = st.columns([4, 1])
-    _hizli_not = _hn1.text_area("", placeholder="aras kullanıyor, 500 koli ist-bursa, 8₺/desi ödüyor, fatura sorunu var, erken alım istiyor, avm var...", height=55, key="an_hizli_not", label_visibility="collapsed")
-    if _hn2.button("⚡ Otomatik Doldur", use_container_width=True, key="an_auto_btn") and _hizli_not:
-        import re as _re2
-        _txt2 = _hizli_not.lower()
-        _km2 = _re2.search(r"(\d+)\s*koli", _txt2)
-        if _km2: st.session_state["an_koli_adet"] = _km2.group(1)
-        _pm2 = _re2.search(r"(\d+)\s*palet", _txt2)
-        if _pm2: st.session_state["an_pal_adet"] = _pm2.group(1)
-        for _k2 in ["aras","yurtiçi","mng","sürat","ptt","dhl","ups","horoz"]:
-            if _k2 in _txt2:
-                st.session_state["an_kargo"] = [_k2.capitalize()]
-        _fm2 = _re2.search(r"(\d+[\.,]?\d*)\s*₺?[/]?\s*desi", _txt2)
-        if _fm2:
-            _fs_list = st.session_state.get("an_fiyat_satirlar", [{"il":"","urun":"koli","min":"","max":"","adet":"","musteri":"","biz":""}])
-            _fs_list[0]["musteri"] = _fm2.group(1)
-            st.session_state["an_fiyat_satirlar"] = _fs_list
-        if "faturasız" in _txt2: st.session_state["an_fatura"] = "faturasız"
-        if "avm" in _txt2:
-            st.session_state["an_avm_satirlar"] = [{"avm":"(nottan eklendi)","sehir":"--","urun":"","saat":""}]
-        st.success("✅ Otomatik dolduruldu!"); st.rerun()
+    _html_form = """<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+body{background:#f1f5f9;padding:12px;font-size:12px;}
+.s{border:0.5px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:10px;background:white;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
+.st{font-size:10px;font-weight:600;color:#1d4ed8;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px;border-bottom:1px solid #eff6ff;padding-bottom:8px;}
+.r{display:flex;gap:8px;align-items:center;margin-bottom:7px;flex-wrap:nowrap;}
+.l{font-size:11px;color:#64748b;min-width:120px;flex-shrink:0;}
+.ts{display:flex;gap:4px;flex-wrap:wrap;}
+.t{font-size:11px;padding:2px 10px;border-radius:12px;border:0.5px solid #e2e8f0;color:#64748b;background:white;cursor:pointer;white-space:nowrap;transition:all 0.12s;user-select:none;}
+.t:hover{border-color:#93c5fd;color:#1d4ed8;}
+.t.on{background:#eff6ff;color:#1d4ed8;border-color:#93c5fd;}
+.t.og{background:#f0fdf4;color:#16a34a;border-color:#86efac;}
+.t.or{background:#fef2f2;color:#dc2626;border-color:#fca5a5;}
+.t.oy{background:#fffbeb;color:#d97706;border-color:#fcd34d;}
+input,select,textarea{font-size:11px;border:0.5px solid #e2e8f0;border-radius:5px;padding:3px 8px;background:#fafafa;color:#1e293b;outline:none;width:100%;}
+input:focus,select:focus,textarea:focus{border-color:#93c5fd;background:white;}
+input.auto{background:#eff6ff;color:#1d4ed8;border-color:#93c5fd;}
+input.empty{background:#f8fafc;border:0.5px dashed #e2e8f0;color:#94a3b8;font-style:italic;}
+.g5{display:grid;grid-template-columns:1.2fr 0.8fr 0.5fr 0.5fr 0.7fr 0.8fr 0.8fr 28px;gap:4px;margin-bottom:4px;align-items:center;}
+.g5b{display:grid;grid-template-columns:1.2fr 0.8fr 0.5fr 0.5fr 0.7fr 0.8fr 1fr 28px;gap:4px;margin-bottom:4px;align-items:center;}
+.gavm{display:grid;grid-template-columns:1.8fr 0.9fr 1.2fr 1.2fr 28px;gap:4px;margin-bottom:4px;align-items:center;}
+.grk{display:grid;grid-template-columns:2fr 0.8fr 0.8fr 2fr 28px;gap:4px;margin-bottom:4px;align-items:center;}
+.gh{font-size:10px;color:#94a3b8;padding-bottom:3px;}
+.rm{font-size:13px;cursor:pointer;color:#cbd5e1;text-align:center;border:none;background:none;border-radius:4px;padding:0 4px;}
+.rm:hover{color:#dc2626;background:#fef2f2;}
+.score-bar{height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;flex:1;margin:0 8px;}
+.score-fill{height:100%;border-radius:4px;transition:width 0.3s;background:linear-gradient(90deg,#dc2626,#f59e0b 50%,#16a34a);}
+.quick{background:#eff6ff;border:0.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-bottom:10px;}
+.not-hint{font-size:10px;color:#94a3b8;margin-top:3px;line-height:1.5;}
+.not-ozet{background:#f8fafc;border-radius:6px;padding:8px 10px;margin-top:6px;font-size:10px;display:none;}
+.act{display:flex;gap:6px;flex-wrap:wrap;padding-top:10px;border-top:0.5px solid #f1f5f9;margin-top:8px;}
+.btn{padding:6px 14px;border:none;border-radius:6px;font-size:11px;font-weight:500;cursor:pointer;}
+.btn-p{background:#1d4ed8;color:white;}
+.btn-g{background:#f1f5f9;color:#374151;border:0.5px solid #e2e8f0;}
+.btn-wa{background:#25d366;color:white;}
+.btn-em{background:#fffbeb;color:#b45309;border:0.5px solid #fcd34d;}
+.btn-cl{background:#f0fdf4;color:#15803d;border:0.5px solid #86efac;}
+.btn-tk{background:#eff6ff;color:#1d4ed8;border:0.5px solid #93c5fd;}
+.btn-sm{padding:4px 10px;font-size:10px;}
+.divider{height:0.5px;background:#f1f5f9;margin:10px 0;}
+.durum-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:8px;}
+.durum-k{padding:6px 10px;border-radius:6px;font-size:10px;text-align:center;font-weight:500;}
+</style></head><body>
+<div class="quick">
+  <div style="font-size:11px;font-weight:600;color:#1d4ed8;margin-bottom:6px;">⚡ hızlı not — devrik de yaz, eksik de bırak, sistem anlar</div>
+  <div style="display:flex;gap:8px;">
+    <textarea id="hizli_not" placeholder="aras kullanıyor, 500 koli ist-bursa, 8₺/desi ödüyor, fatura sorunu var, erken alım istiyor, avm var..." style="flex:1;height:52px;resize:vertical;border-radius:6px;padding:6px 10px;font-size:11px;border:0.5px solid #bfdbfe;background:white;width:auto;"></textarea>
+    <button class="btn btn-p" onclick="hizliDoldur()" style="white-space:nowrap;align-self:stretch;">otomatik doldur ↗</button>
+  </div>
+  <div class="not-hint">💡 "500 koli" → koli adedi · "8₺/desi" → fiyat · "aras" → kargo · "30 gün" → vade · "avm" → AVM teslimatı</div>
+  <div class="not-ozet" id="not_ozet"><div id="not_items"></div></div>
+</div>
+<div class="s">
+  <div class="st">🎯 analiz amacı & müşteri durumu</div>
+  <div class="r"><span class="l">Bu analiz neden?</span>
+    <div class="ts" id="t_amac">
+      <div class="t on" onclick="tog(this)">yeni müşteri kazanım</div><div class="t" onclick="tog(this)">zam görüşmesi</div>
+      <div class="t" onclick="tog(this)">nezaket ziyareti</div><div class="t" onclick="tog(this)">erken potansiyel</div>
+      <div class="t" onclick="tog(this)">kayıp müşteri geri kazanım</div><div class="t" onclick="tog(this)">mevcut müşteri analizi</div>
+      <div class="t" onclick="tog(this)">rakip takibi</div><div class="t" onclick="tog(this)">pazar araştırması</div>
+    </div>
+  </div>
+  <div class="r">
+    <span class="l">Müşteri durumu</span>
+    <div class="ts" id="t_mdurum"><div class="t on" onclick="tekSec('t_mdurum',this)">yeni</div><div class="t" onclick="tekSec('t_mdurum',this)">mevcut</div><div class="t" onclick="tekSec('t_mdurum',this)">eski</div><div class="t" onclick="tekSec('t_mdurum',this)">rakip firmanın müşterisi</div></div>
+    <span class="l" style="margin-left:12px;">Beklenen çıktı</span>
+    <div class="ts" id="t_cikti"><div class="t" onclick="tog(this)">teklif ver</div><div class="t on" onclick="tog(this)">cari listeye ekle</div><div class="t" onclick="tog(this)">takibe al</div><div class="t" onclick="tog(this)">randevu planla</div></div>
+  </div>
+  <div class="r">
+    <span class="l">Beklenen ciro (₺/ay)</span><input id="bek_ciro" placeholder="₺/ay" style="flex:1;" oninput="ciroH()"/>
+    <span class="l" style="margin-left:8px;">Gerçekleşen ciro</span><input id="ger_ciro" placeholder="₺/ay" style="flex:1;" oninput="ciroH()"/>
+    <span class="l" style="margin-left:8px;">Fark</span><input id="fark_ciro" readonly class="auto" style="flex:1;" placeholder="otomatik"/>
+  </div>
+</div>
+<div class="s">
+  <div class="st">🔍 kaynak & müşteri bilgisi</div>
+  <div class="r">
+    <span class="l">Görüşme tarihi/saati</span><input type="date" id="gorusme_tarih" style="flex:1;"/><input type="time" id="gorusme_saat" style="flex:1;"/>
+    <span class="l" style="margin-left:8px;">Temsilci</span><input id="temsilci" placeholder="Ad Soyad" style="flex:1;"/>
+  </div>
+  <div class="r"><span class="l">Nereden bulundu</span>
+    <div class="ts" id="t_kaynak">
+      <div class="t on" onclick="tog(this)">soğuk arama</div><div class="t" onclick="tog(this)">referans</div><div class="t" onclick="tog(this)">linkedin</div>
+      <div class="t" onclick="tog(this)">internet/forum</div><div class="t" onclick="tog(this)">ziyaret</div><div class="t" onclick="tog(this)">fuar</div>
+      <div class="t" onclick="tog(this)">sosyal medya</div><div class="t" onclick="tog(this)">eski müşteri</div>
+    </div>
+  </div>
+  <div class="r">
+    <span class="l">Referans veren</span><input id="referans" placeholder="kim yönlendirdi? — isteğe bağlı" style="flex:1;"/>
+    <span class="l" style="margin-left:8px;">Tel / E-posta</span><input id="iletisim" placeholder="05xx / mail@..." style="flex:1;"/>
+  </div>
+  <div class="r">
+    <span class="l">Firma adı</span><input id="firma" style="flex:2;"/>
+    <select id="firma_durum" style="flex:1;"><option>biliniyor</option><option>bilinmiyor</option><option>rakip firma</option></select>
+  </div>
+  <div class="r">
+    <span class="l">Yetkili / Ünvan</span><input id="yetkili" placeholder="Ad Soyad — Ünvan" style="flex:1;"/>
+    <span class="l" style="margin-left:8px;">Sektör</span>
+    <select id="sektor" style="flex:1;"><option>--</option><option>Tekstil</option><option>Gıda</option><option>Otomotiv</option><option>Elektronik</option><option>İnşaat</option><option>E-ticaret</option><option>AVM/Perakende</option><option>Kimya</option><option>Mobilya</option><option>Medikal</option><option>Kozmetik</option><option>Tarım</option><option>Diğer</option></select>
+  </div>
+  <div class="r">
+    <span class="l">Bizi tanıyor mu?</span>
+    <div class="ts" id="t_tanima"><div class="t" onclick="tekSec('t_tanima',this)">evet tanıyor</div><div class="t on" onclick="tekSec('t_tanima',this)">duymuş</div><div class="t" onclick="tekSec('t_tanima',this)">hayır</div></div>
+    <span class="l" style="margin-left:12px;">Önce teklif verildi mi?</span>
+    <div class="ts" id="t_tonce"><div class="t" onclick="tekSec('t_tonce',this)">evet</div><div class="t on" onclick="tekSec('t_tonce',this)">hayır</div><div class="t" onclick="tekSec('t_tonce',this)">bilinmiyor</div></div>
+  </div>
+  <div class="act">
+    <button class="btn btn-wa" onclick="waGonder()">💬 WhatsApp</button>
+    <button class="btn btn-em" onclick="emailGonder()">✉️ E-posta</button>
+    <button class="btn btn-cl" onclick="kaydet()">💾 Kaydet / Güncelle</button>
+    <button class="btn btn-tk" onclick="ozet()">📋 Özet</button>
+    <button class="btn btn-g" onclick="temizle()" style="color:#dc2626;">🗑 Temizle</button>
+  </div>
+</div>
+<div class="s">
+  <div class="st">📦 ürün, hacim & ölçü</div>
+  <div class="r"><span class="l">Gönderi türü</span>
+    <div class="ts" id="t_urun">
+      <div class="t on" onclick="tog(this)">koli</div><div class="t" onclick="tog(this)">palet</div><div class="t" onclick="tog(this)">parsiyel</div>
+      <div class="t" onclick="tog(this)">TIR/komple</div><div class="t" onclick="tog(this)">soğuk zincir</div><div class="t" onclick="tog(this)">ADR/tehlikeli</div>
+      <div class="t" onclick="tog(this)">ambar kargo</div><div class="t" onclick="tog(this)">dış nakliye</div>
+    </div>
+  </div>
+  <div class="r">
+    <span class="l">Koli desi aralığı</span>
+    <input id="kd_min" placeholder="min" style="width:52px;flex:none;"/><span style="color:#cbd5e1;font-size:10px;margin:0 2px;">—</span>
+    <input id="kd_max" placeholder="max" style="width:52px;flex:none;"/><span style="color:#64748b;font-size:11px;margin-right:16px;">desi</span>
+    <span class="l">Palet desi aralığı</span>
+    <input id="pd_min" placeholder="min" style="width:52px;flex:none;"/><span style="color:#cbd5e1;font-size:10px;margin:0 2px;">—</span>
+    <input id="pd_max" placeholder="max" style="width:52px;flex:none;"/><span style="color:#64748b;font-size:11px;">desi</span>
+  </div>
+  <div class="r">
+    <span class="l">Aylık koli adedi</span><input id="koli_adet" placeholder="örn: 500" style="flex:1;" oninput="toplamDesi()"/>
+    <span class="l" style="margin-left:8px;">Aylık palet adedi</span><input id="pal_adet" placeholder="örn: 50" style="flex:1;" oninput="toplamDesi()"/>
+    <span class="l" style="margin-left:8px;">Ort. ağırlık (kg)</span><input id="koli_kg" placeholder="kg" style="flex:1;" oninput="toplamDesi()"/>
+    <span class="l" style="margin-left:8px;">Toplam desi/ay</span><input id="toplam_desi" readonly class="auto" style="flex:1;" placeholder="otomatik"/>
+  </div>
+  <div class="r">
+    <span class="l">Koli yoğunluğu</span>
+    <div class="ts" id="t_kdesi"><div class="t on" onclick="tog(this)">0–5</div><div class="t" onclick="tog(this)">5–10</div><div class="t" onclick="tog(this)">10–20</div><div class="t" onclick="tog(this)">20–50</div><div class="t" onclick="tog(this)">50+</div></div>
+    <span class="l" style="margin-left:12px;">Palet yoğunluğu</span>
+    <div class="ts" id="t_pdesi"><div class="t" onclick="tog(this)">100–300</div><div class="t on" onclick="tog(this)">300–600</div><div class="t" onclick="tog(this)">600–1000</div><div class="t" onclick="tog(this)">1000+</div></div>
+  </div>
+</div>
+<div class="s">
+  <div class="st">🚚 mevcut kargo & fiyat analizi</div>
+  <div class="r"><span class="l">Çalıştığı kargo</span>
+    <div class="ts" id="t_kargo">
+      <div class="t" onclick="tog(this)">Aras</div><div class="t" onclick="tog(this)">Yurtiçi</div><div class="t" onclick="tog(this)">MNG</div>
+      <div class="t" onclick="tog(this)">Sürat</div><div class="t" onclick="tog(this)">PTT</div><div class="t" onclick="tog(this)">Fedex</div>
+      <div class="t" onclick="tog(this)">DHL</div><div class="t" onclick="tog(this)">UPS</div><div class="t" onclick="tog(this)">Horoz</div><div class="t" onclick="tog(this)">Diğer</div>
+    </div>
+  </div>
+  <div style="margin:8px 0 4px;">
+    <div class="g5" style="margin-bottom:3px;"><span class="gh">il/bölge</span><span class="gh">ürün</span><span class="gh">min desi</span><span class="gh">max desi</span><span class="gh">adet</span><span class="gh">ödediği ₺</span><span class="gh" style="color:#16a34a;">teklifimiz ₺</span><span></span></div>
+    <div id="fiyat_wrap">
+      <div class="g5"><select><option>-- il --</option><option>İstanbul</option><option>Ankara</option><option>İzmir</option><option>Bursa</option><option>Manisa</option><option>Çorlu/Çerkezköy</option><option>Konya</option><option>Kocaeli</option><option>Adana</option><option>Tüm TR</option></select><select><option>koli</option><option>palet</option><option>parsiyel</option><option>TIR</option></select><input placeholder="min"/><input placeholder="max"/><input placeholder="adet"/><input class="mf" placeholder="₺" oninput="farkH(this)"/><input class="bf" placeholder="₺" style="background:#f0fdf4;color:#16a34a;" oninput="farkH(this)"/><button class="rm" onclick="this.closest('.g5').remove()">×</button></div>
+      <div class="g5" style="margin-top:4px;"><select><option>-- il --</option><option>İstanbul</option><option>Ankara</option><option>İzmir</option><option>Bursa</option><option>Manisa</option><option>Çorlu/Çerkezköy</option><option>Konya</option><option>Kocaeli</option><option>Adana</option><option>Tüm TR</option></select><select><option>koli</option><option>palet</option><option>parsiyel</option><option>TIR</option></select><input placeholder="min"/><input placeholder="max"/><input placeholder="adet"/><input class="mf" placeholder="₺" oninput="farkH(this)"/><input class="bf" placeholder="₺" style="background:#f0fdf4;color:#16a34a;" oninput="farkH(this)"/><button class="rm" onclick="this.closest('.g5').remove()">×</button></div>
+    </div>
+    <button class="btn btn-g btn-sm" onclick="fiyatEkle()" style="margin-top:5px;">+ satır ekle</button>
+  </div>
+  <div class="r" style="margin-top:8px;">
+    <span class="l">Aylık toplam ödeme</span><input id="aylik_odeme" placeholder="₺/ay" style="flex:1;" oninput="gelirH()"/>
+    <span class="l" style="margin-left:8px;">Bize kazandırır</span><input id="biz_gelir" readonly class="auto" style="flex:1;" placeholder="otomatik"/>
+  </div>
+  <div class="r">
+    <span class="l">Faturalama</span>
+    <div class="ts" id="t_fatura"><div class="t on" onclick="tekSec('t_fatura',this)">faturalı</div><div class="t" onclick="tekSec('t_fatura',this)">faturasız</div><div class="t" onclick="tekSec('t_fatura',this)">karma</div><div class="t" onclick="tekSec('t_fatura',this)">bilinmiyor</div></div>
+    <span class="l" style="margin-left:8px;">UA / PO</span>
+    <div class="ts" id="t_uapo"><div class="t" onclick="tekSec('t_uapo',this)">UA — gönderici öder</div><div class="t on" onclick="tekSec('t_uapo',this)">PO — alıcı öder</div><div class="t" onclick="tekSec('t_uapo',this)">karma</div></div>
+  </div>
+  <div class="r">
+    <span class="l">Vade / ödeme</span>
+    <div class="ts" id="t_odeme"><div class="t" onclick="tog(this)">nakit</div><div class="t" onclick="tog(this)">havale</div><div class="t" onclick="tog(this)">çek</div><div class="t on" onclick="tog(this)">30 gün</div><div class="t" onclick="tog(this)">45 gün</div><div class="t" onclick="tog(this)">60 gün</div><div class="t" onclick="tog(this)">90 gün</div></div>
+    <span class="l" style="margin-left:8px;">Pazarlık</span>
+    <div class="ts" id="t_paz"><div class="t og" onclick="tekSec('t_paz',this)">inebilir</div><div class="t" onclick="tekSec('t_paz',this)">zorlu</div><div class="t or" onclick="tekSec('t_paz',this)">inmez</div><div class="t" onclick="tekSec('t_paz',this)">bilinmiyor</div></div>
+  </div>
+</div>
+<div class="s">
+  <div class="st">📍 bölge, teslimat & AVM</div>
+  <div class="g5b" style="margin-bottom:3px;"><span class="gh">il/bölge</span><span class="gh">ürün</span><span class="gh">min</span><span class="gh">max</span><span class="gh">adet</span><span class="gh">sıklık</span><span class="gh">not/saat kısıtı</span><span></span></div>
+  <div id="bolge_wrap">
+    <div class="g5b"><select><option>-- il --</option><option>İstanbul</option><option>Ankara</option><option>İzmir</option><option>Bursa</option><option>Manisa</option><option>Çorlu/Çerkezköy</option><option>Konya</option><option>Kocaeli</option><option>Adana</option><option>Tüm TR</option></select><select><option>koli</option><option>palet</option><option>parsiyel</option><option>TIR</option><option>karma</option></select><input placeholder="min"/><input placeholder="max"/><input placeholder="adet"/><select><option>günlük</option><option>hf. 2–3</option><option>haftalık</option><option>aylık</option><option>düzensiz</option></select><input placeholder="not veya saat kısıtı..."/><button class="rm" onclick="this.closest('.g5b').remove()">×</button></div>
+  </div>
+  <button class="btn btn-g btn-sm" onclick="bolgeEkle()" style="margin-top:5px;">+ bölge ekle</button>
+  <div class="divider"></div>
+  <div style="font-size:10px;font-weight:600;color:#64748b;margin-bottom:6px;">AVM TESLİMATLARI</div>
+  <div class="gavm" style="margin-bottom:3px;"><span class="gh">AVM / mağaza adı</span><span class="gh">şehir</span><span class="gh">ürün / adet</span><span class="gh">giriş saati kısıtı</span><span></span></div>
+  <div id="avm_wrap">
+    <div class="gavm"><input placeholder="AVM / mağaza adı"/><select><option>-- şehir --</option><option>İstanbul</option><option>Ankara</option><option>İzmir</option><option>Bursa</option><option>Adana</option><option>Diğer</option></select><input placeholder="koli/palet — adet"/><input placeholder="örn: 08:00–10:00 arası"/><button class="rm" onclick="this.closest('.gavm').remove()">×</button></div>
+  </div>
+  <button class="btn btn-g btn-sm" onclick="avmEkle()" style="margin-top:5px;">+ AVM ekle</button>
+  <div class="divider"></div>
+  <div class="r">
+    <span class="l">Kargo teslim saati</span>
+    <select style="flex:1;"><option>-- seçin --</option><option>08:00'e kadar</option><option>09:00'e kadar</option><option>10:00'e kadar</option><option>12:00'e kadar</option><option>14:00'e kadar</option><option>18:00'e kadar</option></select>
+    <span class="l" style="margin-left:8px;">Alıcı teslimat saati</span>
+    <select style="flex:1;"><option>-- seçin --</option><option>sabah (08–12)</option><option>öğleden sonra (12–17)</option><option>akşam (17–20)</option><option>fark etmez</option></select>
+    <span class="l" style="margin-left:8px;">Ek iller</span><input id="ek_iller" placeholder="Samsun, Trabzon..." style="flex:1;"/>
+  </div>
+</div>
+<div class="s">
+  <div class="st">💬 beklenti, öncelik & karar</div>
+  <div class="r"><span class="l">En önemli beklenti</span>
+    <div class="ts" id="t_beklenti">
+      <div class="t on" onclick="tog(this)">düşük fiyat</div><div class="t" onclick="tog(this)">uzun vade</div><div class="t" onclick="tog(this)">spot fiyat</div>
+      <div class="t" onclick="tog(this)">özel anlaşma</div><div class="t" onclick="tog(this)">hız/dakiklik</div><div class="t" onclick="tog(this)">hizmet kalitesi</div>
+      <div class="t" onclick="tog(this)">alım saati</div><div class="t" onclick="tog(this)">bölge kapsamı</div><div class="t" onclick="tog(this)">takip sistemi</div>
+      <div class="t" onclick="tog(this)">sigorta</div><div class="t" onclick="tog(this)">AVM girişi</div>
+    </div>
+  </div>
+  <div class="r">
+    <span class="l">Fiyat beklentisi</span><input id="fiyat_bek" placeholder="₺/desi — isteğe bağlı" style="flex:1;"/>
+    <span class="l" style="margin-left:8px;">Teklif türü</span>
+    <div class="ts" id="t_ttur"><div class="t" onclick="tog(this)">spot</div><div class="t on" onclick="tog(this)">özel anlaşma</div><div class="t" onclick="tog(this)">sözleşme</div><div class="t" onclick="tog(this)">dönemsel</div></div>
+  </div>
+  <div class="r">
+    <span class="l">Karar verici</span>
+    <div class="ts" id="t_karar"><div class="t on" onclick="tekSec('t_karar',this)">yetkili kendisi</div><div class="t" onclick="tekSec('t_karar',this)">üst yönetim</div><div class="t" onclick="tekSec('t_karar',this)">komite</div><div class="t" onclick="tekSec('t_karar',this)">bilinmiyor</div></div>
+    <span class="l" style="margin-left:8px;">Karar süresi</span>
+    <div class="ts" id="t_sure"><div class="t or" onclick="tekSec('t_sure',this)">acil (bu hafta)</div><div class="t oy" onclick="tekSec('t_sure',this)">kısa (1 ay)</div><div class="t" onclick="tekSec('t_sure',this)">uzun (3+ ay)</div><div class="t" onclick="tekSec('t_sure',this)">belirsiz</div></div>
+  </div>
+  <div class="r">
+    <span class="l">Anlaşma engeli</span>
+    <div class="ts" id="t_engel"><div class="t on" onclick="tog(this)">fiyat</div><div class="t" onclick="tog(this)">vade</div><div class="t" onclick="tog(this)">rakip teklifi</div><div class="t" onclick="tog(this)">karar verici</div><div class="t" onclick="tog(this)">bölge eksikliği</div><div class="t" onclick="tog(this)">güven</div><div class="t" onclick="tog(this)">alışkanlık</div></div>
+  </div>
+  <div class="r">
+    <span class="l">Rakip önce mi verdi?</span>
+    <div class="ts" id="t_ropnce"><div class="t or" onclick="tekSec('t_ropnce',this)">evet</div><div class="t og" onclick="tekSec('t_ropnce',this)">hayır, biz ilkiz</div><div class="t" onclick="tekSec('t_ropnce',this)">bilinmiyor</div></div>
+    <span class="l" style="margin-left:8px;">Referans verir mi?</span>
+    <div class="ts" id="t_ref"><div class="t og" onclick="tekSec('t_ref',this)">evet</div><div class="t" onclick="tekSec('t_ref',this)">belki</div><div class="t or" onclick="tekSec('t_ref',this)">hayır</div></div>
+  </div>
+  <div class="r"><span class="l">Özel istek</span><input id="ozel_istek" placeholder="varsa yaz, boş da bırakabilirsin..." style="flex:1;"/></div>
+</div>
+<div class="s">
+  <div class="st">🏭 lojistik altyapı & operasyon</div>
+  <div class="r">
+    <span class="l">Kendi aracı</span>
+    <div class="ts" id="t_arac"><div class="t" onclick="tekSec('t_arac',this)">evet, kendi dağıtımı</div><div class="t on" onclick="tekSec('t_arac',this)">hayır, dışarıdan</div><div class="t" onclick="tekSec('t_arac',this)">karma</div></div>
+    <span class="l" style="margin-left:8px;">Saha ihtiyacı</span>
+    <div class="ts" id="t_saha"><div class="t on" onclick="tog(this)">araç (noktaya)</div><div class="t" onclick="tog(this)">personel/kurye</div><div class="t" onclick="tog(this)">depo hizmeti</div><div class="t" onclick="tog(this)">istif/paketleme</div></div>
+  </div>
+  <div class="r">
+    <span class="l">Özel kargo kullanımı</span>
+    <div class="ts" id="t_ozel"><div class="t" onclick="tog(this)">ambar kargo</div><div class="t" onclick="tog(this)">dış nakliye</div><div class="t" onclick="tog(this)">deniz yolu</div><div class="t" onclick="tog(this)">hava kargo</div><div class="t on" onclick="tog(this)">bijimsiz</div><div class="t" onclick="tog(this)">istifsizsiz</div></div>
+    <span class="l" style="margin-left:8px;">Depo</span><input id="depo" placeholder="isteğe bağlı..." style="flex:1;"/>
+  </div>
+</div>
+<div class="s">
+  <div class="st">⚔️ rakip analizi & mevcut sorunlar</div>
+  <div class="grk" style="margin-bottom:3px;"><span class="gh">rakip firma</span><span class="gh">fiyatı (₺/desi)</span><span class="gh">durumu</span><span class="gh">tercih sebebi</span><span></span></div>
+  <div id="rakip_wrap">
+    <div class="grk"><input placeholder="rakip firma — isteğe bağlı"/><input placeholder="₺/desi"/><select><option>güçlü</option><option>orta</option><option>zayıf</option></select><input placeholder="fiyat / hız / bölge..."/><button class="rm" onclick="this.closest('.grk').remove()">×</button></div>
+    <div class="grk" style="margin-top:4px;"><input placeholder="rakip firma"/><input placeholder="₺/desi"/><select><option>güçlü</option><option>orta</option><option>zayıf</option></select><input placeholder="tercih sebebi..."/><button class="rm" onclick="this.closest('.grk').remove()">×</button></div>
+  </div>
+  <button class="btn btn-g btn-sm" onclick="rakipEkle()" style="margin-top:5px;">+ rakip ekle</button>
+  <div class="r" style="margin-top:8px;"><span class="l">Şikayetleri</span>
+    <div class="ts" id="t_sik"><div class="t on" onclick="tog(this)">hasar</div><div class="t" onclick="tog(this)">geç teslimat</div><div class="t" onclick="tog(this)">fiyat yüksek</div><div class="t" onclick="tog(this)">iletişim zayıf</div><div class="t" onclick="tog(this)">takip yok</div><div class="t" onclick="tog(this)">kayıp kargo</div><div class="t" onclick="tog(this)">ambar bırakıyor</div><div class="t" onclick="tog(this)">bijimsiz</div><div class="t" onclick="tog(this)">araç gelmiyor</div><div class="t" onclick="tog(this)">AVM girişi yok</div></div>
+  </div>
+  <div class="r"><span class="l">Bize geçiş sebebi</span>
+    <div class="ts" id="t_gecis"><div class="t" onclick="tog(this)">fiyat avantajı</div><div class="t on" onclick="tog(this)">daha hızlı</div><div class="t" onclick="tog(this)">kişisel ilişki</div><div class="t" onclick="tog(this)">güven</div><div class="t" onclick="tog(this)">takip sistemi</div><div class="t" onclick="tog(this)">geniş bölge</div><div class="t" onclick="tog(this)">erken alım</div><div class="t" onclick="tog(this)">AVM çözümü</div></div>
+  </div>
+</div>
+<div class="s">
+  <div class="st">💡 görüşme notu & değerlendirme</div>
+  <div class="r">
+    <span class="l">Görüşme notu</span>
+    <div style="flex:1;">
+      <textarea id="not_alan" placeholder="devrik de yaz, kısa da... karakter sınırı yok." style="width:100%;min-height:72px;resize:vertical;border-radius:6px;padding:6px 10px;font-size:11px;border:0.5px solid #e2e8f0;background:#fafafa;font-family:-apple-system,sans-serif;line-height:1.6;" oninput="notAnaliz(this)"></textarea>
+      <div class="not-hint">karakter sınırı yok · boş da bırakabilirsin · kısa yazsan da anlar</div>
+      <div class="not-ozet" id="not_ozet_alt"><div id="not_alt_items"></div></div>
+    </div>
+  </div>
+  <div class="r">
+    <span class="l">Potansiyel</span>
+    <div class="ts" id="t_pot">
+      <div class="t or" onclick="setPot(this,15,'Çok Düşük')">çok düşük</div>
+      <div class="t oy" onclick="setPot(this,35,'Düşük')">düşük</div>
+      <div class="t on" onclick="setPot(this,60,'Orta')">orta</div>
+      <div class="t og" onclick="setPot(this,80,'Yüksek')">yüksek</div>
+      <div class="t og" onclick="setPot(this,100,'Çok Yüksek')">çok yüksek</div>
+    </div>
+    <div class="score-bar"><div id="pot_bar" class="score-fill" style="width:60%;"></div></div>
+    <span id="pot_txt" style="font-size:11px;font-weight:600;color:#1d4ed8;min-width:80px;">Orta (60%)</span>
+  </div>
+  <div class="r">
+    <span class="l">Görüşme sonucu</span>
+    <div class="ts" id="t_sonuc"><div class="t" onclick="tekSec('t_sonuc',this)">teklif verildi</div><div class="t on" onclick="tekSec('t_sonuc',this)">takip edilecek</div><div class="t" onclick="tekSec('t_sonuc',this)">beklemede</div><div class="t or" onclick="tekSec('t_sonuc',this)">ilgisiz</div><div class="t" onclick="tekSec('t_sonuc',this)">randevu verildi</div><div class="t og" onclick="tekSec('t_sonuc',this)">anlaşma yapıldı</div></div>
+  </div>
+  <div class="r">
+    <span class="l">Takip tarihi</span><input type="date" id="takip_tar" style="flex:1;"/>
+    <span class="l" style="margin-left:8px;">Bir sonraki adım</span><input id="sonraki_adim" placeholder="ne yapılacak? — isteğe bağlı" style="flex:2;"/>
+  </div>
+  <div class="divider"></div>
+  <div class="durum-bar">
+    <div class="durum-k" style="background:#f0fdf4;color:#16a34a;">Dolu: <b id="d_dolu">0</b></div>
+    <div class="durum-k" style="background:#eff6ff;color:#1d4ed8;">Otomatik: <b id="d_auto">0</b></div>
+    <div class="durum-k" style="background:#f8fafc;color:#64748b;">Boş: <b id="d_bos">0</b></div>
+    <div class="durum-k" style="background:#f8fafc;color:#374151;">Senin: <b id="d_senin">0</b></div>
+  </div>
+</div>
+<script>
+const FIRMA = '""" + _secili_firma.replace("'", "\'") + """';
+const MEVCUT = """ + _mevcut_json + """;
+const AUTO_TEL = '""" + _auto_tel.replace("'", "\'") + """';
 
-    st.divider()
+function tog(el){el.classList.toggle('on');durumGuncelle();}
+function tekSec(g,el){document.querySelectorAll('#'+g+' .t').forEach(t=>t.classList.remove('on','og','or','oy'));el.classList.add('on');durumGuncelle();}
+function getSel(id){return[...document.querySelectorAll('#'+id+' .t.on,#'+id+' .t.og,#'+id+' .t.or,#'+id+' .t.oy')].map(t=>t.textContent.trim()).join(', ');}
+function v(id){return document.getElementById(id)?.value||'';}
 
-    # ── FORM ──────────────────────────────────────────────────────────────────
-    with st.expander("🎯 Analiz Amacı & Müşteri Durumu", expanded=True):
-        _ac1,_ac2,_ac3 = st.columns(3)
-        _an_amac = _ac1.multiselect("Analiz amacı", ["yeni müşteri kazanım","zam görüşmesi","nezaket ziyareti","erken potansiyel","kayıp müşteri geri kazanım","mevcut müşteri analizi","rakip takibi","pazar araştırması"], default=_mv_list("amac"), key="an_amac")
-        _an_mdurum = _ac2.selectbox("Müşteri durumu", ["yeni","mevcut","eski","rakip firmanın müşterisi"], index=["yeni","mevcut","eski","rakip firmanın müşterisi"].index(_mv("mdurum","yeni")) if _mv("mdurum","yeni") in ["yeni","mevcut","eski","rakip firmanın müşterisi"] else 0, key="an_mdurum")
-        _an_cikti = _ac3.multiselect("Beklenen çıktı", ["teklif ver","cari listeye ekle","takibe al","randevu planla"], default=[], key="an_cikti")
-        _bc1,_bc2,_bc3 = st.columns(3)
-        _an_bek_ciro = _bc1.text_input("Beklenen ciro (₺/ay)", value=str(int(_mv("bek_ciro",0) or 0)) if _mv("bek_ciro",0) else "", key="an_bek_ciro")
-        _an_ger_ciro = _bc2.text_input("Gerçekleşen ciro (₺/ay)", value=str(int(_mv("ger_ciro",0) or 0)) if _mv("ger_ciro",0) else "", key="an_ger_ciro")
-        try:
-            _bv2 = float((_an_bek_ciro or "0").replace(".","").replace(",","."))
-            _gv2 = float((_an_ger_ciro or "0").replace(".","").replace(",","."))
-            _fark_v2 = f"{'+'if _gv2>=_bv2 else ''}{_gv2-_bv2:,.0f} ₺" if _bv2>0 and _gv2>0 else ""
-        except: _fark_v2 = ""
-        _bc3.text_input("Fark (otomatik)", value=_fark_v2, disabled=True, key="an_fark")
+function toplamDesi(){
+  const k=parseInt(v('koli_adet'))||0,kg=parseInt(v('koli_kg'))||0,p=parseInt(v('pal_adet'))||0;
+  const d=k*(kg>0?kg*3:10)+p*300;
+  const el=document.getElementById('toplam_desi');
+  if(d>0)el.value=d.toLocaleString('tr-TR')+' desi'; else el.value='';
+  durumGuncelle();
+}
+function ciroH(){
+  const b=parseFloat(v('bek_ciro').replace(/\./g,'').replace(',','.'))||0;
+  const g=parseFloat(v('ger_ciro').replace(/\./g,'').replace(',','.'))||0;
+  const el=document.getElementById('fark_ciro');
+  if(b>0&&g>0){const f=g-b;el.value=(f>=0?'+':'')+f.toLocaleString('tr-TR')+' ₺';el.style.background=f>=0?'#f0fdf4':'#fef2f2';el.style.color=f>=0?'#16a34a':'#dc2626';}
+  durumGuncelle();
+}
+function gelirH(){
+  const a=parseFloat(v('aylik_odeme').replace(/\./g,'').replace(',','.'))||0;
+  if(a>0)document.getElementById('biz_gelir').value=(a*0.88).toLocaleString('tr-TR')+' ₺';
+  durumGuncelle();
+}
+function farkH(inp){
+  const row=inp.closest('.g5');if(!row)return;
+  const mf=row.querySelector('.mf'),bf=row.querySelector('.bf');
+  if(mf&&bf){const m=parseFloat(mf.value)||0,b=parseFloat(bf.value)||0;if(m>0&&b>0)bf.title='Fark: '+(m-b>=0?'+':'')+(m-b).toFixed(2)+' ₺';}
+}
+function setPot(el,val,txt){
+  document.querySelectorAll('#t_pot .t').forEach(t=>t.classList.remove('on','og','or','oy'));
+  el.classList.add(val>=80?'og':val>=50?'on':val>=30?'oy':'or');
+  document.getElementById('pot_bar').style.width=val+'%';
+  document.getElementById('pot_txt').textContent=txt+' ('+val+'%)';
+  durumGuncelle();
+}
+function fiyatEkle(){
+  const d=document.createElement('div');d.className='g5';d.style.marginTop='4px';
+  d.innerHTML='<select><option>-- il --</option><option>İstanbul</option><option>Ankara</option><option>İzmir</option><option>Bursa</option><option>Manisa</option><option>Çorlu/Çerkezköy</option><option>Konya</option><option>Kocaeli</option><option>Adana</option><option>Tüm TR</option></select><select><option>koli</option><option>palet</option><option>parsiyel</option><option>TIR</option></select><input placeholder="min"/><input placeholder="max"/><input placeholder="adet"/><input class="mf" placeholder="₺" oninput="farkH(this)"/><input class="bf" placeholder="₺" style="background:#f0fdf4;color:#16a34a;" oninput="farkH(this)"/><button class="rm" onclick="this.closest(\'.g5\').remove()">×</button>';
+  document.getElementById('fiyat_wrap').appendChild(d);
+}
+function bolgeEkle(){
+  const d=document.createElement('div');d.className='g5b';d.style.marginTop='4px';
+  d.innerHTML='<select><option>-- il --</option><option>İstanbul</option><option>Ankara</option><option>İzmir</option><option>Bursa</option><option>Manisa</option><option>Çorlu/Çerkezköy</option><option>Konya</option><option>Kocaeli</option><option>Adana</option><option>Tüm TR</option></select><select><option>koli</option><option>palet</option><option>parsiyel</option><option>TIR</option><option>karma</option></select><input placeholder="min"/><input placeholder="max"/><input placeholder="adet"/><select><option>günlük</option><option>hf. 2–3</option><option>haftalık</option><option>aylık</option><option>düzensiz</option></select><input placeholder="not/saat kısıtı..."/><button class="rm" onclick="this.closest(\'.g5b\').remove()">×</button>';
+  document.getElementById('bolge_wrap').appendChild(d);
+}
+function avmEkle(){
+  const d=document.createElement('div');d.className='gavm';d.style.marginTop='4px';
+  d.innerHTML='<input placeholder="AVM/mağaza"/><select><option>-- şehir --</option><option>İstanbul</option><option>Ankara</option><option>İzmir</option><option>Bursa</option><option>Adana</option><option>Diğer</option></select><input placeholder="koli/palet-adet"/><input placeholder="giriş saati..."/><button class="rm" onclick="this.closest(\'.gavm\').remove()">×</button>';
+  document.getElementById('avm_wrap').appendChild(d);
+}
+function rakipEkle(){
+  const d=document.createElement('div');d.className='grk';d.style.marginTop='4px';
+  d.innerHTML='<input placeholder="rakip firma"/><input placeholder="₺/desi"/><select><option>güçlü</option><option>orta</option><option>zayıf</option></select><input placeholder="tercih sebebi..."/><button class="rm" onclick="this.closest(\'.grk\').remove()">×</button>';
+  document.getElementById('rakip_wrap').appendChild(d);
+}
+function hizliDoldur(){
+  const txt=document.getElementById('hizli_not').value.toLowerCase();
+  const items=[];
+  ['aras','yurtiçi','mng','sürat','ptt','dhl','ups','horoz'].forEach(k=>{if(txt.includes(k)){document.querySelectorAll('#t_kargo .t').forEach(t=>{if(t.textContent.toLowerCase().includes(k))t.classList.add('on');});items.push({i:'🚚',l:'Kargo',d:k.charAt(0).toUpperCase()+k.slice(1)});}});
+  const km=txt.match(/(\d+)\s*koli/);if(km){document.getElementById('koli_adet').value=km[1];toplamDesi();items.push({i:'📦',l:'Aylık koli',d:km[1]+' adet'});}
+  const pm=txt.match(/(\d+)\s*palet/);if(pm){document.getElementById('pal_adet').value=pm[1];toplamDesi();items.push({i:'🏗️',l:'Aylık palet',d:pm[1]+' adet'});}
+  const fm=txt.match(/(\d+[\.,]?\d*)\s*₺?[/]?\s*desi/);if(fm){const mf=document.querySelector('.mf');if(mf)mf.value=fm[1];items.push({i:'💰',l:'Fiyat',d:fm[1]+' ₺/desi'});}
+  const vm=txt.match(/(\d+)\s*g[uü]n/);if(vm){document.querySelectorAll('#t_odeme .t').forEach(t=>{if(t.textContent.includes(vm[1]+' gün'))t.classList.add('on');});items.push({i:'📅',l:'Vade',d:vm[1]+' gün'});}
+  if(txt.includes('faturasız')){document.querySelectorAll('#t_fatura .t').forEach(t=>{if(t.textContent.includes('faturasız'))t.classList.add('on');});items.push({i:'🧾',l:'Fatura',d:'faturasız'});}
+  if(txt.includes('avm')){document.querySelectorAll('#t_beklenti .t').forEach(t=>{if(t.textContent.includes('AVM'))t.classList.add('on');});items.push({i:'🏬',l:'AVM',d:'var'});}
+  if(txt.includes('erken alım')){document.querySelectorAll('#t_beklenti .t').forEach(t=>{if(t.textContent.includes('alım saati'))t.classList.add('on');});items.push({i:'⏰',l:'Beklenti',d:'erken alım'});}
+  const ozet=document.getElementById('not_ozet');const nd=document.getElementById('not_items');
+  if(items.length){ozet.style.display='block';nd.innerHTML=items.map(a=>'<div style="display:flex;gap:8px;padding:2px 0;">'+a.i+' <span style="color:#64748b;min-width:100px;">'+a.l+'</span><b>'+a.d+'</b><span style="margin-left:auto;color:#94a3b8;font-size:9px;">otomatik</span></div>').join('');}
+  document.getElementById('hizli_not').style.borderColor='#86efac';
+  setTimeout(()=>{document.getElementById('hizli_not').style.borderColor='#bfdbfe';},2000);
+  durumGuncelle();
+}
+function notAnaliz(el){
+  const txt=el.value.toLowerCase();const items=[];
+  const km=txt.match(/(\d+)\s*koli/);if(km)items.push('📦 koli: '+km[1]);
+  const pm=txt.match(/(\d+)\s*palet/);if(pm)items.push('🏗️ palet: '+pm[1]);
+  const fm=txt.match(/(\d+[\.,]?\d*)\s*₺?[/]?\s*desi/);if(fm)items.push('💰 fiyat: '+fm[1]+' ₺/desi');
+  if(txt.includes('avm'))items.push('🏬 AVM var');
+  const oz=document.getElementById('not_ozet_alt');const oi=document.getElementById('not_alt_items');
+  if(items.length){oz.style.display='block';oi.innerHTML=items.map(x=>'<span style="margin-right:12px;">'+x+'</span>').join('');}
+  else oz.style.display='none';
+  durumGuncelle();
+}
+function durumGuncelle(){
+  let dolu=0,auto_c=0,bos=0;
+  document.querySelectorAll('input:not([readonly]),select,textarea').forEach(el=>{
+    const val=el.value;
+    if(!val||val==='--'||val==='-- il --'||val==='-- şehir --')bos++;
+    else if(el.classList.contains('auto'))auto_c++;
+    else dolu++;
+  });
+  const secili=document.querySelectorAll('.t.on,.t.og,.t.or,.t.oy').length;
+  dolu+=secili;
+  document.getElementById('d_dolu').textContent=dolu;
+  document.getElementById('d_auto').textContent=auto_c;
+  document.getElementById('d_bos').textContent=bos;
+  document.getElementById('d_senin').textContent=Math.max(0,dolu-auto_c);
+}
+function toplamForm(){
+  const fiyatlar=[...document.querySelectorAll('#fiyat_wrap .g5')].map(r=>{const s=[...r.querySelectorAll('select')],i=[...r.querySelectorAll('input')];return{il:s[0]?.value,urun:s[1]?.value,min:i[0]?.value,max:i[1]?.value,adet:i[2]?.value,musteri:i[3]?.value,biz:i[4]?.value};});
+  const bolgeler=[...document.querySelectorAll('#bolge_wrap .g5b')].map(r=>{const s=[...r.querySelectorAll('select')],i=[...r.querySelectorAll('input')];return{il:s[0]?.value,urun:s[1]?.value,min:i[0]?.value,max:i[1]?.value,adet:i[2]?.value,siklik:s[2]?.value,not:i[3]?.value};});
+  const avmler=[...document.querySelectorAll('#avm_wrap .gavm')].map(r=>{const s=r.querySelector('select'),i=[...r.querySelectorAll('input')];return{avm:i[0]?.value,sehir:s?.value,urun:i[1]?.value,saat:i[2]?.value};});
+  const rakipler=[...document.querySelectorAll('#rakip_wrap .grk')].map(r=>{const s=r.querySelector('select'),i=[...r.querySelectorAll('input')];return{firma:i[0]?.value,fiyat:i[1]?.value,durum:s?.value,sebep:i[2]?.value};});
+  return {
+    yetkili:v('yetkili'),iletisim:v('iletisim'),sektor:v('sektor'),
+    amac:getSel('t_amac'),mdurum:getSel('t_mdurum'),
+    bek_ciro:parseFloat(v('bek_ciro').replace(/\./g,'').replace(',','.'))||0,
+    ger_ciro:parseFloat(v('ger_ciro').replace(/\./g,'').replace(',','.'))||0,
+    kaynak:getSel('t_kaynak'),referans:v('referans'),
+    kargo:getSel('t_kargo'),aylik_odeme:v('aylik_odeme'),
+    fatura:getSel('t_fatura'),uapo:getSel('t_uapo'),odeme:getSel('t_odeme'),pazarlik:getSel('t_paz'),
+    beklenti:getSel('t_beklenti'),fiyat_bek:v('fiyat_bek'),teklif_tur:getSel('t_ttur'),
+    karar:getSel('t_karar'),sure:getSel('t_sure'),engel:getSel('t_engel'),
+    sik:getSel('t_sik'),gecis:getSel('t_gecis'),
+    potansiyel:document.getElementById('pot_txt').textContent,
+    sonuc:getSel('t_sonuc'),not_alan:v('not_alan'),
+    takip_tar:v('takip_tar'),sonraki_adim:v('sonraki_adim'),
+    ozel_istek:v('ozel_istek'),depo:v('depo'),
+    fiyat_tablo:JSON.stringify(fiyatlar),
+    bolge:JSON.stringify(bolgeler),
+    avm:JSON.stringify(avmler),
+    rakip:JSON.stringify(rakipler),
+  };
+}
+function kaydet(){
+  const veri=toplamForm();
+  veri.firma=FIRMA;
+  window.parent.postMessage({type:'analiz_kaydet',data:veri},'*');
+  document.getElementById('kaydet_msg').style.display='block';
+  setTimeout(()=>{document.getElementById('kaydet_msg').style.display='none';},3000);
+}
+function waGonder(){
+  const tel=(v('iletisim').match(/\d+/)||[]).join('').replace(/^0/,'90');
+  const msg='Merhaba '+FIRMA+', gorusemiz icin tesekkurler.';
+  if(tel.length>8)window.open('https://wa.me/'+tel+'?text='+encodeURIComponent(msg));
+  else if(AUTO_TEL){const at=AUTO_TEL.replace(/\D/g,'').replace(/^0/,'90');window.open('https://wa.me/'+at+'?text='+encodeURIComponent(msg));}
+  else alert('Tel/mail alanına WhatsApp numarası girin.');
+}
+function emailGonder(){
+  const mail=v('iletisim').includes('@')?v('iletisim'):'';
+  if(mail)window.open('mailto:'+mail+'?subject=Teklif — '+FIRMA);
+  else alert('Tel/mail alanına e-posta girin.');
+}
+function ozet(){
+  const veri=toplamForm();
+  let html='<div style="background:#f8fafc;border:0.5px solid #e2e8f0;border-radius:8px;padding:12px;margin-top:10px;font-size:11px;">';
+  html+='<b style="color:#1d4ed8;">📋 Görüşme Özeti — '+FIRMA+'</b><table style="width:100%;margin-top:8px;border-collapse:collapse;">';
+  for(const[k,val]of Object.entries(veri)){
+    if(!val||val==='0'||val==='{}')continue;
+    const display=typeof val==='string'&&val.startsWith('[')?' (tablo)':val;
+    html+='<tr style="border-bottom:0.5px solid #f1f5f9;"><td style="padding:2px 6px;color:#64748b;width:140px;">'+k+'</td><td style="padding:2px 6px;color:#1e293b;font-weight:500;">'+display+'</td></tr>';
+  }
+  html+='</table></div>';
+  document.getElementById('ozet_alan').innerHTML=html;document.getElementById('ozet_alan').style.display='block';
+}
+function temizle(){
+  document.querySelectorAll('input:not([readonly]),textarea').forEach(el=>el.value='');
+  document.querySelectorAll('select').forEach(el=>el.selectedIndex=0);
+  document.querySelectorAll('.t.on,.t.og,.t.or,.t.oy').forEach(el=>el.classList.remove('on','og','or','oy'));
+  document.getElementById('pot_bar').style.width='60%';
+  document.getElementById('pot_txt').textContent='Orta (60%)';
+  document.getElementById('ozet_alan').style.display='none';
+  document.getElementById('not_ozet').style.display='none';
+  document.getElementById('not_ozet_alt').style.display='none';
+  durumGuncelle();
+}
+// Mevcut veriyi yükle
+function mevcutYukle(){
+  if(!MEVCUT||!MEVCUT.firma)return;
+  const m=MEVCUT;
+  if(m.yetkili)document.getElementById('yetkili').value=m.yetkili;
+  if(m.iletisim)document.getElementById('iletisim').value=m.iletisim;
+  if(m.not_alan)document.getElementById('not_alan').value=m.not_alan;
+  if(m.takip_tar)document.getElementById('takip_tar').value=m.takip_tar;
+  if(m.sonraki_adim)document.getElementById('sonraki_adim').value=m.sonraki_adim;
+  if(m.bek_ciro)document.getElementById('bek_ciro').value=m.bek_ciro;
+  if(m.ger_ciro)document.getElementById('ger_ciro').value=m.ger_ciro;
+  if(m.fiyat_bek)document.getElementById('fiyat_bek').value=m.fiyat_bek;
+  if(m.aylik_odeme)document.getElementById('aylik_odeme').value=m.aylik_odeme;
+  if(m.koli_adet)document.getElementById('koli_adet').value=m.koli_adet;
+  if(m.pal_adet)document.getElementById('pal_adet').value=m.pal_adet;
+  // Tagları seç
+  function selTags(gid,val){if(!val)return;val.split(',').forEach(v=>{v=v.trim();document.querySelectorAll('#'+gid+' .t').forEach(t=>{if(t.textContent.trim()===v)t.classList.add('on');});});}
+  selTags('t_amac',m.amac);selTags('t_kaynak',m.kaynak);selTags('t_kargo',m.kargo);
+  selTags('t_beklenti',m.beklenti);selTags('t_engel',m.engel);selTags('t_sik',m.sik);
+  selTags('t_gecis',m.gecis);selTags('t_odeme',m.odeme);selTags('t_urun',m.urun);
+  function selOne(gid,val){if(!val)return;document.querySelectorAll('#'+gid+' .t').forEach(t=>{if(t.textContent.trim()===val.trim()){t.classList.remove('on','og','or','oy');t.classList.add('on');}});}
+  selOne('t_mdurum',m.mdurum);selOne('t_fatura',m.fatura);selOne('t_uapo',m.uapo);
+  selOne('t_paz',m.pazarlik);selOne('t_karar',m.karar);selOne('t_sure',m.sure);
+  selOne('t_sonuc',m.sonuc);
+  if(m.sektor){document.getElementById('sektor').querySelectorAll('option').forEach(o=>{if(o.value===m.sektor)o.selected=true;});}
+  ciroH();gelirH();toplamDesi();durumGuncelle();
+}
+window.addEventListener('message',e=>{if(e.data&&e.data.type==='analiz_kaydedildi'){alert('✅ '+FIRMA+' analizi kaydedildi!');}});
+mevcutYukle();
+durumGuncelle();
+</script>
+<div id="kaydet_msg" style="display:none;position:fixed;bottom:20px;right:20px;background:#16a34a;color:white;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:500;z-index:999;">✅ Kaydedildi!</div>
+<div id="ozet_alan" style="display:none;"></div>
+</body></html>"""
 
-    with st.expander("🔍 Kaynak & Müşteri Bilgisi", expanded=True):
-        _m1,_m2,_m3 = st.columns(3)
-        _an_tarih = _m1.date_input("Görüşme tarihi", key="an_tarih")
-        _an_saat = _m2.time_input("Saat", key="an_saat")
-        _an_temsilci = _m3.text_input("Temsilci", value=_mv("olusturan", st.session_state.get("kullanici","")), key="an_temsilci")
-        _m4,_m5 = st.columns([2,1])
-        _an_kaynak = _m4.multiselect("Nereden bulundu?", ["soğuk arama","referans","linkedin","internet/forum","ziyaret","fuar","sosyal medya","eski müşteri"], default=_mv_list("kaynak"), key="an_kaynak")
-        _an_referans = _m5.text_input("Referans veren", value=_mv("yetkili",""), key="an_referans", placeholder="isteğe bağlı")
-        _m6,_m7,_m8 = st.columns(3)
-        _an_yetkili = _m6.text_input("Yetkili / Ünvan", value=_mv("yetkili",""), key="an_yetkili", placeholder="Ad Soyad — Ünvan")
-        _an_iletisim = _m7.text_input("Tel / E-posta", value=_mv("iletisim",""), key="an_iletisim", placeholder="05xx / mail@...")
-        _sektor_list = ["--","Tekstil","Gıda","Otomotiv","Elektronik","İnşaat","E-ticaret","AVM/Perakende","Kimya","Mobilya","Medikal","Kozmetik","Tarım","Diğer"]
-        _an_sektor = _m8.selectbox("Sektör", _sektor_list, index=_sektor_list.index(_mv("sektor","--")) if _mv("sektor","--") in _sektor_list else 0, key="an_sektor")
-        if _secili_cari is not None and not _an_iletisim:
-            _auto_tel = str(_secili_cari.get("gsm","") or _secili_cari.get("email","") or "")
-            if _auto_tel: st.info(f"📞 Cari listeden: {_auto_tel}")
+    st.components.v1.html(_html_form, height=3200, scrolling=True)
 
-    with st.expander("📦 Ürün, Hacim & Ölçü", expanded=False):
-        _urun_list = ["koli","palet","parsiyel","TIR/komple","soğuk zincir","ADR/tehlikeli","ambar kargo","dış nakliye"]
-        _an_urun = st.multiselect("Gönderi türü", _urun_list, default=[x for x in _mv_list("amac") if x in _urun_list] or (["koli"] if not _mevcut_an else []), key="an_urun")
-        _ud1,_ud2,_ud3,_ud4,_ud5,_ud6,_ud7 = st.columns(7)
-        _an_kd_min = _ud1.text_input("Koli min desi", value=_mv("kd_min",""), key="an_kd_min", placeholder="min")
-        _an_kd_max = _ud2.text_input("Koli max desi", value=_mv("kd_max",""), key="an_kd_max", placeholder="max")
-        _an_pd_min = _ud3.text_input("Palet min desi", value=_mv("pd_min",""), key="an_pd_min", placeholder="min")
-        _an_pd_max = _ud4.text_input("Palet max desi", value=_mv("pd_max",""), key="an_pd_max", placeholder="max")
-        _an_koli_adet = _ud5.text_input("Aylık koli", value=_mv("koli_adet",""), key="an_koli_adet", placeholder="adet")
-        _an_pal_adet = _ud6.text_input("Aylık palet", value=_mv("pal_adet",""), key="an_pal_adet", placeholder="adet")
-        _an_koli_kg = _ud7.text_input("Ort. kg", value=_mv("koli_kg",""), key="an_koli_kg", placeholder="kg")
-        try:
-            _td2 = int(_an_koli_adet or 0)*(int(_an_koli_kg or 0)*3 or 10)+int(_an_pal_adet or 0)*300
-            if _td2 > 0: st.info(f"📊 Toplam desi/ay: **{_td2:,} desi**")
-        except: pass
-        _an_kdesi = st.multiselect("Koli desi yoğunluğu", ["0–5","5–10","10–20","20–50","50+"], default=_mv_list("kdesi"), key="an_kdesi")
-        _an_pdesi = st.multiselect("Palet desi yoğunluğu", ["100–300","300–600","600–1000","1000+"], default=_mv_list("pdesi"), key="an_pdesi")
+    # HTML'den gelen postMessage ile kaydet
+    _form_data = st.session_state.get("an_form_data")
 
-    with st.expander("🚚 Mevcut Kargo & Fiyat", expanded=False):
-        _kc1,_kc2 = st.columns([3,1])
-        _kargo_list = ["Aras","Yurtiçi","MNG","Sürat","PTT","Fedex","DHL","UPS","Horoz","Diğer"]
-        _an_kargo = _kc1.multiselect("Çalıştığı kargo", _kargo_list, default=_mv_list("kargo"), key="an_kargo")
-        _an_aylik_odeme = _kc2.text_input("Aylık toplam ödeme (₺)", value=str(int(_mv("aylik_odeme",0) or 0)) if _mv("aylik_odeme",0) else "", key="an_aylik_odeme")
-        st.markdown("<small style='color:#64748b;'>İl | Ürün | Min–Max desi | Adet | Müşteri ödüyor ₺ | Bizim teklifimiz ₺</small>", unsafe_allow_html=True)
-        _def_fiyat = _mv_json("fiyat_tablo") or [{"il":"","urun":"koli","min":"","max":"","adet":"","musteri":"","biz":""}]
-        if "an_fiyat_satirlar" not in st.session_state:
-            st.session_state["an_fiyat_satirlar"] = _def_fiyat
-        _il_list = ["--","İstanbul","Ankara","İzmir","Bursa","Manisa","Çorlu/Çerkezköy","Konya","Kocaeli","Adana","Tüm TR"]
-        _ur_list = ["koli","palet","parsiyel","TIR"]
-        for _fi in range(len(st.session_state["an_fiyat_satirlar"])):
-            _fs = st.session_state["an_fiyat_satirlar"][_fi]
-            _fc = st.columns([1.5,0.8,0.5,0.5,0.6,0.8,0.8,0.3])
-            st.session_state["an_fiyat_satirlar"][_fi]["il"] = _fc[0].selectbox("", _il_list, index=_il_list.index(_fs.get("il","--")) if _fs.get("il","--") in _il_list else 0, key=f"an_fil_{_fi}", label_visibility="collapsed")
-            st.session_state["an_fiyat_satirlar"][_fi]["urun"] = _fc[1].selectbox("", _ur_list, index=_ur_list.index(_fs.get("urun","koli")) if _fs.get("urun","koli") in _ur_list else 0, key=f"an_furun_{_fi}", label_visibility="collapsed")
-            st.session_state["an_fiyat_satirlar"][_fi]["min"] = _fc[2].text_input("", value=_fs.get("min",""), key=f"an_fmin_{_fi}", placeholder="min", label_visibility="collapsed")
-            st.session_state["an_fiyat_satirlar"][_fi]["max"] = _fc[3].text_input("", value=_fs.get("max",""), key=f"an_fmax_{_fi}", placeholder="max", label_visibility="collapsed")
-            st.session_state["an_fiyat_satirlar"][_fi]["adet"] = _fc[4].text_input("", value=_fs.get("adet",""), key=f"an_fadet_{_fi}", placeholder="adet", label_visibility="collapsed")
-            st.session_state["an_fiyat_satirlar"][_fi]["musteri"] = _fc[5].text_input("", value=_fs.get("musteri",""), key=f"an_fmus_{_fi}", placeholder="ödediği ₺", label_visibility="collapsed")
-            st.session_state["an_fiyat_satirlar"][_fi]["biz"] = _fc[6].text_input("", value=_fs.get("biz",""), key=f"an_fbiz_{_fi}", placeholder="teklifimiz ₺", label_visibility="collapsed")
-            if _fc[7].button("×", key=f"an_fdel_{_fi}") and len(st.session_state["an_fiyat_satirlar"])>1:
-                st.session_state["an_fiyat_satirlar"].pop(_fi); st.rerun()
-        if st.button("+ Satır Ekle", key="an_fiyat_ekle"):
-            st.session_state["an_fiyat_satirlar"].append({"il":"","urun":"koli","min":"","max":"","adet":"","musteri":"","biz":""}); st.rerun()
-        _fatura_list = ["faturalı","faturasız","karma","bilinmiyor"]
-        _uapo_list = ["UA — gönderici öder","PO — alıcı öder","karma","bilinmiyor"]
-        _paz_list = ["inebilir","zorlu","inmez","bilinmiyor"]
-        _kd1,_kd2,_kd3,_kd4 = st.columns(4)
-        _an_fatura = _kd1.selectbox("Faturalama", _fatura_list, index=_fatura_list.index(_mv("fatura","faturalı")) if _mv("fatura","faturalı") in _fatura_list else 0, key="an_fatura")
-        _an_uapo = _kd2.selectbox("UA / PO", _uapo_list, index=_uapo_list.index(_mv("uapo","UA — gönderici öder")) if _mv("uapo","UA — gönderici öder") in _uapo_list else 0, key="an_uapo")
-        _an_odeme = _kd3.multiselect("Vade / Ödeme", ["nakit","havale","çek","30 gün","45 gün","60 gün","90 gün"], default=_mv_list("odeme"), key="an_odeme")
-        _an_pazarlik = _kd4.selectbox("Pazarlık", _paz_list, index=_paz_list.index(_mv("pazarlik","inebilir")) if _mv("pazarlik","inebilir") in _paz_list else 0, key="an_pazarlik")
-
-    with st.expander("📍 Bölge, Teslimat & AVM", expanded=False):
-        st.markdown("<small style='color:#64748b;'>İl | Ürün | Min–Max desi | Adet | Sıklık | Not/Saat kısıtı</small>", unsafe_allow_html=True)
-        _def_bolge = _mv_json("bolge") or [{"il":"","urun":"koli","min":"","max":"","adet":"","siklik":"haftalık","not":""}]
-        if "an_bolge_satirlar" not in st.session_state:
-            st.session_state["an_bolge_satirlar"] = _def_bolge
-        _bil_list = ["--","İstanbul","Ankara","İzmir","Bursa","Manisa","Çorlu/Çerkezköy","Konya","Kocaeli","Adana","Tüm TR"]
-        _bur_list = ["koli","palet","parsiyel","TIR","karma"]
-        _bsik_list = ["günlük","hf. 2–3","haftalık","aylık","düzensiz"]
-        for _bi in range(len(st.session_state["an_bolge_satirlar"])):
-            _bs = st.session_state["an_bolge_satirlar"][_bi]
-            _bc2 = st.columns([1.5,0.8,0.5,0.5,0.6,0.8,1,0.3])
-            st.session_state["an_bolge_satirlar"][_bi]["il"] = _bc2[0].selectbox("", _bil_list, index=_bil_list.index(_bs.get("il","--")) if _bs.get("il","--") in _bil_list else 0, key=f"an_bil_{_bi}", label_visibility="collapsed")
-            st.session_state["an_bolge_satirlar"][_bi]["urun"] = _bc2[1].selectbox("", _bur_list, index=_bur_list.index(_bs.get("urun","koli")) if _bs.get("urun","koli") in _bur_list else 0, key=f"an_burun_{_bi}", label_visibility="collapsed")
-            st.session_state["an_bolge_satirlar"][_bi]["min"] = _bc2[2].text_input("", value=_bs.get("min",""), key=f"an_bmin_{_bi}", placeholder="min", label_visibility="collapsed")
-            st.session_state["an_bolge_satirlar"][_bi]["max"] = _bc2[3].text_input("", value=_bs.get("max",""), key=f"an_bmax_{_bi}", placeholder="max", label_visibility="collapsed")
-            st.session_state["an_bolge_satirlar"][_bi]["adet"] = _bc2[4].text_input("", value=_bs.get("adet",""), key=f"an_badet_{_bi}", placeholder="adet", label_visibility="collapsed")
-            st.session_state["an_bolge_satirlar"][_bi]["siklik"] = _bc2[5].selectbox("", _bsik_list, index=_bsik_list.index(_bs.get("siklik","haftalık")) if _bs.get("siklik","haftalık") in _bsik_list else 0, key=f"an_bsik_{_bi}", label_visibility="collapsed")
-            st.session_state["an_bolge_satirlar"][_bi]["not"] = _bc2[6].text_input("", value=_bs.get("not",""), key=f"an_bnot_{_bi}", placeholder="not / saat kısıtı", label_visibility="collapsed")
-            if _bc2[7].button("×", key=f"an_bdel_{_bi}") and len(st.session_state["an_bolge_satirlar"])>1:
-                st.session_state["an_bolge_satirlar"].pop(_bi); st.rerun()
-        if st.button("+ Bölge Ekle", key="an_bolge_ekle"):
-            st.session_state["an_bolge_satirlar"].append({"il":"","urun":"koli","min":"","max":"","adet":"","siklik":"haftalık","not":""}); st.rerun()
-        st.markdown("**AVM Teslimatları**")
-        _def_avm = _mv_json("avm") or [{"avm":"","sehir":"--","urun":"","saat":""}]
-        if "an_avm_satirlar" not in st.session_state:
-            st.session_state["an_avm_satirlar"] = _def_avm
-        _ash_list = ["--","İstanbul","Ankara","İzmir","Bursa","Adana","Diğer"]
-        for _ai in range(len(st.session_state["an_avm_satirlar"])):
-            _as2 = st.session_state["an_avm_satirlar"][_ai]
-            _ac2 = st.columns([2,1,1.5,1.5,0.3])
-            st.session_state["an_avm_satirlar"][_ai]["avm"] = _ac2[0].text_input("", value=_as2.get("avm",""), key=f"an_aavm_{_ai}", placeholder="AVM / mağaza adı", label_visibility="collapsed")
-            st.session_state["an_avm_satirlar"][_ai]["sehir"] = _ac2[1].selectbox("", _ash_list, index=_ash_list.index(_as2.get("sehir","--")) if _as2.get("sehir","--") in _ash_list else 0, key=f"an_asehir_{_ai}", label_visibility="collapsed")
-            st.session_state["an_avm_satirlar"][_ai]["urun"] = _ac2[2].text_input("", value=_as2.get("urun",""), key=f"an_aurun_{_ai}", placeholder="koli/palet — adet", label_visibility="collapsed")
-            st.session_state["an_avm_satirlar"][_ai]["saat"] = _ac2[3].text_input("", value=_as2.get("saat",""), key=f"an_asaat_{_ai}", placeholder="giriş saati kısıtı...", label_visibility="collapsed")
-            if _ac2[4].button("×", key=f"an_adel_{_ai}") and len(st.session_state["an_avm_satirlar"])>1:
-                st.session_state["an_avm_satirlar"].pop(_ai); st.rerun()
-        if st.button("+ AVM Ekle", key="an_avm_ekle"):
-            st.session_state["an_avm_satirlar"].append({"avm":"","sehir":"--","urun":"","saat":""}); st.rerun()
-
-    with st.expander("💬 Beklenti, Öncelik & Karar", expanded=False):
-        _be1,_be2 = st.columns(2)
-        _an_beklenti = _be1.multiselect("En önemli beklenti", ["düşük fiyat","uzun vade","spot fiyat","özel anlaşma","hız/dakiklik","hizmet kalitesi","alım saati","bölge kapsamı","takip sistemi","sigorta","AVM girişi"], default=_mv_list("beklenti"), key="an_beklenti")
-        _an_fiyat_bek = _be2.text_input("Fiyat beklentisi", value=_mv("fiyat_bek",""), key="an_fiyat_bek", placeholder="₺/desi — isteğe bağlı")
-        _bk1,_bk2,_bk3,_bk4 = st.columns(4)
-        _karar_list = ["yetkili kendisi","üst yönetim","komite","bilinmiyor"]
-        _sure_list = ["acil (bu hafta)","kısa (1 ay)","uzun (3+ ay)","belirsiz"]
-        _an_ttur = _bk1.multiselect("Teklif türü", ["spot","özel anlaşma","sözleşme","dönemsel"], default=_mv_list("teklif_tur"), key="an_ttur")
-        _an_karar = _bk2.selectbox("Karar verici", _karar_list, index=_karar_list.index(_mv("karar","yetkili kendisi")) if _mv("karar","yetkili kendisi") in _karar_list else 0, key="an_karar")
-        _an_sure = _bk3.selectbox("Karar süresi", _sure_list, index=_sure_list.index(_mv("sure","belirsiz")) if _mv("sure","belirsiz") in _sure_list else 3, key="an_sure")
-        _rakip_once_list = ["hayır biz ilkiz","evet","bilinmiyor"]
-        _an_rakip_once = _bk4.selectbox("Rakip önce mi?", _rakip_once_list, key="an_rakip_once")
-        _an_engel = st.multiselect("Anlaşma engeli", ["fiyat","vade","rakip teklifi","karar verici","bölge eksikliği","güven","alışkanlık"], default=_mv_list("engel"), key="an_engel")
-        _an_ozel = st.text_input("Özel istek", value=_mv("sonraki_adim",""), key="an_ozel", placeholder="varsa yaz, boş da bırakabilirsin...")
-
-    with st.expander("🏭 Lojistik Altyapı", expanded=False):
-        _la1,_la2 = st.columns(2)
-        _arac_list = ["hayır dışarıdan","evet kendi dağıtımı","karma"]
-        _an_arac = _la1.selectbox("Kendi aracı", _arac_list, key="an_arac")
-        _an_depo = _la2.text_input("Depo lokasyonu", value=_mv("depo",""), key="an_depo", placeholder="isteğe bağlı")
-        _la3,_la4 = st.columns(2)
-        _an_saha = _la3.multiselect("Saha ihtiyacı", ["araç (noktaya)","personel/kurye","depo hizmeti","istif/paketleme"], default=_mv_list("saha"), key="an_saha")
-        _an_ozel_kargo = _la4.multiselect("Özel kargo", ["ambar kargo","dış nakliye","deniz yolu","hava kargo","bijimsiz","istifsizsiz"], default=_mv_list("ozel_kargo"), key="an_ozel_kargo")
-
-    with st.expander("⚔️ Rakip & Şikayetler", expanded=False):
-        st.markdown("<small style='color:#64748b;'>Rakip firma | ₺/desi | Durumu | Tercih sebebi</small>", unsafe_allow_html=True)
-        _def_rakip = _mv_json("rakip") or [{"firma":"","fiyat":"","durum":"orta","sebep":""}]
-        if "an_rakip_satirlar" not in st.session_state:
-            st.session_state["an_rakip_satirlar"] = _def_rakip
-        _rd_list = ["güçlü","orta","zayıf"]
-        for _ri in range(len(st.session_state["an_rakip_satirlar"])):
-            _rs = st.session_state["an_rakip_satirlar"][_ri]
-            _rc = st.columns([2,1,1,2,0.3])
-            st.session_state["an_rakip_satirlar"][_ri]["firma"] = _rc[0].text_input("", value=_rs.get("firma",""), key=f"an_rfirma_{_ri}", placeholder="rakip firma", label_visibility="collapsed")
-            st.session_state["an_rakip_satirlar"][_ri]["fiyat"] = _rc[1].text_input("", value=_rs.get("fiyat",""), key=f"an_rfiyat_{_ri}", placeholder="₺/desi", label_visibility="collapsed")
-            st.session_state["an_rakip_satirlar"][_ri]["durum"] = _rc[2].selectbox("", _rd_list, index=_rd_list.index(_rs.get("durum","orta")) if _rs.get("durum","orta") in _rd_list else 1, key=f"an_rdurum_{_ri}", label_visibility="collapsed")
-            st.session_state["an_rakip_satirlar"][_ri]["sebep"] = _rc[3].text_input("", value=_rs.get("sebep",""), key=f"an_rsebep_{_ri}", placeholder="tercih sebebi", label_visibility="collapsed")
-            if _rc[4].button("×", key=f"an_rdel_{_ri}") and len(st.session_state["an_rakip_satirlar"])>1:
-                st.session_state["an_rakip_satirlar"].pop(_ri); st.rerun()
-        if st.button("+ Rakip Ekle", key="an_rakip_ekle"):
-            st.session_state["an_rakip_satirlar"].append({"firma":"","fiyat":"","durum":"orta","sebep":""}); st.rerun()
-        _rs1,_rs2 = st.columns(2)
-        _an_sik = _rs1.multiselect("Şikayetleri", ["hasar","geç teslimat","fiyat yüksek","iletişim zayıf","takip yok","kayıp kargo","ambar bırakıyor","bijimsiz","araç gelmiyor","AVM girişi yok"], default=_mv_list("sik"), key="an_sik")
-        _an_gecis = _rs2.multiselect("Bize geçiş sebebi", ["fiyat avantajı","daha hızlı","kişisel ilişki","güven","takip sistemi","geniş bölge","erken alım","AVM çözümü"], default=_mv_list("gecis"), key="an_gecis")
-
-    with st.expander("💡 Değerlendirme & Görüşme Notu", expanded=True):
-        _pot_list = ["çok düşük","düşük","orta","yüksek","çok yüksek"]
-        _sonuc_list = ["takip edilecek","teklif verildi","beklemede","ilgisiz","randevu verildi","anlaşma yapıldı"]
-        _de1,_de2,_de3 = st.columns(3)
-        _an_pot = _de1.select_slider("Potansiyel", options=_pot_list, value=_mv("potansiyel","orta") if _mv("potansiyel","orta") in _pot_list else "orta", key="an_pot")
-        _an_sonuc = _de2.selectbox("Görüşme sonucu", _sonuc_list, index=_sonuc_list.index(_mv("sonuc","takip edilecek")) if _mv("sonuc","takip edilecek") in _sonuc_list else 0, key="an_sonuc")
-        _an_takip = _de3.date_input("Takip tarihi", key="an_takip_tar")
-        _an_sonraki = st.text_input("Bir sonraki adım", value=_mv("sonraki_adim",""), key="an_sonraki", placeholder="isteğe bağlı...")
-        _an_not = st.text_area("Görüşme notu", value=_mv("not_alan",""), key="an_not", placeholder="devrik de yaz, kısa da... karakter sınırı yok.", height=100)
-
-    st.divider()
-
-    # ── AKSİYON BUTONLARI ─────────────────────────────────────────────────────
-    _btn_c = st.columns(5)
-    _kaydet_btn = _btn_c[0].button("💾 " + ("Güncelle" if _duzenle_mod else "Kaydet"), type="primary", use_container_width=True, key="an_kaydet")
-    _cari_btn = _btn_c[1].button("+ Cari Listesi", use_container_width=True, key="an_cari")
-    _teklif_btn = _btn_c[2].button("📄 Teklif Oluştur", use_container_width=True, key="an_teklif")
-
-    _an_tel_clean = str(_an_iletisim or "").replace(" ","").replace("-","")
-    if _an_tel_clean and "@" not in _an_tel_clean:
-        if _an_tel_clean.startswith("0"): _an_tel_clean = "90" + _an_tel_clean[1:]
-        _wa_text = "Merhaba " + _secili_firma + ", gorusemiz icin tesekkurler."
-        _wa_enc = _wa_text.replace(" ", "%20")
-        _btn_c[3].markdown("<a href='https://wa.me/" + _an_tel_clean + "?text=" + _wa_enc + "' target='_blank'><button style='width:100%;padding:6px;font-size:12px;border:none;background:#25d366;color:white;border-radius:6px;cursor:pointer;'>💬 WhatsApp</button></a>", unsafe_allow_html=True)
-    if _an_iletisim and "@" in _an_iletisim:
-        _btn_c[4].markdown("<a href='mailto:" + _an_iletisim + "?subject=Teklif'><button style='width:100%;padding:6px;font-size:12px;background:#fffbeb;color:#b45309;border:1px solid #fcd34d;border-radius:6px;cursor:pointer;'>✉️ E-posta</button></a>", unsafe_allow_html=True)
-
-    if _kaydet_btn:
-        _veri_an = {
-            "yetkili": _an_yetkili or "",
-            "iletisim": _an_iletisim or "",
-            "sektor": _an_sektor or "",
-            "amac": ", ".join(_an_amac) if _an_amac else "",
-            "mdurum": _an_mdurum or "",
-            "bek_ciro": float((_an_bek_ciro or "0").replace(".","").replace(",",".")) if _an_bek_ciro else 0,
-            "ger_ciro": float((_an_ger_ciro or "0").replace(".","").replace(",",".")) if _an_ger_ciro else 0,
-            "kaynak": ", ".join(_an_kaynak) if _an_kaynak else "",
-            "kargo": ", ".join(_an_kargo) if _an_kargo else "",
-            "fatura": _an_fatura or "",
-            "uapo": _an_uapo or "",
-            "odeme": ", ".join(_an_odeme) if _an_odeme else "",
-            "pazarlik": _an_pazarlik or "",
-            "beklenti": ", ".join(_an_beklenti) if _an_beklenti else "",
-            "teklif_tur": ", ".join(_an_ttur) if _an_ttur else "",
-            "karar": _an_karar or "",
-            "sure": _an_sure or "",
-            "engel": ", ".join(_an_engel) if _an_engel else "",
-            "sik": ", ".join(_an_sik) if _an_sik else "",
-            "gecis": ", ".join(_an_gecis) if _an_gecis else "",
-            "potansiyel": _an_pot or "",
-            "sonuc": _an_sonuc or "",
-            "not_alan": _an_not or "",
-            "takip_tar": str(_an_takip) if _an_takip else "",
-            "sonraki_adim": _an_sonraki or "",
-            "bolge": _aj.dumps(st.session_state.get("an_bolge_satirlar",[]), ensure_ascii=False),
-            "avm": _aj.dumps(st.session_state.get("an_avm_satirlar",[]), ensure_ascii=False),
-            "fiyat_tablo": _aj.dumps(st.session_state.get("an_fiyat_satirlar",[]), ensure_ascii=False),
-            "rakip": _aj.dumps(st.session_state.get("an_rakip_satirlar",[]), ensure_ascii=False),
-            "olusturan": st.session_state.get("kullanici",""),
-        }
-        _ok, _ = _an_upsert(_secili_firma, _veri_an)
-        if _ok:
-            _eylem = "güncellendi" if _duzenle_mod else "kaydedildi"
-            st.success(f"✅ **{_secili_firma}** analizi başarıyla {_eylem}!")
-            st.balloons()
-            try: db_read.clear()
-            except: pass
-            st.rerun()
-
-    if _cari_btn:
-        _var_mi = not _df_cari_an[_df_cari_an["firma"].str.lower()==_secili_firma.lower()].empty
-        if _var_mi:
-            st.info(f"ℹ️ {_secili_firma} zaten cari listede!")
-        else:
-            db_insert("cari_kartlar", {
-                "firma": _secili_firma, "yetkili": _an_yetkili or "",
-                "gsm": _an_iletisim if "@" not in (_an_iletisim or "") else "",
-                "email": _an_iletisim if "@" in (_an_iletisim or "") else "",
-                "il":"","durum":"Hedef","islem_asamasi":"İlk Temas",
-                "beklenen_ciro": float((_an_bek_ciro or "0").replace(".","").replace(",",".")) if _an_bek_ciro else 0,
-                "olusturan": st.session_state.get("kullanici",""), "silindi": 0
-            })
-            try: db_read.clear()
-            except: pass
-            st.success(f"✅ {_secili_firma} cari listeye eklendi!")
-
-    if _teklif_btn:
-        st.session_state["aktif_tab"] = "teklif"
-        st.rerun()
-
-    # ── TÜM ANALİZLER LİSTESİ ─────────────────────────────────────────────────
+    # Tüm analizler — ayrı bölüm
     st.divider()
     st.markdown("### 📋 Tüm Müşteri Analizleri")
-    _df_tum = _an_getir_tumü(limit=500)
+    _df_tum = _an_getir_tumü()
     if _df_tum.empty:
         st.info("Henüz analiz kaydedilmedi.")
     else:
@@ -4020,60 +4242,27 @@ elif aktif == "analiz":
         if _fs2 != "Tümü": _df_f = _df_f[_df_f["sonuc"]==_fs2]
         if _fp != "Tümü": _df_f = _df_f[_df_f["potansiyel"]==_fp]
         st.caption(f"{len(_df_f)} analiz")
-
         for _, _ar in _df_f.iterrows():
             _pot_ic = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(str(_ar.get("potansiyel","")),"-")
-            _exp_t = f"{_pot_ic} **{_ar.get('firma','?')}** · {str(_ar.get('tarih',''))[:10]} · {_ar.get('sonuc','')} · {_ar.get('potansiyel','')} potansiyel"
-            with st.expander(_exp_t):
+            with st.expander(f"{_pot_ic} **{_ar.get('firma','?')}** · {str(_ar.get('tarih',''))[:10]} · {_ar.get('sonuc','')} · {_ar.get('potansiyel','')}"):
                 _em1,_em2,_em3,_em4 = st.columns(4)
                 _em1.metric("Potansiyel", _ar.get("potansiyel","—"))
                 _em2.metric("Beklenen Ciro", f"{float(_ar.get('bek_ciro',0) or 0):,.0f} ₺")
                 _em3.metric("Gerçekleşen", f"{float(_ar.get('ger_ciro',0) or 0):,.0f} ₺")
                 _em4.metric("Sonuç", _ar.get("sonuc","—"))
                 st.markdown(f"""
-| Alan | Değer |
+| | |
 |---|---|
-| **Firma** | {_ar.get("firma","—")} |
-| **Yetkili** | {_ar.get("yetkili","—")} |
-| **İletişim** | {_ar.get("iletisim","—")} |
-| **Sektör** | {_ar.get("sektor","—")} |
-| **Analiz Amacı** | {_ar.get("amac","—")} |
-| **Kaynak** | {_ar.get("kaynak","—")} |
-| **Kargo** | {_ar.get("kargo","—")} |
-| **Fatura / UA/PO** | {_ar.get("fatura","—")} / {_ar.get("uapo","—")} |
-| **Vade/Ödeme** | {_ar.get("odeme","—")} · Pazarlık: {_ar.get("pazarlik","—")} |
+| **Firma** | {_ar.get("firma","—")} · **Yetkili:** {_ar.get("yetkili","—")} · **Sektör:** {_ar.get("sektor","—")} |
+| **Kargo** | {_ar.get("kargo","—")} · **Fatura:** {_ar.get("fatura","—")} · **UA/PO:** {_ar.get("uapo","—")} |
+| **Vade** | {_ar.get("odeme","—")} · **Pazarlık:** {_ar.get("pazarlik","—")} |
 | **Beklenti** | {_ar.get("beklenti","—")} |
-| **Karar Verici** | {_ar.get("karar","—")} · Süre: {_ar.get("sure","—")} |
 | **Engel** | {_ar.get("engel","—")} |
-| **Şikayetleri** | {_ar.get("sik","—")} |
-| **Geçiş Sebebi** | {_ar.get("gecis","—")} |
-| **Sonraki Adım** | {_ar.get("sonraki_adim","—")} |
-| **Takip Tarihi** | {_ar.get("takip_tar","—")} |
-| **Temsilci** | {_ar.get("olusturan","—")} |
+| **Not** | {_ar.get("not_alan","—")} |
+| **Sonraki Adım** | {_ar.get("sonraki_adim","—")} · **Takip:** {_ar.get("takip_tar","—")} |
 """)
-                if _ar.get("not_alan"):
-                    st.info(f"📝 **Not:** {_ar.get('not_alan')}")
-                try:
-                    _ft2 = _aj.loads(_ar.get("fiyat_tablo","[]") or "[]")
-                    if _ft2 and any(s.get("il") and s.get("il")!="--" for s in _ft2):
-                        st.markdown("**💰 Fiyat Tablosu:**")
-                        st.dataframe(pd.DataFrame(_ft2), use_container_width=True, hide_index=True)
-                except: pass
-                try:
-                    _bt2 = _aj.loads(_ar.get("bolge","[]") or "[]")
-                    if _bt2 and any(s.get("il") and s.get("il")!="--" for s in _bt2):
-                        st.markdown("**📍 Bölge Teslimat:**")
-                        st.dataframe(pd.DataFrame(_bt2), use_container_width=True, hide_index=True)
-                except: pass
-                try:
-                    _at2 = _aj.loads(_ar.get("avm","[]") or "[]")
-                    if _at2 and any(s.get("avm") for s in _at2):
-                        st.markdown("**🏬 AVM Teslimatları:**")
-                        st.dataframe(pd.DataFrame(_at2), use_container_width=True, hide_index=True)
-                except: pass
-                # AKSİYON
-                _wb = st.columns(4)
-                if _wb[0].button("✏️ Düzenle", key=f"an_duz_{_ar.get('firma','')}", use_container_width=True):
+                _wb1,_wb2,_wb3,_wb4 = st.columns(4)
+                if _wb1.button("✏️ Düzenle", key=f"an_duz_{_ar.get('firma','')}", use_container_width=True):
                     st.session_state["an_duzenle_firma"] = str(_ar.get("firma",""))
                     for _k3 in ["an_fiyat_satirlar","an_bolge_satirlar","an_avm_satirlar","an_rakip_satirlar"]:
                         if _k3 in st.session_state: del st.session_state[_k3]
@@ -4081,46 +4270,27 @@ elif aktif == "analiz":
                 _tel3 = str(_ar.get("iletisim","") or "").replace(" ","").replace("-","")
                 if _tel3 and "@" not in _tel3:
                     if _tel3.startswith("0"): _tel3="90"+_tel3[1:]
-                    _wa3 = "Merhaba " + str(_ar.get("firma","")) + ", gorusemiz icin tesekkurler."
-                    _wb[1].markdown("<a href='https://wa.me/"+_tel3+"?text="+_wa3.replace(" ","%20")+"' target='_blank'><button style='width:100%;padding:5px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;'>💬 WA</button></a>", unsafe_allow_html=True)
-                if _wb[2].button("📄 Teklif", key=f"an_tek_{_ar.get('firma','')}", use_container_width=True):
-                    st.session_state["aktif_tab"] = "teklif"
-                    st.rerun()
-                if _wb[3].button("🗑 Sil", key=f"an_sil_{_ar.get('firma','')}", use_container_width=True):
-                    if _an_sil(str(_ar.get("firma",""))):
-                        st.success("Analiz silindi!")
-                        st.rerun()
+                    _wb2.markdown(f"<a href='https://wa.me/{_tel3}' target='_blank'><button style='width:100%;padding:5px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;'>💬 WA</button></a>", unsafe_allow_html=True)
+                if _wb3.button("📄 Teklif", key=f"an_tek_{_ar.get('firma','')}", use_container_width=True):
+                    st.session_state["aktif_tab"] = "teklif"; st.rerun()
+                if _wb4.button("🗑 Sil", key=f"an_sil_{_ar.get('firma','')}", use_container_width=True):
+                    if _an_sil(str(_ar.get("firma",""))): st.success("Silindi!"); st.rerun()
 
-    # İSTATİSTİKLER
-    if not _df_tum.empty:
+        # İstatistikler
         st.divider()
         st.markdown("### 📊 İstatistikler")
-        _s1,_s2,_s3,_s4,_s5 = st.columns(5)
-        _s1.metric("Toplam Analiz", len(_df_tum))
-        _s2.metric("Yüksek Potansiyel", len(_df_tum[_df_tum["potansiyel"].isin(["yüksek","çok yüksek"])]))
-        _s3.metric("Takip Bekleyen", len(_df_tum[_df_tum["sonuc"]=="takip edilecek"]))
-        _s4.metric("Anlaşma Yapılan", len(_df_tum[_df_tum["sonuc"]=="anlaşma yapıldı"]))
-        try: _s5.metric("Toplam Beklenen Ciro", f"{_df_tum['bek_ciro'].sum():,.0f} ₺")
+        _sc1,_sc2,_sc3,_sc4,_sc5 = st.columns(5)
+        _sc1.metric("Toplam", len(_df_tum))
+        _sc2.metric("Yüksek Pot.", len(_df_tum[_df_tum["potansiyel"].isin(["yüksek","çok yüksek"])]))
+        _sc3.metric("Takip Bekleyen", len(_df_tum[_df_tum["sonuc"]=="takip edilecek"]))
+        _sc4.metric("Anlaşma", len(_df_tum[_df_tum["sonuc"]=="anlaşma yapıldı"]))
+        try: _sc5.metric("Beklenen Ciro", f"{_df_tum['bek_ciro'].sum():,.0f} ₺")
         except: pass
         _ic1,_ic2 = st.columns(2)
         with _ic1:
-            st.markdown("**Potansiyel Dağılımı**")
-            st.bar_chart(_df_tum["potansiyel"].value_counts())
+            st.markdown("**Potansiyel**"); st.bar_chart(_df_tum["potansiyel"].value_counts())
         with _ic2:
-            st.markdown("**Görüşme Sonuçları**")
-            st.bar_chart(_df_tum["sonuc"].value_counts())
-        _ic3,_ic4 = st.columns(2)
-        with _ic3:
-            st.markdown("**Sektör Dağılımı**")
-            st.bar_chart(_df_tum["sektor"].value_counts().head(8))
-        with _ic4:
-            st.markdown("**En Çok Rakip Kargo**")
-            try:
-                _kg_all = []
-                for _k4 in _df_tum["kargo"].dropna():
-                    _kg_all.extend([x.strip() for x in str(_k4).split(",")])
-                if _kg_all: st.bar_chart(pd.Series(_kg_all).value_counts())
-            except: pass
+            st.markdown("**Sonuçlar**"); st.bar_chart(_df_tum["sonuc"].value_counts())
 
 elif aktif == "whatsapp":
     import requests as _wa_req
