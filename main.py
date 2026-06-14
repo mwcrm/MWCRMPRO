@@ -4242,7 +4242,7 @@ durumGuncelle();
         if _fs2 != "Tümü": _df_f = _df_f[_df_f["sonuc"]==_fs2]
         if _fp != "Tümü": _df_f = _df_f[_df_f["potansiyel"]==_fp]
         st.caption(f"{len(_df_f)} analiz")
-        for _, _ar in _df_f.iterrows():
+        for _aidx, (___, _ar) in enumerate(_df_f.iterrows()):
             _pot_ic = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(str(_ar.get("potansiyel","")),"-")
             with st.expander(f"{_pot_ic} **{_ar.get('firma','?')}** · {str(_ar.get('tarih',''))[:10]} · {_ar.get('sonuc','')} · {_ar.get('potansiyel','')}"):
                 _em1,_em2,_em3,_em4 = st.columns(4)
@@ -4262,7 +4262,7 @@ durumGuncelle();
 | **Sonraki Adım** | {_ar.get("sonraki_adim","—")} · **Takip:** {_ar.get("takip_tar","—")} |
 """)
                 _wb1,_wb2,_wb3,_wb4 = st.columns(4)
-                if _wb1.button("✏️ Düzenle", key=f"an_duz_{_ar.get('firma','')}", use_container_width=True):
+                if _wb1.button("✏️ Düzenle", key=f"an_duz_{_aidx}", use_container_width=True):
                     st.session_state["an_duzenle_firma"] = str(_ar.get("firma",""))
                     for _k3 in ["an_fiyat_satirlar","an_bolge_satirlar","an_avm_satirlar","an_rakip_satirlar"]:
                         if _k3 in st.session_state: del st.session_state[_k3]
@@ -4271,9 +4271,9 @@ durumGuncelle();
                 if _tel3 and "@" not in _tel3:
                     if _tel3.startswith("0"): _tel3="90"+_tel3[1:]
                     _wb2.markdown(f"<a href='https://wa.me/{_tel3}' target='_blank'><button style='width:100%;padding:5px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;'>💬 WA</button></a>", unsafe_allow_html=True)
-                if _wb3.button("📄 Teklif", key=f"an_tek_{_ar.get('firma','')}", use_container_width=True):
+                if _wb3.button("📄 Teklif", key=f"an_tek_{_aidx}", use_container_width=True):
                     st.session_state["aktif_tab"] = "teklif"; st.rerun()
-                if _wb4.button("🗑 Sil", key=f"an_sil_{_ar.get('firma','')}", use_container_width=True):
+                if _wb4.button("🗑 Sil", key=f"an_sil_{_aidx}", use_container_width=True):
                     if _an_sil(str(_ar.get("firma",""))): st.success("Silindi!"); st.rerun()
 
         # İstatistikler
