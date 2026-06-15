@@ -1404,10 +1404,11 @@ elif aktif == "liste":
                 st.rerun()
 
     # ── FİLTRE TEK SATIR ─────────────────────────────────────────────────────
-    _fc = st.columns([1.3, 1.3, 1.8, 1.8, 1.0, 0.8, 0.4, 0.8])
+    _fc = st.columns([1,1,2,2,1,1,0.3,0.6])
     filtre_asama = _fc[0].selectbox("", ["Aşama: Tümü"]+tum_asama_opts, key="fil_asama", label_visibility="collapsed")
     filtre_durum = _fc[1].selectbox("", ["Durum: Tümü"]+tum_durum_opts, key="fil_durum", label_visibility="collapsed")
     filtre_seg   = _fc[4].selectbox("", ["Segment: Tümü","👑 A+","⭐ A","🔵 B","⚪ C","Segmentsiz"], key="fil_seg", label_visibility="collapsed")
+    siralama_kol = _fc[5].selectbox("", ["Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z"], key="siralama_kol", label_visibility="collapsed")
 
     df_f = df.copy()
     if filtre_asama != "Aşama: Tümü": df_f = df_f[df_f["islem_asamasi"]==filtre_asama]
@@ -1432,7 +1433,6 @@ elif aktif == "liste":
         st.session_state.pop("kart_sec", None)
     secili_kart = _fc[2].selectbox("", kart_opts, key="kart_sec", label_visibility="collapsed")
     ara_txt      = _fc[3].text_input("", placeholder="🔍 Firma, yetkili, il...", key="ara_liste", label_visibility="collapsed")
-    siralama_kol = _fc[4].selectbox("", ["Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z"], key="siralama_kol", label_visibility="collapsed")
 
     if ara_txt: df_f = df_f[df_f.apply(lambda r: ara_txt.lower() in str(r).lower(), axis=1)]
     if siralama_kol == "Firma A-Z":      df_f = df_f.sort_values("firma", ascending=True)
