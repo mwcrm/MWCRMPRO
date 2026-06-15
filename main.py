@@ -1189,6 +1189,10 @@ if aktif == "yeni":
 
     il_listesi = sorted(ILLER_ILCELER.keys())
     mevcut_il   = duzenle.get("il","") if duzenle and duzenle.get("il","") in il_listesi else il_listesi[0]
+    # Eski session key'lerini temizle
+    for _dk in ["yeni_il_sec","yeni_ilce_sec","yeni_il_form","yeni_ilce_form"]:
+        if _dk in st.session_state and not duzenle:
+            del st.session_state[_dk]
     _asama_base = _tanimlar_yukle("asama")
     try:
         _df_as2 = db_read("cari_kartlar", extra_sql="WHERE silindi=0 OR silindi IS NULL")
@@ -1211,8 +1215,10 @@ if aktif == "yeni":
         r2c1,r2c2,r2c3,r2c4,r2c5,r2c6 = st.columns(6)
         il_idx    = il_listesi.index(mevcut_il) if mevcut_il in il_listesi else 0
         il        = r2c1.selectbox("İl", il_listesi, index=il_idx, key="yeni_il_form")
-        ilce_list = ILLER_ILCELER[il]
+        ilce_list = ILLER_ILCELER.get(il, [""])
         mevcut_ilce = duzenle.get("ilce","") if duzenle else ""
+        # Seçili il değişmişse ilçeyi sıfırla
+        if mevcut_ilce not in ilce_list: mevcut_ilce = ilce_list[0] if ilce_list else ""
         ilce_idx  = ilce_list.index(mevcut_ilce) if mevcut_ilce in ilce_list else 0
         ilce      = r2c2.selectbox("İlçe", ilce_list, index=ilce_idx, key="yeni_ilce_form")
         durum_opts = ["Aktif","Hedef","Pasif"]
