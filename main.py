@@ -1427,59 +1427,118 @@ elif aktif == "liste":
             bek = float(kart_row.get("beklenen_ciro",0) or 0)
             ger = float(kart_row.get("gerceklesen_ciro",0) or 0)
             _seg_val = str(kart_row.get("segment","") or "")
-            _not = str(kart_row.get("aciklama","") or "")
+            _gsm = fmt_tel(kart_row.get("gsm","")) or "-"
+            _sabit = fmt_tel(kart_row.get("sabit","")) or "-"
+            _email = str(kart_row.get("email","") or "-")
+            _yetkili = str(kart_row.get("yetkili","") or "-")
+            _il = str(kart_row.get("il","") or "-")
+            _ilce = str(kart_row.get("ilce","") or "-")
+            _durum = str(kart_row.get("durum","") or "-")
+            _asama = str(kart_row.get("islem_asamasi","") or "-")
+            _temsilci = str(kart_row.get("temsilci","") or "-")
+            _yuzde = round((ger/bek)*100) if bek > 0 else 0
+            _fark = ger - bek
+            _fark_renk = "#16a34a" if _fark >= 0 else "#dc2626"
 
-            # ── KART BAŞLIĞI ─────────────────────────────────────────────────
+            # ── BAŞLIK ───────────────────────────────────────────────────────
             st.markdown(f"""
-<div style='background:#fff;border:2px solid #e2e8f0;border-radius:12px;padding:20px;margin:8px 0'>
-<div style='display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px'>
+<div style='background:#1e293b;color:white;padding:12px 20px;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:12px'>
+  <span style='font-size:28px'>🏢</span>
   <div>
-    <h2 style='margin:0;font-size:22px'>🏢 {kart_row.get('firma','')}</h2>
-    <div style='margin-top:8px;font-size:13px;color:#475569;display:flex;flex-wrap:wrap;gap:16px'>
-      <span>👤 {kart_row.get('yetkili','-') or '-'}</span>
-      <span>📱 {fmt_tel(kart_row.get('gsm','')) or '-'}</span>
-      <span>☎️ {fmt_tel(kart_row.get('sabit','')) or '-'}</span>
-      <span>✉️ {kart_row.get('email','-') or '-'}</span>
-    </div>
-    <div style='margin-top:6px;font-size:13px;color:#475569;display:flex;flex-wrap:wrap;gap:16px'>
-      <span>🏙️ {kart_row.get('il','-') or '-'} / {kart_row.get('ilce','-') or '-'}</span>
-      <span>📊 {kart_row.get('durum','-') or '-'}</span>
-      <span>🔄 {kart_row.get('islem_asamasi','-') or '-'}</span>
-      <span>👔 {kart_row.get('temsilci','-') or '-'}</span>
-      {f"<span style='background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:10px;font-size:11px'>{_seg_val}</span>" if _seg_val and _seg_val != "--" else ""}
-    </div>
-    {f"<div style='margin-top:8px;background:#f0fdf4;border-left:3px solid #22c55e;padding:6px 10px;border-radius:4px;font-size:13px'>📝 {_not}</div>" if _not and _not != "nan" else ""}
+    <div style='font-size:11px;color:#94a3b8'>Müşteri Detay Paneli</div>
+    <div style='font-size:20px;font-weight:800;letter-spacing:0.5px'>{kart_row.get('firma','').upper()}</div>
   </div>
-  <div style='text-align:right;min-width:160px'>
-    <div style='font-size:12px;color:#94a3b8'>Beklenen</div>
-    <div style='font-size:24px;font-weight:800;color:#1e40af'>{fmt_para(bek)}</div>
-    <div style='font-size:12px;color:#94a3b8;margin-top:8px'>Gerçekleşen</div>
-    <div style='font-size:20px;font-weight:700;color:{"#16a34a" if ger>=bek else "#dc2626"}'>{fmt_para(ger)}</div>
-  </div>
-</div>
 </div>""", unsafe_allow_html=True)
 
-            # ── BUTONLAR ────────────────────────────────────────────────────
-            ab1,ab2,ab3,ab4 = st.columns(4)
-            if ab1.button("✏️ Düzenle", key=f"kd_{kart_id}", use_container_width=True):
+            # ── 3 PANEL ──────────────────────────────────────────────────────
+            _p1, _p2, _p3 = st.columns(3)
+
+            with _p1:
+                st.markdown(f"""
+<div style='border:1px solid #e2e8f0;border-radius:0 0 0 10px;padding:16px;height:100%'>
+  <div style='font-weight:700;font-size:13px;margin-bottom:10px;color:#374151'>📋 İletişim & Konum</div>
+  <div style='font-size:13px;line-height:2;color:#374151'>
+    <div>👤 {_yetkili}</div>
+    <div>📱 {_gsm}</div>
+    <div>☎️ {_sabit}</div>
+    <div>✉️ {"<a href='mailto:"+_email+"' style='color:#3b82f6'>"+_email+"</a>" if "@" in _email else _email}</div>
+  </div>
+</div>""", unsafe_allow_html=True)
+
+            with _p2:
+                st.markdown(f"""
+<div style='border:1px solid #e2e8f0;border-top:none;padding:16px;height:100%'>
+  <div style='font-weight:700;font-size:13px;margin-bottom:10px;color:#374151'>📍 Konum & Durum</div>
+  <div style='font-size:13px;line-height:2;color:#374151'>
+    <div>🏙️ {_il} / {_ilce}</div>
+    <div>📊 {_durum}</div>
+    <div>🔄 {_asama}</div>
+    <div>👔 {_temsilci}</div>
+    {f"<div><span style='background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600'>{_seg_val}</span></div>" if _seg_val and _seg_val not in ["--",""] else ""}
+  </div>
+</div>""", unsafe_allow_html=True)
+
+            with _p3:
+                st.markdown(f"""
+<div style='border:1px solid #e2e8f0;border-radius:0 0 10px 0;border-top:none;padding:16px;height:100%'>
+  <div style='font-weight:700;font-size:13px;margin-bottom:10px;color:#374151'>💰 Özet Finans</div>
+  <div style='display:flex;align-items:center;gap:16px'>
+    <div style='text-align:center'>
+      <svg width='80' height='80' viewBox='0 0 80 80'>
+        <circle cx='40' cy='40' r='32' fill='none' stroke='#e2e8f0' stroke-width='8'/>
+        <circle cx='40' cy='40' r='32' fill='none' stroke='{"#22c55e" if _yuzde>=100 else "#3b82f6"}' stroke-width='8'
+          stroke-dasharray='{min(_yuzde,100)*2.01} 201' stroke-dashoffset='50' stroke-linecap='round'/>
+      </svg>
+      <div style='font-size:12px;color:#64748b;margin-top:-8px'>%{_yuzde}</div>
+    </div>
+    <div>
+      <div style='font-size:11px;color:#94a3b8'>Beklenen:</div>
+      <div style='font-size:18px;font-weight:800;color:#1e40af'>{fmt_para(bek)}</div>
+      <div style='font-size:11px;color:#94a3b8;margin-top:6px'>Gerçekleşen:</div>
+      <div style='font-size:16px;font-weight:700;color:#374151'>{fmt_para(ger)}</div>
+      <div style='margin-top:4px;background:{"#f0fdf4" if _fark>=0 else "#fef2f2"};color:{_fark_renk};padding:2px 8px;border-radius:6px;font-size:12px;font-weight:600;display:inline-block'>
+        {"▲" if _fark>=0 else "▼"} {fmt_para(abs(_fark))}
+      </div>
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
+
+            # ── AKSİYONLAR ───────────────────────────────────────────────────
+            st.markdown("<div style='background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;margin-top:12px'>", unsafe_allow_html=True)
+            _ax1,_ax2,_ax3,_ax4,_ax5,_ax6 = st.columns([1,1,1,1,1.2,1])
+            if _ax1.button("✏️ Düzenle", key=f"kd_{kart_id}", use_container_width=True):
                 d2 = {str(k):(None if str(v) in ["nan","None","NaT"] else v) for k,v in kart_row.items()}
                 for _k in ["firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","aciklama"]:
                     if _k in d2: d2[_k] = "" if d2[_k] is None else str(d2[_k])
                 st.session_state["duzenle_musteri"] = d2
                 st.session_state["aktif_tab"] = "yeni"; st.rerun()
-            if ab2.button("📄 Teklif", key=f"kt_{kart_id}", use_container_width=True, type="primary"):
+            if _ax2.button("📄 Teklif", key=f"kt_{kart_id}", use_container_width=True, type="primary"):
                 st.session_state["aktif_tab"] = "teklif"
                 st.session_state["hedef_mus"] = str(kart_row.get("firma",""))
                 st.session_state["son_secili_id"] = None; st.rerun()
-            if ab3.button("📅 Randevu", key=f"kr_{kart_id}", use_container_width=True, type="primary"):
+            if _ax3.button("📅 Randevu", key=f"kr_{kart_id}", use_container_width=True, type="primary"):
                 st.session_state["aktif_tab"] = "randevu"
                 st.session_state["rand_musteri_onsel"] = kart_id; st.rerun()
-            if ab4.button("🗑️ Arşive", key=f"ka_{kart_id}", use_container_width=True):
+            _gsm_raw = str(kart_row.get("gsm","") or "").replace(" ","").replace("-","")
+            if _gsm_raw.startswith("0"): _gsm_raw = "90" + _gsm_raw[1:]
+            if _gsm_raw and _ax4.button("💬 WhatsApp", key=f"kwa_{kart_id}", use_container_width=True):
+                st.markdown(f"<a href='https://wa.me/{_gsm_raw}' target='_blank'>WhatsApp aç</a>", unsafe_allow_html=True)
+            if _ax5.button("💾 Kaydet", key=f"kkaydet_{kart_id}", use_container_width=True, type="primary"):
+                try:
+                    _g = {"firma":str(kart_row.get("firma","")), "yetkili":str(kart_row.get("yetkili","")), "gsm":str(kart_row.get("gsm","")), "sabit":str(kart_row.get("sabit","")), "email":str(kart_row.get("email","")), "il":str(kart_row.get("il","")), "ilce":str(kart_row.get("ilce","")), "durum":str(kart_row.get("durum","")), "temsilci":str(kart_row.get("temsilci","")), "islem_asamasi":str(kart_row.get("islem_asamasi",""))}
+                    if sb_liste: sb_liste.table("cari_kartlar").update(_g).eq("id",kart_id).execute()
+                    else: db_update("cari_kartlar",_g,"id",kart_id)
+                    try: db_read.clear()
+                    except: pass
+                    st.success("✅ Kaydedildi!")
+                except Exception as _ke: st.error(f"Hata: {_ke}")
+            if _ax6.button("🗑️ Arşive", key=f"ka_{kart_id}", use_container_width=True):
                 if sb_liste: sb_liste.table("cari_kartlar").update({"silindi":1}).eq("id",kart_id).execute()
                 else: db_update("cari_kartlar",{"silindi":1},"id",kart_id)
                 try: db_read.clear()
                 except: pass
                 st.success("Arşive gönderildi!"); st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
             # ── AÇIKLAMA SİSTEMİ ──────────────────────────────────────────────
             st.markdown("---")
