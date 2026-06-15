@@ -3669,20 +3669,19 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{padding:2px 8px!impo
                     st.rerun()
         return st.session_state.get(key, sel)
 
-    # SEKMELER
-    _atab1, _atab2 = st.tabs(["✏️ Yeni / Düzenle", "📋 Tüm Analizler"])
-
-    # ══ TÜM ANALİZLER — müşteri seçimi gerektirmez ══════════════════════════
-    with _atab2:
+    # ══ TÜM ANALİZLER ═══════════════════════════════════════════════════════
+    if True:
         st.markdown("### 📋 Tüm Müşteri Analizleri")
         _df_tum = pd.DataFrame()
         try:
-            _sb2 = get_sb_client()
+            _sb2 = get_sb_service() or get_sb_client()
             if _sb2:
                 _r2 = _sb2.table("musteri_analiz").select("*").order("tarih", desc=True).limit(500).execute()
-                if _r2.data:
+                if _r2 and _r2.data:
                     _df_tum = pd.DataFrame(_r2.data)
                     _df_tum = _df_tum[_df_tum["firma"].notna() & (_df_tum["firma"] != "")]
+            else:
+                st.error("Supabase bağlantısı kurulamadı!")
         except Exception as _e2:
             st.error(f"Hata: {_e2}")
 
@@ -3746,8 +3745,9 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{padding:2px 8px!impo
             with _ic1: st.markdown("**Potansiyel**"); st.bar_chart(_df_tum["potansiyel"].value_counts())
             with _ic2: st.markdown("**Sonuçlar**"); st.bar_chart(_df_tum["sonuc"].value_counts())
 
-    # ══ YENİ / DÜZENLE FORMU ═══════════════════════════════════════════════
-    with _atab1:
+    st.divider()
+    st.markdown("## ✏️ Yeni / Düzenle")
+    if True:
         _mv_data = None
         try:
             _sb_an = get_sb_client()
