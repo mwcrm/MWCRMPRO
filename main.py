@@ -1188,75 +1188,64 @@ if aktif == "yeni":
         st.markdown("### ➕ Yeni Cari Kart")
 
     il_listesi = sorted(ILLER_ILCELER.keys())
-    mevcut_il = duzenle.get("il") if duzenle and duzenle.get("il") in il_listesi else il_listesi[0]
-    mevcut_ilce_listesi = ILLER_ILCELER[mevcut_il]
-    mevcut_ilce = duzenle.get("ilce") if duzenle and duzenle.get("ilce") in mevcut_ilce_listesi else mevcut_ilce_listesi[0]
-
-    # İl/İlçe form dışında - dinamik güncelleme için
-    il_col1, il_col2 = st.columns(2)
-    il_idx = il_listesi.index(mevcut_il)
-    secilen_il = il_col1.selectbox("İl", il_listesi, index=il_idx, key="yeni_il_sec")
-    ilce_listesi_sec = ILLER_ILCELER[secilen_il]
-    ilce_idx_sec = ilce_listesi_sec.index(mevcut_ilce) if mevcut_ilce in ilce_listesi_sec else 0
-    secilen_ilce = il_col2.selectbox("İlçe", ilce_listesi_sec, index=ilce_idx_sec, key="yeni_ilce_sec")
+    mevcut_il   = duzenle.get("il","") if duzenle and duzenle.get("il","") in il_listesi else il_listesi[0]
+    _asama_base = _tanimlar_yukle("asama")
+    try:
+        _df_as2 = db_read("cari_kartlar", extra_sql="WHERE silindi=0 OR silindi IS NULL")
+        if not _df_as2.empty and "islem_asamasi" in _df_as2.columns:
+            for _a in _df_as2["islem_asamasi"].dropna().unique():
+                if str(_a).strip() and str(_a) not in ["nan",""] and _a not in _asama_base:
+                    _asama_base.append(str(_a))
+    except: pass
 
     with st.form("yeni_kart_form"):
-        col1, col2, col3 = st.columns(3)
-        firma    = col1.text_input("Firma Adı",  value=duzenle.get("firma","") if duzenle else "")
-        yetkili  = col1.text_input("Yetkili",    value=duzenle.get("yetkili","") if duzenle else "")
-        gsm      = col2.text_input("GSM",        value=fmt_tel(duzenle.get("gsm","")) if duzenle else "")
-        sabit    = col2.text_input("Sabit Tel",  value=fmt_tel(duzenle.get("sabit","")) if duzenle else "")
-        email    = col3.text_input("E-Mail",     value=duzenle.get("email","") if duzenle else "")
+        # ── SATIR 1: Firma, Yetkili, GSM, Sabit Tel, E-Mail ─────────────────
+        r1c1,r1c2,r1c3,r1c4,r1c5 = st.columns(5)
+        firma   = r1c1.text_input("Firma Adı *", value=duzenle.get("firma","") if duzenle else "", placeholder="Firma adı")
+        yetkili = r1c2.text_input("Yetkili",     value=duzenle.get("yetkili","") if duzenle else "", placeholder="Ad Soyad")
+        gsm     = r1c3.text_input("GSM",         value=fmt_tel(duzenle.get("gsm","")) if duzenle else "", placeholder="05xx xxx xx xx")
+        sabit   = r1c4.text_input("Sabit Tel",   value=fmt_tel(duzenle.get("sabit","")) if duzenle else "", placeholder="0212 xxx xx xx")
+        email   = r1c5.text_input("E-Mail",      value=duzenle.get("email","") if duzenle else "", placeholder="mail@firma.com")
 
-        il_idx   = il_listesi.index(secilen_il)
-        il       = col3.selectbox("İl", il_listesi, index=il_idx, key="yeni_il_form")
-        ilce_listesi = ILLER_ILCELER[secilen_il]
-        ilce_idx = ilce_listesi.index(secilen_ilce) if secilen_ilce in ilce_listesi else 0
-        ilce     = col3.selectbox("İlçe", ilce_listesi, index=ilce_idx, key="yeni_ilce_form")
-
+        # ── SATIR 2: İl, İlçe, Durum, Temsilci, Segment, Aşama ─────────────
+        r2c1,r2c2,r2c3,r2c4,r2c5,r2c6 = st.columns(6)
+        il_idx    = il_listesi.index(mevcut_il) if mevcut_il in il_listesi else 0
+        il        = r2c1.selectbox("İl", il_listesi, index=il_idx, key="yeni_il_form")
+        ilce_list = ILLER_ILCELER[il]
+        mevcut_ilce = duzenle.get("ilce","") if duzenle else ""
+        ilce_idx  = ilce_list.index(mevcut_ilce) if mevcut_ilce in ilce_list else 0
+        ilce      = r2c2.selectbox("İlçe", ilce_list, index=ilce_idx, key="yeni_ilce_form")
         durum_opts = ["Aktif","Hedef","Pasif"]
-        durum_idx  = durum_opts.index(duzenle.get("durum")) if duzenle and duzenle.get("durum") in durum_opts else 0
-        durum      = col1.selectbox("Durum", durum_opts, index=durum_idx)
-        temsilci   = col2.text_input("Temsilci", value=duzenle.get("temsilci","") if duzenle else "")
+        durum_idx  = durum_opts.index(duzenle.get("durum","Aktif")) if duzenle and duzenle.get("durum","") in durum_opts else 0
+        durum      = r2c3.selectbox("Durum", durum_opts, index=durum_idx)
+        temsilci   = r2c4.text_input("Temsilci", value=duzenle.get("temsilci","") if duzenle else "", placeholder="Temsilci adı")
         seg_opts   = ["--","⭐ A+","⭐ A","⭐ A-","B","C"]
         seg_idx    = seg_opts.index(duzenle.get("segment","--")) if duzenle and duzenle.get("segment","--") in seg_opts else 0
-        segment    = col3.selectbox("Segment", seg_opts, index=seg_idx, help="A+ en özel, stratejik müşteriler")
+        segment    = r2c5.selectbox("Segment", seg_opts, index=seg_idx)
+        _asama_default = duzenle.get("islem_asamasi") if duzenle else st.session_state.pop("varsayilan_asama", None)
+        asama_idx  = _asama_base.index(_asama_default) if _asama_default and _asama_default in _asama_base else 0
+        asama      = r2c6.selectbox("İşlem Aşaması", _asama_base, index=asama_idx)
 
-        # Dinamik aşama listesi (sistemdeki tüm aşamalar + ekstralar)
-        _asama_base = _tanimlar_yukle("asama")
-        # df'de olan ama tabloda olmayan aşamaları da ekle
-        try:
-            _df_as2 = db_read("cari_kartlar", extra_sql="WHERE silindi=0 OR silindi IS NULL")
-            if not _df_as2.empty and "islem_asamasi" in _df_as2.columns:
-                for _a in _df_as2["islem_asamasi"].dropna().unique():
-                    if str(_a).strip() and str(_a) not in ["nan",""] and _a not in _asama_base:
-                        _asama_base.append(str(_a))
-        except: pass
-        asama_opts = _asama_base
-        _varsayilan_asama = st.session_state.pop("varsayilan_asama", None)
-        _asama_default = duzenle.get("islem_asamasi") if duzenle else _varsayilan_asama
-        asama_idx  = asama_opts.index(_asama_default) if _asama_default and _asama_default in asama_opts else 0
-        asama      = col3.selectbox("İşlem Aşaması", asama_opts, index=asama_idx)
-        adres      = st.text_area("Adres", value=duzenle.get("adres","") if duzenle else "")
-        notlar_v   = st.text_area("📝 Açıklama", value=str(duzenle.get("aciklama","") or "") if duzenle else "", height=70, key="yeni_notlar")
+        # ── SATIR 3: Adres, Açıklama ─────────────────────────────────────────
+        r3c1, r3c2 = st.columns(2)
+        adres    = r3c1.text_area("Adres", value=duzenle.get("adres","") if duzenle else "", height=70)
+        notlar_v = r3c2.text_area("📝 Açıklama", value=str(duzenle.get("aciklama","") or "") if duzenle else "", height=70, key="yeni_notlar")
 
-        st.markdown("#### 💰 Ciro Bilgileri")
-        ciro_col1, ciro_col2, ciro_col3, ciro_col4 = st.columns(4)
-        bek_val = duzenle.get("beklenen_ciro", 0) if duzenle else 0
-        ger_val = duzenle.get("gerceklesen_ciro", 0) if duzenle else 0
-
-        bek_str = ciro_col1.text_input("Beklenen Ciro (₺)", value=fmt_para(bek_val).replace(" ₺",""), placeholder="Örn: 10.000", key="bek_ciro_str")
-        ger_str = ciro_col2.text_input("Gerçekleşen Ciro (₺)", value=fmt_para(ger_val).replace(" ₺",""), placeholder="Örn: 8.500", key="ger_ciro_str")
-
-        beklenen_ciro = parse_para(bek_str)
+        # ── SATIR 4: Ciro ────────────────────────────────────────────────────
+        cc1,cc2,cc3,cc4 = st.columns(4)
+        bek_val = duzenle.get("beklenen_ciro",0) if duzenle else 0
+        ger_val = duzenle.get("gerceklesen_ciro",0) if duzenle else 0
+        bek_str = cc1.text_input("Beklenen Ciro (₺)", value=fmt_para(bek_val).replace(" ₺",""), placeholder="0", key="bek_ciro_str")
+        ger_str = cc2.text_input("Gerçekleşen Ciro (₺)", value=fmt_para(ger_val).replace(" ₺",""), placeholder="0", key="ger_ciro_str")
+        beklenen_ciro    = parse_para(bek_str)
         gerceklesen_ciro = parse_para(ger_str)
-        fark = gerceklesen_ciro - beklenen_ciro
-        yuzde = (gerceklesen_ciro / beklenen_ciro * 100) if beklenen_ciro > 0 else 0
-        ciro_col3.metric("Fark (₺)", fmt_para(fark))
-        ciro_col4.metric("Gerçekleşme %", f"%{yuzde:.1f}".replace(".",","))
+        fark  = gerceklesen_ciro - beklenen_ciro
+        yuzde = (gerceklesen_ciro/beklenen_ciro*100) if beklenen_ciro>0 else 0
+        cc3.metric("Fark (₺)", fmt_para(fark))
+        cc4.metric("Gerçekleşme %", f"%{yuzde:.1f}".replace(".",","))
 
         btn_label = "💾 Güncelle" if duzenle else "💾 Cari Kartı Kaydet"
-        if st.form_submit_button(btn_label):
+        if st.form_submit_button(btn_label, type="primary", use_container_width=True):
             if not firma:
                 st.warning("Firma adı boş bırakılamaz!")
             elif duzenle:
