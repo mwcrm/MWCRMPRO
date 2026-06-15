@@ -3643,17 +3643,19 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{padding:2px 8px!impo
         except: return []
 
     def _btn(key, opts, tek=False):
-        sel = list(st.session_state.get(key, []))
-        cs = st.columns(len(opts))
-        for i, o in enumerate(opts):
-            with cs[i]:
-                if st.button(o, key=f"{key}_{i}", type="primary" if o in sel else "secondary", use_container_width=True):
-                    if tek: sel = [o]
-                    elif o in sel: sel.remove(o)
-                    else: sel.append(o)
-                    st.session_state[key] = sel
-                    st.rerun()
-        return st.session_state.get(key, [])
+        sel = st.session_state.get(key, [])
+        if tek:
+            # Tek seçim — radio gibi
+            idx = opts.index(sel[0]) if sel and sel[0] in opts else 0
+            secilen = st.radio("", opts, index=idx, key=f"{key}_r", horizontal=True, label_visibility="collapsed")
+            st.session_state[key] = [secilen]
+            return [secilen]
+        else:
+            # Çok seçim — multiselect
+            gecerli = [s for s in sel if s in opts]
+            secilen = st.multiselect("", opts, default=gecerli, key=f"{key}_m", label_visibility="collapsed")
+            st.session_state[key] = secilen
+            return secilen
 
     # TUM ANALIZLER
     st.markdown("### 📋 Tüm Müşteri Analizleri")
