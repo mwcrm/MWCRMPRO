@@ -3642,8 +3642,11 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{
             sb = get_sb_client()
             if sb:
                 r = sb.table("musteri_analiz").select("*").order("tarih",desc=True).limit(limit).execute()
-                return pd.DataFrame(r.data) if r.data else pd.DataFrame()
-        except: pass
+                if r.data:
+                    return pd.DataFrame(r.data)
+                return pd.DataFrame()
+        except Exception as _e:
+            st.warning(f"Supabase hata: {_e}")
         try:
             conn = get_conn()
             conn.execute("""CREATE TABLE IF NOT EXISTS musteri_analiz (
