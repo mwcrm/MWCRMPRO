@@ -868,9 +868,9 @@ def save_menu_tercihi(kullanici, sira):
         except: sira.append("analiz")
     if "a_segment" not in sira:
         try:
-            idx = sira.index("liste") + 1
-            sira.insert(idx, "analiz")
-        except: sira.append("analiz")
+            idx = sira.index("analiz") + 1
+            sira.insert(idx, "a_segment")
+        except: sira.append("a_segment")
 
     try:
         sb_m = get_sb_client()
