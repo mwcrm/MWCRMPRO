@@ -1736,9 +1736,22 @@ elif aktif == "liste":
     secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
 
     # ── BUTONLAR ──────────────────────────────────────────────────────────────
+    # Kaydet flag'i — ilk tıkta set et, ikinci render'da çalıştır
+    if st.session_state.get("_kaydet_flag"):
+        st.session_state.pop("_kaydet_flag")
+        _editor_state = st.session_state.get("cari_editor", {})
+        _edited_rows  = _editor_state.get("edited_rows", {})
+        _tablo_json   = st.session_state.get("_ls_tablo")
+        _do_kaydet = True
+    else:
+        _do_kaydet = False
+
     btn_k, btn_a, btn_s = st.columns(3)
     with btn_k:
         if st.button("💾 Değişiklikleri Kaydet", use_container_width=True, type="primary", key="liste_kaydet"):
+            st.session_state["_kaydet_flag"] = True
+            st.rerun()
+        if _do_kaydet:
             _editor_state = st.session_state.get("cari_editor", {})
             _edited_rows  = _editor_state.get("edited_rows", {})
             _tablo_json   = st.session_state.get("_ls_tablo")
