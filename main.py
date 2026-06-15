@@ -3701,7 +3701,16 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{
 
     with _atab1:
         # MÜŞTERİ SEÇİMİ
-        _df_cari_an = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
+        # Cache olmadan çek — güncel veri
+        try:
+            _sb_an = get_sb_client()
+            if _sb_an:
+                _r_an = _sb_an.table("cari_kartlar").select("id,firma,gsm,email").neq("silindi",1).order("firma").execute()
+                _df_cari_an = pd.DataFrame(_r_an.data) if _r_an.data else pd.DataFrame()
+            else:
+                _df_cari_an = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
+        except:
+            _df_cari_an = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
         _c1, _c2 = st.columns([3,1])
         _cari_opts = ["-- Seçin --"] + [f"[{int(r['id'])}] {r['firma']}" for _,r in _df_cari_an.iterrows()]
         _cari_sec = _c1.selectbox("Cari listeden müşteri seç", _cari_opts, key="an_cari_sec")
@@ -3990,7 +3999,9 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{
                 "rakip":_aj.dumps(st.session_state.get("an_rakip_rows",[]),ensure_ascii=False),
                 "olusturan":st.session_state.get("kullanici",""),
             }
-            if _an_upsert(_secili_firma,_veri):
+            if not _secili_firma:
+                st.error("❌ Firma adı boş — lütfen müşteri seçin!")
+            elif _an_upsert(_secili_firma,_veri):
                 st.success(f"✅ **{_secili_firma}** analizi {('güncellendi' if _duzenle else 'kaydedildi')}!")
                 st.balloons()
                 if _init_key in st.session_state: del st.session_state[_init_key]
