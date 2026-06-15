@@ -788,16 +788,14 @@ _TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "a_segment", "randevu", "tekl
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
-    "rapor": "📊 Raporlar",
+    "analiz": "🔍 Müşteri Analizi",
+    "a_segment": "⭐ A Segment",
+    "randevu": "📅 Randevular",
     "teklif": "📄 Spot Teklif",
     "ozel_teklif": "⭐ Özel Teklif",
     "excel": "📥 Excel Aktar",
     "kisiler": "📞 Telefon Kişiler",
-        "analiz": "🔍 Müşteri Analizi",
-    "a_segment": "⭐ A Segment",
-    "analiz": "🔍 Müşteri Analizi",
-    "a_segment": "⭐ A Segment",
-    "randevu": "📅 Randevular",
+    "rapor": "📊 Raporlar",
     "kullanici": "👥 Kullanıcı Yönetimi",
     "mesajlar": "💬 Mesajlar",
     "admin_rapor": "📊 Rapor Tasarla",
@@ -862,8 +860,13 @@ def get_menu_tercihi(kullanici):
     return _temizle(tam_liste)
 
 def save_menu_tercihi(kullanici, sira):
-    # Analiz her zaman listede olsun
+    # Analiz ve A Segment her zaman listede olsun
     if "analiz" not in sira:
+        try:
+            idx = sira.index("liste") + 1
+            sira.insert(idx, "analiz")
+        except: sira.append("analiz")
+    if "a_segment" not in sira:
         try:
             idx = sira.index("liste") + 1
             sira.insert(idx, "analiz")
