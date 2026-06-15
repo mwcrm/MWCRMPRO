@@ -1427,10 +1427,13 @@ elif aktif == "liste":
             bek = float(kart_row.get("beklenen_ciro",0) or 0)
             ger = float(kart_row.get("gerceklesen_ciro",0) or 0)
             _seg_val = str(kart_row.get("segment","") or "")
-            _gsm = fmt_tel(kart_row.get("gsm","")) or "-"
-            _sabit = fmt_tel(kart_row.get("sabit","")) or "-"
-            _email = str(kart_row.get("email","") or "-")
-            _yetkili = str(kart_row.get("yetkili","") or "-")
+            def _temiz(v):
+                s = str(v or "").strip()
+                return s if s and s not in ["nan","None","-",""] else "-"
+            _gsm     = _temiz(kart_row.get("gsm","") or kart_row.get("telefon","") or kart_row.get("tel",""))
+            _sabit   = _temiz(kart_row.get("sabit","") or kart_row.get("sabit_hat",""))
+            _email   = _temiz(kart_row.get("email","") or kart_row.get("eposta",""))
+            _yetkili = _temiz(kart_row.get("yetkili","") or kart_row.get("yetkili_adi",""))
             _il = str(kart_row.get("il","") or "-")
             _ilce = str(kart_row.get("ilce","") or "-")
             _durum = str(kart_row.get("durum","") or "-")
@@ -1440,6 +1443,9 @@ elif aktif == "liste":
             _fark = ger - bek
             _fark_renk = "#16a34a" if _fark >= 0 else "#dc2626"
 
+            # DEBUG — hangi kolonlar var ve dolu mu
+            with st.expander("🔍 Debug: Kolon Değerleri", expanded=False):
+                st.json({k: str(v) for k,v in kart_row.items() if str(v) not in ["nan","None",""]})
             # ── BAŞLIK ───────────────────────────────────────────────────────
             st.markdown(f"""
 <div style='background:#1e293b;color:white;padding:12px 20px;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:12px'>
