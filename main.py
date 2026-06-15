@@ -3715,17 +3715,7 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{padding:2px 8px!impo
         _sc4.metric("Anlaşma", len(_df_tum[_df_tum["sonuc"]=="anlaşma yapıldı"]))
         try: _sc5.metric("Beklenen Ciro", f"{_df_tum['bek_ciro'].sum():,.0f} ₺")
         except: pass
-        _ic1,_ic2,_ic3 = st.columns(3)
-        with _ic1:
-            st.markdown("**Potansiyel Dağılımı**")
-            st.bar_chart(_df_tum["potansiyel"].value_counts())
-        with _ic2:
-            st.markdown("**Görüşme Sonuçları**")
-            st.bar_chart(_df_tum["sonuc"].value_counts())
-        with _ic3:
-            st.markdown("**Sektör Dağılımı**")
-            if "sektor" in _df_tum.columns:
-                st.bar_chart(_df_tum["sektor"].value_counts().head(6))
+
 
     st.divider()
 
