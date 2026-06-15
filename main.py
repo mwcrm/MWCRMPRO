@@ -3702,6 +3702,69 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{
     # SEKMELER
     _atab1, _atab2 = st.tabs(["✏️ Analiz Formu", "📋 Tüm Analizler"])
 
+    # TÜM ANALİZLER — müşteri seçimi gerekmez
+    with _atab2:
+        st.markdown("### 📋 Tüm Müşteri Analizleri")
+        _df_tum = _an_tumu()
+        if _df_tum.empty:
+            st.info("Henüz analiz kaydedilmedi.")
+        else:
+            _fa1,_fa2,_fa3=st.columns(3)
+            _ff=_fa1.text_input("Firma ara",key="an_ff",placeholder="firma adı...")
+            _fs2=_fa2.selectbox("Sonuç",["Tümü","takip edilecek","teklif verildi","anlaşma yapıldı","beklemede","ilgisiz"],key="an_fs")
+            _fp=_fa3.selectbox("Potansiyel",["Tümü","çok yüksek","yüksek","orta","düşük","çok düşük"],key="an_fp")
+            _df_f=_df_tum.copy()
+            if _ff: _df_f=_df_f[_df_f["firma"].str.contains(_ff,case=False,na=False)]
+            if _fs2!="Tümü": _df_f=_df_f[_df_f["sonuc"]==_fs2]
+            if _fp!="Tümü": _df_f=_df_f[_df_f["potansiyel"]==_fp]
+            st.caption(f"{len(_df_f)} analiz")
+            for _aidx,(___, _ar) in enumerate(_df_f.iterrows()):
+                _pic={"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(str(_ar.get("potansiyel","")),"-")
+                with st.expander(f"{_pic} **{_ar.get('firma','?')}** · {str(_ar.get('tarih',''))[:10]} · {_ar.get('sonuc','')} · {_ar.get('potansiyel','')}"):
+                    _m1,_m2,_m3,_m4=st.columns(4)
+                    _m1.metric("Potansiyel",_ar.get("potansiyel","—"))
+                    _m2.metric("Beklenen Ciro",f"{float(_ar.get('bek_ciro',0) or 0):,.0f} ₺")
+                    _m3.metric("Gerçekleşen",f"{float(_ar.get('ger_ciro',0) or 0):,.0f} ₺")
+                    _m4.metric("Sonuç",_ar.get("sonuc","—"))
+                    st.markdown(f"""| | |
+|---|---|
+| **Firma / Yetkili** | {_ar.get("firma","—")} · {_ar.get("yetkili","—")} · {_ar.get("iletisim","—")} |
+| **Sektör / Kaynak** | {_ar.get("sektor","—")} · {_ar.get("kaynak","—")} |
+| **Kargo / Fatura** | {_ar.get("kargo","—")} · {_ar.get("fatura","—")} |
+| **Beklenti / Engel** | {_ar.get("beklenti","—")} · {_ar.get("engel","—")} |
+| **Not** | {_ar.get("not_alan","—")} |
+| **Sonraki Adım** | {_ar.get("sonraki_adim","—")} · {_ar.get("takip_tar","—")} |""")
+                    _wb1,_wb2,_wb3,_wb4=st.columns(4)
+                    if _wb1.button("✏️ Düzenle",key=f"an_duz_{_aidx}",use_container_width=True):
+                        st.session_state["an_duzenle_firma"]=str(_ar.get("firma",""))
+                        _ik2 = f"an_init_{_ar.get('firma','')}"
+                        if _ik2 in st.session_state: del st.session_state[_ik2]
+                        for _k3 in ["an_fiyat_rows","an_bolge_rows","an_avm_rows","an_rakip_rows"]:
+                            if _k3 in st.session_state: del st.session_state[_k3]
+                        st.rerun()
+                    _tel3=str(_ar.get("iletisim","") or "").replace(" ","").replace("-","")
+                    if _tel3 and "@" not in _tel3:
+                        if _tel3.startswith("0"): _tel3="90"+_tel3[1:]
+                        _wb2.markdown(f"<a href='https://wa.me/{_tel3}' target='_blank'><button style='width:100%;padding:5px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;'>💬 WA</button></a>",unsafe_allow_html=True)
+                    if _wb3.button("📄 Teklif",key=f"an_tek_{_aidx}",use_container_width=True):
+                        st.session_state["aktif_tab"]="teklif"
+                        st.session_state["teklif_musteri_onsel"]=str(_ar.get("firma",""))
+                        st.rerun()
+                    if _wb4.button("🗑 Sil",key=f"an_sil_{_aidx}",use_container_width=True):
+                        if _an_sil(str(_ar.get("firma",""))): st.success("Silindi!"); st.rerun()
+            st.divider()
+            st.markdown("### 📊 İstatistikler")
+            _sc1,_sc2,_sc3,_sc4,_sc5=st.columns(5)
+            _sc1.metric("Toplam",len(_df_tum))
+            _sc2.metric("Yüksek Pot.",len(_df_tum[_df_tum["potansiyel"].isin(["yüksek","çok yüksek"])]))
+            _sc3.metric("Takip Bekleyen",len(_df_tum[_df_tum["sonuc"]=="takip edilecek"]))
+            _sc4.metric("Anlaşma",len(_df_tum[_df_tum["sonuc"]=="anlaşma yapıldı"]))
+            try: _sc5.metric("Beklenen Ciro",f"{_df_tum['bek_ciro'].sum():,.0f} ₺")
+            except: pass
+            _ic1,_ic2=st.columns(2)
+            with _ic1: st.markdown("**Potansiyel**"); st.bar_chart(_df_tum["potansiyel"].value_counts())
+            with _ic2: st.markdown("**Sonuçlar**"); st.bar_chart(_df_tum["sonuc"].value_counts())
+
     with _atab1:
         # MÜŞTERİ SEÇİMİ
         # Cache olmadan çek — güncel veri
@@ -4021,83 +4084,6 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{
             st.session_state["teklif_musteri_onsel"]=_secili_firma
             st.rerun()
 
-    # TÜM ANALİZLER SEKMESİ
-    with _atab2:
-        st.markdown("### 📋 Tüm Müşteri Analizleri")
-        _df_tum = _an_tumu()
-        if _df_tum.empty:
-            st.info("Henüz analiz kaydedilmedi.")
-        else:
-            _fa1,_fa2,_fa3=st.columns(3)
-            _ff=_fa1.text_input("Firma ara",key="an_ff",placeholder="firma adı...")
-            _fs2=_fa2.selectbox("Sonuç",["Tümü","takip edilecek","teklif verildi","anlaşma yapıldı","beklemede","ilgisiz"],key="an_fs")
-            _fp=_fa3.selectbox("Potansiyel",["Tümü","çok yüksek","yüksek","orta","düşük","çok düşük"],key="an_fp")
-            _df_f=_df_tum.copy()
-            if _ff: _df_f=_df_f[_df_f["firma"].str.contains(_ff,case=False,na=False)]
-            if _fs2!="Tümü": _df_f=_df_f[_df_f["sonuc"]==_fs2]
-            if _fp!="Tümü": _df_f=_df_f[_df_f["potansiyel"]==_fp]
-            st.caption(f"{len(_df_f)} analiz")
-            for _aidx,(___, _ar) in enumerate(_df_f.iterrows()):
-                _pic={"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(str(_ar.get("potansiyel","")),"-")
-                with st.expander(f"{_pic} **{_ar.get('firma','?')}** · {str(_ar.get('tarih',''))[:10]} · {_ar.get('sonuc','')} · {_ar.get('potansiyel','')}"):
-                    _m1,_m2,_m3,_m4=st.columns(4)
-                    _m1.metric("Potansiyel",_ar.get("potansiyel","—"))
-                    _m2.metric("Beklenen Ciro",f"{float(_ar.get('bek_ciro',0) or 0):,.0f} ₺")
-                    _m3.metric("Gerçekleşen",f"{float(_ar.get('ger_ciro',0) or 0):,.0f} ₺")
-                    _m4.metric("Sonuç",_ar.get("sonuc","—"))
-                    st.markdown(f"""
-| | |
-|---|---|
-| **Firma / Yetkili** | {_ar.get("firma","—")} · {_ar.get("yetkili","—")} · {_ar.get("iletisim","—")} |
-| **Sektör / Kaynak** | {_ar.get("sektor","—")} · {_ar.get("kaynak","—")} |
-| **Kargo / Fatura / UA-PO** | {_ar.get("kargo","—")} · {_ar.get("fatura","—")} · {_ar.get("uapo","—")} |
-| **Vade / Pazarlık** | {_ar.get("odeme","—")} · {_ar.get("pazarlik","—")} |
-| **Beklenti / Engel** | {_ar.get("beklenti","—")} · {_ar.get("engel","—")} |
-| **Not** | {_ar.get("not_alan","—")} |
-| **Sonraki Adım / Takip** | {_ar.get("sonraki_adim","—")} · {_ar.get("takip_tar","—")} |
-""")
-                    try:
-                        _ft2=_aj.loads(_ar.get("fiyat_tablo","[]") or "[]")
-                        if _ft2 and any(s.get("il") and s.get("il")!="--" for s in _ft2):
-                            st.markdown("**💰 Fiyat Tablosu:**")
-                            st.dataframe(pd.DataFrame(_ft2),use_container_width=True,hide_index=True)
-                    except: pass
-                    try:
-                        _at2=_aj.loads(_ar.get("avm","[]") or "[]")
-                        if _at2 and any(s.get("avm") for s in _at2):
-                            st.markdown("**🏬 AVM Teslimatları:**")
-                            st.dataframe(pd.DataFrame(_at2),use_container_width=True,hide_index=True)
-                    except: pass
-                    _wb1,_wb2,_wb3,_wb4=st.columns(4)
-                    if _wb1.button("✏️ Düzenle",key=f"an_duz_{_aidx}",use_container_width=True):
-                        st.session_state["an_duzenle_firma"]=str(_ar.get("firma",""))
-                        if _init_key in st.session_state: del st.session_state[_init_key]
-                        for _k3 in ["an_fiyat_rows","an_bolge_rows","an_avm_rows","an_rakip_rows"]:
-                            if _k3 in st.session_state: del st.session_state[_k3]
-                        st.rerun()
-                    _tel3=str(_ar.get("iletisim","") or "").replace(" ","").replace("-","")
-                    if _tel3 and "@" not in _tel3:
-                        if _tel3.startswith("0"): _tel3="90"+_tel3[1:]
-                        _wb2.markdown(f"<a href='https://wa.me/{_tel3}' target='_blank'><button style='width:100%;padding:5px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;'>💬 WA</button></a>",unsafe_allow_html=True)
-                    if _wb3.button("📄 Teklif",key=f"an_tek_{_aidx}",use_container_width=True):
-                        st.session_state["aktif_tab"]="teklif"
-                        st.session_state["teklif_musteri_onsel"]=str(_ar.get("firma",""))
-                        st.rerun()
-                    if _wb4.button("🗑 Sil",key=f"an_sil_{_aidx}",use_container_width=True):
-                        if _an_sil(str(_ar.get("firma",""))): st.success("Silindi!"); st.rerun()
-
-            st.divider()
-            st.markdown("### 📊 İstatistikler")
-            _sc1,_sc2,_sc3,_sc4,_sc5=st.columns(5)
-            _sc1.metric("Toplam",len(_df_tum))
-            _sc2.metric("Yüksek Pot.",len(_df_tum[_df_tum["potansiyel"].isin(["yüksek","çok yüksek"])]))
-            _sc3.metric("Takip Bekleyen",len(_df_tum[_df_tum["sonuc"]=="takip edilecek"]))
-            _sc4.metric("Anlaşma",len(_df_tum[_df_tum["sonuc"]=="anlaşma yapıldı"]))
-            try: _sc5.metric("Beklenen Ciro",f"{_df_tum['bek_ciro'].sum():,.0f} ₺")
-            except: pass
-            _ic1,_ic2=st.columns(2)
-            with _ic1: st.markdown("**Potansiyel**"); st.bar_chart(_df_tum["potansiyel"].value_counts())
-            with _ic2: st.markdown("**Sonuçlar**"); st.bar_chart(_df_tum["sonuc"].value_counts())
 
 elif aktif == "whatsapp":
     import requests as _wa_req
