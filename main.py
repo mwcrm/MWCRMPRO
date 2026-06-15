@@ -73,7 +73,7 @@ def get_kullanici_listesi():
     """2 dk cache'li kullanıcı listesi"""
     return db_read("kullanicilar", extra_sql="")
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=120)
 def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
     """Supabase veya SQLite'dan DataFrame döner"""
     sb = get_sb_client()
@@ -3684,7 +3684,7 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{
     def _msel(key, opts, tek=False):
         sel = st.session_state.get(key, [])
         cols = st.columns(len(opts))
-        yeni = list(sel); degisti = False
+        yeni = list(sel)
         for i, o in enumerate(opts):
             with cols[i]:
                 kind = "primary" if o in yeni else "secondary"
@@ -3692,9 +3692,9 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{
                     if tek: yeni = [o]
                     elif o in yeni: yeni.remove(o)
                     else: yeni.append(o)
-                    degisti = True
-        if degisti: st.session_state[key] = yeni; st.rerun()
-        return yeni
+                    st.session_state[key] = yeni
+                    st.rerun()
+        return st.session_state.get(key, sel)
 
     # SEKMELER
     _atab1, _atab2 = st.tabs(["✏️ Analiz Formu", "📋 Tüm Analizler"])
