@@ -3705,7 +3705,17 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{
     # TÜM ANALİZLER — müşteri seçimi gerekmez
     with _atab2:
         st.markdown("### 📋 Tüm Müşteri Analizleri")
-        _df_tum = _an_tumu()
+        # Direkt Supabase'den çek
+        _df_tum = pd.DataFrame()
+        try:
+            _sb2 = get_sb_client()
+            if _sb2:
+                _r2 = _sb2.table("musteri_analiz").select("*").order("tarih", desc=True).limit(500).execute()
+                if _r2.data:
+                    _df_tum = pd.DataFrame(_r2.data)
+                    _df_tum = _df_tum[_df_tum["firma"].notna() & (_df_tum["firma"] != "")]
+        except Exception as _e2:
+            st.error(f"Veri çekme hatası: {_e2}")
         if _df_tum.empty:
             st.info("Henüz analiz kaydedilmedi.")
         else:
