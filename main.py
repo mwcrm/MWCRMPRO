@@ -1222,6 +1222,26 @@ if aktif == "yeni":
                     _asama_base.append(str(_a))
     except: pass
 
+    # ── İL / İLÇE form dışında — dinamik güncelleme için ───────────────────
+    r2c1,r2c2,r2c3,r2c4,r2c5,r2c6 = st.columns(6)
+    il_idx  = il_listesi.index(mevcut_il) if mevcut_il in il_listesi else 0
+    il      = r2c1.selectbox("İl", il_listesi, index=il_idx, key="yeni_il_dis")
+    ilce_list = ILLER_ILCELER.get(il, [""])
+    mevcut_ilce = duzenle.get("ilce","") if duzenle else ""
+    if mevcut_ilce not in ilce_list: mevcut_ilce = ilce_list[0] if ilce_list else ""
+    ilce_idx = ilce_list.index(mevcut_ilce) if mevcut_ilce in ilce_list else 0
+    ilce    = r2c2.selectbox("İlçe", ilce_list, index=ilce_idx, key="yeni_ilce_dis")
+    durum_opts = ["Aktif","Hedef","Pasif"]
+    durum_idx  = durum_opts.index(duzenle.get("durum","Aktif")) if duzenle and duzenle.get("durum","") in durum_opts else 0
+    durum   = r2c3.selectbox("Durum", durum_opts, index=durum_idx, key="yeni_durum_dis")
+    temsilci_dis = r2c4.text_input("Temsilci", value=duzenle.get("temsilci","") if duzenle else "", key="yeni_temsilci_dis", placeholder="Temsilci adı")
+    seg_opts = ["--","⭐ A+","⭐ A","⭐ A-","B","C"]
+    seg_idx  = seg_opts.index(duzenle.get("segment","--")) if duzenle and duzenle.get("segment","--") in seg_opts else 0
+    segment  = r2c5.selectbox("Segment", seg_opts, index=seg_idx, key="yeni_seg_dis")
+    _asama_default = duzenle.get("islem_asamasi") if duzenle else st.session_state.pop("varsayilan_asama", None)
+    asama_idx = _asama_base.index(_asama_default) if _asama_default and _asama_default in _asama_base else 0
+    asama    = r2c6.selectbox("İşlem Aşaması", _asama_base, index=asama_idx, key="yeni_asama_dis")
+
     with st.form("yeni_kart_form"):
         # ── SATIR 1: Firma, Yetkili, GSM, Sabit Tel, E-Mail ─────────────────
         r1c1,r1c2,r1c3,r1c4,r1c5 = st.columns(5)
@@ -1230,27 +1250,7 @@ if aktif == "yeni":
         gsm     = r1c3.text_input("GSM",         value=fmt_tel(duzenle.get("gsm","")) if duzenle else "", placeholder="05xx xxx xx xx")
         sabit   = r1c4.text_input("Sabit Tel",   value=fmt_tel(duzenle.get("sabit","")) if duzenle else "", placeholder="0212 xxx xx xx")
         email   = r1c5.text_input("E-Mail",      value=duzenle.get("email","") if duzenle else "", placeholder="mail@firma.com")
-
-        # ── SATIR 2: İl, İlçe, Durum, Temsilci, Segment, Aşama ─────────────
-        r2c1,r2c2,r2c3,r2c4,r2c5,r2c6 = st.columns(6)
-        il_idx    = il_listesi.index(mevcut_il) if mevcut_il in il_listesi else 0
-        il        = r2c1.selectbox("İl", il_listesi, index=il_idx, key="yeni_il_form")
-        ilce_list = ILLER_ILCELER.get(il, [""])
-        mevcut_ilce = duzenle.get("ilce","") if duzenle else ""
-        # Seçili il değişmişse ilçeyi sıfırla
-        if mevcut_ilce not in ilce_list: mevcut_ilce = ilce_list[0] if ilce_list else ""
-        ilce_idx  = ilce_list.index(mevcut_ilce) if mevcut_ilce in ilce_list else 0
-        ilce      = r2c2.selectbox("İlçe", ilce_list, index=ilce_idx, key="yeni_ilce_form")
-        durum_opts = ["Aktif","Hedef","Pasif"]
-        durum_idx  = durum_opts.index(duzenle.get("durum","Aktif")) if duzenle and duzenle.get("durum","") in durum_opts else 0
-        durum      = r2c3.selectbox("Durum", durum_opts, index=durum_idx)
-        temsilci   = r2c4.text_input("Temsilci", value=duzenle.get("temsilci","") if duzenle else "", placeholder="Temsilci adı")
-        seg_opts   = ["--","⭐ A+","⭐ A","⭐ A-","B","C"]
-        seg_idx    = seg_opts.index(duzenle.get("segment","--")) if duzenle and duzenle.get("segment","--") in seg_opts else 0
-        segment    = r2c5.selectbox("Segment", seg_opts, index=seg_idx)
-        _asama_default = duzenle.get("islem_asamasi") if duzenle else st.session_state.pop("varsayilan_asama", None)
-        asama_idx  = _asama_base.index(_asama_default) if _asama_default and _asama_default in _asama_base else 0
-        asama      = r2c6.selectbox("İşlem Aşaması", _asama_base, index=asama_idx)
+        temsilci = temsilci_dis  # form dışından al
 
         # ── SATIR 3: Adres, Açıklama ─────────────────────────────────────────
         r3c1, r3c2 = st.columns(2)
