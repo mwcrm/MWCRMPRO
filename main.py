@@ -49,9 +49,18 @@ def get_sb():
     return get_sb_client()
 
 def hesapla_segment(manuel_segment, gerceklesen_ciro):
-    """Manuel segment varsa onu, yoksa ciroya göre otomatik hesapla"""
-    if manuel_segment and str(manuel_segment).strip() not in ["","--","nan","None"]:
-        return str(manuel_segment).strip()
+    """Manuel segment varsa onu normalize et, yoksa ciroya göre otomatik hesapla"""
+    # Normalize — eski kayıtlardaki farklı ikonları düzelt
+    _norm = {"⭐ A+":"👑 A+","A+":"👑 A+","⭐ A-":"⭐ A","A":"⭐ A","A-":"⭐ A","B":"🔵 B","C":"⚪ C"}
+    if manuel_segment:
+        _m = str(manuel_segment).strip()
+        if _m and _m not in ["","--","nan","None"]:
+            # Önce tam eşleşme dene
+            if _m in ["👑 A+","⭐ A","🔵 B","⚪ C"]: return _m
+            # Sonra normalize
+            for _k,_v in _norm.items():
+                if _k in _m: return _v
+            return _m
     ger = float(gerceklesen_ciro or 0)
     if ger >= 500000: return "👑 A+"
     if ger >= 200000: return "⭐ A"
@@ -1235,7 +1244,7 @@ if aktif == "yeni":
     durum_idx  = durum_opts.index(duzenle.get("durum","Aktif")) if duzenle and duzenle.get("durum","") in durum_opts else 0
     durum   = r2c3.selectbox("Durum", durum_opts, index=durum_idx, key="yeni_durum_dis")
     temsilci_dis = r2c4.text_input("Temsilci", value=duzenle.get("temsilci","") if duzenle else "", key="yeni_temsilci_dis", placeholder="Temsilci adı")
-    seg_opts = ["--","⭐ A+","⭐ A","⭐ A-","B","C"]
+    seg_opts = ["--","👑 A+","⭐ A","🔵 B","⚪ C"]
     seg_idx  = seg_opts.index(duzenle.get("segment","--")) if duzenle and duzenle.get("segment","--") in seg_opts else 0
     segment  = r2c5.selectbox("Segment", seg_opts, index=seg_idx, key="yeni_seg_dis")
     _asama_default = duzenle.get("islem_asamasi") if duzenle else st.session_state.pop("varsayilan_asama", None)
