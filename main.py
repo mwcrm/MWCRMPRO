@@ -3704,6 +3704,19 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{padding:2px 8px!impo
                 if _b4.button("🗑 Sil", key=f"sil_{_ai}", use_container_width=True):
                     if _an_sil(str(_ar.get("firma",""))): st.success("Silindi!"); st.rerun()
 
+    # İSTATİSTİKLER
+    if not _df_tum.empty:
+        st.divider()
+        st.markdown("### 📊 İstatistikler")
+        _sc1,_sc2,_sc3,_sc4,_sc5 = st.columns(5)
+        _sc1.metric("Toplam Analiz", len(_df_tum))
+        _sc2.metric("Yüksek Pot.", len(_df_tum[_df_tum["potansiyel"].isin(["yüksek","çok yüksek"])]))
+        _sc3.metric("Takip Bekleyen", len(_df_tum[_df_tum["sonuc"]=="takip edilecek"]))
+        _sc4.metric("Anlaşma", len(_df_tum[_df_tum["sonuc"]=="anlaşma yapıldı"]))
+        try: _sc5.metric("Beklenen Ciro", f"{_df_tum['bek_ciro'].sum():,.0f} ₺")
+        except: pass
+
+
     st.divider()
 
     # FORM
