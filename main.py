@@ -784,7 +784,7 @@ def parse_para(s):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "a_segment", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -794,7 +794,9 @@ _TAB_ETIKETLER = {
     "excel": "📥 Excel Aktar",
     "kisiler": "📞 Telefon Kişiler",
         "analiz": "🔍 Müşteri Analizi",
+    "a_segment": "⭐ A Segment",
     "analiz": "🔍 Müşteri Analizi",
+    "a_segment": "⭐ A Segment",
     "randevu": "📅 Randevular",
     "kullanici": "👥 Kullanıcı Yönetimi",
     "mesajlar": "💬 Mesajlar",
@@ -3988,6 +3990,285 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{padding:2px 8px!impo
                 st.rerun()
             else:
                 st.error(f"❌ Kayıt hatası: {_err}")
+
+elif aktif == "a_segment":
+    sayfa_log("a_segment")
+    from datetime import date as _dt
+
+    st.markdown("## ⭐ A Segment Müşteriler")
+    st.markdown("<small style='color:#64748b;'>Yüksek potansiyel ve stratejik müşteriler — özel takip listesi</small>", unsafe_allow_html=True)
+
+    # Supabase tablosu kontrol
+    def _aseg_init():
+        try:
+            sb = get_sb_service() or get_sb_client()
+            if sb:
+                sb.table("a_segment").select("id").limit(1).execute()
+        except:
+            try:
+                sb = get_sb_service() or get_sb_client()
+                if sb:
+                    sb.rpc("query", {"q": """
+                        CREATE TABLE IF NOT EXISTS a_segment (
+                            id BIGSERIAL PRIMARY KEY,
+                            cari_id INTEGER,
+                            firma TEXT,
+                            yetkili TEXT,
+                            gsm TEXT,
+                            durum TEXT DEFAULT 'Aktif',
+                            segment TEXT DEFAULT 'A',
+                            risk TEXT DEFAULT 'Düşük',
+                            aylik_ciro NUMERIC DEFAULT 0,
+                            onceki_ciro NUMERIC DEFAULT 0,
+                            son_gorusme TEXT,
+                            sonraki_adim TEXT,
+                            takip_tar TEXT,
+                            notlar TEXT,
+                            ekleyen TEXT,
+                            tarih TIMESTAMP DEFAULT NOW()
+                        )
+                    """}).execute()
+            except: pass
+        try:
+            conn = get_conn()
+            conn.execute("""CREATE TABLE IF NOT EXISTS a_segment (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cari_id INTEGER, firma TEXT, yetkili TEXT, gsm TEXT,
+                durum TEXT DEFAULT 'Aktif', segment TEXT DEFAULT 'A',
+                risk TEXT DEFAULT 'Düşük',
+                aylik_ciro REAL DEFAULT 0, onceki_ciro REAL DEFAULT 0,
+                son_gorusme TEXT, sonraki_adim TEXT, takip_tar TEXT,
+                notlar TEXT, ekleyen TEXT,
+                tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""")
+            conn.commit(); conn.close()
+        except: pass
+
+    _aseg_init()
+
+    def _aseg_listesi():
+        try:
+            sb = get_sb_service() or get_sb_client()
+            if sb:
+                r = sb.table("a_segment").select("*").order("tarih", desc=True).execute()
+                return pd.DataFrame(r.data) if r.data else pd.DataFrame()
+        except: pass
+        try:
+            conn = get_conn()
+            df = pd.read_sql_query("SELECT * FROM a_segment ORDER BY tarih DESC", conn)
+            conn.close(); return df
+        except: return pd.DataFrame()
+
+    def _aseg_ekle(veri):
+        try:
+            sb = get_sb_service() or get_sb_client()
+            if sb:
+                ex = sb.table("a_segment").select("id").eq("firma", veri["firma"]).execute()
+                if ex.data: return False, "Bu müşteri zaten A Segment listesinde!"
+                sb.table("a_segment").insert(veri).execute(); return True, ""
+        except: pass
+        try:
+            conn = get_conn()
+            ex = conn.execute("SELECT id FROM a_segment WHERE firma=?", (veri["firma"],)).fetchone()
+            if ex: conn.close(); return False, "Bu müşteri zaten A Segment listesinde!"
+            cols = ",".join(veri.keys()); vals = ",".join(["?" for _ in veri])
+            conn.execute(f"INSERT INTO a_segment ({cols}) VALUES ({vals})", list(veri.values()))
+            conn.commit(); conn.close(); return True, ""
+        except Exception as e: return False, str(e)
+
+    def _aseg_guncelle(firma, veri):
+        try:
+            sb = get_sb_service() or get_sb_client()
+            if sb:
+                sb.table("a_segment").update(veri).eq("firma", firma).execute(); return True
+        except: pass
+        try:
+            conn = get_conn()
+            sets = ",".join([f"{k}=?" for k in veri.keys()])
+            conn.execute(f"UPDATE a_segment SET {sets} WHERE firma=?", list(veri.values())+[firma])
+            conn.commit(); conn.close(); return True
+        except: return False
+
+    def _aseg_cikar(firma):
+        try:
+            sb = get_sb_service() or get_sb_client()
+            if sb:
+                sb.table("a_segment").delete().eq("firma", firma).execute(); return True
+        except: pass
+        try:
+            conn = get_conn()
+            conn.execute("DELETE FROM a_segment WHERE firma=?", (firma,))
+            conn.commit(); conn.close(); return True
+        except: return False
+
+    # VERİ YÜKLE
+    _df_aseg = _aseg_listesi()
+
+    # METRİKLER
+    _sm1,_sm2,_sm3,_sm4 = st.columns(4)
+    _toplam = len(_df_aseg)
+    _aktif = len(_df_aseg[_df_aseg["durum"]=="Aktif"]) if not _df_aseg.empty and "durum" in _df_aseg.columns else 0
+    _takip = 0
+    if not _df_aseg.empty and "takip_tar" in _df_aseg.columns:
+        bugun = str(_dt.today())
+        _takip = len(_df_aseg[_df_aseg["takip_tar"] <= bugun])
+    _ciro = _df_aseg["aylik_ciro"].sum() if not _df_aseg.empty and "aylik_ciro" in _df_aseg.columns else 0
+    _sm1.metric("Toplam", _toplam)
+    _sm2.metric("Aktif", _aktif)
+    _sm3.metric("Takip Bekleyen", _takip)
+    _sm4.metric("Aylık Ciro", f"{_ciro:,.0f} ₺")
+
+    st.divider()
+
+    # CARİ LİSTEDEN EKLE
+    with st.expander("➕ Cari Listeden A Segment'e Ekle", expanded=False):
+        _df_cari_s = get_cari_listesi()
+        _mevcut_firmalar = list(_df_aseg["firma"]) if not _df_aseg.empty and "firma" in _df_aseg.columns else []
+        _df_cari_s = _df_cari_s[~_df_cari_s["firma"].isin(_mevcut_firmalar)] if not _df_cari_s.empty else _df_cari_s
+        if _df_cari_s.empty:
+            st.info("Eklenebilecek müşteri yok.")
+        else:
+            _opts_s = ["-- Seçin --"] + [f"[{int(r['id'])}] {r['firma']}" for _,r in _df_cari_s.iterrows()]
+            _sec_s = st.selectbox("Müşteri seç", _opts_s, key="aseg_sec")
+            if _sec_s != "-- Seçin --" and "[" in _sec_s:
+                _cid_s = int(_sec_s.split("]")[0].replace("[","").strip())
+                _crow_s = _df_cari_s[_df_cari_s["id"]==_cid_s].iloc[0]
+                _sc1,_sc2,_sc3 = st.columns(3)
+                _seg_sec = _sc1.selectbox("Segment", ["A+","A","A-"], key="aseg_seg")
+                _risk_sec = _sc2.selectbox("Risk", ["Düşük","Orta","Yüksek"], key="aseg_risk")
+                _ciro_sec = _sc3.text_input("Aylık ciro (₺)", key="aseg_ciro", placeholder="0")
+                _takip_sec = st.date_input("Takip tarihi", key="aseg_takip")
+                _not_sec = st.text_area("Not", key="aseg_not", placeholder="isteğe bağlı...", height=60)
+                if st.button("⭐ A Segment'e Ekle", type="primary", key="aseg_ekle_btn"):
+                    _veri_s = {
+                        "cari_id": int(_cid_s),
+                        "firma": str(_crow_s.get("firma","")),
+                        "yetkili": str(_crow_s.get("yetkili","") or ""),
+                        "gsm": str(_crow_s.get("gsm","") or ""),
+                        "durum": "Aktif",
+                        "segment": _seg_sec,
+                        "risk": _risk_sec,
+                        "aylik_ciro": float(_ciro_sec or 0),
+                        "takip_tar": str(_takip_sec),
+                        "notlar": _not_sec or "",
+                        "ekleyen": st.session_state.get("kullanici",""),
+                    }
+                    _ok_s, _err_s = _aseg_ekle(_veri_s)
+                    if _ok_s:
+                        st.success(f"✅ {_crow_s.get('firma','')} A Segment'e eklendi!")
+                        st.rerun()
+                    else:
+                        st.error(_err_s)
+
+    # FİLTRE
+    _ff1,_ff2,_ff3 = st.columns(3)
+    _fara = _ff1.text_input("Firma ara", key="aseg_ara", placeholder="firma adı...")
+    _fdurum = _ff2.selectbox("Durum", ["Tümü","Aktif","Takipte","Risk","Pasif"], key="aseg_fdurum")
+    _fseg = _ff3.selectbox("Segment", ["Tümü","A+","A","A-"], key="aseg_fseg")
+
+    _df_f = _df_aseg.copy() if not _df_aseg.empty else pd.DataFrame()
+    if not _df_f.empty:
+        if _fara: _df_f = _df_f[_df_f["firma"].str.contains(_fara, case=False, na=False)]
+        if _fdurum != "Tümü" and "durum" in _df_f.columns: _df_f = _df_f[_df_f["durum"]==_fdurum]
+        if _fseg != "Tümü" and "segment" in _df_f.columns: _df_f = _df_f[_df_f["segment"]==_fseg]
+
+    st.caption(f"{len(_df_f)} müşteri")
+
+    if _df_f.empty:
+        st.info("Henüz A Segment müşteri eklenmedi. Yukarıdan cari listeden ekleyebilirsiniz.")
+    else:
+        bugun_str = str(_dt.today())
+        for _si, (___, _sr) in enumerate(_df_f.iterrows()):
+            _firma_s = str(_sr.get("firma","?"))
+            _seg_r = str(_sr.get("segment","A"))
+            _risk_r = str(_sr.get("risk","Düşük"))
+            _durum_r = str(_sr.get("durum","Aktif"))
+            _takip_r = str(_sr.get("takip_tar","") or "")
+            _gecti = _takip_r and _takip_r <= bugun_str
+
+            # Renk kodları
+            _seg_renk = {"A+":"background:#eff6ff;color:#1d4ed8","A":"background:#f0fdf4;color:#16a34a","A-":"background:#fffbeb;color:#d97706"}.get(_seg_r,"")
+            _risk_renk = {"Düşük":"background:#f0fdf4;color:#16a34a","Orta":"background:#fffbeb;color:#d97706","Yüksek":"background:#fef2f2;color:#dc2626"}.get(_risk_r,"")
+            _dur_renk = {"Aktif":"background:#f0fdf4;color:#16a34a","Takipte":"background:#fffbeb;color:#d97706","Risk":"background:#fef2f2;color:#dc2626","Pasif":"background:#f8fafc;color:#64748b"}.get(_durum_r,"")
+
+            with st.expander(f"⭐ **{_firma_s}** · {_seg_r} · {_durum_r}" + (" ⚠️ TAKİP GEÇTİ" if _gecti else "")):
+                # Üst bilgiler
+                _hc1,_hc2,_hc3,_hc4 = st.columns(4)
+                _hc1.markdown(f"<span style='font-size:11px;padding:2px 8px;border-radius:10px;{_seg_renk};'>{_seg_r}</span>", unsafe_allow_html=True)
+                _hc2.markdown(f"<span style='font-size:11px;padding:2px 8px;border-radius:10px;{_dur_renk};'>{_durum_r}</span>", unsafe_allow_html=True)
+                _hc3.markdown(f"<span style='font-size:11px;padding:2px 8px;border-radius:10px;{_risk_renk};'>Risk: {_risk_r}</span>", unsafe_allow_html=True)
+                if _gecti:
+                    _hc4.markdown("<span style='font-size:11px;color:#dc2626;font-weight:500;'>⚠️ Takip tarihi geçti!</span>", unsafe_allow_html=True)
+                else:
+                    _hc4.markdown(f"<span style='font-size:11px;color:#64748b;'>Takip: {_takip_r}</span>", unsafe_allow_html=True)
+
+                # Bilgiler
+                _ciro_r = float(_sr.get("aylik_ciro",0) or 0)
+                _onc_r = float(_sr.get("onceki_ciro",0) or 0)
+                _delta = _ciro_r - _onc_r
+                _mc1,_mc2,_mc3 = st.columns(3)
+                _mc1.metric("Aylık Ciro", f"{_ciro_r:,.0f} ₺", delta=f"{_delta:+,.0f} ₺" if _delta != 0 else None)
+                _mc2.metric("Yetkili", _sr.get("yetkili","—") or "—")
+                _mc3.metric("GSM", _sr.get("gsm","—") or "—")
+
+                st.markdown(f"""
+| | |
+|---|---|
+| **Son Görüşme** | {_sr.get("son_gorusme","—") or "—"} |
+| **Sonraki Adım** | {_sr.get("sonraki_adim","—") or "—"} |
+| **Not** | {_sr.get("notlar","—") or "—"} |
+| **Ekleyen** | {_sr.get("ekleyen","—") or "—"} |
+""")
+
+                # GÜNCELLE FORMU
+                with st.expander("✏️ Güncelle", expanded=False):
+                    _ug1,_ug2,_ug3 = st.columns(3)
+                    _ug_durum = _ug1.selectbox("Durum", ["Aktif","Takipte","Risk","Pasif"],
+                        index=["Aktif","Takipte","Risk","Pasif"].index(_durum_r) if _durum_r in ["Aktif","Takipte","Risk","Pasif"] else 0,
+                        key=f"ug_durum_{_si}")
+                    _ug_risk = _ug2.selectbox("Risk", ["Düşük","Orta","Yüksek"],
+                        index=["Düşük","Orta","Yüksek"].index(_risk_r) if _risk_r in ["Düşük","Orta","Yüksek"] else 0,
+                        key=f"ug_risk_{_si}")
+                    _ug_ciro = _ug3.text_input("Aylık ciro (₺)", value=str(int(_ciro_r)) if _ciro_r else "", key=f"ug_ciro_{_si}")
+                    _ug_takip = st.date_input("Takip tarihi", key=f"ug_takip_{_si}")
+                    _ug_gorusme = st.text_input("Son görüşme notu", value=_sr.get("son_gorusme","") or "", key=f"ug_gor_{_si}")
+                    _ug_sonraki = st.text_input("Sonraki adım", value=_sr.get("sonraki_adim","") or "", key=f"ug_son_{_si}")
+                    _ug_not = st.text_area("Not", value=_sr.get("notlar","") or "", key=f"ug_not_{_si}", height=60)
+                    if st.button("💾 Kaydet", key=f"ug_btn_{_si}", type="primary"):
+                        _ug_veri = {
+                            "durum": _ug_durum, "risk": _ug_risk,
+                            "aylik_ciro": float(_ug_ciro or 0),
+                            "takip_tar": str(_ug_takip),
+                            "son_gorusme": _ug_gorusme,
+                            "sonraki_adim": _ug_sonraki,
+                            "notlar": _ug_not,
+                        }
+                        if _aseg_guncelle(_firma_s, _ug_veri):
+                            st.success("✅ Güncellendi!"); st.rerun()
+
+                # AKSIYON BUTONLARI
+                _ab1,_ab2,_ab3,_ab4,_ab5,_ab6 = st.columns(6)
+                if _ab1.button("📄 Teklif", key=f"as_tek_{_si}", use_container_width=True):
+                    st.session_state["aktif_tab"] = "teklif"
+                    st.session_state["teklif_musteri_onsel"] = _firma_s
+                    st.rerun()
+                if _ab2.button("📅 Randevu", key=f"as_ran_{_si}", use_container_width=True):
+                    st.session_state["aktif_tab"] = "randevu"
+                    st.rerun()
+                if _ab3.button("🔍 Analiz", key=f"as_an_{_si}", use_container_width=True):
+                    st.session_state["aktif_tab"] = "analiz"
+                    st.session_state["an_duzenle_firma"] = _firma_s
+                    st.rerun()
+                _gsm_s = str(_sr.get("gsm","") or "").replace(" ","").replace("-","")
+                if _gsm_s:
+                    if _gsm_s.startswith("0"): _gsm_s = "90"+_gsm_s[1:]
+                    _ab4.markdown(f"<a href='https://wa.me/{_gsm_s}' target='_blank'><button style='width:100%;padding:5px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;'>💬 WA</button></a>", unsafe_allow_html=True)
+                if _ab5.button("✏️ Cari Düzenle", key=f"as_car_{_si}", use_container_width=True):
+                    st.session_state["aktif_tab"] = "yeni"
+                    st.rerun()
+                if _ab6.button("❌ Listeden Çıkar", key=f"as_cik_{_si}", use_container_width=True):
+                    if _aseg_cikar(_firma_s):
+                        st.success(f"{_firma_s} listeden çıkarıldı!"); st.rerun()
+
 
 elif aktif == "whatsapp":
     import requests as _wa_req
