@@ -1218,6 +1218,9 @@ if aktif == "yeni":
         durum_idx  = durum_opts.index(duzenle.get("durum")) if duzenle and duzenle.get("durum") in durum_opts else 0
         durum      = col1.selectbox("Durum", durum_opts, index=durum_idx)
         temsilci   = col2.text_input("Temsilci", value=duzenle.get("temsilci","") if duzenle else "")
+        seg_opts   = ["--","⭐ A+","⭐ A","⭐ A-","B","C"]
+        seg_idx    = seg_opts.index(duzenle.get("segment","--")) if duzenle and duzenle.get("segment","--") in seg_opts else 0
+        segment    = col3.selectbox("Segment", seg_opts, index=seg_idx, help="A+ en özel, stratejik müşteriler")
 
         # Dinamik aşama listesi (sistemdeki tüm aşamalar + ekstralar)
         _asama_base = _tanimlar_yukle("asama")
@@ -1395,7 +1398,7 @@ elif aktif == "liste":
     if filtre_durum  != "Durum: Tümü": df_f = df_f[df_f["durum"]==filtre_durum]
 
     kart_opts = ["-- Müşteri Seçin --"] + [
-        f"[{int(r['id'])}] {r['firma']} | {r.get('il','')} | {r.get('islem_asamasi','')}"
+        f"[{int(r['id'])}] {r['firma']} {'⭐' if r.get('segment','') and r.get('segment','') not in ['','--'] else ''} | {r.get('il','')} | {r.get('islem_asamasi','')}"
         for _, r in df_f.iterrows()
     ]
     if st.session_state.get("kart_sec_reset"):
@@ -1434,6 +1437,9 @@ elif aktif == "liste":
                 st.write(f"🏙️ {kart_row.get('il','-')} / {kart_row.get('ilce','-')}")
                 st.write(f"📊 {kart_row.get('durum','-')}")
                 st.write(f"🔄 {kart_row.get('islem_asamasi','-')}")
+                _seg_val = str(kart_row.get("segment","") or "")
+                if _seg_val and _seg_val not in ["--",""]:
+                    st.markdown(f"<span style='background:#eff6ff;color:#1d4ed8;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:600;'>{_seg_val}</span>", unsafe_allow_html=True)
                 st.write(f"👔 {kart_row.get('temsilci','-')}")
                 _not = str(kart_row.get("aciklama","") or "")
                 if _not and _not != "nan":
