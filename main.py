@@ -1424,31 +1424,42 @@ elif aktif == "liste":
         try:
             kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
             kart_row = df_f[df_f["id"]==kart_id].iloc[0]
-            st.markdown(f"---\n## 🏢 {kart_row.get('firma','')}")
-            kc1,kc2,kc3 = st.columns(3)
-            with kc1:
-                st.markdown("**📋 İletişim**")
-                st.write(f"👤 {kart_row.get('yetkili','-')}")
-                st.write(f"📱 {fmt_tel(kart_row.get('gsm','')) or '-'}")
-                st.write(f"☎️ {fmt_tel(kart_row.get('sabit','')) or '-'}")
-                st.write(f"✉️ {kart_row.get('email','-')}")
-            with kc2:
-                st.markdown("**📍 Konum & Durum**")
-                st.write(f"🏙️ {kart_row.get('il','-')} / {kart_row.get('ilce','-')}")
-                st.write(f"📊 {kart_row.get('durum','-')}")
-                st.write(f"🔄 {kart_row.get('islem_asamasi','-')}")
-                _seg_val = str(kart_row.get("segment","") or "")
-                if _seg_val and _seg_val not in ["--",""]:
-                    st.markdown(f"<span style='background:#eff6ff;color:#1d4ed8;padding:2px 10px;border-radius:10px;font-size:12px;font-weight:600;'>{_seg_val}</span>", unsafe_allow_html=True)
-                st.write(f"👔 {kart_row.get('temsilci','-')}")
-                _not = str(kart_row.get("aciklama","") or "")
-                if _not and _not != "nan":
-                    st.info(f"📝 {_not}")
-            with kc3:
-                bek = float(kart_row.get("beklenen_ciro",0) or 0)
-                ger = float(kart_row.get("gerceklesen_ciro",0) or 0)
-                st.metric("Beklenen",     fmt_para(bek))
-                st.metric("Gerçekleşen",  fmt_para(ger), delta=fmt_para(ger-bek))
+            bek = float(kart_row.get("beklenen_ciro",0) or 0)
+            ger = float(kart_row.get("gerceklesen_ciro",0) or 0)
+            _seg_val = str(kart_row.get("segment","") or "")
+            _not = str(kart_row.get("aciklama","") or "")
+
+            # ── KART BAŞLIĞI ─────────────────────────────────────────────────
+            st.markdown(f"""
+<div style='background:#fff;border:2px solid #e2e8f0;border-radius:12px;padding:20px;margin:8px 0'>
+<div style='display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px'>
+  <div>
+    <h2 style='margin:0;font-size:22px'>🏢 {kart_row.get('firma','')}</h2>
+    <div style='margin-top:8px;font-size:13px;color:#475569;display:flex;flex-wrap:wrap;gap:16px'>
+      <span>👤 {kart_row.get('yetkili','-') or '-'}</span>
+      <span>📱 {fmt_tel(kart_row.get('gsm','')) or '-'}</span>
+      <span>☎️ {fmt_tel(kart_row.get('sabit','')) or '-'}</span>
+      <span>✉️ {kart_row.get('email','-') or '-'}</span>
+    </div>
+    <div style='margin-top:6px;font-size:13px;color:#475569;display:flex;flex-wrap:wrap;gap:16px'>
+      <span>🏙️ {kart_row.get('il','-') or '-'} / {kart_row.get('ilce','-') or '-'}</span>
+      <span>📊 {kart_row.get('durum','-') or '-'}</span>
+      <span>🔄 {kart_row.get('islem_asamasi','-') or '-'}</span>
+      <span>👔 {kart_row.get('temsilci','-') or '-'}</span>
+      {f"<span style='background:#eff6ff;color:#1d4ed8;padding:2px 8px;border-radius:10px;font-size:11px'>{_seg_val}</span>" if _seg_val and _seg_val != "--" else ""}
+    </div>
+    {f"<div style='margin-top:8px;background:#f0fdf4;border-left:3px solid #22c55e;padding:6px 10px;border-radius:4px;font-size:13px'>📝 {_not}</div>" if _not and _not != "nan" else ""}
+  </div>
+  <div style='text-align:right;min-width:160px'>
+    <div style='font-size:12px;color:#94a3b8'>Beklenen</div>
+    <div style='font-size:24px;font-weight:800;color:#1e40af'>{fmt_para(bek)}</div>
+    <div style='font-size:12px;color:#94a3b8;margin-top:8px'>Gerçekleşen</div>
+    <div style='font-size:20px;font-weight:700;color:{"#16a34a" if ger>=bek else "#dc2626"}'>{fmt_para(ger)}</div>
+  </div>
+</div>
+</div>""", unsafe_allow_html=True)
+
+            # ── BUTONLAR ────────────────────────────────────────────────────
             ab1,ab2,ab3,ab4 = st.columns(4)
             if ab1.button("✏️ Düzenle", key=f"kd_{kart_id}", use_container_width=True):
                 d2 = {str(k):(None if str(v) in ["nan","None","NaT"] else v) for k,v in kart_row.items()}
@@ -1469,83 +1480,6 @@ elif aktif == "liste":
                 try: db_read.clear()
                 except: pass
                 st.success("Arşive gönderildi!"); st.rerun()
-
-            # ── HIZLI KAYDET ─────────────────────────────────────────────────
-            if st.button("💾 Değişiklikleri Kaydet", key=f"hiz_kyt_{kart_id}", use_container_width=True, type="primary"):
-                _editor_state = st.session_state.get("cari_editor", {})
-                _edited_rows  = _editor_state.get("edited_rows", {})
-                _tablo_json   = st.session_state.get("_ls_tablo")
-                _kayit_sayi   = 0
-                if _edited_rows and _tablo_json:
-                    import json as _hk_json
-                    try:
-                        _rows = _hk_json.loads(_tablo_json)
-                        for idx_str, degisiklikler in _edited_rows.items():
-                            try:
-                                idx = int(idx_str)
-                                if idx >= len(_rows): continue
-                                rid = int(float(str(_rows[idx].get("id",0))))
-                                if not rid: continue
-                                guncelle = {k: str(v) if v is not None else ""
-                                           for k, v in degisiklikler.items() if k != "Seç"}
-                                if not guncelle: continue
-                                if sb_liste:
-                                    sb_liste.table("cari_kartlar").update(guncelle).eq("id", rid).execute()
-                                _kayit_sayi += 1
-                            except: pass
-                    except: pass
-                if _kayit_sayi > 0:
-                    try: db_read.clear()
-                    except: pass
-                    st.success(f"✅ {_kayit_sayi} satır kaydedildi!")
-                else:
-                    st.info("Tabloda değişiklik yok. Tabloda düzenleme yaptıktan sonra buradan kaydedebilirsiniz.")
-
-            # ── HIZLI KAYDET BUTONU — ayrı satırda her zaman görünsün ────
-            if st.button("💾 Bu Firmayı Kaydet", key=f"hiz_kyt2_{kart_id}", use_container_width=True, type="primary"):
-                try:
-                    _editor_state = st.session_state.get("cari_editor", {})
-                    _edited_rows  = _editor_state.get("edited_rows", {})
-                    _tablo_json   = st.session_state.get("_ls_tablo")
-                    _kayit_sayi   = 0
-                    if _edited_rows and _tablo_json:
-                        import json as _hk_json
-                        _rows = _hk_json.loads(_tablo_json)
-                        for idx_str, degisiklikler in _edited_rows.items():
-                            try:
-                                idx = int(idx_str)
-                                if idx >= len(_rows): continue
-                                rid = int(float(str(_rows[idx].get("id",0))))
-                                if not rid: continue
-                                guncelle = {k: str(v) if v is not None else ""
-                                           for k, v in degisiklikler.items() if k != "Seç"}
-                                if not guncelle: continue
-                                if sb_liste:
-                                    sb_liste.table("cari_kartlar").update(guncelle).eq("id", rid).execute()
-                                _kayit_sayi += 1
-                            except: pass
-                    # Değişiklik yoksa mevcut satırı kaydet
-                    if _kayit_sayi == 0:
-                        _guncelle = {
-                            "firma":        str(kart_row.get("firma","") or ""),
-                            "yetkili":      str(kart_row.get("yetkili","") or ""),
-                            "gsm":          str(kart_row.get("gsm","") or ""),
-                            "sabit":        str(kart_row.get("sabit","") or ""),
-                            "email":        str(kart_row.get("email","") or ""),
-                            "il":           str(kart_row.get("il","") or ""),
-                            "ilce":         str(kart_row.get("ilce","") or ""),
-                            "durum":        str(kart_row.get("durum","") or ""),
-                            "temsilci":     str(kart_row.get("temsilci","") or ""),
-                            "islem_asamasi":str(kart_row.get("islem_asamasi","") or ""),
-                        }
-                        if sb_liste:
-                            sb_liste.table("cari_kartlar").update(_guncelle).eq("id", kart_id).execute()
-                        _kayit_sayi = 1
-                    try: db_read.clear()
-                    except: pass
-                    st.success(f"✅ Kaydedildi!")
-                except Exception as _hke:
-                    st.error(f"Hata: {_hke}")
 
             # ── AÇIKLAMA SİSTEMİ ──────────────────────────────────────────────
             st.markdown("---")
