@@ -51,7 +51,7 @@ def get_sb():
 def get_supabase():
     return get_sb_client()
 
-@st.cache_data(ttl=60)
+@st.cache_data(ttl=3600)
 def get_cari_listesi():
     """60 sn cache'li cari listesi"""
     sb = get_sb_client()
@@ -68,12 +68,12 @@ def get_cari_listesi():
     except:
         return pd.DataFrame()
 
-@st.cache_data(ttl=120)
+@st.cache_data(ttl=3600)
 def get_kullanici_listesi():
     """2 dk cache'li kullanıcı listesi"""
     return db_read("kullanicilar", extra_sql="")
 
-@st.cache_data(ttl=120)
+@st.cache_data(ttl=3600)
 def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
     """Supabase veya SQLite'dan DataFrame döner"""
     sb = get_sb_client()
@@ -1373,7 +1373,6 @@ elif aktif == "liste":
         _em = _DURUM_EMOJI.get(_ad, "🔹")
         if _d_cols[i].button(f"{_em} {_ad}\n{_sayi}", key=f"dur_btn_{i}", use_container_width=True):
             st.session_state["fil_durum"] = "Tümü" if _ad == "Toplam" else _ad
-            st.rerun()
 
     # Aşama satırı
     if tum_asama_opts:
@@ -1383,7 +1382,6 @@ elif aktif == "liste":
             _em2 = _ASAMA_EMOJI.get(_an, "🔸")
             if _a_cols[i].button(f"{_em2} {_an}\n{_ac}", key=f"asm_btn_{i}", use_container_width=True):
                 st.session_state["fil_asama"] = _an
-                st.rerun()
 
     # ── FİLTRE TEK SATIR ─────────────────────────────────────────────────────
     _fc = st.columns([1.3, 1.3, 1.8, 1.8, 1.3, 0.4, 0.8])
