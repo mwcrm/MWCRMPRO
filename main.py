@@ -796,9 +796,10 @@ _TAB_ETIKETLER = {
     "excel": "📥 Excel Aktar",
     "kisiler": "📞 Telefon Kişiler",
     "rapor": "📊 Raporlar",
+    "admin_rapor": "🎨 Rapor Tasarla",
     "kullanici": "👥 Kullanıcı Yönetimi",
     "mesajlar": "💬 Mesajlar",
-    "admin_rapor": "📊 Rapor Tasarla",
+
 }
 
 def get_menu_tercihi(kullanici):
@@ -2491,295 +2492,298 @@ function updateBot(v){{
 4. Sorun çıkarsa **🔄 Geri Al** → önceki sürüme dön
                 """)
 
-elif aktif == "rapor":
-    sayfa_log("rapor")
-    import io as _rio2
+elif aktif == "raporlar":
+    sayfa_log("raporlar")
+    _rt1, _rt2 = st.tabs(["📊 Raporlar", "🎨 Rapor Tasarla"])
+    with _rt1:
+            sayfa_log("rapor")
+            import io as _rio2
 
-    # Veri yükle
-    df_rapor = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi=\'0\' OR silindi IS NULL)")
-    df_rand_r = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC")
-    df_tek_r  = db_read("teklifler", order_col="tarih")
+            # Veri yükle
+            df_rapor = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi=\'0\' OR silindi IS NULL)")
+            df_rand_r = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC")
+            df_tek_r  = db_read("teklifler", order_col="tarih")
 
-    if not df_rapor.empty:
-        for col in ["beklenen_ciro","gerceklesen_ciro"]:
-            if col not in df_rapor.columns: df_rapor[col] = 0
-            df_rapor[col] = pd.to_numeric(df_rapor[col], errors="coerce").fillna(0)
-        for col in ["durum","islem_asamasi","temsilci","il","firma","yetkili","id","ilce","gsm","email"]:
-            if col not in df_rapor.columns: df_rapor[col] = ""
-        df_rapor["fark"]  = df_rapor["gerceklesen_ciro"] - df_rapor["beklenen_ciro"]
-        df_rapor["yuzde"] = df_rapor.apply(lambda r: (r["gerceklesen_ciro"]/r["beklenen_ciro"]*100) if r["beklenen_ciro"]>0 else 0, axis=1)
-        toplam = len(df_rapor)
-        toplam_beklenen = df_rapor["beklenen_ciro"].sum()
-        toplam_gercek   = df_rapor["gerceklesen_ciro"].sum()
-    else:
-        toplam = 0; toplam_beklenen = 0; toplam_gercek = 0
+            if not df_rapor.empty:
+                for col in ["beklenen_ciro","gerceklesen_ciro"]:
+                    if col not in df_rapor.columns: df_rapor[col] = 0
+                    df_rapor[col] = pd.to_numeric(df_rapor[col], errors="coerce").fillna(0)
+                for col in ["durum","islem_asamasi","temsilci","il","firma","yetkili","id","ilce","gsm","email"]:
+                    if col not in df_rapor.columns: df_rapor[col] = ""
+                df_rapor["fark"]  = df_rapor["gerceklesen_ciro"] - df_rapor["beklenen_ciro"]
+                df_rapor["yuzde"] = df_rapor.apply(lambda r: (r["gerceklesen_ciro"]/r["beklenen_ciro"]*100) if r["beklenen_ciro"]>0 else 0, axis=1)
+                toplam = len(df_rapor)
+                toplam_beklenen = df_rapor["beklenen_ciro"].sum()
+                toplam_gercek   = df_rapor["gerceklesen_ciro"].sum()
+            else:
+                toplam = 0; toplam_beklenen = 0; toplam_gercek = 0
 
-    if not df_rand_r.empty and "adet" in df_rand_r.columns:
-        df_rand_r["adet"] = pd.to_numeric(df_rand_r["adet"], errors="coerce").fillna(0)
+            if not df_rand_r.empty and "adet" in df_rand_r.columns:
+                df_rand_r["adet"] = pd.to_numeric(df_rand_r["adet"], errors="coerce").fillna(0)
 
-    # ── ÖZET SATIRI ───────────────────────────────────────────────────────────
-    _aktif_say  = len(df_rapor[df_rapor["durum"]=="Aktif"]) if not df_rapor.empty else 0
-    _hedef_say  = len(df_rapor[df_rapor["durum"]=="Hedef"]) if not df_rapor.empty else 0
-    _rand_say   = len(df_rand_r) if not df_rand_r.empty else 0
-    _bitti_say  = len(df_rand_r[df_rand_r["sonuc"]=="Bitti"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0
-    _devam_say  = len(df_rand_r[df_rand_r["sonuc"]=="Devam Ediyor"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0
-    _gidilmedi  = len(df_rand_r[df_rand_r["sonuc"]=="Gidilmedi"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0
-    st.markdown(
-        f"🏢 **Cari:** {toplam} kayıt &nbsp;·&nbsp; Aktif: **{_aktif_say}** &nbsp;·&nbsp; Hedef: **{_hedef_say}** &nbsp;·&nbsp; "
-        f"Beklenen: **{fmt_para(toplam_beklenen)}** &nbsp;·&nbsp; Gerçekleşen: **{fmt_para(toplam_gercek)}** "
-        f"&nbsp;&nbsp;|&nbsp;&nbsp; "
-        f"📅 **Randevu:** {_rand_say} &nbsp;·&nbsp; ✅ Bitti: **{_bitti_say}** &nbsp;·&nbsp; "
-        f"🔄 Devam: **{_devam_say}** &nbsp;·&nbsp; ❌ Gidilmedi: **{_gidilmedi}**"
-    )
-    st.divider()
+            # ── ÖZET SATIRI ───────────────────────────────────────────────────────────
+            _aktif_say  = len(df_rapor[df_rapor["durum"]=="Aktif"]) if not df_rapor.empty else 0
+            _hedef_say  = len(df_rapor[df_rapor["durum"]=="Hedef"]) if not df_rapor.empty else 0
+            _rand_say   = len(df_rand_r) if not df_rand_r.empty else 0
+            _bitti_say  = len(df_rand_r[df_rand_r["sonuc"]=="Bitti"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0
+            _devam_say  = len(df_rand_r[df_rand_r["sonuc"]=="Devam Ediyor"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0
+            _gidilmedi  = len(df_rand_r[df_rand_r["sonuc"]=="Gidilmedi"]) if not df_rand_r.empty and "sonuc" in df_rand_r.columns else 0
+            st.markdown(
+                f"🏢 **Cari:** {toplam} kayıt &nbsp;·&nbsp; Aktif: **{_aktif_say}** &nbsp;·&nbsp; Hedef: **{_hedef_say}** &nbsp;·&nbsp; "
+                f"Beklenen: **{fmt_para(toplam_beklenen)}** &nbsp;·&nbsp; Gerçekleşen: **{fmt_para(toplam_gercek)}** "
+                f"&nbsp;&nbsp;|&nbsp;&nbsp; "
+                f"📅 **Randevu:** {_rand_say} &nbsp;·&nbsp; ✅ Bitti: **{_bitti_say}** &nbsp;·&nbsp; "
+                f"🔄 Devam: **{_devam_say}** &nbsp;·&nbsp; ❌ Gidilmedi: **{_gidilmedi}**"
+            )
+            st.divider()
 
-    # ── RAPOR SIRALAMA SİSTEMİ ────────────────────────────────────────────────
-    _RAPOR_LISTESI = [
-        "tarih_gorev", "bolge", "asama_durum",
-        "il_bazli", "musteri_ciro", "wa_email"
-    ]
-    _RAPOR_ETIKET = {
-        "tarih_gorev": "📅 Tarih & Görev Raporu",
-        "bolge":       "🗺️ Bölge Raporu",
-        "asama_durum": "🔄 Aşama & Durum Bazlı Detay Raporu",
-        "il_bazli":    "🗺️ İl Bazlı Rapor (Top 15)",
-        "musteri_ciro":"💰 Müşteri Bazlı Ciro Detayı (Top 20)",
-        "wa_email":    "📱 WhatsApp & Email Gönderim Raporu",
-    }
+            # ── RAPOR SIRALAMA SİSTEMİ ────────────────────────────────────────────────
+            _RAPOR_LISTESI = [
+                "tarih_gorev", "bolge", "asama_durum",
+                "il_bazli", "musteri_ciro", "wa_email"
+            ]
+            _RAPOR_ETIKET = {
+                "tarih_gorev": "📅 Tarih & Görev Raporu",
+                "bolge":       "🗺️ Bölge Raporu",
+                "asama_durum": "🔄 Aşama & Durum Bazlı Detay Raporu",
+                "il_bazli":    "🗺️ İl Bazlı Rapor (Top 15)",
+                "musteri_ciro":"💰 Müşteri Bazlı Ciro Detayı (Top 20)",
+                "wa_email":    "📱 WhatsApp & Email Gönderim Raporu",
+            }
 
-    def _rapor_sira_yukle():
-        try:
-            _sb = get_sb_client()
-            if _sb:
-                _r = _sb.table("kullanici_tercih").select("deger") \
-                    .eq("kullanici", st.session_state.get("kullanici","")) \
-                    .eq("anahtar","rapor_sirasi").execute()
-                if _r.data:
-                    import json as _rj
-                    _kayitli = _rj.loads(_r.data[0]["deger"])
-                    # Yeni raporlar varsa sona ekle
-                    for _k in _RAPOR_LISTESI:
-                        if _k not in _kayitli: _kayitli.append(_k)
-                    return [k for k in _kayitli if k in _RAPOR_LISTESI]
-        except: pass
-        return _RAPOR_LISTESI.copy()
-
-    def _rapor_sira_kaydet(sira):
-        try:
-            import json as _rj
-            _sb = get_sb_client()
-            if _sb:
-                _sb.table("kullanici_tercih").upsert({
-                    "kullanici": st.session_state.get("kullanici",""),
-                    "anahtar": "rapor_sirasi",
-                    "deger": _rj.dumps(sira)
-                }, on_conflict="kullanici,anahtar").execute()
-        except: pass
-
-    _rapor_sira = _rapor_sira_yukle()
-
-    # ── RAPOR SIRALAMA ────────────────────────────────────────────────────────
-    _RAPOR_LISTESI = ["tarih_gorev","bolge","asama_durum","il_bazli","musteri_ciro","wa_email"]
-    _RAPOR_ETIKET = {
-        "tarih_gorev": "📅 Tarih & Görev Raporu",
-        "bolge":       "🗺️ Bölge Raporu",
-        "asama_durum": "🔄 Aşama & Durum Bazlı Detay Raporu",
-        "il_bazli":    "🗺️ İl Bazlı Rapor (Top 15)",
-        "musteri_ciro":"💰 Müşteri Bazlı Ciro Detayı (Top 20)",
-        "wa_email":    "📱 WhatsApp & Email Gönderim Raporu",
-    }
-    def _rapor_sira_yukle():
-        try:
-            import json as _rj
-            _sb = get_sb_client()
-            if _sb:
-                _r = _sb.table("kullanici_tercih").select("deger").eq("kullanici",st.session_state.get("kullanici","")).eq("anahtar","rapor_sirasi").execute()
-                if _r.data:
-                    _k = _rj.loads(_r.data[0]["deger"])
-                    for _x in _RAPOR_LISTESI:
-                        if _x not in _k: _k.append(_x)
-                    return [x for x in _k if x in _RAPOR_LISTESI]
-        except: pass
-        return _RAPOR_LISTESI.copy()
-    def _rapor_sira_kaydet(sira):
-        try:
-            import json as _rj
-            _sb = get_sb_client()
-            if _sb:
-                _sb.table("kullanici_tercih").upsert({"kullanici":st.session_state.get("kullanici",""),"anahtar":"rapor_sirasi","deger":_rj.dumps(sira)},on_conflict="kullanici,anahtar").execute()
-        except: pass
-    _rapor_sira = _rapor_sira_yukle()
-    with st.expander("⚙️ Rapor Sırası"):
-        for _ri, _rk in enumerate(_rapor_sira):
-            _rc1,_rc2,_rc3 = st.columns([5,1,1])
-            _rc1.caption(_RAPOR_ETIKET.get(_rk,_rk))
-            if _ri > 0 and _rc2.button("▲", key=f"raporsira_up_{_rk}"):
-                _rapor_sira[_ri],_rapor_sira[_ri-1] = _rapor_sira[_ri-1],_rapor_sira[_ri]
-                _rapor_sira_kaydet(_rapor_sira); st.rerun()
-            if _ri < len(_rapor_sira)-1 and _rc3.button("▼", key=f"raporsira_dn_{_rk}"):
-                _rapor_sira[_ri],_rapor_sira[_ri+1] = _rapor_sira[_ri+1],_rapor_sira[_ri]
-                _rapor_sira_kaydet(_rapor_sira); st.rerun()
-
-    for _rk in _rapor_sira:
-        if _rk == "tarih_gorev":
-            with st.expander("📅 Tarih & Görev Raporu"):
-                if df_rand_r.empty:
-                    st.info("Randevu yok.")
-                else:
-                    _rg = df_rand_r.copy()
-                    if not df_rapor.empty:
-                        _rg = _rg.merge(df_rapor[["firma","beklenen_ciro","gerceklesen_ciro"]], left_on="musteri_adi", right_on="firma", how="left")
-                        _rg["beklenen_ciro"] = pd.to_numeric(_rg["beklenen_ciro"], errors="coerce").fillna(0)
-                        _rg["gerceklesen_ciro"] = pd.to_numeric(_rg["gerceklesen_ciro"], errors="coerce").fillna(0)
-                    else:
-                        _rg["beklenen_ciro"] = 0; _rg["gerceklesen_ciro"] = 0
-                    _gc = ["randevu_tarihi","gorev"] if "gorev" in _rg.columns else ["randevu_tarihi"]
-                    _tg = _rg.groupby(_gc).agg(Randevu=("id","count"),Musteri=("musteri_adi","nunique"),Bitti=("sonuc",lambda x:(x=="Bitti").sum()),Beklenen=("beklenen_ciro","sum"),Gerceklesen=("gerceklesen_ciro","sum")).reset_index().sort_values("randevu_tarihi",ascending=False)
-                    _tg["Fark"] = _tg["Gerceklesen"] - _tg["Beklenen"]
-                    for _col in ["Beklenen","Gerceklesen","Fark"]: _tg[_col] = _tg[_col].apply(fmt_para)
-                    _tg.rename(columns={"randevu_tarihi":"Tarih","gorev":"Görev","Musteri":"Müşteri","Beklenen":"Beklenen Ciro","Gerceklesen":"Gerçekleşen"},inplace=True)
-                    st.dataframe(_tg, use_container_width=True, hide_index=True)
-                    _buf=_rio2.BytesIO(); _tg.to_excel(_buf,index=False); _buf.seek(0)
-                    st.download_button("📥 İndir",data=_buf,file_name="tarih_gorev.xlsx",use_container_width=True)
-
-        elif _rk == "bolge":
-            with st.expander("🗺️ Bölge Raporu"):
-                if df_rand_r.empty or "bolge" not in df_rand_r.columns:
-                    st.info("Randevu yok.")
-                else:
-                    _rc = df_rand_r[["bolge","musteri_adi"]].drop_duplicates()
-                    if not df_rapor.empty:
-                        _rc = _rc.merge(df_rapor[["firma","beklenen_ciro","gerceklesen_ciro"]],left_on="musteri_adi",right_on="firma",how="left")
-                        _rc["beklenen_ciro"] = pd.to_numeric(_rc["beklenen_ciro"],errors="coerce").fillna(0)
-                        _rc["gerceklesen_ciro"] = pd.to_numeric(_rc["gerceklesen_ciro"],errors="coerce").fillna(0)
-                        b_oz = _rc.groupby("bolge").agg(Musteri=("musteri_adi","nunique"),Beklenen=("beklenen_ciro","sum"),Gerceklesen=("gerceklesen_ciro","sum")).reset_index().sort_values("Beklenen",ascending=False)
-                        b_oz["Beklenen"] = b_oz["Beklenen"].apply(fmt_para)
-                        b_oz["Gerceklesen"] = b_oz["Gerceklesen"].apply(fmt_para)
-                        b_oz.columns = ["Bölge","Müşteri","Beklenen Ciro","Gerçekleşen"]
-                    else:
-                        b_oz = df_rand_r.groupby("bolge").agg(Musteri=("musteri_adi","nunique")).reset_index()
-                        b_oz.columns = ["Bölge","Müşteri"]
-                    st.dataframe(b_oz, use_container_width=True, hide_index=True)
-                    _buf=_rio2.BytesIO(); b_oz.to_excel(_buf,index=False); _buf.seek(0)
-                    st.download_button("📥 İndir",data=_buf,file_name="bolge.xlsx",use_container_width=True)
-
-        elif _rk == "asama_durum":
-            with st.expander("🔄 Aşama & Durum Bazlı Detay Raporu", expanded=False):
-                if df_rapor.empty:
-                    st.info("Veri yok.")
-                else:
-                    _rb1,_rb2,_rb3 = st.columns(3)
-                    _trbas = _rb1.date_input("Başlangıç:", key="rp_asama_bas", value=None)
-                    _trbit = _rb2.date_input("Bitiş:", key="rp_asama_bit", value=None)
-                    _tdur_opts = _tanimlar_yukle("durum")
-                    _fil_dur = _rb3.selectbox("Durum:", ["Tümü"]+_tdur_opts, key="rp_asama_durum")
-                    _drf = df_rapor.copy()
-                    if _trbas or _trbit:
-                        _drf["_dt"] = pd.to_datetime(_drf["tarih"],errors="coerce").dt.date
-                        if _trbas: _drf = _drf[_drf["_dt"] >= _trbas]
-                        if _trbit: _drf = _drf[_drf["_dt"] <= _trbit]
-                    if _fil_dur != "Tümü": _drf = _drf[_drf["durum"]==_fil_dur]
-                    _tum_as = sorted(_drf["islem_asamasi"].dropna().unique().tolist())
-                    _s1,_s2 = st.columns(2)
-                    with _s1:
-                        st.caption(f"**Aşama Özeti** — {len(_drf)} kayıt")
-                        _aoz = _drf.groupby("islem_asamasi").agg(Firma=("firma","count"),Beklenen=("beklenen_ciro","sum"),Gerceklesen=("gerceklesen_ciro","sum")).reset_index().sort_values("Firma",ascending=False)
-                        _aoz["Başarı%"] = _aoz.apply(lambda r: f"{r['Gerceklesen']/r['Beklenen']*100:.0f}%" if r["Beklenen"]>0 else "—",axis=1)
-                        _aoz["Beklenen"] = _aoz["Beklenen"].apply(fmt_para)
-                        _aoz["Gerceklesen"] = _aoz["Gerceklesen"].apply(fmt_para)
-                        _aoz.columns = ["Aşama","Firma","Beklenen","Gerçekleşen","Başarı%"]
-                        st.dataframe(_aoz, use_container_width=True, hide_index=True)
-                    with _s2:
-                        st.caption("**Durum Özeti**")
-                        _doz = _drf.groupby("durum").agg(Firma=("firma","count"),Beklenen=("beklenen_ciro","sum"),Gerceklesen=("gerceklesen_ciro","sum")).reset_index().sort_values("Firma",ascending=False)
-                        _doz["Beklenen"] = _doz["Beklenen"].apply(fmt_para)
-                        _doz["Gerceklesen"] = _doz["Gerceklesen"].apply(fmt_para)
-                        _doz.columns = ["Durum","Firma","Beklenen","Gerçekleşen"]
-                        st.dataframe(_doz, use_container_width=True, hide_index=True)
-                    st.divider()
-                    if _tum_as:
-                        _atabs = st.tabs([f"🔹 {a}" for a in _tum_as])
-                        for _ti, _an in enumerate(_tum_as):
-                            with _atabs[_ti]:
-                                _dar = _drf[_drf["islem_asamasi"]==_an]
-                                _do = " · ".join([f"{r['durum']}: {r['Adet']}" for _,r in _dar.groupby("durum").size().reset_index(name="Adet").iterrows()]) if "durum" in _dar.columns else ""
-                                st.caption(f"**{len(_dar)} firma** · {_do} · Beklenen: {fmt_para(_dar['beklenen_ciro'].sum())} · Gerçekleşen: {fmt_para(_dar['gerceklesen_ciro'].sum())}")
-                                _gc2 = [c for c in ["id","tarih","firma","yetkili","gsm","il","durum","temsilci","beklenen_ciro","gerceklesen_ciro"] if c in _dar.columns]
-                                _ds = _dar[_gc2].copy()
-                                if "beklenen_ciro" in _ds.columns: _ds["beklenen_ciro"] = _ds["beklenen_ciro"].apply(fmt_para)
-                                if "gerceklesen_ciro" in _ds.columns: _ds["gerceklesen_ciro"] = _ds["gerceklesen_ciro"].apply(fmt_para)
-                                if "tarih" in _ds.columns: _ds["tarih"] = _ds["tarih"].astype(str).str[:10]
-                                st.dataframe(_ds, use_container_width=True, hide_index=True)
-                                _buf=_rio2.BytesIO(); _dar.to_excel(_buf,index=False); _buf.seek(0)
-                                st.download_button("📥 Excel",data=_buf,file_name=f"asama_{_an}.xlsx",use_container_width=True,key=f"dl_asama_{_an}")
-
-        elif _rk == "il_bazli":
-            with st.expander("🗺️ İl Bazlı Rapor (Top 15)"):
-                if df_rapor.empty: st.info("Veri yok.")
-                else:
-                    _il = df_rapor.groupby("il").agg(Musteri=("firma","count"),Beklenen=("beklenen_ciro","sum"),Gerceklesen=("gerceklesen_ciro","sum")).reset_index().sort_values("Musteri",ascending=False).head(15)
-                    _il["Beklenen"] = _il["Beklenen"].apply(fmt_para)
-                    _il["Gerceklesen"] = _il["Gerceklesen"].apply(fmt_para)
-                    st.dataframe(_il, use_container_width=True, hide_index=True)
-
-        elif _rk == "musteri_ciro":
-            with st.expander("💰 Müşteri Bazlı Ciro Detayı (Top 20)"):
-                if df_rapor.empty: st.info("Veri yok.")
-                else:
-                    _t20 = df_rapor.sort_values("beklenen_ciro",ascending=False).head(20)
-                    _sc = [c for c in ["firma","temsilci","il","durum","islem_asamasi","beklenen_ciro","gerceklesen_ciro","yuzde"] if c in _t20.columns]
-                    _dt = _t20[_sc].copy()
-                    if "beklenen_ciro" in _dt.columns: _dt["beklenen_ciro"] = _dt["beklenen_ciro"].apply(fmt_para)
-                    if "gerceklesen_ciro" in _dt.columns: _dt["gerceklesen_ciro"] = _dt["gerceklesen_ciro"].apply(fmt_para)
-                    if "yuzde" in _dt.columns: _dt["yuzde"] = _dt["yuzde"].apply(lambda x: f"{x:.1f}%")
-                    st.dataframe(_dt, use_container_width=True, hide_index=True)
-                    _buf=_rio2.BytesIO(); _dt.to_excel(_buf,index=False); _buf.seek(0)
-                    st.download_button("📥 İndir",data=_buf,file_name="ciro_top20.xlsx",use_container_width=True)
-
-        elif _rk == "wa_email":
-            with st.expander("📱 WhatsApp & Email Gönderim Raporu"):
+            def _rapor_sira_yukle():
                 try:
-                    _dik = db_read("islem_kaydi", order_col="tarih", limit=1000)
-                    if not _dik.empty and "islem_turu" in _dik.columns:
-                        _dik = _dik[_dik["islem_turu"].str.contains("WhatsApp|Email|WA|Teklif|Randevu|Uyarı",case=False,na=False)]
-                    if not _dik.empty:
-                        _dik = _dik.rename(columns={"musteri_adi":"Müşteri","islem_turu":"Kanal","gonderim_bilgisi":"Numara/Email","olusturan":"Gönderen","icerik":"Detay","tarih":"Tarih"})
-                        _dik["Kaynak"] = "Sistem"
-                        _dik = _dik[["Tarih","Müşteri","Kanal","Detay","Numara/Email","Gönderen","Kaynak"]]
-                    _dkml = db_read("kisiler_mesaj_log", order_col="tarih", limit=1000)
-                    if not _dkml.empty:
-                        _dkml = _dkml.rename(columns={"kisi_adi":"Müşteri","sablon_adi":"Kanal","mesaj":"Detay","telefon":"Numara/Email","gonderen":"Gönderen","tarih":"Tarih"})
-                        _dkml["Kanal"] = "📱 WA Kişi — " + _dkml["Kanal"].astype(str)
-                        _dkml["Kaynak"] = "Kişiler"
-                        _dkml = _dkml[["Tarih","Müşteri","Kanal","Detay","Numara/Email","Gönderen","Kaynak"]]
-                    _pp = [d for d in [_dik, _dkml] if not d.empty]
-                    if not _pp:
-                        st.info("Henüz WA/Email gönderim kaydı yok.")
-                    else:
-                        _dtum = pd.concat(_pp, ignore_index=True)
-                        _dtum["Tarih"] = pd.to_datetime(_dtum["Tarih"], errors="coerce")
-                        _dtum = _dtum.sort_values("Tarih", ascending=False)
-                        _dtum["Tarih"] = _dtum["Tarih"].astype(str).str[:16]
-                        _wt = len(_dtum[_dtum["Kanal"].str.contains("WhatsApp Teklif|WA Teklif",na=False)])
-                        _we = len(_dtum[_dtum["Kanal"].str.contains("Email",na=False)])
-                        _wr = len(_dtum[_dtum["Kanal"].str.contains("Randevu|Uyarı",na=False)])
-                        _wk = len(_dtum[_dtum["Kanal"].str.contains("WA Kişi",na=False)])
-                        st.markdown(f"📊 Toplam: **{len(_dtum)}** &nbsp;·&nbsp; 📱 WA Teklif: **{_wt}** &nbsp;·&nbsp; ✉️ Email: **{_we}** &nbsp;·&nbsp; 📅 Randevu WA: **{_wr}** &nbsp;·&nbsp; 👤 Kişi WA: **{_wk}**")
-                        _wf1,_wf2,_wf3 = st.columns(3)
-                        _fk = _wf1.selectbox("Kanal:",["Tümü"]+sorted(_dtum["Kanal"].dropna().unique().tolist()),key="wa_fil_kanal")
-                        _fg = _wf2.selectbox("Gönderen:",["Tümü"]+sorted(_dtum["Gönderen"].dropna().unique().tolist()),key="wa_fil_gon")
-                        _fa = _wf3.text_input("🔍 Müşteri ara:",key="wa_fil_ara")
-                        _dg = _dtum.copy()
-                        if _fk != "Tümü": _dg = _dg[_dg["Kanal"]==_fk]
-                        if _fg != "Tümü": _dg = _dg[_dg["Gönderen"]==_fg]
-                        if _fa: _dg = _dg[_dg["Müşteri"].str.contains(_fa,case=False,na=False)]
-                        st.caption(f"**{len(_dg)} kayıt**")
-                        _dg2 = _dg.copy(); _dg2["Detay"] = _dg2["Detay"].astype(str).str[:80]
-                        st.dataframe(_dg2[["Tarih","Müşteri","Kanal","Numara/Email","Gönderen","Detay"]], use_container_width=True, hide_index=True)
-                        _buf=_rio2.BytesIO(); _dg.to_excel(_buf,index=False); _buf.seek(0)
-                        st.download_button("📥 Excel İndir",data=_buf,file_name=f"wa_email_{datetime.now().strftime('%Y%m%d')}.xlsx",use_container_width=True)
-                except Exception as _e:
-                    st.error(f"Hata: {_e}")
+                    _sb = get_sb_client()
+                    if _sb:
+                        _r = _sb.table("kullanici_tercih").select("deger") \
+                            .eq("kullanici", st.session_state.get("kullanici","")) \
+                            .eq("anahtar","rapor_sirasi").execute()
+                        if _r.data:
+                            import json as _rj
+                            _kayitli = _rj.loads(_r.data[0]["deger"])
+                            # Yeni raporlar varsa sona ekle
+                            for _k in _RAPOR_LISTESI:
+                                if _k not in _kayitli: _kayitli.append(_k)
+                            return [k for k in _kayitli if k in _RAPOR_LISTESI]
+                except: pass
+                return _RAPOR_LISTESI.copy()
+
+            def _rapor_sira_kaydet(sira):
+                try:
+                    import json as _rj
+                    _sb = get_sb_client()
+                    if _sb:
+                        _sb.table("kullanici_tercih").upsert({
+                            "kullanici": st.session_state.get("kullanici",""),
+                            "anahtar": "rapor_sirasi",
+                            "deger": _rj.dumps(sira)
+                        }, on_conflict="kullanici,anahtar").execute()
+                except: pass
+
+            _rapor_sira = _rapor_sira_yukle()
+
+            # ── RAPOR SIRALAMA ────────────────────────────────────────────────────────
+            _RAPOR_LISTESI = ["tarih_gorev","bolge","asama_durum","il_bazli","musteri_ciro","wa_email"]
+            _RAPOR_ETIKET = {
+                "tarih_gorev": "📅 Tarih & Görev Raporu",
+                "bolge":       "🗺️ Bölge Raporu",
+                "asama_durum": "🔄 Aşama & Durum Bazlı Detay Raporu",
+                "il_bazli":    "🗺️ İl Bazlı Rapor (Top 15)",
+                "musteri_ciro":"💰 Müşteri Bazlı Ciro Detayı (Top 20)",
+                "wa_email":    "📱 WhatsApp & Email Gönderim Raporu",
+            }
+            def _rapor_sira_yukle():
+                try:
+                    import json as _rj
+                    _sb = get_sb_client()
+                    if _sb:
+                        _r = _sb.table("kullanici_tercih").select("deger").eq("kullanici",st.session_state.get("kullanici","")).eq("anahtar","rapor_sirasi").execute()
+                        if _r.data:
+                            _k = _rj.loads(_r.data[0]["deger"])
+                            for _x in _RAPOR_LISTESI:
+                                if _x not in _k: _k.append(_x)
+                            return [x for x in _k if x in _RAPOR_LISTESI]
+                except: pass
+                return _RAPOR_LISTESI.copy()
+            def _rapor_sira_kaydet(sira):
+                try:
+                    import json as _rj
+                    _sb = get_sb_client()
+                    if _sb:
+                        _sb.table("kullanici_tercih").upsert({"kullanici":st.session_state.get("kullanici",""),"anahtar":"rapor_sirasi","deger":_rj.dumps(sira)},on_conflict="kullanici,anahtar").execute()
+                except: pass
+            _rapor_sira = _rapor_sira_yukle()
+            with st.expander("⚙️ Rapor Sırası"):
+                for _ri, _rk in enumerate(_rapor_sira):
+                    _rc1,_rc2,_rc3 = st.columns([5,1,1])
+                    _rc1.caption(_RAPOR_ETIKET.get(_rk,_rk))
+                    if _ri > 0 and _rc2.button("▲", key=f"raporsira_up_{_rk}"):
+                        _rapor_sira[_ri],_rapor_sira[_ri-1] = _rapor_sira[_ri-1],_rapor_sira[_ri]
+                        _rapor_sira_kaydet(_rapor_sira); st.rerun()
+                    if _ri < len(_rapor_sira)-1 and _rc3.button("▼", key=f"raporsira_dn_{_rk}"):
+                        _rapor_sira[_ri],_rapor_sira[_ri+1] = _rapor_sira[_ri+1],_rapor_sira[_ri]
+                        _rapor_sira_kaydet(_rapor_sira); st.rerun()
+
+            for _rk in _rapor_sira:
+                if _rk == "tarih_gorev":
+                    with st.expander("📅 Tarih & Görev Raporu"):
+                        if df_rand_r.empty:
+                            st.info("Randevu yok.")
+                        else:
+                            _rg = df_rand_r.copy()
+                            if not df_rapor.empty:
+                                _rg = _rg.merge(df_rapor[["firma","beklenen_ciro","gerceklesen_ciro"]], left_on="musteri_adi", right_on="firma", how="left")
+                                _rg["beklenen_ciro"] = pd.to_numeric(_rg["beklenen_ciro"], errors="coerce").fillna(0)
+                                _rg["gerceklesen_ciro"] = pd.to_numeric(_rg["gerceklesen_ciro"], errors="coerce").fillna(0)
+                            else:
+                                _rg["beklenen_ciro"] = 0; _rg["gerceklesen_ciro"] = 0
+                            _gc = ["randevu_tarihi","gorev"] if "gorev" in _rg.columns else ["randevu_tarihi"]
+                            _tg = _rg.groupby(_gc).agg(Randevu=("id","count"),Musteri=("musteri_adi","nunique"),Bitti=("sonuc",lambda x:(x=="Bitti").sum()),Beklenen=("beklenen_ciro","sum"),Gerceklesen=("gerceklesen_ciro","sum")).reset_index().sort_values("randevu_tarihi",ascending=False)
+                            _tg["Fark"] = _tg["Gerceklesen"] - _tg["Beklenen"]
+                            for _col in ["Beklenen","Gerceklesen","Fark"]: _tg[_col] = _tg[_col].apply(fmt_para)
+                            _tg.rename(columns={"randevu_tarihi":"Tarih","gorev":"Görev","Musteri":"Müşteri","Beklenen":"Beklenen Ciro","Gerceklesen":"Gerçekleşen"},inplace=True)
+                            st.dataframe(_tg, use_container_width=True, hide_index=True)
+                            _buf=_rio2.BytesIO(); _tg.to_excel(_buf,index=False); _buf.seek(0)
+                            st.download_button("📥 İndir",data=_buf,file_name="tarih_gorev.xlsx",use_container_width=True)
+
+                elif _rk == "bolge":
+                    with st.expander("🗺️ Bölge Raporu"):
+                        if df_rand_r.empty or "bolge" not in df_rand_r.columns:
+                            st.info("Randevu yok.")
+                        else:
+                            _rc = df_rand_r[["bolge","musteri_adi"]].drop_duplicates()
+                            if not df_rapor.empty:
+                                _rc = _rc.merge(df_rapor[["firma","beklenen_ciro","gerceklesen_ciro"]],left_on="musteri_adi",right_on="firma",how="left")
+                                _rc["beklenen_ciro"] = pd.to_numeric(_rc["beklenen_ciro"],errors="coerce").fillna(0)
+                                _rc["gerceklesen_ciro"] = pd.to_numeric(_rc["gerceklesen_ciro"],errors="coerce").fillna(0)
+                                b_oz = _rc.groupby("bolge").agg(Musteri=("musteri_adi","nunique"),Beklenen=("beklenen_ciro","sum"),Gerceklesen=("gerceklesen_ciro","sum")).reset_index().sort_values("Beklenen",ascending=False)
+                                b_oz["Beklenen"] = b_oz["Beklenen"].apply(fmt_para)
+                                b_oz["Gerceklesen"] = b_oz["Gerceklesen"].apply(fmt_para)
+                                b_oz.columns = ["Bölge","Müşteri","Beklenen Ciro","Gerçekleşen"]
+                            else:
+                                b_oz = df_rand_r.groupby("bolge").agg(Musteri=("musteri_adi","nunique")).reset_index()
+                                b_oz.columns = ["Bölge","Müşteri"]
+                            st.dataframe(b_oz, use_container_width=True, hide_index=True)
+                            _buf=_rio2.BytesIO(); b_oz.to_excel(_buf,index=False); _buf.seek(0)
+                            st.download_button("📥 İndir",data=_buf,file_name="bolge.xlsx",use_container_width=True)
+
+                elif _rk == "asama_durum":
+                    with st.expander("🔄 Aşama & Durum Bazlı Detay Raporu", expanded=False):
+                        if df_rapor.empty:
+                            st.info("Veri yok.")
+                        else:
+                            _rb1,_rb2,_rb3 = st.columns(3)
+                            _trbas = _rb1.date_input("Başlangıç:", key="rp_asama_bas", value=None)
+                            _trbit = _rb2.date_input("Bitiş:", key="rp_asama_bit", value=None)
+                            _tdur_opts = _tanimlar_yukle("durum")
+                            _fil_dur = _rb3.selectbox("Durum:", ["Tümü"]+_tdur_opts, key="rp_asama_durum")
+                            _drf = df_rapor.copy()
+                            if _trbas or _trbit:
+                                _drf["_dt"] = pd.to_datetime(_drf["tarih"],errors="coerce").dt.date
+                                if _trbas: _drf = _drf[_drf["_dt"] >= _trbas]
+                                if _trbit: _drf = _drf[_drf["_dt"] <= _trbit]
+                            if _fil_dur != "Tümü": _drf = _drf[_drf["durum"]==_fil_dur]
+                            _tum_as = sorted(_drf["islem_asamasi"].dropna().unique().tolist())
+                            _s1,_s2 = st.columns(2)
+                            with _s1:
+                                st.caption(f"**Aşama Özeti** — {len(_drf)} kayıt")
+                                _aoz = _drf.groupby("islem_asamasi").agg(Firma=("firma","count"),Beklenen=("beklenen_ciro","sum"),Gerceklesen=("gerceklesen_ciro","sum")).reset_index().sort_values("Firma",ascending=False)
+                                _aoz["Başarı%"] = _aoz.apply(lambda r: f"{r['Gerceklesen']/r['Beklenen']*100:.0f}%" if r["Beklenen"]>0 else "—",axis=1)
+                                _aoz["Beklenen"] = _aoz["Beklenen"].apply(fmt_para)
+                                _aoz["Gerceklesen"] = _aoz["Gerceklesen"].apply(fmt_para)
+                                _aoz.columns = ["Aşama","Firma","Beklenen","Gerçekleşen","Başarı%"]
+                                st.dataframe(_aoz, use_container_width=True, hide_index=True)
+                            with _s2:
+                                st.caption("**Durum Özeti**")
+                                _doz = _drf.groupby("durum").agg(Firma=("firma","count"),Beklenen=("beklenen_ciro","sum"),Gerceklesen=("gerceklesen_ciro","sum")).reset_index().sort_values("Firma",ascending=False)
+                                _doz["Beklenen"] = _doz["Beklenen"].apply(fmt_para)
+                                _doz["Gerceklesen"] = _doz["Gerceklesen"].apply(fmt_para)
+                                _doz.columns = ["Durum","Firma","Beklenen","Gerçekleşen"]
+                                st.dataframe(_doz, use_container_width=True, hide_index=True)
+                            st.divider()
+                            if _tum_as:
+                                _atabs = st.tabs([f"🔹 {a}" for a in _tum_as])
+                                for _ti, _an in enumerate(_tum_as):
+                                    with _atabs[_ti]:
+                                        _dar = _drf[_drf["islem_asamasi"]==_an]
+                                        _do = " · ".join([f"{r['durum']}: {r['Adet']}" for _,r in _dar.groupby("durum").size().reset_index(name="Adet").iterrows()]) if "durum" in _dar.columns else ""
+                                        st.caption(f"**{len(_dar)} firma** · {_do} · Beklenen: {fmt_para(_dar['beklenen_ciro'].sum())} · Gerçekleşen: {fmt_para(_dar['gerceklesen_ciro'].sum())}")
+                                        _gc2 = [c for c in ["id","tarih","firma","yetkili","gsm","il","durum","temsilci","beklenen_ciro","gerceklesen_ciro"] if c in _dar.columns]
+                                        _ds = _dar[_gc2].copy()
+                                        if "beklenen_ciro" in _ds.columns: _ds["beklenen_ciro"] = _ds["beklenen_ciro"].apply(fmt_para)
+                                        if "gerceklesen_ciro" in _ds.columns: _ds["gerceklesen_ciro"] = _ds["gerceklesen_ciro"].apply(fmt_para)
+                                        if "tarih" in _ds.columns: _ds["tarih"] = _ds["tarih"].astype(str).str[:10]
+                                        st.dataframe(_ds, use_container_width=True, hide_index=True)
+                                        _buf=_rio2.BytesIO(); _dar.to_excel(_buf,index=False); _buf.seek(0)
+                                        st.download_button("📥 Excel",data=_buf,file_name=f"asama_{_an}.xlsx",use_container_width=True,key=f"dl_asama_{_an}")
+
+                elif _rk == "il_bazli":
+                    with st.expander("🗺️ İl Bazlı Rapor (Top 15)"):
+                        if df_rapor.empty: st.info("Veri yok.")
+                        else:
+                            _il = df_rapor.groupby("il").agg(Musteri=("firma","count"),Beklenen=("beklenen_ciro","sum"),Gerceklesen=("gerceklesen_ciro","sum")).reset_index().sort_values("Musteri",ascending=False).head(15)
+                            _il["Beklenen"] = _il["Beklenen"].apply(fmt_para)
+                            _il["Gerceklesen"] = _il["Gerceklesen"].apply(fmt_para)
+                            st.dataframe(_il, use_container_width=True, hide_index=True)
+
+                elif _rk == "musteri_ciro":
+                    with st.expander("💰 Müşteri Bazlı Ciro Detayı (Top 20)"):
+                        if df_rapor.empty: st.info("Veri yok.")
+                        else:
+                            _t20 = df_rapor.sort_values("beklenen_ciro",ascending=False).head(20)
+                            _sc = [c for c in ["firma","temsilci","il","durum","islem_asamasi","beklenen_ciro","gerceklesen_ciro","yuzde"] if c in _t20.columns]
+                            _dt = _t20[_sc].copy()
+                            if "beklenen_ciro" in _dt.columns: _dt["beklenen_ciro"] = _dt["beklenen_ciro"].apply(fmt_para)
+                            if "gerceklesen_ciro" in _dt.columns: _dt["gerceklesen_ciro"] = _dt["gerceklesen_ciro"].apply(fmt_para)
+                            if "yuzde" in _dt.columns: _dt["yuzde"] = _dt["yuzde"].apply(lambda x: f"{x:.1f}%")
+                            st.dataframe(_dt, use_container_width=True, hide_index=True)
+                            _buf=_rio2.BytesIO(); _dt.to_excel(_buf,index=False); _buf.seek(0)
+                            st.download_button("📥 İndir",data=_buf,file_name="ciro_top20.xlsx",use_container_width=True)
+
+                elif _rk == "wa_email":
+                    with st.expander("📱 WhatsApp & Email Gönderim Raporu"):
+                        try:
+                            _dik = db_read("islem_kaydi", order_col="tarih", limit=1000)
+                            if not _dik.empty and "islem_turu" in _dik.columns:
+                                _dik = _dik[_dik["islem_turu"].str.contains("WhatsApp|Email|WA|Teklif|Randevu|Uyarı",case=False,na=False)]
+                            if not _dik.empty:
+                                _dik = _dik.rename(columns={"musteri_adi":"Müşteri","islem_turu":"Kanal","gonderim_bilgisi":"Numara/Email","olusturan":"Gönderen","icerik":"Detay","tarih":"Tarih"})
+                                _dik["Kaynak"] = "Sistem"
+                                _dik = _dik[["Tarih","Müşteri","Kanal","Detay","Numara/Email","Gönderen","Kaynak"]]
+                            _dkml = db_read("kisiler_mesaj_log", order_col="tarih", limit=1000)
+                            if not _dkml.empty:
+                                _dkml = _dkml.rename(columns={"kisi_adi":"Müşteri","sablon_adi":"Kanal","mesaj":"Detay","telefon":"Numara/Email","gonderen":"Gönderen","tarih":"Tarih"})
+                                _dkml["Kanal"] = "📱 WA Kişi — " + _dkml["Kanal"].astype(str)
+                                _dkml["Kaynak"] = "Kişiler"
+                                _dkml = _dkml[["Tarih","Müşteri","Kanal","Detay","Numara/Email","Gönderen","Kaynak"]]
+                            _pp = [d for d in [_dik, _dkml] if not d.empty]
+                            if not _pp:
+                                st.info("Henüz WA/Email gönderim kaydı yok.")
+                            else:
+                                _dtum = pd.concat(_pp, ignore_index=True)
+                                _dtum["Tarih"] = pd.to_datetime(_dtum["Tarih"], errors="coerce")
+                                _dtum = _dtum.sort_values("Tarih", ascending=False)
+                                _dtum["Tarih"] = _dtum["Tarih"].astype(str).str[:16]
+                                _wt = len(_dtum[_dtum["Kanal"].str.contains("WhatsApp Teklif|WA Teklif",na=False)])
+                                _we = len(_dtum[_dtum["Kanal"].str.contains("Email",na=False)])
+                                _wr = len(_dtum[_dtum["Kanal"].str.contains("Randevu|Uyarı",na=False)])
+                                _wk = len(_dtum[_dtum["Kanal"].str.contains("WA Kişi",na=False)])
+                                st.markdown(f"📊 Toplam: **{len(_dtum)}** &nbsp;·&nbsp; 📱 WA Teklif: **{_wt}** &nbsp;·&nbsp; ✉️ Email: **{_we}** &nbsp;·&nbsp; 📅 Randevu WA: **{_wr}** &nbsp;·&nbsp; 👤 Kişi WA: **{_wk}**")
+                                _wf1,_wf2,_wf3 = st.columns(3)
+                                _fk = _wf1.selectbox("Kanal:",["Tümü"]+sorted(_dtum["Kanal"].dropna().unique().tolist()),key="wa_fil_kanal")
+                                _fg = _wf2.selectbox("Gönderen:",["Tümü"]+sorted(_dtum["Gönderen"].dropna().unique().tolist()),key="wa_fil_gon")
+                                _fa = _wf3.text_input("🔍 Müşteri ara:",key="wa_fil_ara")
+                                _dg = _dtum.copy()
+                                if _fk != "Tümü": _dg = _dg[_dg["Kanal"]==_fk]
+                                if _fg != "Tümü": _dg = _dg[_dg["Gönderen"]==_fg]
+                                if _fa: _dg = _dg[_dg["Müşteri"].str.contains(_fa,case=False,na=False)]
+                                st.caption(f"**{len(_dg)} kayıt**")
+                                _dg2 = _dg.copy(); _dg2["Detay"] = _dg2["Detay"].astype(str).str[:80]
+                                st.dataframe(_dg2[["Tarih","Müşteri","Kanal","Numara/Email","Gönderen","Detay"]], use_container_width=True, hide_index=True)
+                                _buf=_rio2.BytesIO(); _dg.to_excel(_buf,index=False); _buf.seek(0)
+                                st.download_button("📥 Excel İndir",data=_buf,file_name=f"wa_email_{datetime.now().strftime('%Y%m%d')}.xlsx",use_container_width=True)
+                        except Exception as _e:
+                            st.error(f"Hata: {_e}")
 
 
 
@@ -3093,7 +3097,7 @@ elif aktif == "teklif":
             st.error(f"Hata: {_e}")
 
 
-elif aktif == "ozel_teklif":
+        elif aktif == "ozel_teklif":
     sayfa_log("ozel_teklif")
     import json as _ozj, re as _ozre
 
@@ -3486,7 +3490,7 @@ elif aktif == "ozel_teklif":
                     else: st.error("Kaydedilemedi!")
 
 
-elif aktif == "excel":
+        elif aktif == "excel":
     sayfa_log("excel")
     import io
 
@@ -3504,12 +3508,12 @@ elif aktif == "excel":
     # ── KART 1 ────────────────────────────────────────────────────────────────
     with _ek1:
         st.markdown(f"""<div style='border:1.5px solid #bfdbfe;border-radius:10px;padding:16px 18px;background:#f0f6ff;min-height:160px;'>
-<div style='display:flex;align-items:center;gap:10px;margin-bottom:10px;'>
-  <div style='width:30px;height:30px;background:#1d4ed8;border-radius:7px;color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;'>1</div>
-  <span style='font-size:13px;font-weight:600;color:#1e293b;'>Şablon İndir</span>
-</div>
-<div style='font-size:11px;color:#475569;line-height:1.5;'>Hazır Excel şablonunu indir, doldur. Sütun başlıklarını değiştirme.</div>
-</div>""", unsafe_allow_html=True)
+        <div style='display:flex;align-items:center;gap:10px;margin-bottom:10px;'>
+          <div style='width:30px;height:30px;background:#1d4ed8;border-radius:7px;color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;'>1</div>
+          <span style='font-size:13px;font-weight:600;color:#1e293b;'>Şablon İndir</span>
+        </div>
+        <div style='font-size:11px;color:#475569;line-height:1.5;'>Hazır Excel şablonunu indir, doldur. Sütun başlıklarını değiştirme.</div>
+        </div>""", unsafe_allow_html=True)
         sablon_buf = io.BytesIO()
         pd.DataFrame(columns=sablon_kolonlar).to_excel(sablon_buf, index=False)
         sablon_buf.seek(0)
@@ -3518,23 +3522,23 @@ elif aktif == "excel":
     # ── KART 2 ────────────────────────────────────────────────────────────────
     with _ek2:
         st.markdown("""<div style='border:1.5px solid #ede9fe;border-radius:10px;padding:16px 18px;background:#f5f3ff;min-height:160px;'>
-<div style='display:flex;align-items:center;gap:10px;margin-bottom:10px;'>
-  <div style='width:30px;height:30px;background:#7c3aed;border-radius:7px;color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;'>2</div>
-  <span style='font-size:13px;font-weight:600;color:#1e293b;'>Dosya Yükle</span>
-</div>
-<div style='font-size:11px;color:#475569;line-height:1.5;'>Doldurduğun Excel dosyasını yükle ve sisteme aktar.</div>
-</div>""", unsafe_allow_html=True)
+        <div style='display:flex;align-items:center;gap:10px;margin-bottom:10px;'>
+          <div style='width:30px;height:30px;background:#7c3aed;border-radius:7px;color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;'>2</div>
+          <span style='font-size:13px;font-weight:600;color:#1e293b;'>Dosya Yükle</span>
+        </div>
+        <div style='font-size:11px;color:#475569;line-height:1.5;'>Doldurduğun Excel dosyasını yükle ve sisteme aktar.</div>
+        </div>""", unsafe_allow_html=True)
         yukl_dosya = st.file_uploader("", type=["xlsx","xls"], key="excel_yukle", label_visibility="collapsed")
 
     # ── KART 3 ────────────────────────────────────────────────────────────────
     with _ek3:
         st.markdown(f"""<div style='border:1.5px solid #bbf7d0;border-radius:10px;padding:16px 18px;background:#f0fdf4;min-height:160px;'>
-<div style='display:flex;align-items:center;gap:10px;margin-bottom:10px;'>
-  <div style='width:30px;height:30px;background:#16a34a;border-radius:7px;color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;'>3</div>
-  <span style='font-size:13px;font-weight:600;color:#1e293b;'>Veri Aktar</span>
-</div>
-<div style='font-size:11px;color:#475569;line-height:1.5;'>Sistemdeki <b>{_kayit_say} kayıt</b> Excel olarak dışa aktar.</div>
-</div>""", unsafe_allow_html=True)
+        <div style='display:flex;align-items:center;gap:10px;margin-bottom:10px;'>
+          <div style='width:30px;height:30px;background:#16a34a;border-radius:7px;color:white;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;'>3</div>
+          <span style='font-size:13px;font-weight:600;color:#1e293b;'>Veri Aktar</span>
+        </div>
+        <div style='font-size:11px;color:#475569;line-height:1.5;'>Sistemdeki <b>{_kayit_say} kayıt</b> Excel olarak dışa aktar.</div>
+        </div>""", unsafe_allow_html=True)
         if not df_ck.empty:
             aktar_buf = io.BytesIO()
             df_ck.to_excel(aktar_buf, index=False)
@@ -3571,7 +3575,7 @@ elif aktif == "excel":
         except Exception as e:
             st.error(f"Dosya okunamadı: {e}")
 
-elif aktif == "analiz":
+        elif aktif == "analiz":
     sayfa_log("analiz")
     import json as _aj
 
@@ -3579,9 +3583,9 @@ elif aktif == "analiz":
 
     # CSS
     st.markdown("""<style>
-div[data-testid="stHorizontalBlock"] button[kind="secondary"]{padding:2px 8px!important;font-size:11px!important;border-radius:12px!important;min-height:26px!important;background:#f8fafc!important;border:0.5px solid #e2e8f0!important;color:#64748b!important;}
-div[data-testid="stHorizontalBlock"] button[kind="primary"]{padding:2px 8px!important;font-size:11px!important;border-radius:12px!important;min-height:26px!important;background:#eff6ff!important;border:0.5px solid #93c5fd!important;color:#1d4ed8!important;}
-</style>""", unsafe_allow_html=True)
+        div[data-testid="stHorizontalBlock"] button[kind="secondary"]{padding:2px 8px!important;font-size:11px!important;border-radius:12px!important;min-height:26px!important;background:#f8fafc!important;border:0.5px solid #e2e8f0!important;color:#64748b!important;}
+        div[data-testid="stHorizontalBlock"] button[kind="primary"]{padding:2px 8px!important;font-size:11px!important;border-radius:12px!important;min-height:26px!important;background:#eff6ff!important;border:0.5px solid #93c5fd!important;color:#1d4ed8!important;}
+        </style>""", unsafe_allow_html=True)
 
     # DB FONKSIYONLARI
     def _sb():
@@ -3684,13 +3688,13 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{padding:2px 8px!impo
                 _c3.metric("Gerçekleşen", f"{float(_ar.get('ger_ciro',0) or 0):,.0f} ₺")
                 _c4.metric("Sonuç", _ar.get("sonuc","—"))
                 st.markdown(f"""| | |
-|---|---|
-| **Firma / Yetkili** | {_ar.get("firma","—")} · {_ar.get("yetkili","—")} · {_ar.get("iletisim","—")} |
-| **Sektör / Kaynak** | {_ar.get("sektor","—")} · {_ar.get("kaynak","—")} |
-| **Kargo / Fatura** | {_ar.get("kargo","—")} · {_ar.get("fatura","—")} |
-| **Beklenti / Engel** | {_ar.get("beklenti","—")} · {_ar.get("engel","—")} |
-| **Not** | {_ar.get("not_alan","—")} |
-| **Sonraki Adım** | {_ar.get("sonraki_adim","—")} · {_ar.get("takip_tar","—")} |""")
+        |---|---|
+        | **Firma / Yetkili** | {_ar.get("firma","—")} · {_ar.get("yetkili","—")} · {_ar.get("iletisim","—")} |
+        | **Sektör / Kaynak** | {_ar.get("sektor","—")} · {_ar.get("kaynak","—")} |
+        | **Kargo / Fatura** | {_ar.get("kargo","—")} · {_ar.get("fatura","—")} |
+        | **Beklenti / Engel** | {_ar.get("beklenti","—")} · {_ar.get("engel","—")} |
+        | **Not** | {_ar.get("not_alan","—")} |
+        | **Sonraki Adım** | {_ar.get("sonraki_adim","—")} · {_ar.get("takip_tar","—")} |""")
                 _b1,_b2,_b3,_b4 = st.columns(4)
                 if _b1.button("✏️ Düzenle", key=f"duz_{_ai}", use_container_width=True):
                     st.session_state["an_duzenle_firma"] = str(_ar.get("firma",""))
@@ -3994,7 +3998,7 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{padding:2px 8px!impo
             else:
                 st.error(f"❌ Kayıt hatası: {_err}")
 
-elif aktif == "a_segment":
+        elif aktif == "a_segment":
     sayfa_log("a_segment")
     from datetime import date as _dt
 
@@ -4214,13 +4218,13 @@ elif aktif == "a_segment":
                 _mc3.metric("GSM", _sr.get("gsm","—") or "—")
 
                 st.markdown(f"""
-| | |
-|---|---|
-| **Son Görüşme** | {_sr.get("son_gorusme","—") or "—"} |
-| **Sonraki Adım** | {_sr.get("sonraki_adim","—") or "—"} |
-| **Not** | {_sr.get("notlar","—") or "—"} |
-| **Ekleyen** | {_sr.get("ekleyen","—") or "—"} |
-""")
+        | | |
+        |---|---|
+        | **Son Görüşme** | {_sr.get("son_gorusme","—") or "—"} |
+        | **Sonraki Adım** | {_sr.get("sonraki_adim","—") or "—"} |
+        | **Not** | {_sr.get("notlar","—") or "—"} |
+        | **Ekleyen** | {_sr.get("ekleyen","—") or "—"} |
+        """)
 
                 # GÜNCELLE FORMU
                 with st.expander("✏️ Güncelle", expanded=False):
@@ -4273,7 +4277,7 @@ elif aktif == "a_segment":
                         st.success(f"{_firma_s} listeden çıkarıldı!"); st.rerun()
 
 
-elif aktif == "whatsapp":
+        elif aktif == "whatsapp":
     import requests as _wa_req
 
     st.markdown("## 💬 WhatsApp Entegrasyonu")
@@ -4549,8 +4553,8 @@ elif aktif == "whatsapp":
         except Exception as e:
             st.error(f"Hata: {e}")
 
-# ── TELEFON KİŞİLER ──────────────────────────────────────────────────────────
-elif aktif == "kisiler":
+        # ── TELEFON KİŞİLER ──────────────────────────────────────────────────────────
+        elif aktif == "kisiler":
     sayfa_log("kisiler")
     import re as _re_kis
     st.markdown("## 📞 Telefon Kişiler & Rehber")
@@ -4936,7 +4940,7 @@ elif aktif == "kisiler":
                     st.warning("Ad ve telefon zorunlu!")
 
 
-elif aktif == "randevu":
+        elif aktif == "randevu":
     sayfa_log("randevu")
     import io as _rio
     st.markdown("## 📅 Randevular")
@@ -5358,10 +5362,10 @@ elif aktif == "randevu":
                     for _dd in df["durum"].dropna().unique():
                         if str(_dd).strip() and str(_dd) not in ["nan",""] and _dd not in tum_durum_opts:
                             tum_durum_opts.append(str(_dd))
-            
+
             # ── AŞAMA & DURUM YÖNETİMİ — Supabase'e kayıtlı ─────────────────────────
             import json as _ydj
-            
+
             def _sb_tercih_yukle(anahtar):
                 try:
                     _sb = get_sb_client()
@@ -5371,7 +5375,7 @@ elif aktif == "randevu":
                         if r.data: return _ydj.loads(r.data[0]["deger"])
                 except: pass
                 return []
-            
+
             def _sb_tercih_kaydet(anahtar, liste):
                 try:
                     _sb = get_sb_client()
@@ -5383,15 +5387,15 @@ elif aktif == "randevu":
                         return True
                 except: pass
                 return False
-            
+
             yc1, yc2 = st.columns(2)
-            
+
             # ── AŞAMA YÖNETİMİ ────────────────────────────────────────────────────
             with yc1:
                 st.markdown("**🔄 Aşama Yönetimi**")
-            
+
                 _mevcut_asamalar = _tanimlar_yukle("asama")
-            
+
                 # Yeni aşama ekle
                 _ya1, _ya2 = st.columns([3,1])
                 _yeni_a = _ya1.text_input("", key="yeni_asama_ekle",
@@ -5405,13 +5409,13 @@ elif aktif == "randevu":
                             st.rerun()
                         else:
                             st.error("Eklenemedi!")
-            
+
                 st.caption("Tüm aşamalar — sırala:")
                 for _ai, _a in enumerate(_mevcut_asamalar):
                     _adet = len(df[df["islem_asamasi"]==_a]) if not df.empty and "islem_asamasi" in df.columns else 0
                     _ac1, _ac2, _ac3, _ac4, _ac5 = st.columns([3,1,1,1,1])
                     _ac1.caption(f"{'🔹' if _adet>0 else '⬜'} **{_a}** ({_adet})")
-            
+
                     # Sırala ▲▼
                     if _ai > 0:
                         if _ac2.button("▲", key=f"asm_up_{_ai}", help="Yukarı"):
@@ -5429,7 +5433,7 @@ elif aktif == "randevu":
                             st.rerun()
                     else:
                         _ac2.caption("")
-            
+
                     if _ai < len(_mevcut_asamalar)-1:
                         if _ac3.button("▼", key=f"asm_dn_{_ai}", help="Aşağı"):
                             try:
@@ -5445,17 +5449,17 @@ elif aktif == "randevu":
                             st.rerun()
                     else:
                         _ac3.caption("")
-            
+
                     if _ac4.button("✏️", key=f"asm_duz_{_ai}", help="Düzenle"):
                         st.session_state[f"asm_edit_{_a}"] = True
-            
+
                     if _adet == 0:
                         if _ac5.button("🗑️", key=f"asm_sil_{_ai}", help="Sil"):
                             if _tanim_sil("asama", _a):
                                 st.rerun()
                     else:
                         _ac5.caption("—")
-            
+
                     if st.session_state.get(f"asm_edit_{_a}"):
                         with st.form(f"asm_form_{_a}"):
                             _yeni_asm = st.text_input("Yeni ad:", value=_a, key=f"asm_inp_{_a}")
@@ -5469,13 +5473,13 @@ elif aktif == "randevu":
                             if _f2.form_submit_button("İptal", use_container_width=True):
                                 st.session_state.pop(f"asm_edit_{_a}", None)
                                 st.rerun()
-            
+
             # ── DURUM YÖNETİMİ ────────────────────────────────────────────────────
             with yc2:
                 st.markdown("**📊 Durum Yönetimi**")
-            
+
                 _mevcut_durumlar = _tanimlar_yukle("durum")
-            
+
                 # Yeni durum ekle
                 _yd1, _yd2 = st.columns([3,1])
                 _yeni_d = _yd1.text_input("", key="yeni_durum_ekle",
@@ -5489,13 +5493,13 @@ elif aktif == "randevu":
                             st.rerun()
                         else:
                             st.error("Eklenemedi!")
-            
+
                 st.caption("Tüm durumlar — sırala:")
                 for _di, _d in enumerate(_mevcut_durumlar):
                     _dadet = len(df[df["durum"]==_d]) if not df.empty and "durum" in df.columns else 0
                     _dc1, _dc2, _dc3, _dc4, _dc5 = st.columns([3,1,1,1,1])
                     _dc1.caption(f"{'🔹' if _dadet>0 else '⬜'} **{_d}** ({_dadet})")
-            
+
                     # Sırala ▲▼
                     if _di > 0:
                         if _dc2.button("▲", key=f"dur_up_{_di}", help="Yukarı"):
@@ -5512,7 +5516,7 @@ elif aktif == "randevu":
                             st.rerun()
                     else:
                         _dc2.caption("")
-            
+
                     if _di < len(_mevcut_durumlar)-1:
                         if _dc3.button("▼", key=f"dur_dn_{_di}", help="Aşağı"):
                             try:
@@ -5528,17 +5532,17 @@ elif aktif == "randevu":
                             st.rerun()
                     else:
                         _dc3.caption("")
-            
+
                     if _dc4.button("✏️", key=f"dur_duz_{_di}", help="Düzenle"):
                         st.session_state[f"dur_edit_{_d}"] = True
-            
+
                     if _dadet == 0:
                         if _dc5.button("🗑️", key=f"dur_sil_{_di}", help="Sil"):
                             if _tanim_sil("durum", _d):
                                 st.rerun()
                     else:
                         _dc5.caption("—")
-            
+
                     if st.session_state.get(f"dur_edit_{_d}"):
                         with st.form(f"dur_form_{_d}"):
                             _yeni_dur = st.text_input("Yeni ad:", value=_d, key=f"dur_inp_{_d}")
@@ -5552,11 +5556,11 @@ elif aktif == "randevu":
                             if _f2.form_submit_button("İptal", use_container_width=True):
                                 st.session_state.pop(f"dur_edit_{_d}", None)
                                 st.rerun()
-            
-            
-            
+
+
+
             st.divider()
-            
+
         elif _yt_sec == "📊 Rapor & Durum Yönetimi":
             _sb_yt2 = get_sb_client()
             try:
@@ -5810,7 +5814,7 @@ elif aktif == "randevu":
 
 
 
-elif aktif == "admin_rapor":
+    with _rt2:
     sayfa_log("admin_rapor")
 
     import json as _arj
@@ -6157,8 +6161,8 @@ elif aktif == "admin_rapor":
 
 
 
-# ── FOOTER ────────────────────────────────────────────────────────────────────
-st.markdown(
+        # ── FOOTER ────────────────────────────────────────────────────────────────────
+        st.markdown(
     "<div style='position:fixed;bottom:0;left:0;right:0;background:#f0f2f6;padding:6px;text-align:center;font-size:11px;color:#888;z-index:999;'>"
     "MWCRMPRO v6.7 &nbsp;|&nbsp; "
     "<a href='tel:05400344228' style='color:#888;text-decoration:none;'>📞 5400344228</a>"
@@ -6168,4 +6172,4 @@ st.markdown(
     "<a href='https://wa.me/905400344228' target='_blank' style='color:#25D366;text-decoration:none;'>💬 WhatsApp</a>"
     "</div>",
     unsafe_allow_html=True
-)
+        )
