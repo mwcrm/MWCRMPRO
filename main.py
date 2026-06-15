@@ -1281,15 +1281,22 @@ if aktif == "yeni":
 
         btn_label = "💾 Güncelle" if duzenle else "💾 Cari Kartı Kaydet"
         if st.form_submit_button(btn_label, type="primary", use_container_width=True):
+            # Form dışındaki değerleri session_state'den al
+            _il_kayit    = st.session_state.get("yeni_il_dis", il)
+            _ilce_kayit  = st.session_state.get("yeni_ilce_dis", ilce)
+            _durum_kayit = st.session_state.get("yeni_durum_dis", durum)
+            _seg_kayit   = st.session_state.get("yeni_seg_dis", "--")
+            _asama_kayit = st.session_state.get("yeni_asama_dis", asama)
+            _tem_kayit   = st.session_state.get("yeni_temsilci_dis", temsilci)
             if not firma:
                 st.warning("Firma adı boş bırakılamaz!")
             elif duzenle:
                 ok = db_update("cari_kartlar", {
                     "firma": firma, "yetkili": yetkili, "gsm": gsm,
                     "sabit": sabit, "email": email, "adres": adres,
-                    "ilce": ilce, "il": il, "durum": durum,
-                    "temsilci": temsilci, "islem_asamasi": asama,
-                    "segment": segment, "aciklama": notlar_v,
+                    "ilce": _ilce_kayit, "il": _il_kayit, "durum": _durum_kayit,
+                    "temsilci": _tem_kayit, "islem_asamasi": _asama_kayit,
+                    "segment": _seg_kayit, "aciklama": notlar_v,
                     "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro
                 }, "id", duzenle.get("id"))
                 try: db_read.clear()
@@ -1303,9 +1310,9 @@ if aktif == "yeni":
                     "tarih": datetime.now().isoformat(),
                     "firma": firma, "yetkili": yetkili, "gsm": gsm,
                     "sabit": sabit, "email": email, "adres": adres,
-                    "ilce": ilce, "il": il, "durum": durum,
-                    "temsilci": temsilci, "islem_asamasi": asama,
-                    "segment": segment, "aciklama": notlar_v,
+                    "ilce": _ilce_kayit, "il": _il_kayit, "durum": _durum_kayit,
+                    "temsilci": _tem_kayit, "islem_asamasi": _asama_kayit,
+                    "segment": _seg_kayit, "aciklama": notlar_v,
                     "silindi": 0, "olusturan": st.session_state["kullanici"],
                     "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro
                 })
