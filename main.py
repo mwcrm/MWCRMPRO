@@ -1289,7 +1289,7 @@ if aktif == "yeni":
                     "sabit": sabit, "email": email, "adres": adres,
                     "ilce": ilce, "il": il, "durum": durum,
                     "temsilci": temsilci, "islem_asamasi": asama,
-                    "aciklama": notlar_v,
+                    "segment": segment, "aciklama": notlar_v,
                     "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro
                 }, "id", duzenle.get("id"))
                 try: db_read.clear()
@@ -1305,7 +1305,7 @@ if aktif == "yeni":
                     "sabit": sabit, "email": email, "adres": adres,
                     "ilce": ilce, "il": il, "durum": durum,
                     "temsilci": temsilci, "islem_asamasi": asama,
-                    "aciklama": notlar_v,
+                    "segment": segment, "aciklama": notlar_v,
                     "silindi": 0, "olusturan": st.session_state["kullanici"],
                     "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro
                 })
