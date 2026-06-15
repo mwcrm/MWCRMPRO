@@ -48,6 +48,26 @@ def get_sb_service():
 def get_sb():
     return get_sb_client()
 
+def hesapla_segment(manuel_segment, gerceklesen_ciro):
+    """Manuel segment varsa onu, yoksa ciroya göre otomatik hesapla"""
+    if manuel_segment and str(manuel_segment).strip() not in ["","--","nan","None"]:
+        return str(manuel_segment).strip()
+    ger = float(gerceklesen_ciro or 0)
+    if ger >= 500000: return "👑 A+"
+    if ger >= 200000: return "⭐ A"
+    if ger >= 50000:  return "🔵 B"
+    if ger > 0:       return "⚪ C"
+    return ""
+
+def segment_renk(seg):
+    """Segment → arka plan ve yazı rengi"""
+    s = str(seg or "")
+    if "A+" in s: return "#fef3c7","#92400e","#f59e0b"  # bg, text, border
+    if "A"  in s: return "#f1f5f9","#475569","#94a3b8"
+    if "B"  in s: return "#eff6ff","#1e40af","#3b82f6"
+    if "C"  in s: return "#f8fafc","#64748b","#cbd5e1"
+    return "#ffffff","#374151","#e2e8f0"
+
 def get_supabase():
     return get_sb_client()
 
@@ -1384,16 +1404,27 @@ elif aktif == "liste":
                 st.rerun()
 
     # ── FİLTRE TEK SATIR ─────────────────────────────────────────────────────
-    _fc = st.columns([1.3, 1.3, 1.8, 1.8, 1.3, 0.4, 0.8])
+    _fc = st.columns([1.3, 1.3, 1.8, 1.8, 1.0, 0.8, 0.4, 0.8])
     filtre_asama = _fc[0].selectbox("", ["Aşama: Tümü"]+tum_asama_opts, key="fil_asama", label_visibility="collapsed")
     filtre_durum = _fc[1].selectbox("", ["Durum: Tümü"]+tum_durum_opts, key="fil_durum", label_visibility="collapsed")
+    filtre_seg   = _fc[4].selectbox("", ["Segment: Tümü","👑 A+","⭐ A","🔵 B","⚪ C","Segmentsiz"], key="fil_seg", label_visibility="collapsed")
 
     df_f = df.copy()
     if filtre_asama != "Aşama: Tümü": df_f = df_f[df_f["islem_asamasi"]==filtre_asama]
     if filtre_durum  != "Durum: Tümü": df_f = df_f[df_f["durum"]==filtre_durum]
+    if filtre_seg != "Segment: Tümü":
+        df_f["_seg_tmp"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
+        if filtre_seg == "Segmentsiz": df_f = df_f[df_f["_seg_tmp"]==""]
+        else: df_f = df_f[df_f["_seg_tmp"]==filtre_seg]
+
+    # Segment hesapla ve sırala
+    df_f["_seg_goster"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
+    _seg_sira = {"👑 A+":0,"⭐ A":1,"🔵 B":2,"⚪ C":3,"":4}
+    df_f["_seg_sira"] = df_f["_seg_goster"].map(lambda s: _seg_sira.get(s,4))
+    df_f = df_f.sort_values(["_seg_sira","firma"], ascending=[True,True]).reset_index(drop=True)
 
     kart_opts = ["-- Müşteri Seçin --"] + [
-        f"[{int(r['id'])}] {r['firma']} {'⭐' if r.get('segment','') and r.get('segment','') not in ['','--'] else ''} | {r.get('il','')} | {r.get('islem_asamasi','')}"
+        f"[{int(r['id'])}] {r['_seg_goster']+' ' if r['_seg_goster'] else ''}{r['firma']} | {r.get('il','')} | {r.get('islem_asamasi','')}"
         for _, r in df_f.iterrows()
     ]
     if st.session_state.get("kart_sec_reset"):
@@ -1438,17 +1469,20 @@ elif aktif == "liste":
             _fark = ger - bek
             _fark_renk = "#16a34a" if _fark >= 0 else "#dc2626"
 
-            # DEBUG — hangi kolonlar var ve dolu mu
-            with st.expander("🔍 Debug: Kolon Değerleri", expanded=False):
-                st.json({k: str(v) for k,v in kart_row.items() if str(v) not in ["nan","None",""]})
             # ── BAŞLIK ───────────────────────────────────────────────────────
+            _seg_auto = hesapla_segment(kart_row.get("segment",""), kart_row.get("gerceklesen_ciro",0))
+            _sbg, _stxt, _sbrd = segment_renk(_seg_auto)
+            _baslik_renk = {"👑 A+":"#92400e","⭐ A":"#374151","🔵 B":"#1e3a8a","⚪ C":"#334155"}.get(_seg_auto,"#1e293b")
             st.markdown(f"""
-<div style='background:#1e293b;color:white;padding:12px 20px;border-radius:10px 10px 0 0;display:flex;align-items:center;gap:12px'>
-  <span style='font-size:28px'>🏢</span>
-  <div>
-    <div style='font-size:11px;color:#94a3b8'>Müşteri Detay Paneli</div>
-    <div style='font-size:20px;font-weight:800;letter-spacing:0.5px'>{kart_row.get('firma','').upper()}</div>
+<div style='background:{_baslik_renk};color:white;padding:12px 20px;border-radius:10px 10px 0 0;display:flex;align-items:center;justify-content:space-between'>
+  <div style='display:flex;align-items:center;gap:12px'>
+    <span style='font-size:28px'>🏢</span>
+    <div>
+      <div style='font-size:11px;color:rgba(255,255,255,0.6)'>Müşteri Detay Paneli</div>
+      <div style='font-size:20px;font-weight:800;letter-spacing:0.5px'>{kart_row.get('firma','').upper()}</div>
+    </div>
   </div>
+  {f"<div style='background:rgba(255,255,255,0.2);padding:4px 14px;border-radius:20px;font-size:14px;font-weight:700'>{_seg_auto}</div>" if _seg_auto else ""}
 </div>""", unsafe_allow_html=True)
 
             # ── 3 PANEL ──────────────────────────────────────────────────────
