@@ -957,6 +957,11 @@ if st.session_state.get("rol") != "admin":
         pass  # Bağlantı hatası olursa engelleme yapma
 
 
+# Sidebar zorla aç
+if "sidebar_acildi" not in st.session_state:
+    st.session_state["sidebar_acildi"] = True
+    st.rerun()
+
 with st.sidebar:
     st.markdown("""
 <style>
