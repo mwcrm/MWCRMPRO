@@ -1719,6 +1719,29 @@ elif aktif == "liste":
         key="cari_editor"
     )
 
+    # 📨 Not okuma — seçili tek satırın notlarını tablonun altında göster
+    if secili_sayi == 1:
+        _not_id = int(secili_idler[0]) if secili_idler else 0
+        if _not_id:
+            _not_firma = df_f[df_f["id"]==_not_id].iloc[0].get("firma","") if not df_f[df_f["id"]==_not_id].empty else ""
+            try:
+                if sb_liste:
+                    _not_r = sb_liste.table("cari_aciklamalar").select("*").eq("cari_id",_not_id).order("tarih",desc=True).execute()
+                    _not_df = pd.DataFrame(_not_r.data) if _not_r.data else pd.DataFrame()
+                else:
+                    _not_df = pd.DataFrame()
+                if not _not_df.empty:
+                    st.markdown(f"#### 📨 {_not_firma} — Notlar ({len(_not_df)})")
+                    for _, _nr in _not_df.iterrows():
+                        _nt = str(_nr.get("tarih",""))[:16]
+                        _nk = str(_nr.get("olusturan",""))
+                        _na = str(_nr.get("aciklama",""))
+                        st.markdown(f"""<div style='background:var(--color-background-secondary);border-left:3px solid var(--color-border-secondary);padding:10px 14px;margin:6px 0;border-radius:0 8px 8px 0;font-size:13px'>
+<span style='color:var(--color-text-tertiary);font-size:11px'>📅 {_nt} · 👤 {_nk}</span><br>{_na}</div>""", unsafe_allow_html=True)
+                elif sb_liste:
+                    st.info(f"📭 {_not_firma} için henüz not yok.")
+            except: pass
+
     # Her render'da tüm tabloyu session_state'e kaydet
     try:
         _kv = edited_df.copy()
@@ -1734,6 +1757,16 @@ elif aktif == "liste":
     secili_df = edited_df[edited_df["Seç"] == True]
     secili_sayi = len(secili_df)
     secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
+
+    # 📨 Nota tıklanınca müşteriyi seç — seç kolonundan tek seçili varsa karta yönlendir
+    if secili_sayi == 1 and not st.session_state.get("kart_sec_reset"):
+        _tek_id = int(secili_idler[0])
+        _tek_row = df_f[df_f["id"]==_tek_id]
+        if not _tek_row.empty:
+            _tek_firma = _tek_row.iloc[0].get("firma","")
+            _kart_opts_match = [o for o in kart_opts if f"[{_tek_id}]" in o]
+            if _kart_opts_match:
+                st.session_state["kart_sec"] = _kart_opts_match[0]
 
     # ── BUTONLAR ──────────────────────────────────────────────────────────────
     # Kaydet flag'i — ilk tıkta set et, ikinci render'da çalıştır
