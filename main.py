@@ -690,7 +690,7 @@ def cikis():
     st.rerun()
 
 # ── SESSION STATE ─────────────────────────────────────────────────────────────
-st.set_page_config(page_title="MWCRMPRO", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="MWCRMPRO", layout="wide")
 
 # ── EKRAN AYARLARI UYGULA ────────────────────────────────────────────────────
 _e_r1      = st.session_state.get("_ekran_r1","")
@@ -1157,8 +1157,6 @@ button[data-testid="manage-app-button"] { display: none !important; }
                                 _sb_dy.table("duyurular").update({"aktif":0}).eq("id",int(_dy.get("id",0))).execute()
                             st.rerun()
             except: pass
-
-    st.divider()
 
     st.divider()
 
@@ -3184,10 +3182,6 @@ elif aktif == "ozel_teklif":
     import json as _ozj, re as _ozre
 
     st.markdown("## ⭐ Özel Teklif")
-    if st.button("🔄 Formu Sıfırla", key="oz2_sifirla"):
-        for _k in ["oz2_grp","oz2_duz_id","oz2_duz_musteri","oz2_hedef","oz2_son_sec","oz2_musteri","oz2_wa_mesaj","oz2_fil"]:
-            st.session_state.pop(_k, None)
-        st.rerun()
 
     _OZ_URUN_VARSAYILAN = ["Koli","Sandık","Top","Çuval","Kasa","Palet","Diğer"]
 
@@ -5962,7 +5956,6 @@ elif aktif == "admin_rapor":
                             del _raporlar[_rn]
                             _ar_kaydet(_raporlar)
                             st.rerun()
-
 
 
 
