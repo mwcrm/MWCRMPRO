@@ -1757,15 +1757,7 @@ elif aktif == "liste":
                     st.info(f"📭 {_not_firma} için henüz not yok.")
             except: pass
 
-    # 📨 Nota tıklanınca müşteriyi seç — seç kolonundan tek seçili varsa karta yönlendir
-    if secili_sayi == 1 and not st.session_state.get("kart_sec_reset"):
-        _tek_id = int(secili_idler[0])
-        _tek_row = df_f[df_f["id"]==_tek_id]
-        if not _tek_row.empty:
-            _tek_firma = _tek_row.iloc[0].get("firma","")
-            _kart_opts_match = [o for o in kart_opts if f"[{_tek_id}]" in o]
-            if _kart_opts_match:
-                st.session_state["kart_sec"] = _kart_opts_match[0]
+
 
     # ── BUTONLAR ──────────────────────────────────────────────────────────────
     # Kaydet flag'i — ilk tıkta set et, ikinci render'da çalıştır
