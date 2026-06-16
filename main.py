@@ -3182,6 +3182,10 @@ elif aktif == "ozel_teklif":
     import json as _ozj, re as _ozre
 
     st.markdown("## ⭐ Özel Teklif")
+    if st.button("🔄 Formu Sıfırla", key="oz2_sifirla"):
+        for _k in ["oz2_grp","oz2_duz_id","oz2_duz_musteri","oz2_hedef","oz2_son_sec","oz2_musteri","oz2_wa_mesaj","oz2_fil"]:
+            st.session_state.pop(_k, None)
+        st.rerun()
 
     _OZ_URUN_VARSAYILAN = ["Koli","Sandık","Top","Çuval","Kasa","Palet","Diğer"]
 
