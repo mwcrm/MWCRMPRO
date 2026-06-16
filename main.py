@@ -3374,7 +3374,7 @@ elif aktif == "ozel_teklif":
                 _b2 = int(_s.get("bit",0) or 0)
                 _kk = int(_s.get("kg",0) or 0)
                 _ff = float(_s.get("fiyat",0) or 0)
-                if not _tt and not _ff: continue
+                if not _tt: continue  # sadece ürün adı boşsa atla, fiyat 0 olsa da göster
                 _ds = f"{_b1}–{_b2} desi" if _b1 or _b2 else ""
                 _ks = f"{_kk} kg" if _kk else ""
                 _satir = f"  • {_tt}"
