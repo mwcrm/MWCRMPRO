@@ -1719,7 +1719,23 @@ elif aktif == "liste":
         key="cari_editor"
     )
 
-    # 📨 Not okuma — seçili tek satırın notlarını tablonun altında göster
+    # Her render'da tüm tabloyu session_state'e kaydet
+    try:
+        _kv = edited_df.copy()
+        if "aciklama" not in _kv.columns:
+            _kv["aciklama"] = ""
+        _kv["aciklama"] = _kv["aciklama"].fillna("").astype(str).replace("nan","")
+        _kayit_kolonlar = ["id","firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi","aciklama"]
+        _mevcut = [c for c in _kayit_kolonlar if c in _kv.columns]
+        st.session_state["_ls_tablo"] = _kv[_mevcut].to_json(orient="records", force_ascii=False)
+    except:
+        pass
+
+    secili_df = edited_df[edited_df["Seç"] == True]
+    secili_sayi = len(secili_df)
+    secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
+
+    # 📨 Not okuma — tek satır seçilince notları altında göster
     if secili_sayi == 1:
         _not_id = int(secili_idler[0]) if secili_idler else 0
         if _not_id:
@@ -1736,27 +1752,10 @@ elif aktif == "liste":
                         _nt = str(_nr.get("tarih",""))[:16]
                         _nk = str(_nr.get("olusturan",""))
                         _na = str(_nr.get("aciklama",""))
-                        st.markdown(f"""<div style='background:var(--color-background-secondary);border-left:3px solid var(--color-border-secondary);padding:10px 14px;margin:6px 0;border-radius:0 8px 8px 0;font-size:13px'>
-<span style='color:var(--color-text-tertiary);font-size:11px'>📅 {_nt} · 👤 {_nk}</span><br>{_na}</div>""", unsafe_allow_html=True)
+                        st.markdown(f"<div style='background:var(--color-background-secondary);border-left:3px solid var(--color-border-secondary);padding:10px 14px;margin:6px 0;border-radius:0 8px 8px 0;font-size:13px'><span style='color:var(--color-text-tertiary);font-size:11px'>📅 {_nt} · 👤 {_nk}</span><br>{_na}</div>", unsafe_allow_html=True)
                 elif sb_liste:
                     st.info(f"📭 {_not_firma} için henüz not yok.")
             except: pass
-
-    # Her render'da tüm tabloyu session_state'e kaydet
-    try:
-        _kv = edited_df.copy()
-        if "aciklama" not in _kv.columns:
-            _kv["aciklama"] = ""
-        _kv["aciklama"] = _kv["aciklama"].fillna("").astype(str).replace("nan","")
-        _kayit_kolonlar = ["id","firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi","aciklama"]
-        _mevcut = [c for c in _kayit_kolonlar if c in _kv.columns]
-        st.session_state["_ls_tablo"] = _kv[_mevcut].to_json(orient="records", force_ascii=False)
-    except:
-        pass
-
-    secili_df = edited_df[edited_df["Seç"] == True]
-    secili_sayi = len(secili_df)
-    secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
 
     # 📨 Nota tıklanınca müşteriyi seç — seç kolonundan tek seçili varsa karta yönlendir
     if secili_sayi == 1 and not st.session_state.get("kart_sec_reset"):
