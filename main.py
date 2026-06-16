@@ -3477,8 +3477,7 @@ elif aktif == "ozel_teklif":
         try:
             _oz_df_tek = db_read("teklifler", order_col="tarih")
             if not _oz_df_tek.empty and "satirlar" in _oz_df_tek.columns:
-                _oz_df_tek2 = _oz_df_tek[_oz_df_tek["satirlar"].str.contains('"tip": "ozel"', na=False) |
-                                          _oz_df_tek["satirlar"].str.contains('"tip":"ozel"', na=False)]
+                _oz_df_tek2 = _oz_df_tek[_oz_df_tek["satirlar"].str.contains('ozel', case=False, na=False)]
             else:
                 _oz_df_tek2 = pd.DataFrame()
 
