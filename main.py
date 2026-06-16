@@ -1160,50 +1160,6 @@ button[data-testid="manage-app-button"] { display: none !important; }
 
     st.divider()
 
-    # ── DESİ HESAP MAKİNESİ ───────────────────────────────────────────────────
-    with st.expander("📐 Desi Hesap Makinesi", expanded=False):
-        _dc1,_dc2,_dc3,_dc4 = st.columns(4)
-        _den  = _dc1.number_input("En",  min_value=0.0, value=30.0, step=1.0, key="desi_en")
-        _dboy = _dc2.number_input("Boy", min_value=0.0, value=40.0, step=1.0, key="desi_boy")
-        _dyuk = _dc3.number_input("Yük", min_value=0.0, value=20.0, step=1.0, key="desi_yuk")
-        _dag  = _dc4.number_input("Ağ.", min_value=0.0, value=5.0,  step=0.1, key="desi_ag")
-        _db1,_db2,_db3,_db4 = st.columns(4)
-        if _db1.button("3000",key="db1",use_container_width=True): st.session_state["desi_bolen"]=3000
-        if _db2.button("4000",key="db2",use_container_width=True): st.session_state["desi_bolen"]=4000
-        if _db3.button("5000",key="db3",use_container_width=True): st.session_state["desi_bolen"]=5000
-        if _db4.button("6000",key="db4",use_container_width=True): st.session_state["desi_bolen"]=6000
-        _dbolen = st.session_state.get("desi_bolen",3000)
-        st.caption(f"Bölen: **{_dbolen}**  (Kara=3000 · Hava=5000 · Deniz=6000)")
-        _dc5,_dc6 = st.columns(2)
-        _dcikis = _dc5.selectbox("Çıkış İli",["-- Seç --","İstanbul","Ankara","İzmir","Bursa","Kocaeli","Tekirdağ","Manisa","Antalya","Adana","Konya","Mersin","Diğer"],key="desi_cikis")
-        _dvaris = _dc6.selectbox("Varış İli", ["-- Seç --","İstanbul","Ankara","İzmir","Bursa","Kocaeli","Tekirdağ","Manisa","Antalya","Adana","Konya","Mersin","Diğer"],key="desi_varis")
-        _distif = st.radio("İstiflenir mi? *",["-- Seç --","✅ İstiflenir","⚠️ İstiflenmez"],horizontal=True,key="desi_istif")
-        _hacim = (_den*_dboy*_dyuk)/_dbolen
-        _fat   = max(_hacim,_dag)
-        _fat_ac = "hacim > ağırlık" if _hacim>=_dag else "ağırlık > hacim"
-        _zor_ok = _distif!="-- Seç --" and _dcikis!="-- Seç --" and _dvaris!="-- Seç --"
-        if not _zor_ok:
-            st.error("⚠️ Çıkış ili, varış ili ve istiflenir seçimi zorunlu!")
-        else:
-            if _distif=="⚠️ İstiflenmez":
-                st.warning("⚠️ İstiflenmez — yüksek hasar riski, birim fiyata ek yansıtın.")
-            else:
-                st.success(f"✅ {_dcikis} → {_dvaris} | İstiflenir")
-        _dr1,_dr2 = st.columns(2)
-        _dr1.metric("Hacimsel Desi",f"{_hacim:.1f}")
-        _dr2.metric("Faturalanacak",f"{_fat:.1f}",delta=_fat_ac,delta_color="off")
-        _df1,_df2,_df3 = st.columns(3)
-        _dbirim = _df1.number_input("Birim ₺",min_value=0.0,value=0.0,step=0.1,key="desi_birim")
-        _dmin   = _df2.number_input("Min. ₺", min_value=0.0,value=0.0,step=0.5,key="desi_min")
-        _dadet  = _df3.number_input("Adet",   min_value=1,  value=1,  step=1,  key="desi_adet")
-        if _dbirim>0:
-            _dtoplam = max(_fat*_dbirim,_dmin)*_dadet
-            st.metric("💰 Toplam",f"{_dtoplam:,.2f} ₺")
-        if _fat>0:
-            with st.expander("🚚 Kargo Karşılaştır"):
-                for _kad,_kfiyat in sorted([(a,max(_fat*b,m)*_dadet) for a,b,m in [("Aras",3.2,12),("Yurtiçi",3.5,15),("MNG",3.1,11),("Sürat",3.3,13),("PTT",2.8,10),("DHL",5.5,25)]],key=lambda x:x[1]):
-                    st.markdown(f"{'🟢' if _kad==sorted([(a,max(_fat*b,m)*_dadet) for a,b,m in [('Aras',3.2,12),('Yurtiçi',3.5,15),('MNG',3.1,11),('Sürat',3.3,13),('PTT',2.8,10),('DHL',5.5,25)]],key=lambda x:x[1])[0][0] else '⚪'} **{_kad}** — {_kfiyat:,.2f} ₺")
-
     st.divider()
 
     # ── KULLANICI + ÇIKIŞ ─────────────────────────────────────────────────────
