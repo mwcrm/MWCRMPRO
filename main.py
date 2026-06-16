@@ -5965,8 +5965,7 @@ elif aktif == "admin_rapor":
 
 
 # ── DESİ HESAP MAKİNESİ — sabit sağ alt köşe ─────────────────────────────────
-import streamlit.components.v1 as _stc
-_stc.html("""<style>
+st.markdown(""" <style>
 #dp-fab{position:fixed;right:24px;bottom:48px;width:52px;height:52px;background:linear-gradient(135deg,#2563eb,#7c3aed);color:white;border:none;border-radius:50%;font-size:20px;cursor:pointer;box-shadow:0 4px 18px rgba(37,99,235,0.45);z-index:99999;display:flex;align-items:center;justify-content:center;transition:transform 0.15s}
 #dp-fab:hover{transform:scale(1.1)}
 #dp-panel{position:fixed;right:24px;bottom:110px;width:400px;background:white;border-radius:16px;box-shadow:0 12px 48px rgba(0,0,0,0.2);z-index:99998;display:none;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;overflow:hidden}
@@ -6148,7 +6147,7 @@ function dpSifirla(){['dp-en','dp-boy','dp-yuk','dp-ag','dp-birim','dp-min'].for
 function dpRG(){var el=document.getElementById('dp-g-l');if(!dpG.length){el.innerHTML='<div style="color:#94a3b8;font-size:13px;text-align:center;padding:20px">Henüz hesap kaydedilmedi.</div>';return;}el.innerHTML=dpG.map(function(g){return'<div style="padding:9px 12px;background:#f8fafc;border-radius:8px;margin-bottom:5px"><div style="font-size:13px;font-weight:700;color:#1e293b">📐 '+g.desi+' → '+g.tutar+'</div><div style="font-size:11px;color:#64748b;margin-top:2px">'+g.il+' · '+g.istif+'</div><div style="font-size:11px;color:#94a3b8">'+g.saat+'</div></div>';}).join('');}
 
 dpH();dpHC();dpHK();
-</script>""", height=0)
+</script> """, unsafe_allow_html=True)
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
