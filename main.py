@@ -813,7 +813,7 @@ def parse_para(s):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "desi", "kullanici", "admin_rapor"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -828,7 +828,6 @@ _TAB_ETIKETLER = {
     "kullanici": "👥 Kullanıcı Yönetimi",
     "mesajlar": "💬 Mesajlar",
     "admin_rapor": "📊 Rapor Tasarla",
-    "desi": "📐 Desi Hesap",
 }
 
 def get_menu_tercihi(kullanici):
@@ -5618,75 +5617,6 @@ elif aktif == "randevu":
 
 
 
-
-elif aktif == "desi":
-    sayfa_log("desi")
-    st.markdown("## 📐 Desi Hesap Makinesi")
-
-    _d1,_d2 = st.columns([1,1])
-    with _d1:
-        st.markdown("##### 📦 Ölçüler")
-        _dc1,_dc2,_dc3,_dc4 = st.columns(4)
-        _den  = _dc1.number_input("En (cm)",  min_value=0.0, value=30.0, step=1.0, key="desi_en")
-        _dboy = _dc2.number_input("Boy (cm)", min_value=0.0, value=40.0, step=1.0, key="desi_boy")
-        _dyuk = _dc3.number_input("Yük. (cm)",min_value=0.0, value=20.0, step=1.0, key="desi_yuk")
-        _dag  = _dc4.number_input("Ağırlık (kg)",min_value=0.0,value=5.0,step=0.1,key="desi_ag")
-
-        st.markdown("##### 🔢 Desi Böleni")
-        _db1,_db2,_db3,_db4 = st.columns(4)
-        if _db1.button("3000 — Kara",key="db1",use_container_width=True): st.session_state["desi_bolen"]=3000
-        if _db2.button("4000",key="db2",use_container_width=True): st.session_state["desi_bolen"]=4000
-        if _db3.button("5000 — Hava",key="db3",use_container_width=True): st.session_state["desi_bolen"]=5000
-        if _db4.button("6000 — Deniz",key="db4",use_container_width=True): st.session_state["desi_bolen"]=6000
-        _dbolen = st.session_state.get("desi_bolen",3000)
-        st.info(f"Seçili bölen: **{_dbolen}**")
-
-        st.markdown("##### 🗺️ Güzergah & İstifleme")
-        _dc5,_dc6 = st.columns(2)
-        _dcikis = _dc5.selectbox("Çıkış İli",["-- Seç --","İstanbul","Ankara","İzmir","Bursa","Kocaeli","Tekirdağ","Manisa","Antalya","Adana","Konya","Mersin","Gaziantep","Kayseri","Trabzon","Samsun","Diğer"],key="desi_cikis")
-        _dvaris = _dc6.selectbox("Varış İli", ["-- Seç --","İstanbul","Ankara","İzmir","Bursa","Kocaeli","Tekirdağ","Manisa","Antalya","Adana","Konya","Mersin","Gaziantep","Kayseri","Trabzon","Samsun","Diğer"],key="desi_varis")
-        _distif = st.radio("İstiflenir mi? *(Zorunlu)",["-- Seç --","✅ İstiflenir","⚠️ İstiflenmez"],horizontal=True,key="desi_istif")
-
-        _hacim = (_den*_dboy*_dyuk)/_dbolen
-        _fat   = max(_hacim,_dag)
-
-        _zor_ok = _distif!="-- Seç --" and _dcikis!="-- Seç --" and _dvaris!="-- Seç --"
-        if not _zor_ok:
-            st.error("⚠️ Çıkış ili, varış ili ve istiflenir seçimi zorunludur!")
-        else:
-            if _distif=="⚠️ İstiflenmez":
-                st.warning("⚠️ İstiflenmez kargo — yüksek hasar riski, birim fiyata ek yansıtın.")
-            else:
-                st.success(f"✅ {_dcikis} → {_dvaris} | İstiflenir")
-
-    with _d2:
-        st.markdown("##### 📊 Hesap Sonucu")
-        _sr1,_sr2,_sr3 = st.columns(3)
-        _sr1.metric("Hacimsel Desi", f"{_hacim:.1f}")
-        _sr2.metric("Ağırlık Desisi", f"{_dag:.1f}")
-        _sr3.metric("🎯 Faturalanacak", f"{_fat:.1f}", delta="hacim > ağırlık" if _hacim>=_dag else "ağırlık > hacim", delta_color="off")
-
-        st.markdown("##### 💰 Fiyatlandırma")
-        _df1,_df2,_df3 = st.columns(3)
-        _dbirim = _df1.number_input("Birim Fiyat (₺/desi)", min_value=0.0, value=0.0, step=0.1, key="desi_birim")
-        _dmin   = _df2.number_input("Min. Ücret (₺)",       min_value=0.0, value=0.0, step=0.5, key="desi_min")
-        _dadet  = _df3.number_input("Adet",                  min_value=1,   value=1,   step=1,   key="desi_adet")
-
-        if _dbirim > 0:
-            _dtoplam = max(_fat * _dbirim, _dmin) * _dadet
-            st.metric("💰 Toplam Tutar", f"{_dtoplam:,.2f} ₺")
-            if _zor_ok:
-                _kopyala_txt = f"{_dcikis}→{_dvaris} | {_distif.split()[1] if len(_distif.split())>1 else ''} | Desi: {_fat:.1f} | Tutar: {_dtoplam:,.2f} ₺"
-                st.code(_kopyala_txt)
-                st.caption("👆 Kopyalamak için tıkla")
-
-        st.markdown("##### 🚚 Kargo Karşılaştırma")
-        if _fat > 0:
-            _kargolar = [("Aras",3.2,12),("Yurtiçi",3.5,15),("MNG",3.1,11),("Sürat",3.3,13),("PTT",2.8,10),("DHL",5.5,25)]
-            _kg_sonuc = sorted([(a, max(_fat*b,m)*_dadet) for a,b,m in _kargolar], key=lambda x:x[1])
-            _kc = st.columns(len(_kg_sonuc))
-            for i,(kad,kfiyat) in enumerate(_kg_sonuc):
-                _kc[i].metric(f"{'🟢' if i==0 else '⚪'} {kad}", f"{kfiyat:,.2f} ₺")
 
 elif aktif == "admin_rapor":
     sayfa_log("admin_rapor")
