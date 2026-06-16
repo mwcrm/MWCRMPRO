@@ -1757,7 +1757,15 @@ elif aktif == "liste":
                     st.info(f"📭 {_not_firma} için henüz not yok.")
             except: pass
 
-
+    # 📨 Nota tıklanınca müşteriyi seç — seç kolonundan tek seçili varsa karta yönlendir
+    if secili_sayi == 1 and not st.session_state.get("kart_sec_reset"):
+        _tek_id = int(secili_idler[0])
+        _tek_row = df_f[df_f["id"]==_tek_id]
+        if not _tek_row.empty:
+            _tek_firma = _tek_row.iloc[0].get("firma","")
+            _kart_opts_match = [o for o in kart_opts if f"[{_tek_id}]" in o]
+            if _kart_opts_match:
+                st.session_state["kart_sec"] = _kart_opts_match[0]
 
     # ── BUTONLAR ──────────────────────────────────────────────────────────────
     # Kaydet flag'i — ilk tıkta set et, ikinci render'da çalıştır
@@ -3374,7 +3382,7 @@ elif aktif == "ozel_teklif":
                 _b2 = int(_s.get("bit",0) or 0)
                 _kk = int(_s.get("kg",0) or 0)
                 _ff = float(_s.get("fiyat",0) or 0)
-                if not _tt: continue  # sadece ürün adı boşsa atla, fiyat 0 olsa da göster
+                if not _tt and not _ff: continue
                 _ds = f"{_b1}–{_b2} desi" if _b1 or _b2 else ""
                 _ks = f"{_kk} kg" if _kk else ""
                 _satir = f"  • {_tt}"
@@ -3477,7 +3485,8 @@ elif aktif == "ozel_teklif":
         try:
             _oz_df_tek = db_read("teklifler", order_col="tarih")
             if not _oz_df_tek.empty and "satirlar" in _oz_df_tek.columns:
-                _oz_df_tek2 = _oz_df_tek[_oz_df_tek["satirlar"].str.contains('ozel', case=False, na=False)]
+                _oz_df_tek2 = _oz_df_tek[_oz_df_tek["satirlar"].str.contains('"tip": "ozel"', na=False) |
+                                          _oz_df_tek["satirlar"].str.contains('"tip":"ozel"', na=False)]
             else:
                 _oz_df_tek2 = pd.DataFrame()
 
