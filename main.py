@@ -1160,6 +1160,52 @@ button[data-testid="manage-app-button"] { display: none !important; }
 
     st.divider()
 
+    # ── DESİ HESAP MAKİNESİ ───────────────────────────────────────────────────
+    with st.expander("📐 Desi Hesap Makinesi", expanded=False):
+        _dc1,_dc2,_dc3,_dc4 = st.columns(4)
+        _den  = _dc1.number_input("En",  min_value=0.0, value=30.0, step=1.0, key="desi_en")
+        _dboy = _dc2.number_input("Boy", min_value=0.0, value=40.0, step=1.0, key="desi_boy")
+        _dyuk = _dc3.number_input("Yük", min_value=0.0, value=20.0, step=1.0, key="desi_yuk")
+        _dag  = _dc4.number_input("Ağ.", min_value=0.0, value=5.0,  step=0.1, key="desi_ag")
+        _db1,_db2,_db3,_db4 = st.columns(4)
+        if _db1.button("3000",key="db1",use_container_width=True): st.session_state["desi_bolen"]=3000
+        if _db2.button("4000",key="db2",use_container_width=True): st.session_state["desi_bolen"]=4000
+        if _db3.button("5000",key="db3",use_container_width=True): st.session_state["desi_bolen"]=5000
+        if _db4.button("6000",key="db4",use_container_width=True): st.session_state["desi_bolen"]=6000
+        _dbolen = st.session_state.get("desi_bolen",3000)
+        st.caption(f"Bölen: **{_dbolen}**  (Kara=3000 · Hava=5000 · Deniz=6000)")
+        _dc5,_dc6 = st.columns(2)
+        _dcikis = _dc5.selectbox("Çıkış İli",["-- Seç --","İstanbul","Ankara","İzmir","Bursa","Kocaeli","Tekirdağ","Manisa","Antalya","Adana","Konya","Mersin","Diğer"],key="desi_cikis")
+        _dvaris = _dc6.selectbox("Varış İli", ["-- Seç --","İstanbul","Ankara","İzmir","Bursa","Kocaeli","Tekirdağ","Manisa","Antalya","Adana","Konya","Mersin","Diğer"],key="desi_varis")
+        _distif = st.radio("İstiflenir mi? *",["-- Seç --","✅ İstiflenir","⚠️ İstiflenmez"],horizontal=True,key="desi_istif")
+        _hacim = (_den*_dboy*_dyuk)/_dbolen
+        _fat   = max(_hacim,_dag)
+        _fat_ac = "hacim > ağırlık" if _hacim>=_dag else "ağırlık > hacim"
+        _zor_ok = _distif!="-- Seç --" and _dcikis!="-- Seç --" and _dvaris!="-- Seç --"
+        if not _zor_ok:
+            st.error("⚠️ Çıkış ili, varış ili ve istiflenir seçimi zorunlu!")
+        else:
+            if _distif=="⚠️ İstiflenmez":
+                st.warning("⚠️ İstiflenmez — yüksek hasar riski, birim fiyata ek yansıtın.")
+            else:
+                st.success(f"✅ {_dcikis} → {_dvaris} | İstiflenir")
+        _dr1,_dr2 = st.columns(2)
+        _dr1.metric("Hacimsel Desi",f"{_hacim:.1f}")
+        _dr2.metric("Faturalanacak",f"{_fat:.1f}",delta=_fat_ac,delta_color="off")
+        _df1,_df2,_df3 = st.columns(3)
+        _dbirim = _df1.number_input("Birim ₺",min_value=0.0,value=0.0,step=0.1,key="desi_birim")
+        _dmin   = _df2.number_input("Min. ₺", min_value=0.0,value=0.0,step=0.5,key="desi_min")
+        _dadet  = _df3.number_input("Adet",   min_value=1,  value=1,  step=1,  key="desi_adet")
+        if _dbirim>0:
+            _dtoplam = max(_fat*_dbirim,_dmin)*_dadet
+            st.metric("💰 Toplam",f"{_dtoplam:,.2f} ₺")
+        if _fat>0:
+            with st.expander("🚚 Kargo Karşılaştır"):
+                for _kad,_kfiyat in sorted([(a,max(_fat*b,m)*_dadet) for a,b,m in [("Aras",3.2,12),("Yurtiçi",3.5,15),("MNG",3.1,11),("Sürat",3.3,13),("PTT",2.8,10),("DHL",5.5,25)]],key=lambda x:x[1]):
+                    st.markdown(f"{'🟢' if _kad==sorted([(a,max(_fat*b,m)*_dadet) for a,b,m in [('Aras',3.2,12),('Yurtiçi',3.5,15),('MNG',3.1,11),('Sürat',3.3,13),('PTT',2.8,10),('DHL',5.5,25)]],key=lambda x:x[1])[0][0] else '⚪'} **{_kad}** — {_kfiyat:,.2f} ₺")
+
+    st.divider()
+
     # ── KULLANICI + ÇIKIŞ ─────────────────────────────────────────────────────
     _kc1, _kc2 = st.columns([3, 1])
     _kc1.markdown(
@@ -5963,191 +6009,6 @@ elif aktif == "admin_rapor":
 
 
 
-
-# ── DESİ HESAP MAKİNESİ — sabit sağ alt köşe ─────────────────────────────────
-st.markdown(""" <style>
-#dp-fab{position:fixed;right:24px;bottom:48px;width:52px;height:52px;background:linear-gradient(135deg,#2563eb,#7c3aed);color:white;border:none;border-radius:50%;font-size:20px;cursor:pointer;box-shadow:0 4px 18px rgba(37,99,235,0.45);z-index:99999;display:flex;align-items:center;justify-content:center;transition:transform 0.15s}
-#dp-fab:hover{transform:scale(1.1)}
-#dp-panel{position:fixed;right:24px;bottom:110px;width:400px;background:white;border-radius:16px;box-shadow:0 12px 48px rgba(0,0,0,0.2);z-index:99998;display:none;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;overflow:hidden}
-.dp-h{background:linear-gradient(135deg,#1e293b,#334155);color:white;padding:13px 16px;display:flex;justify-content:space-between;align-items:center}
-.dp-tabs{display:flex;background:#f8fafc;border-bottom:1px solid #e2e8f0}
-.dp-tab{flex:1;padding:9px 4px;font-size:11px;font-weight:700;color:#94a3b8;border:none;background:none;cursor:pointer;border-bottom:2px solid transparent}
-.dp-tab.ak{color:#2563eb;border-bottom-color:#2563eb;background:white}
-.dp-body{padding:14px;max-height:480px;overflow-y:auto}
-.dp-sec{display:none}.dp-sec.ak{display:block}
-.dp-lbl{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;margin-bottom:4px}
-.dp-inp{width:100%;padding:8px 10px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:13px;outline:none;box-sizing:border-box}
-.dp-inp:focus{border-color:#3b82f6}.dp-inp.err{border-color:#fca5a5}
-.dp-g4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:7px;margin-bottom:11px}
-.dp-g2{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:11px}
-.dp-g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-bottom:11px}
-.dp-bolen{display:flex;gap:5px;margin-bottom:12px}
-.dp-bb{flex:1;padding:7px 4px;border:1.5px solid #e2e8f0;border-radius:8px;font-size:11px;font-weight:700;color:#64748b;background:white;cursor:pointer;line-height:1.4;text-align:center}
-.dp-bb.ak{border-color:#3b82f6;color:#2563eb;background:#eff6ff}
-.dp-zor{background:#fef2f2;border:1.5px solid #fca5a5;border-radius:10px;padding:11px;margin-bottom:12px}
-.dp-zor.ok{background:#f0fdf4;border-color:#86efac}
-.dp-istif{display:flex;gap:8px;margin-top:8px}
-.dp-ib{flex:1;padding:9px 8px;border:2px solid #e2e8f0;border-radius:8px;font-size:13px;font-weight:700;color:#64748b;background:white;cursor:pointer}
-.dp-ib.evet{border-color:#22c55e;color:#166534;background:#f0fdf4}
-.dp-ib.hayir{border-color:#f59e0b;color:#92400e;background:#fffbeb}
-.dp-sonuc{background:linear-gradient(135deg,#eff6ff,#f0fdf4);border-radius:12px;padding:13px;margin-bottom:11px;border:1px solid #bfdbfe}
-.dp-sr{display:flex;justify-content:space-between;padding:3px 0;font-size:12px}
-.dp-sr span:first-child{color:#475569}.dp-sr span:last-child{font-weight:700}
-.dp-fat{display:flex;justify-content:space-between;align-items:center;margin-top:6px;padding-top:7px;border-top:1px solid #e2e8f0}
-.dp-top{background:#eff6ff;border-radius:10px;padding:11px 14px;margin-bottom:11px;display:flex;justify-content:space-between;align-items:center}
-.dp-btnrow{display:flex;gap:6px}
-.dp-btn{flex:1;padding:9px;border:none;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer}
-.dp-kg-row{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#f8fafc;border-radius:8px;margin-bottom:5px}
-.dp-kg-row.ucuz{background:#f0fdf4;border:1px solid #86efac}
-.ks{display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:6px;margin-bottom:6px}
-.ks input{padding:7px;border:1.5px solid #e2e8f0;border-radius:7px;font-size:12px;text-align:center;outline:none;width:100%;box-sizing:border-box}
-.ks-sil{background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:6px;padding:6px 8px;font-size:11px;cursor:pointer}
-.dp-warn{background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;font-size:11px;color:#92400e;margin-top:6px}
-</style>
-
-<button id="dp-fab" onclick="dpToggle()">📐</button>
-
-<div id="dp-panel">
-<div class="dp-h">
-  <span style="font-size:14px;font-weight:800">📐 Desi Hesap Makinesi</span>
-  <button style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:18px;cursor:pointer" onclick="dpToggle()">✕</button>
-</div>
-<div class="dp-tabs">
-  <button class="dp-tab ak" onclick="dpTab('tek',this)">Tek Koli</button>
-  <button class="dp-tab" onclick="dpTab('cok',this)">Çoklu</button>
-  <button class="dp-tab" onclick="dpTab('kargo',this)">Kargo Kıyasla</button>
-  <button class="dp-tab" onclick="dpTab('gecmis',this)">Geçmiş</button>
-</div>
-<div class="dp-body">
-
-<div class="dp-zor" id="dp-zor">
-  <div id="dp-zor-lbl" style="font-size:11px;font-weight:700;color:#dc2626;margin-bottom:8px">⚠️ ZORUNLU — Doldurmadan hesap yapılmaz</div>
-  <div class="dp-g2">
-    <div><div class="dp-lbl">ÇIKIŞ İLİ</div>
-      <select class="dp-inp err" id="dp-cikis" onchange="dpZK()">
-        <option value="">-- Seç --</option>
-        <option>İstanbul</option><option>Ankara</option><option>İzmir</option><option>Bursa</option><option>Kocaeli</option><option>Tekirdağ</option><option>Manisa</option><option>Antalya</option><option>Adana</option><option>Konya</option><option>Mersin</option><option>Gaziantep</option><option>Eskişehir</option><option>Sakarya</option><option>Balıkesir</option><option>Muğla</option><option>Denizli</option><option>Kayseri</option><option>Trabzon</option><option>Samsun</option><option>Diğer</option>
-      </select>
-    </div>
-    <div><div class="dp-lbl">VARIŞ İLİ</div>
-      <select class="dp-inp err" id="dp-varis" onchange="dpZK()">
-        <option value="">-- Seç --</option>
-        <option>İstanbul</option><option>Ankara</option><option>İzmir</option><option>Bursa</option><option>Kocaeli</option><option>Tekirdağ</option><option>Manisa</option><option>Antalya</option><option>Adana</option><option>Konya</option><option>Mersin</option><option>Gaziantep</option><option>Eskişehir</option><option>Sakarya</option><option>Balıkesir</option><option>Muğla</option><option>Denizli</option><option>Kayseri</option><option>Trabzon</option><option>Samsun</option><option>Diğer</option>
-      </select>
-    </div>
-  </div>
-  <div class="dp-lbl">İSTİFLENİR Mİ? <span style="color:#dc2626">*</span></div>
-  <div class="dp-istif">
-    <button class="dp-ib" id="dp-ib-e" onclick="dpIstif(true)">✅ İstiflenir</button>
-    <button class="dp-ib" id="dp-ib-h" onclick="dpIstif(false)">⚠️ İstiflenmez</button>
-  </div>
-  <div class="dp-warn" id="dp-warn" style="display:none">⚠️ İstiflenmez — yüksek hasar riski, birim fiyata ek yansıtın.</div>
-</div>
-
-<div class="dp-sec ak" id="dp-sec-tek">
-  <div class="dp-g4">
-    <div><div class="dp-lbl">EN (cm)</div><input class="dp-inp" type="number" id="dp-en" value="30" oninput="dpH()"></div>
-    <div><div class="dp-lbl">BOY (cm)</div><input class="dp-inp" type="number" id="dp-boy" value="40" oninput="dpH()"></div>
-    <div><div class="dp-lbl">YÜK. (cm)</div><input class="dp-inp" type="number" id="dp-yuk" value="20" oninput="dpH()"></div>
-    <div><div class="dp-lbl">AĞIRLIK (kg)</div><input class="dp-inp" type="number" id="dp-ag" value="5" step="0.1" oninput="dpH()"></div>
-  </div>
-  <div class="dp-lbl">DESİ BÖLENİ</div>
-  <div class="dp-bolen">
-    <button class="dp-bb ak" onclick="dpBolen(3000,this)">3000<br><span style="font-size:9px;font-weight:400">Kara</span></button>
-    <button class="dp-bb" onclick="dpBolen(4000,this)">4000</button>
-    <button class="dp-bb" onclick="dpBolen(5000,this)">5000<br><span style="font-size:9px;font-weight:400">Hava</span></button>
-    <button class="dp-bb" onclick="dpBolen(6000,this)">6000<br><span style="font-size:9px;font-weight:400">Deniz</span></button>
-  </div>
-  <div class="dp-sonuc">
-    <div class="dp-sr"><span>Hacimsel Desi</span><span id="dp-r-h">8.0</span></div>
-    <div class="dp-sr"><span>Ağırlık Desisi</span><span id="dp-r-a">5.0</span></div>
-    <div class="dp-sr" id="dp-r-guz" style="display:none"><span>Güzergah</span><span id="dp-r-guz-v" style="color:#2563eb"></span></div>
-    <div class="dp-sr" id="dp-r-ist" style="display:none"><span>İstifleme</span><span id="dp-r-ist-v"></span></div>
-    <div class="dp-fat"><span style="font-size:13px;font-weight:700;color:#374151">Faturalanacak</span><span style="font-size:24px;font-weight:800;color:#2563eb" id="dp-r-f">8.0 desi</span></div>
-    <div style="font-size:11px;color:#94a3b8;text-align:right" id="dp-r-ac">hacim > ağırlık</div>
-  </div>
-  <div class="dp-g3">
-    <div><div class="dp-lbl" id="dp-birim-lbl">BİRİM FİYAT (₺)</div><input class="dp-inp" type="number" id="dp-birim" placeholder="3.50" step="0.1" oninput="dpH()"></div>
-    <div><div class="dp-lbl">MİN. ÜCRET (₺)</div><input class="dp-inp" type="number" id="dp-min" placeholder="15" oninput="dpH()"></div>
-    <div><div class="dp-lbl">ADET</div><input class="dp-inp" type="number" id="dp-adet" value="1" oninput="dpH()"></div>
-  </div>
-  <div class="dp-top"><span style="font-size:12px;color:#1d4ed8;font-weight:600">Toplam Tutar</span><span style="font-size:22px;font-weight:800;color:#1d4ed8" id="dp-r-top">—</span></div>
-  <div class="dp-btnrow">
-    <button class="dp-btn" style="background:#059669;color:white" onclick="dpKaydet()">💾 Kaydet</button>
-    <button class="dp-btn" style="background:#6366f1;color:white" onclick="dpKopyala()">📋 Kopyala</button>
-    <button class="dp-btn" style="background:#f1f5f9;color:#374151;border:1px solid #e2e8f0" onclick="dpSifirla()">🔄 Sıfırla</button>
-  </div>
-</div>
-
-<div class="dp-sec" id="dp-sec-cok">
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr auto;gap:6px;margin-bottom:5px">
-    <span style="font-size:10px;font-weight:700;color:#94a3b8">En</span><span style="font-size:10px;font-weight:700;color:#94a3b8">Boy</span><span style="font-size:10px;font-weight:700;color:#94a3b8">Yük.</span><span style="font-size:10px;font-weight:700;color:#94a3b8">Ağ.(kg)</span><span></span>
-  </div>
-  <div id="dp-kl">
-    <div class="ks"><input type="number" value="30" oninput="dpHC()"><input type="number" value="40" oninput="dpHC()"><input type="number" value="20" oninput="dpHC()"><input type="number" value="5" oninput="dpHC()"><button class="ks-sil" onclick="dpKS(this)">✕</button></div>
-  </div>
-  <button style="width:100%;padding:8px;border:1.5px dashed #bfdbfe;border-radius:8px;background:#f0f7ff;color:#2563eb;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:10px" onclick="dpKE()">+ Koli Ekle</button>
-  <div class="dp-sonuc">
-    <div class="dp-sr"><span>Toplam Hacimsel Desi</span><span id="dp-c-h">8.0</span></div>
-    <div class="dp-sr"><span>Toplam Ağırlık</span><span id="dp-c-a">5.0 kg</span></div>
-    <div class="dp-fat"><span style="font-size:13px;font-weight:700;color:#374151">Faturalanacak</span><span style="font-size:24px;font-weight:800;color:#2563eb" id="dp-c-f">8.0 desi</span></div>
-  </div>
-  <div class="dp-g2">
-    <div><div class="dp-lbl">BİRİM FİYAT (₺)</div><input class="dp-inp" type="number" id="dp-c-birim" placeholder="3.50" oninput="dpHC()"></div>
-    <div><div class="dp-lbl">MİN. ÜCRET (₺)</div><input class="dp-inp" type="number" id="dp-c-min" placeholder="15" oninput="dpHC()"></div>
-  </div>
-  <div class="dp-top"><span style="font-size:12px;color:#1d4ed8;font-weight:600">Toplam</span><span style="font-size:22px;font-weight:800;color:#1d4ed8" id="dp-c-top">—</span></div>
-</div>
-
-<div class="dp-sec" id="dp-sec-kargo">
-  <div class="dp-g2" style="margin-bottom:10px">
-    <div><div class="dp-lbl">DESİ</div><input class="dp-inp" type="number" id="dp-k-d" placeholder="8.0" oninput="dpHK()"></div>
-    <div><div class="dp-lbl">ADET</div><input class="dp-inp" type="number" id="dp-k-a" value="1" oninput="dpHK()"></div>
-  </div>
-  <div id="dp-kg-l"></div>
-</div>
-
-<div class="dp-sec" id="dp-sec-gecmis">
-  <div id="dp-g-l"><div style="color:#94a3b8;font-size:13px;text-align:center;padding:20px">Henüz hesap kaydedilmedi.</div></div>
-</div>
-
-</div>
-</div>
-
-<script>
-var dpB=3000,dpI=null,dpG=[];
-var KG=[{ad:"Aras",baz:3.2,min:12},{ad:"Yurtiçi",baz:3.5,min:15},{ad:"MNG",baz:3.1,min:11},{ad:"Sürat",baz:3.3,min:13},{ad:"PTT",baz:2.8,min:10},{ad:"DHL",baz:5.5,min:25}];
-
-function dpToggle(){var p=document.getElementById('dp-panel'),f=document.getElementById('dp-fab');if(p.style.display==='block'){p.style.display='none';f.textContent='📐';}else{p.style.display='block';f.textContent='✕';dpH();dpHK();}}
-
-function dpTab(id,btn){document.querySelectorAll('.dp-sec').forEach(function(s){s.classList.remove('ak');});document.querySelectorAll('.dp-tab').forEach(function(t){t.classList.remove('ak');});document.getElementById('dp-sec-'+id).classList.add('ak');btn.classList.add('ak');if(id==='kargo')dpHK();if(id==='gecmis')dpRG();}
-
-function dpBolen(v,btn){dpB=v;document.querySelectorAll('.dp-bb').forEach(function(b){b.classList.remove('ak');});btn.classList.add('ak');dpH();dpHC();}
-
-function dpIstif(v){dpI=v;document.getElementById('dp-ib-e').className='dp-ib'+(v===true?' evet':'');document.getElementById('dp-ib-h').className='dp-ib'+(v===false?' hayir':'');document.getElementById('dp-warn').style.display=v===false?'block':'none';var l=document.getElementById('dp-birim-lbl');if(l)l.textContent=v===false?'BİRİM FİYAT (₺) *':'BİRİM FİYAT (₺)';dpZK();dpH();}
-
-function dpZK(){var c=document.getElementById('dp-cikis').value,v=document.getElementById('dp-varis').value,ok=c&&v&&dpI!==null;var z=document.getElementById('dp-zor'),l=document.getElementById('dp-zor-lbl');document.getElementById('dp-cikis').className='dp-inp'+(c?'':' err');document.getElementById('dp-varis').className='dp-inp'+(v?'':' err');if(ok){z.className='dp-zor ok';l.style.color='#166534';l.textContent='✅ Temel bilgiler tamam';}else{z.className='dp-zor';l.style.color='#dc2626';l.textContent='⚠️ ZORUNLU — Doldurmadan hesap yapılmaz';}dpH();}
-
-function dpH(){var en=+document.getElementById('dp-en').value||0,boy=+document.getElementById('dp-boy').value||0,yuk=+document.getElementById('dp-yuk').value||0,ag=+document.getElementById('dp-ag').value||0,birim=+document.getElementById('dp-birim').value||0,min_u=+document.getElementById('dp-min').value||0,adet=+document.getElementById('dp-adet').value||1,hacim=(en*boy*yuk)/dpB,fat=Math.max(hacim,ag);document.getElementById('dp-r-h').textContent=hacim.toFixed(1);document.getElementById('dp-r-a').textContent=ag.toFixed(1);document.getElementById('dp-r-f').textContent=fat.toFixed(1)+' desi';document.getElementById('dp-r-ac').textContent=hacim>=ag?'hacim > ağırlık':'ağırlık > hacim';var c=document.getElementById('dp-cikis').value,v=document.getElementById('dp-varis').value;if(c&&v){document.getElementById('dp-r-guz').style.display='flex';document.getElementById('dp-r-guz-v').textContent=c+' → '+v;}else{document.getElementById('dp-r-guz').style.display='none';}if(dpI!==null){document.getElementById('dp-r-ist').style.display='flex';document.getElementById('dp-r-ist-v').textContent=dpI?'✅ İstiflenir':'⚠️ İstiflenmez';document.getElementById('dp-r-ist-v').style.color=dpI?'#166534':'#92400e';}else{document.getElementById('dp-r-ist').style.display='none';}document.getElementById('dp-k-d').value=fat.toFixed(1);var ok=c&&v&&dpI!==null,t=document.getElementById('dp-r-top');if(ok&&birim>0){t.textContent=Math.max(fat*birim,min_u)*adet>0?(Math.max(fat*birim,min_u)*adet).toFixed(2)+' ₺':'—';t.style.color='#1d4ed8';}else if(!ok){t.textContent='Zorunlu eksik';t.style.color='#dc2626';}else{t.textContent='—';t.style.color='#1d4ed8';}}
-
-function dpHC(){var s=document.querySelectorAll('#dp-kl .ks'),tH=0,tA=0;s.forEach(function(x){var i=x.querySelectorAll('input');tH+=(+i[0].value||0)*(+i[1].value||0)*(+i[2].value||0)/dpB;tA+=+i[3].value||0;});var fat=Math.max(tH,tA);document.getElementById('dp-c-h').textContent=tH.toFixed(1);document.getElementById('dp-c-a').textContent=tA.toFixed(1)+' kg';document.getElementById('dp-c-f').textContent=fat.toFixed(1)+' desi';var b=+document.getElementById('dp-c-birim').value||0,m=+document.getElementById('dp-c-min').value||0;document.getElementById('dp-c-top').textContent=b>0?Math.max(fat*b,m).toFixed(2)+' ₺':'—';}
-
-function dpHK(){var d=+document.getElementById('dp-k-d').value||0,a=+document.getElementById('dp-k-a').value||1,fl=KG.map(function(k){return{ad:k.ad,top:Math.max(d*k.baz,k.min)*a};}).sort(function(x,y){return x.top-y.top;}),mn=fl[0]?fl[0].top:0;document.getElementById('dp-kg-l').innerHTML=fl.map(function(k){return'<div class="dp-kg-row'+(k.top===mn?' ucuz':'')+'"><span style="font-size:13px;font-weight:600;color:#374151">'+k.ad+'</span><span style="font-size:14px;font-weight:800;color:'+(k.top===mn?'#059669':'#2563eb')+'">'+k.top.toFixed(2)+' ₺'+(k.top===mn?' <span style="font-size:10px;background:#dcfce7;color:#166534;padding:1px 7px;border-radius:10px;margin-left:4px">En Ucuz</span>':'')+'</span></div>';}).join('');}
-
-function dpKE(){var d=document.getElementById('dp-kl'),div=document.createElement('div');div.className='ks';div.innerHTML='<input type="number" placeholder="En" oninput="dpHC()"><input type="number" placeholder="Boy" oninput="dpHC()"><input type="number" placeholder="Yük." oninput="dpHC()"><input type="number" placeholder="kg" oninput="dpHC()"><button class="ks-sil" onclick="dpKS(this)">✕</button>';d.appendChild(div);}
-
-function dpKS(btn){if(document.querySelectorAll('#dp-kl .ks').length>1){btn.closest('.ks').remove();dpHC();}}
-
-function dpKaydet(){var ok=document.getElementById('dp-cikis').value&&document.getElementById('dp-varis').value&&dpI!==null;if(!ok){alert('Zorunlu alanları doldurun!');return;}var fat=document.getElementById('dp-r-f').textContent,top=document.getElementById('dp-r-top').textContent,c=document.getElementById('dp-cikis').value,v=document.getElementById('dp-varis').value;dpG.unshift({desi:fat,tutar:top,il:c+'→'+v,istif:dpI?'İstiflenir':'İstiflenmez',saat:new Date().toLocaleTimeString('tr')});if(dpG.length>5)dpG.pop();alert('💾 Kaydedildi!');}
-
-function dpKopyala(){var fat=document.getElementById('dp-r-f').textContent,top=document.getElementById('dp-r-top').textContent,c=document.getElementById('dp-cikis').value||'?',v=document.getElementById('dp-varis').value||'?',ist=dpI===null?'Seçilmedi':dpI?'İstiflenir':'İstiflenmez';try{navigator.clipboard.writeText(c+'→'+v+' | '+ist+' | Desi: '+fat+' | Tutar: '+top);}catch(e){}alert('📋 Kopyalandı!');}
-
-function dpSifirla(){['dp-en','dp-boy','dp-yuk','dp-ag','dp-birim','dp-min'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('dp-adet').value=1;document.getElementById('dp-cikis').value='';document.getElementById('dp-varis').value='';dpI=null;document.getElementById('dp-ib-e').className='dp-ib';document.getElementById('dp-ib-h').className='dp-ib';document.getElementById('dp-warn').style.display='none';dpZK();dpH();}
-
-function dpRG(){var el=document.getElementById('dp-g-l');if(!dpG.length){el.innerHTML='<div style="color:#94a3b8;font-size:13px;text-align:center;padding:20px">Henüz hesap kaydedilmedi.</div>';return;}el.innerHTML=dpG.map(function(g){return'<div style="padding:9px 12px;background:#f8fafc;border-radius:8px;margin-bottom:5px"><div style="font-size:13px;font-weight:700;color:#1e293b">📐 '+g.desi+' → '+g.tutar+'</div><div style="font-size:11px;color:#64748b;margin-top:2px">'+g.il+' · '+g.istif+'</div><div style="font-size:11px;color:#94a3b8">'+g.saat+'</div></div>';}).join('');}
-
-dpH();dpHC();dpHK();
-</script> """, unsafe_allow_html=True)
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
