@@ -690,7 +690,7 @@ def cikis():
     st.rerun()
 
 # ── SESSION STATE ─────────────────────────────────────────────────────────────
-st.set_page_config(page_title="MWCRMPRO", layout="wide")
+st.set_page_config(page_title="MWCRMPRO", layout="wide", initial_sidebar_state="expanded")
 
 # ── EKRAN AYARLARI UYGULA ────────────────────────────────────────────────────
 _e_r1      = st.session_state.get("_ekran_r1","")
