@@ -1737,6 +1737,10 @@ elif aktif == "liste":
     secili_sayi = len(secili_df)
     secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
 
+    secili_df2 = edited_df[edited_df["Seç"] == True]
+    secili_sayi = len(secili_df2)
+    secili_idler = secili_df2["id"].tolist() if not secili_df2.empty else []
+
     # 📨 Not okuma — tek satır seçilince notları altında göster
     if secili_sayi == 1:
         _not_id = int(secili_idler[0]) if secili_idler else 0
