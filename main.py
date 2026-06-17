@@ -4104,7 +4104,6 @@ elif aktif == "detay_cari":
     import json as _dcj
 
     st.markdown("## 📊 Detay Cari Liste — Çalışma Tablosu")
-    st.markdown("<small style='color:#64748b;'>Her müşteri tek satırda. Tüm hücrelere tıklayıp yazabilirsiniz. Birden fazla değer için virgülle ayırın (örn: İstanbul, Ankara, Bursa).</small>", unsafe_allow_html=True)
 
     def _dc_sb():
         return get_sb_service() or get_sb_client()
@@ -4184,122 +4183,128 @@ elif aktif == "detay_cari":
 
     st.caption(f"{len(_df_goster)} müşteri")
 
-    # TABLO VERİSİ — tüm sütunlar düz metin, virgülle ayrılmış
-    _tablo_satirlar = []
-    for _idx, (___, _cr) in enumerate(_df_goster.iterrows(), start=1):
-        _cid = int(_cr["id"])
-        _kayit = _dc_kayitlar.get(_cid, {})
-        _notlar_bu = _dc_notlar_tum.get(_cid, [])
-        _eski_notlar = " | ".join([f"{str(n.get('tarih',''))[:10]}: {n.get('aciklama','')}" for n in _notlar_bu]) if _notlar_bu else ""
+    # MOD SEÇİMİ
+    _dc_mod = st.session_state.get("dc_mod", "goruntule")
+    _bm1, _bm2 = st.columns(2)
+    if _bm1.button("👁️ Görüntüle (alt alta görünüm)", use_container_width=True, type="primary" if _dc_mod=="goruntule" else "secondary"):
+        st.session_state["dc_mod"] = "goruntule"; st.rerun()
+    if _bm2.button("✏️ Düzenle (hücrelere yaz)", use_container_width=True, type="primary" if _dc_mod=="duzenle" else "secondary"):
+        st.session_state["dc_mod"] = "duzenle"; st.rerun()
 
-        _hedef_oto = str(int(_cr.get("beklenen_ciro",0))) if _cr.get("beklenen_ciro",0) else ""
-        _gercek_oto = str(int(_cr.get("gerceklesen_ciro",0))) if _cr.get("gerceklesen_ciro",0) else ""
+    st.divider()
 
-        _tablo_satirlar.append({
-            "Sıra": _idx,
-            "Kayıt Tarihi": str(_cr.get("tarih","") or "")[:10],
-            "ID": _cid,
-            "Firma": str(_cr.get("firma","")),
-            "Yetkili": str(_cr.get("yetkili","") or ""),
-            "GSM": str(_cr.get("gsm","") or ""),
-            "İl": str(_cr.get("il","") or ""),
-            "İlçe": str(_cr.get("ilce","") or ""),
-            "Çıkış İl": _kayit.get("cikis_il","") or "",
-            "Varış İl": _kayit.get("varis_il","") or "",
-            "Ciro": _kayit.get("ciro","") or "",
-            "Tür": _kayit.get("tur","") or "",
-            "Desi-Kg": _kayit.get("desi_kg","") or "",
-            "Fiyat": _kayit.get("fiyat","") or "",
-            "Durum": _kayit.get("durum","") or str(_cr.get("durum","") or ""),
-            "Aşama": _kayit.get("asama","") or str(_cr.get("islem_asamasi","") or ""),
-            "Hedef Ciro": _kayit.get("hedef_ciro","") or _hedef_oto,
-            "Gerçekleşen": _kayit.get("gerceklesen","") or _gercek_oto,
-            "fark": _kayit.get("fark","") or "",
-            "Başarı yuzdesi": _kayit.get("basari","") or "",
-            "Açıklama Yaz": "",
-            "Eski Açıklama Notu": _eski_notlar,
-            "Randevu İşlem Tarih": _kayit.get("randevu_tar","") or "",
-        })
+    if _dc_mod == "duzenle":
+        # DÜZENLEME MODU — data_editor, virgülle yazılır
+        st.caption("💡 Çoklu değer için virgülle ayırın (örn: İstanbul, Ankara, Bursa). Kaydedince Görüntüle moduna geçip alt alta görebilirsiniz.")
 
-    _df_tablo = pd.DataFrame(_tablo_satirlar)
+        _tablo_satirlar = []
+        for _idx, (___, _cr) in enumerate(_df_goster.iterrows(), start=1):
+            _cid = int(_cr["id"])
+            _kayit = _dc_kayitlar.get(_cid, {})
+            _notlar_bu = _dc_notlar_tum.get(_cid, [])
+            _eski_notlar = " | ".join([f"{str(n.get('tarih',''))[:10]}: {n.get('aciklama','')}" for n in _notlar_bu]) if _notlar_bu else ""
+            _hedef_oto = str(int(_cr.get("beklenen_ciro",0))) if _cr.get("beklenen_ciro",0) else ""
+            _gercek_oto = str(int(_cr.get("gerceklesen_ciro",0))) if _cr.get("gerceklesen_ciro",0) else ""
 
-    _edited = st.data_editor(
-        _df_tablo,
-        use_container_width=True,
-        hide_index=True,
-        height=min(700, 90 + len(_df_tablo)*40),
-        disabled=["Sıra","Kayıt Tarihi","ID","Firma","Yetkili","GSM","İl","İlçe","Eski Açıklama Notu"],
-        column_config={
-            "Sıra": st.column_config.NumberColumn(width="small"),
-            "Kayıt Tarihi": st.column_config.TextColumn(width="small"),
-            "ID": st.column_config.NumberColumn(width="small"),
-            "Çıkış İl": st.column_config.TextColumn(width="medium", help="virgülle ayırın: İstanbul, Ankara"),
-            "Varış İl": st.column_config.TextColumn(width="medium", help="virgülle ayırın"),
-            "Ciro": st.column_config.TextColumn(width="medium", help="virgülle ayırın: 5000, 10000"),
-            "Tür": st.column_config.TextColumn(width="medium", help="Koli, Palet, Çarpan"),
-            "Desi-Kg": st.column_config.TextColumn(width="medium", help="virgülle ayırın: 00-30, 31-50"),
-            "Fiyat": st.column_config.TextColumn(width="small", help="virgülle ayırın: 200, 300"),
-            "Durum": st.column_config.TextColumn(width="small"),
-            "Aşama": st.column_config.TextColumn(width="small"),
-            "Hedef Ciro": st.column_config.TextColumn(width="small"),
-            "Gerçekleşen": st.column_config.TextColumn(width="small"),
-            "fark": st.column_config.TextColumn(width="small"),
-            "Başarı yuzdesi": st.column_config.TextColumn(width="small"),
-            "Açıklama Yaz": st.column_config.TextColumn(width="medium"),
-            "Eski Açıklama Notu": st.column_config.TextColumn(width="large"),
-            "Randevu İşlem Tarih": st.column_config.TextColumn(width="medium"),
-        },
-        key="dc_data_editor"
-    )
+            _tablo_satirlar.append({
+                "Sıra": _idx, "Kayıt Tarihi": str(_cr.get("tarih","") or "")[:10], "ID": _cid,
+                "Firma": str(_cr.get("firma","")), "Yetkili": str(_cr.get("yetkili","") or ""),
+                "GSM": str(_cr.get("gsm","") or ""), "İl": str(_cr.get("il","") or ""), "İlçe": str(_cr.get("ilce","") or ""),
+                "Çıkış İl": _kayit.get("cikis_il","") or "", "Varış İl": _kayit.get("varis_il","") or "",
+                "Ciro": _kayit.get("ciro","") or "", "Tür": _kayit.get("tur","") or "",
+                "Desi-Kg": _kayit.get("desi_kg","") or "", "Fiyat": _kayit.get("fiyat","") or "",
+                "Durum": _kayit.get("durum","") or str(_cr.get("durum","") or ""),
+                "Aşama": _kayit.get("asama","") or str(_cr.get("islem_asamasi","") or ""),
+                "Hedef Ciro": _kayit.get("hedef_ciro","") or _hedef_oto,
+                "Gerçekleşen": _kayit.get("gerceklesen","") or _gercek_oto,
+                "fark": _kayit.get("fark","") or "", "Başarı yuzdesi": _kayit.get("basari","") or "",
+                "Açıklama Yaz": "", "Eski Açıklama Notu": _eski_notlar,
+                "Randevu İşlem Tarih": _kayit.get("randevu_tar","") or "",
+            })
 
-    if st.button("💾 Tüm Değişiklikleri Kaydet", type="primary", use_container_width=True, key="dc_kaydet_tum"):
-        _basarili = 0
-        _hatali = 0
-        for _i, _row in _edited.iterrows():
-            _cid_e = int(_row["ID"])
-            _eski_satir = _df_tablo.iloc[_i]
+        _df_tablo = pd.DataFrame(_tablo_satirlar)
 
-            _degisti = any(str(_row[_c]) != str(_eski_satir[_c]) for _c in [
-                "Çıkış İl","Varış İl","Ciro","Tür","Desi-Kg","Fiyat","Durum","Aşama",
-                "Hedef Ciro","Gerçekleşen","fark","Başarı yuzdesi","Açıklama Yaz","Randevu İşlem Tarih"
-            ])
-            if not _degisti:
-                continue
+        _edited = st.data_editor(
+            _df_tablo, use_container_width=True, hide_index=True,
+            height=min(700, 90 + len(_df_tablo)*40),
+            disabled=["Sıra","Kayıt Tarihi","ID","Firma","Yetkili","GSM","İl","İlçe","Eski Açıklama Notu"],
+            key="dc_data_editor"
+        )
 
-            _yeni_not = str(_row.get("Açıklama Yaz","") or "").strip()
-            if _yeni_not:
-                _dc_not_ekle(_cid_e, str(_row["Firma"]), _yeni_not)
+        if st.button("💾 Tüm Değişiklikleri Kaydet", type="primary", use_container_width=True, key="dc_kaydet_tum"):
+            _basarili = 0; _hatali = 0
+            for _i, _row in _edited.iterrows():
+                _cid_e = int(_row["ID"])
+                _eski_satir = _df_tablo.iloc[_i]
+                _degisti = any(str(_row[_c]) != str(_eski_satir[_c]) for _c in [
+                    "Çıkış İl","Varış İl","Ciro","Tür","Desi-Kg","Fiyat","Durum","Aşama",
+                    "Hedef Ciro","Gerçekleşen","fark","Başarı yuzdesi","Açıklama Yaz","Randevu İşlem Tarih"
+                ])
+                if not _degisti: continue
+                _yeni_not = str(_row.get("Açıklama Yaz","") or "").strip()
+                if _yeni_not:
+                    _dc_not_ekle(_cid_e, str(_row["Firma"]), _yeni_not)
+                _veri_kayit = {
+                    "firma": str(_row["Firma"]), "cikis_il": str(_row.get("Çıkış İl","") or ""),
+                    "varis_il": str(_row.get("Varış İl","") or ""), "ciro": str(_row.get("Ciro","") or ""),
+                    "tur": str(_row.get("Tür","") or ""), "desi_kg": str(_row.get("Desi-Kg","") or ""),
+                    "fiyat": str(_row.get("Fiyat","") or ""), "durum": str(_row.get("Durum","") or ""),
+                    "asama": str(_row.get("Aşama","") or ""), "hedef_ciro": str(_row.get("Hedef Ciro","") or ""),
+                    "gerceklesen": str(_row.get("Gerçekleşen","") or ""), "fark": str(_row.get("fark","") or ""),
+                    "basari": str(_row.get("Başarı yuzdesi","") or ""),
+                    "randevu_tar": str(_row.get("Randevu İşlem Tarih","") or ""),
+                    "guncelleyen": st.session_state.get("kullanici",""),
+                }
+                if _dc_kaydet_satir(_cid_e, _veri_kayit): _basarili += 1
+                else: _hatali += 1
+            if _basarili: st.success(f"✅ {_basarili} müşteri kaydedildi!")
+            if _hatali: st.error(f"❌ {_hatali} müşteride hata oluştu.")
+            if _basarili or _hatali:
+                st.session_state["dc_mod"] = "goruntule"
+                st.rerun()
 
-            _veri_kayit = {
-                "firma": str(_row["Firma"]),
-                "cikis_il": str(_row.get("Çıkış İl","") or ""),
-                "varis_il": str(_row.get("Varış İl","") or ""),
-                "ciro": str(_row.get("Ciro","") or ""),
-                "tur": str(_row.get("Tür","") or ""),
-                "desi_kg": str(_row.get("Desi-Kg","") or ""),
-                "fiyat": str(_row.get("Fiyat","") or ""),
-                "durum": str(_row.get("Durum","") or ""),
-                "asama": str(_row.get("Aşama","") or ""),
-                "hedef_ciro": str(_row.get("Hedef Ciro","") or ""),
-                "gerceklesen": str(_row.get("Gerçekleşen","") or ""),
-                "fark": str(_row.get("fark","") or ""),
-                "basari": str(_row.get("Başarı yuzdesi","") or ""),
-                "randevu_tar": str(_row.get("Randevu İşlem Tarih","") or ""),
-                "guncelleyen": st.session_state.get("kullanici",""),
-            }
-            if _dc_kaydet_satir(_cid_e, _veri_kayit):
-                _basarili += 1
-            else:
-                _hatali += 1
+    else:
+        # GÖRÜNTÜLEME MODU — HTML, gerçek alt alta görünüm
+        _html_rows = []
+        for _idx, (___, _cr) in enumerate(_df_goster.iterrows(), start=1):
+            _cid = int(_cr["id"])
+            _kayit = _dc_kayitlar.get(_cid, {})
+            _notlar_bu = _dc_notlar_tum.get(_cid, [])
+            _eski_notlar = "<br>".join([f"{str(n.get('tarih',''))[:16]}: {n.get('aciklama','')}" for n in _notlar_bu]) if _notlar_bu else ""
+            _hedef_oto = str(int(_cr.get("beklenen_ciro",0))) if _cr.get("beklenen_ciro",0) else ""
+            _gercek_oto = str(int(_cr.get("gerceklesen_ciro",0))) if _cr.get("gerceklesen_ciro",0) else ""
 
-        if _basarili:
-            st.success(f"✅ {_basarili} müşteri kaydedildi!")
-        if _hatali:
-            st.error(f"❌ {_hatali} müşteride hata oluştu.")
-        if _basarili or _hatali:
-            st.rerun()
-        else:
-            st.info("Değişiklik bulunamadı.")
+            def _br(metin):
+                return "<br>".join([x.strip() for x in (metin or "").split(",") if x.strip()])
+
+            _html_rows.append(f"""<tr>
+<td>{_idx}</td><td>{str(_cr.get('tarih','') or '')[:10]}</td><td>{_cid}</td>
+<td style="text-align:left;"><b>{_cr.get('firma','')}</b></td><td>{_cr.get('yetkili','') or ''}</td><td>{_cr.get('gsm','') or ''}</td>
+<td>{_cr.get('il','') or ''}</td><td>{_cr.get('ilce','') or ''}</td>
+<td>{_br(_kayit.get('cikis_il',''))}</td><td>{_br(_kayit.get('varis_il',''))}</td><td>{_br(_kayit.get('ciro',''))}</td>
+<td>{_br(_kayit.get('tur',''))}</td><td>{_br(_kayit.get('desi_kg',''))}</td><td>{_br(_kayit.get('fiyat',''))}</td>
+<td>{_kayit.get('durum','') or _cr.get('durum','') or ''}</td><td>{_kayit.get('asama','') or _cr.get('islem_asamasi','') or ''}</td>
+<td>{_kayit.get('hedef_ciro','') or _hedef_oto}</td><td>{_kayit.get('gerceklesen','') or _gercek_oto}</td>
+<td>{_kayit.get('fark','') or ''}</td><td>{_kayit.get('basari','') or ''}</td>
+<td></td><td style="font-size:10px;text-align:left;">{_eski_notlar}</td><td>{_kayit.get('randevu_tar','') or ''}</td>
+</tr>""")
+
+        _html_tablo = f"""<style>
+.dctbl{{width:100%;border-collapse:collapse;font-size:12px;font-family:Arial,sans-serif;}}
+.dctbl th{{background:#f1f5f9;border:1px solid #cbd5e1;padding:8px 10px;text-align:center;font-weight:600;white-space:nowrap;}}
+.dctbl td{{border:1px solid #cbd5e1;padding:8px 10px;text-align:center;vertical-align:top;}}
+</style>
+<div style="overflow-x:auto;">
+<table class="dctbl">
+<tr><th>Sıra</th><th>Kayıt Tarihi</th><th>ID</th><th>Firma</th><th>Yetkili</th><th>GSM</th><th>İl</th><th>İlçe</th>
+<th>Çıkış İl</th><th>Varış İl</th><th>Ciro</th><th>Tür</th><th>Desi-Kg</th><th>Fiyat</th>
+<th>Durum</th><th>Aşama</th><th>Hedef Ciro</th><th>Gerçekleşen</th><th>fark</th><th>Başarı yuzdesi</th>
+<th>Açıklama Yaz</th><th>Eski Açıklama Notu</th><th>Randevu İşlem Tarih</th></tr>
+{"".join(_html_rows)}
+</table></div>"""
+
+        import streamlit.components.v1 as _dccomp
+        _dccomp.html(_html_tablo, height=min(700, 120 + len(_df_goster)*90), scrolling=True)
 
 
 elif aktif == "whatsapp":
