@@ -4104,7 +4104,21 @@ elif aktif == "detay_cari":
     import json as _dcj
 
     st.markdown("## 📊 Detay Cari Liste — Çalışma Tablosu")
-    st.markdown("<small style='color:#64748b;'>Sistemdeki tüm cari müşteriler — Excel gibi düzenlenebilir tablo. Çoklu değerleri virgülle ayırarak yazabilirsiniz.</small>", unsafe_allow_html=True)
+    st.markdown("<small style='color:#64748b;'>Sistemdeki tüm cari müşteriler — Excel gibi düzenlenebilir tablo. Çoklu değer için hücrede Shift+Enter ile alt satıra geçin.</small>", unsafe_allow_html=True)
+
+    TR_81_IL = ["Adana","Adıyaman","Afyonkarahisar","Ağrı","Amasya","Ankara","Antalya","Artvin","Aydın","Balıkesir",
+        "Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa","Çanakkale","Çankırı","Çorum","Denizli",
+        "Diyarbakır","Edirne","Elazığ","Erzincan","Erzurum","Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari",
+        "Hatay","Isparta","Mersin","İstanbul","İzmir","Kars","Kastamonu","Kayseri","Kırklareli","Kırşehir",
+        "Kocaeli","Konya","Kütahya","Malatya","Manisa","Kahramanmaraş","Mardin","Muğla","Muş","Nevşehir",
+        "Niğde","Ordu","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas","Tekirdağ","Tokat",
+        "Trabzon","Tunceli","Şanlıurfa","Uşak","Van","Yozgat","Zonguldak","Aksaray","Bayburt","Karaman",
+        "Kırıkkale","Batman","Şırnak","Bartın","Ardahan","Iğdır","Yalova","Karabük","Kilis","Osmaniye","Düzce"]
+    TUR_BAREM = ["Koli","Palet","Çarpan","Parsiyel","TIR","Ambar Kargo","Dış Nakliye"]
+
+    with st.expander("ℹ️ Referans listeler — il ve tür baremleri", expanded=False):
+        st.caption("İl seçimi: " + ", ".join(TR_81_IL[:15]) + " ... (81 il, hücreye yazarken kullanabilirsiniz)")
+        st.caption("Tür baremleri: " + ", ".join(TUR_BAREM))
 
     def _dc_sb():
         return get_sb_service() or get_sb_client()
@@ -4118,6 +4132,31 @@ elif aktif == "detay_cari":
         except Exception as e:
             st.error(f"Veri çekme hatası: {e}")
         return {}
+
+    def _dc_notlar_getir(cari_id):
+        """Ortak not arşivi — cari_aciklamalar tablosundan (cari kart, cari liste, detay liste hepsi burayı paylaşır)"""
+        try:
+            sb = _dc_sb()
+            if sb:
+                r = sb.table("cari_aciklamalar").select("*").eq("cari_id", cari_id).order("tarih", desc=True).execute()
+                return r.data if r.data else []
+        except: pass
+        return []
+
+    def _dc_not_ekle(cari_id, firma, metin):
+        try:
+            sb = _dc_sb()
+            if sb:
+                sb.table("cari_aciklamalar").insert({
+                    "cari_id": cari_id,
+                    "cari_adi": firma,
+                    "aciklama": metin,
+                    "olusturan": st.session_state.get("kullanici","")
+                }).execute()
+                return True
+        except Exception as e:
+            st.error(f"Not ekleme hatası: {e}")
+        return False
 
     def _dc_kaydet_satir(cari_id, veri):
         try:
@@ -4156,11 +4195,8 @@ elif aktif == "detay_cari":
     for _idx, (___, _cr) in enumerate(_df_goster.iterrows(), start=1):
         _cid = int(_cr["id"])
         _kayit = _dc_kayitlar.get(_cid, {})
-        _not_arsiv = []
-        try:
-            _not_arsiv = _dcj.loads(_kayit.get("not_arsiv","[]") or "[]")
-        except: pass
-        _eski_notlar = "\n".join([f"{n.get('tarih','')}: {n.get('not','')}" for n in _not_arsiv]) if _not_arsiv else ""
+        _notlar_ortak = _dc_notlar_getir(_cid)
+        _eski_notlar = "\n".join([f"{str(n.get('tarih',''))[:16]} ({n.get('olusturan','')}): {n.get('aciklama','')}" for n in _notlar_ortak]) if _notlar_ortak else ""
 
         _tablo_satirlar.append({
             "Sıra": _idx,
@@ -4227,15 +4263,10 @@ elif aktif == "detay_cari":
                 continue
 
             _kayit_e = _dc_kayitlar.get(_cid_e, {})
-            _not_arsiv_e = []
-            try:
-                _not_arsiv_e = _dcj.loads(_kayit_e.get("not_arsiv","[]") or "[]")
-            except: pass
 
             _yeni_not = str(_row.get("Açıklama Yaz","") or "").strip()
             if _yeni_not:
-                from datetime import date as _ddd
-                _not_arsiv_e.append({"tarih": str(_ddd.today()), "not": _yeni_not, "yazan": st.session_state.get("kullanici","")})
+                _dc_not_ekle(_cid_e, str(_row["Firma"]), _yeni_not)
 
             _veri_kayit = {
                 "firma": str(_row["Firma"]),
@@ -4252,7 +4283,6 @@ elif aktif == "detay_cari":
                 "fark": str(_row.get("Fark","") or ""),
                 "basari": str(_row.get("Başarı %","") or ""),
                 "randevu_tar": str(_row.get("Randevu/İşlem Tarihi","") or ""),
-                "not_arsiv": _dcj.dumps(_not_arsiv_e, ensure_ascii=False),
                 "guncelleyen": st.session_state.get("kullanici",""),
             }
             if _dc_kaydet_satir(_cid_e, _veri_kayit):
