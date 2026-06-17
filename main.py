@@ -691,6 +691,7 @@ def cikis():
 
 # ── SESSION STATE ─────────────────────────────────────────────────────────────
 st.set_page_config(page_title="MWCRMPRO", layout="wide", initial_sidebar_state="expanded")
+st.markdown("<style>section[data-testid='stSidebar']{transform:none!important;display:flex!important;}button[data-testid='collapsedControl']{display:none!important;}</style>", unsafe_allow_html=True)
 
 # ── EKRAN AYARLARI UYGULA ────────────────────────────────────────────────────
 _e_r1      = st.session_state.get("_ekran_r1","")
