@@ -3664,41 +3664,62 @@ elif aktif == "excel":
                 _ekl1, _ekl2 = st.columns(2)
                 if _ekl1.button("✅ Sisteme Aktar", type="primary", use_container_width=True, key="excel_aktar_btn"):
                     _mevcut_firmalar = set(df_ck["firma"].str.strip().str.lower()) if not df_ck.empty else set()
-                    _basarili=0; _hatali=0; _atlanan=0; _hata_listesi=[]; _atlanan_listesi=[]
-                    _prog = st.progress(0, text="Aktarılıyor...")
-                    _toplam = len(df_yukl)
+                    _eklenecekler = []
+                    _atlanan = 0
+                    _atlanan_listesi = []
+
                     for _ix, (_,row) in enumerate(df_yukl.iterrows()):
-                        try:
-                            _firma=str(row.get("firma","") or "").strip()
-                            if not _firma:
-                                continue
-                            if _firma.lower() in _mevcut_firmalar:
-                                _atlanan += 1
-                                _atlanan_listesi.append(_firma)
-                                continue
-                            _ins_ok = db_insert("cari_kartlar",{"firma":_firma,"yetkili":str(row.get("yetkili","") or ""),"gsm":str(row.get("gsm","") or ""),"sabit":str(row.get("sabit","") or ""),"email":str(row.get("email","") or ""),"adres":str(row.get("adres","") or ""),"ilce":str(row.get("ilce","") or ""),"il":str(row.get("il","") or ""),"durum":str(row.get("durum","Hedef") or "Hedef"),"temsilci":str(row.get("temsilci","") or ""),"islem_asamasi":str(row.get("islem_asamasi","İlk Temas") or "İlk Temas"),"beklenen_ciro":float(row.get("beklenen_ciro",0) or 0),"gerceklesen_ciro":float(row.get("gerceklesen_ciro",0) or 0),"olusturan":st.session_state.get("kullanici",""),"silindi":0})
-                            if _ins_ok:
-                                _basarili+=1
-                                _mevcut_firmalar.add(_firma.lower())
-                            else:
-                                _hatali+=1
-                                _hata_listesi.append(f"Satır {_ix+2} ({_firma}): {st.session_state.get('_last_db_error','bilinmeyen hata')}")
-                        except Exception as _einsert:
-                            _hatali+=1
-                            _hata_listesi.append(f"Satır {_ix+2} ({_firma if _firma else '?'}): {_einsert}")
-                        _prog.progress((_ix+1)/_toplam, text=f"Aktarılıyor... {_ix+1}/{_toplam}")
-                    _prog.empty()
+                        _firma=str(row.get("firma","") or "").strip()
+                        if not _firma:
+                            continue
+                        if _firma.lower() in _mevcut_firmalar:
+                            _atlanan += 1
+                            _atlanan_listesi.append(_firma)
+                            continue
+                        _eklenecekler.append({"firma":_firma,"yetkili":str(row.get("yetkili","") or ""),"gsm":str(row.get("gsm","") or ""),"sabit":str(row.get("sabit","") or ""),"email":str(row.get("email","") or ""),"adres":str(row.get("adres","") or ""),"ilce":str(row.get("ilce","") or ""),"il":str(row.get("il","") or ""),"durum":str(row.get("durum","Hedef") or "Hedef"),"temsilci":str(row.get("temsilci","") or ""),"islem_asamasi":str(row.get("islem_asamasi","İlk Temas") or "İlk Temas"),"beklenen_ciro":float(row.get("beklenen_ciro",0) or 0),"gerceklesen_ciro":float(row.get("gerceklesen_ciro",0) or 0),"olusturan":st.session_state.get("kullanici",""),"silindi":0})
+                        _mevcut_firmalar.add(_firma.lower())
+
+                    _basarili = 0
+                    _hatali = 0
+                    _hata_listesi = []
+
+                    if _eklenecekler:
+                        _prog = st.progress(0, text=f"0/{len(_eklenecekler)} aktarıldı...")
+                        sb_bulk = get_sb_client()
+                        _BATCH = 50
+                        for _bi in range(0, len(_eklenecekler), _BATCH):
+                            _parca = _eklenecekler[_bi:_bi+_BATCH]
+                            _toplu_ok = False
+                            if sb_bulk:
+                                try:
+                                    sb_bulk.table("cari_kartlar").insert(_parca).execute()
+                                    _basarili += len(_parca)
+                                    _toplu_ok = True
+                                except Exception as _ebulk:
+                                    _hata_listesi.append(f"Toplu ekleme hatası (satır {_bi+1}-{_bi+len(_parca)}): {_ebulk}")
+                            if not _toplu_ok:
+                                # Tek tek dene (Supabase yoksa veya toplu başarısızsa SQLite'a tek tek yaz)
+                                for _p in _parca:
+                                    if db_insert("cari_kartlar", _p):
+                                        _basarili += 1
+                                    else:
+                                        _hatali += 1
+                                        _hata_listesi.append(f"{_p.get('firma','?')}: {st.session_state.get('_last_db_error','bilinmeyen hata')}")
+                            _prog.progress(min((_bi+_BATCH)/len(_eklenecekler), 1.0), text=f"{min(_bi+_BATCH,len(_eklenecekler))}/{len(_eklenecekler)} aktarıldı...")
+                        _prog.empty()
+
                     try: db_read.clear()
                     except: pass
                     try: get_cari_listesi.clear()
                     except: pass
+
                     if _basarili: st.success(f"✅ {_basarili} yeni kayıt eklendi!")
                     if _atlanan:
                         st.info(f"ℹ️ {_atlanan} kayıt zaten sistemde olduğu için atlandı.")
                         with st.expander("Atlanan firmalar"):
                             for _af in _atlanan_listesi[:50]:
                                 st.caption(f"• {_af}")
-                    if _hatali:
+                    if _hatali or _hata_listesi:
                         st.warning(f"⚠️ {_hatali} kayıt eklenemedi.")
                         with st.expander("Hata detayları"):
                             for _h in _hata_listesi[:20]:
