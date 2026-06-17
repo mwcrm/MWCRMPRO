@@ -965,7 +965,15 @@ if "sidebar_acildi" not in st.session_state:
 with st.sidebar:
     st.markdown("""
 <style>
-section[data-testid="stSidebar"] { padding-top: 0.5rem !important; }
+section[data-testid="stSidebar"] { 
+    padding-top: 0.5rem !important;
+    transform: none !important;
+    display: flex !important;
+    visibility: visible !important;
+    left: 0 !important;
+    width: 244px !important;
+}
+section[data-testid="stSidebarCollapsedControl"] { display: none !important; }
 section[data-testid="stSidebar"] .stButton>button {
     text-align: left !important;
     justify-content: flex-start !important;
