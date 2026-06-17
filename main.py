@@ -957,10 +957,30 @@ if st.session_state.get("rol") != "admin":
         pass  # Bağlantı hatası olursa engelleme yapma
 
 
-# Sidebar zorla aç
-if "sidebar_acildi" not in st.session_state:
-    st.session_state["sidebar_acildi"] = True
-    st.rerun()
+# Sidebar JavaScript ile zorla aç
+st.markdown("""
+<script>
+window.addEventListener('load', function() {
+    setTimeout(function() {
+        var btn = document.querySelector('[data-testid="collapsedControl"]');
+        if (btn) { btn.click(); }
+        var sidebar = document.querySelector('[data-testid="stSidebar"]');
+        if (sidebar) {
+            sidebar.style.transform = 'none';
+            sidebar.style.display = 'flex';
+            sidebar.style.visibility = 'visible';
+        }
+    }, 500);
+    setTimeout(function() {
+        var sidebar = document.querySelector('[data-testid="stSidebar"]');
+        if (sidebar) {
+            sidebar.style.transform = 'none';
+            sidebar.style.display = 'flex';
+        }
+    }, 1500);
+});
+</script>
+""", unsafe_allow_html=True)
 
 with st.sidebar:
     st.markdown("""
