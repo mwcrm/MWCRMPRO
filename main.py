@@ -957,43 +957,10 @@ if st.session_state.get("rol") != "admin":
         pass  # Bağlantı hatası olursa engelleme yapma
 
 
-# Sidebar JavaScript ile zorla aç
-st.markdown("""
-<script>
-window.addEventListener('load', function() {
-    setTimeout(function() {
-        var btn = document.querySelector('[data-testid="collapsedControl"]');
-        if (btn) { btn.click(); }
-        var sidebar = document.querySelector('[data-testid="stSidebar"]');
-        if (sidebar) {
-            sidebar.style.transform = 'none';
-            sidebar.style.display = 'flex';
-            sidebar.style.visibility = 'visible';
-        }
-    }, 500);
-    setTimeout(function() {
-        var sidebar = document.querySelector('[data-testid="stSidebar"]');
-        if (sidebar) {
-            sidebar.style.transform = 'none';
-            sidebar.style.display = 'flex';
-        }
-    }, 1500);
-});
-</script>
-""", unsafe_allow_html=True)
-
 with st.sidebar:
     st.markdown("""
 <style>
-section[data-testid="stSidebar"] { 
-    padding-top: 0.5rem !important;
-    transform: none !important;
-    display: flex !important;
-    visibility: visible !important;
-    left: 0 !important;
-    width: 244px !important;
-}
-section[data-testid="stSidebarCollapsedControl"] { display: none !important; }
+section[data-testid="stSidebar"] { padding-top: 0.5rem !important; transform: translateX(0px) !important; }
 section[data-testid="stSidebar"] .stButton>button {
     text-align: left !important;
     justify-content: flex-start !important;
@@ -1040,6 +1007,7 @@ section[data-testid="stSidebar"] div[data-testid="stExpander"] > div { padding: 
 }
 div[data-testid="stVerticalBlock"] > div { gap: 0.3rem !important; }
 footer { visibility: hidden !important; }
+header { visibility: hidden !important; }
 div[data-testid="stToolbar"] { display: none !important; }
 div[data-testid="stDecoration"] { display: none !important; }
 div[data-testid="stStatusWidget"] { display: none !important; }
@@ -1769,9 +1737,9 @@ elif aktif == "liste":
     secili_sayi = len(secili_df)
     secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
 
-    secili_df2 = edited_df[edited_df["Seç"] == True]
-    secili_sayi = len(secili_df2)
-    secili_idler = secili_df2["id"].tolist() if not secili_df2.empty else []
+    secili_df = edited_df[edited_df["Seç"] == True]
+    secili_sayi = len(secili_df)
+    secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
 
     # 📨 Not okuma — tek satır seçilince notları altında göster
     if secili_sayi == 1:
