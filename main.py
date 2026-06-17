@@ -141,13 +141,14 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
 def db_insert(table, data):
     """Insert — Supabase önce, SQLite fallback"""
     sb = get_sb_client()
+    _sb_hata = None
     if sb:
         try:
             res = sb.table(table).insert(data).execute()
             if res.data:
                 return True
         except Exception as e:
-            pass  # SQLite fallback
+            _sb_hata = str(e)
     # SQLite fallback
     try:
         conn = get_conn()
@@ -158,6 +159,7 @@ def db_insert(table, data):
         conn.close()
         return True
     except Exception as e:
+        st.session_state["_last_db_error"] = f"Supabase: {_sb_hata} | SQLite: {e}"
         st.error(f"DB insert hatası ({table}): {e}")
     return False
 
@@ -3674,9 +3676,13 @@ elif aktif == "excel":
                                 _atlanan += 1
                                 _atlanan_listesi.append(_firma)
                                 continue
-                            db_insert("cari_kartlar",{"firma":_firma,"yetkili":str(row.get("yetkili","") or ""),"gsm":str(row.get("gsm","") or ""),"sabit":str(row.get("sabit","") or ""),"email":str(row.get("email","") or ""),"adres":str(row.get("adres","") or ""),"ilce":str(row.get("ilce","") or ""),"il":str(row.get("il","") or ""),"durum":str(row.get("durum","Hedef") or "Hedef"),"temsilci":str(row.get("temsilci","") or ""),"islem_asamasi":str(row.get("islem_asamasi","İlk Temas") or "İlk Temas"),"beklenen_ciro":float(row.get("beklenen_ciro",0) or 0),"gerceklesen_ciro":float(row.get("gerceklesen_ciro",0) or 0),"olusturan":st.session_state.get("kullanici",""),"silindi":0})
-                            _basarili+=1
-                            _mevcut_firmalar.add(_firma.lower())
+                            _ins_ok = db_insert("cari_kartlar",{"firma":_firma,"yetkili":str(row.get("yetkili","") or ""),"gsm":str(row.get("gsm","") or ""),"sabit":str(row.get("sabit","") or ""),"email":str(row.get("email","") or ""),"adres":str(row.get("adres","") or ""),"ilce":str(row.get("ilce","") or ""),"il":str(row.get("il","") or ""),"durum":str(row.get("durum","Hedef") or "Hedef"),"temsilci":str(row.get("temsilci","") or ""),"islem_asamasi":str(row.get("islem_asamasi","İlk Temas") or "İlk Temas"),"beklenen_ciro":float(row.get("beklenen_ciro",0) or 0),"gerceklesen_ciro":float(row.get("gerceklesen_ciro",0) or 0),"olusturan":st.session_state.get("kullanici",""),"silindi":0})
+                            if _ins_ok:
+                                _basarili+=1
+                                _mevcut_firmalar.add(_firma.lower())
+                            else:
+                                _hatali+=1
+                                _hata_listesi.append(f"Satır {_ix+2} ({_firma}): {st.session_state.get('_last_db_error','bilinmeyen hata')}")
                         except Exception as _einsert:
                             _hatali+=1
                             _hata_listesi.append(f"Satır {_ix+2} ({_firma if _firma else '?'}): {_einsert}")
