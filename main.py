@@ -4234,8 +4234,8 @@ elif aktif == "detay_cari":
             _asama_r = _kayit_a.get("asama","") or str(_ar.get("islem_asamasi","") or "--")
 
             _pc7, _pc8, _pc9, _pc10 = st.columns(4)
-            _durum_v = _pc7.selectbox("Durum", DURUM_OPTS, index=DURUM_OPTS.index(_durum_r) if _durum_r in DURUM_OPTS else 0, key=f"dc_p_durum_{_dc_aktif_id}")
-            _asama_v = _pc8.selectbox("Aşama", ASAMA_OPTS, index=ASAMA_OPTS.index(_asama_r) if _asama_r in ASAMA_OPTS else 0, key=f"dc_p_asama_{_dc_aktif_id}")
+            _durum_v = _pc7.text_input("Durum", value=_durum_r if _durum_r != "--" else "", key=f"dc_p_durum_{_dc_aktif_id}", placeholder="Takip, Aktif, Anlaşma...")
+            _asama_v = _pc8.text_input("Aşama", value=_asama_r if _asama_r != "--" else "", key=f"dc_p_asama_{_dc_aktif_id}", placeholder="İlk Temas, Görüşme...")
             _hedef_v = _pc9.text_input("Hedef Ciro", value=_kayit_a.get("hedef_ciro","") or _hedef_oto, key=f"dc_p_hedef_{_dc_aktif_id}")
             _gercek_v = _pc10.text_input("Gerçekleşen", value=_kayit_a.get("gerceklesen","") or _gercek_oto, key=f"dc_p_gercek_{_dc_aktif_id}")
 
@@ -4253,6 +4253,7 @@ elif aktif == "detay_cari":
 
                 if _yeni_not_v and _yeni_not_v.strip():
                     _dc_not_ekle(_dc_aktif_id, _firma_a, _yeni_not_v.strip())
+                    st.session_state[f"dc_p_not_{_dc_aktif_id}"] = ""
 
                 _veri_p = {
                     "firma": _firma_a,
