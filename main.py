@@ -3661,7 +3661,8 @@ elif aktif == "excel":
                 st.dataframe(df_yukl.head(10), use_container_width=True, hide_index=True)
                 _ekl1, _ekl2 = st.columns(2)
                 if _ekl1.button("✅ Sisteme Aktar", type="primary", use_container_width=True, key="excel_aktar_btn"):
-                    _basarili=0; _hatali=0; _hata_listesi=[]
+                    _mevcut_firmalar = set(df_ck["firma"].str.strip().str.lower()) if not df_ck.empty else set()
+                    _basarili=0; _hatali=0; _atlanan=0; _hata_listesi=[]; _atlanan_listesi=[]
                     _prog = st.progress(0, text="Aktarılıyor...")
                     _toplam = len(df_yukl)
                     for _ix, (_,row) in enumerate(df_yukl.iterrows()):
@@ -3669,8 +3670,13 @@ elif aktif == "excel":
                             _firma=str(row.get("firma","") or "").strip()
                             if not _firma:
                                 continue
+                            if _firma.lower() in _mevcut_firmalar:
+                                _atlanan += 1
+                                _atlanan_listesi.append(_firma)
+                                continue
                             db_insert("cari_kartlar",{"firma":_firma,"yetkili":str(row.get("yetkili","") or ""),"gsm":str(row.get("gsm","") or ""),"sabit":str(row.get("sabit","") or ""),"email":str(row.get("email","") or ""),"adres":str(row.get("adres","") or ""),"ilce":str(row.get("ilce","") or ""),"il":str(row.get("il","") or ""),"durum":str(row.get("durum","Hedef") or "Hedef"),"temsilci":str(row.get("temsilci","") or ""),"islem_asamasi":str(row.get("islem_asamasi","İlk Temas") or "İlk Temas"),"beklenen_ciro":float(row.get("beklenen_ciro",0) or 0),"gerceklesen_ciro":float(row.get("gerceklesen_ciro",0) or 0),"olusturan":st.session_state.get("kullanici",""),"silindi":0})
                             _basarili+=1
+                            _mevcut_firmalar.add(_firma.lower())
                         except Exception as _einsert:
                             _hatali+=1
                             _hata_listesi.append(f"Satır {_ix+2} ({_firma if _firma else '?'}): {_einsert}")
@@ -3680,7 +3686,12 @@ elif aktif == "excel":
                     except: pass
                     try: get_cari_listesi.clear()
                     except: pass
-                    if _basarili: st.success(f"✅ {_basarili} kayıt eklendi!")
+                    if _basarili: st.success(f"✅ {_basarili} yeni kayıt eklendi!")
+                    if _atlanan:
+                        st.info(f"ℹ️ {_atlanan} kayıt zaten sistemde olduğu için atlandı.")
+                        with st.expander("Atlanan firmalar"):
+                            for _af in _atlanan_listesi[:50]:
+                                st.caption(f"• {_af}")
                     if _hatali:
                         st.warning(f"⚠️ {_hatali} kayıt eklenemedi.")
                         with st.expander("Hata detayları"):
