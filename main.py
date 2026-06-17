@@ -4104,14 +4104,29 @@ elif aktif == "detay_cari":
     import json as _dcj
 
     st.markdown("## 📊 Detay Cari Liste — Çalışma Tablosu")
-    st.markdown("<small style='color:#64748b;'>Sistemdeki tüm cari müşteriler tek tabloda. Hücreye çoklu değer yazarken Shift+Enter ile alt satıra geçin.</small>", unsafe_allow_html=True)
+    st.markdown("<small style='color:#64748b;'>Sistemdeki tüm cari müşteriler. Çıkış İl / Varış İl / Tür için Düzenle butonuna basın.</small>", unsafe_allow_html=True)
+
+    TR_81_IL = ["Adana","Adıyaman","Afyonkarahisar","Ağrı","Amasya","Ankara","Antalya","Artvin","Aydın","Balıkesir",
+        "Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa","Çanakkale","Çankırı","Çorum","Denizli",
+        "Diyarbakır","Edirne","Elazığ","Erzincan","Erzurum","Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari",
+        "Hatay","Isparta","Mersin","İstanbul","İzmir","Kars","Kastamonu","Kayseri","Kırklareli","Kırşehir",
+        "Kocaeli","Konya","Kütahya","Malatya","Manisa","Kahramanmaraş","Mardin","Muğla","Muş","Nevşehir",
+        "Niğde","Ordu","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas","Tekirdağ","Tokat",
+        "Trabzon","Tunceli","Şanlıurfa","Uşak","Van","Yozgat","Zonguldak","Aksaray","Bayburt","Karaman",
+        "Kırıkkale","Batman","Şırnak","Bartın","Ardahan","Iğdır","Yalova","Karabük","Kilis","Osmaniye","Düzce","Şehiriçi"]
+    TUR_BAREM = ["Koli","Palet","Çarpan","Parsiyel","TIR","Ambar Kargo","Dış Nakliye"]
+
+    @st.cache_data(ttl=3600)
+    def _dc_sb_cache_key():
+        return True
 
     def _dc_sb():
         return get_sb_service() or get_sb_client()
 
+    @st.cache_data(ttl=120)
     def _dc_getir_tum():
         try:
-            sb = _dc_sb()
+            sb = get_sb_service() or get_sb_client()
             if sb:
                 r = sb.table("musteri_calisma_tablosu").select("*").execute()
                 return {row["cari_id"]: row for row in r.data} if r.data else {}
@@ -4119,14 +4134,21 @@ elif aktif == "detay_cari":
             st.error(f"Veri çekme hatası: {e}")
         return {}
 
-    def _dc_notlar_getir(cari_id):
+    @st.cache_data(ttl=120)
+    def _dc_notlar_getir_tum():
+        """Tek seferde TÜM notları çek — N+1 sorgu sorununu önler"""
         try:
-            sb = _dc_sb()
+            sb = get_sb_service() or get_sb_client()
             if sb:
-                r = sb.table("cari_aciklamalar").select("*").eq("cari_id", cari_id).order("tarih", desc=True).execute()
-                return r.data if r.data else []
+                r = sb.table("cari_aciklamalar").select("*").order("tarih", desc=True).execute()
+                if r.data:
+                    _gruplu = {}
+                    for row in r.data:
+                        cid = row.get("cari_id")
+                        _gruplu.setdefault(cid, []).append(row)
+                    return _gruplu
         except: pass
-        return []
+        return {}
 
     def _dc_not_ekle(cari_id, firma, metin):
         try:
@@ -4136,6 +4158,8 @@ elif aktif == "detay_cari":
                     "cari_id": cari_id, "cari_adi": firma, "aciklama": metin,
                     "olusturan": st.session_state.get("kullanici","")
                 }).execute()
+                try: _dc_notlar_getir_tum.clear()
+                except: pass
                 return True
         except Exception as e:
             st.error(f"Not ekleme hatası: {e}")
@@ -4151,15 +4175,18 @@ elif aktif == "detay_cari":
                 else:
                     veri["cari_id"] = cari_id
                     sb.table("musteri_calisma_tablosu").insert(veri).execute()
+                try: _dc_getir_tum.clear()
+                except: pass
                 return True
         except Exception as e:
             st.error(f"Kayıt hatası ({veri.get('firma','?')}): {e}")
             return False
         return False
 
-    # VERİ YÜKLE
+    # VERİ YÜKLE — TEK SEFERDE
     _df_cari_dc = get_cari_listesi()
     _dc_kayitlar = _dc_getir_tum()
+    _dc_notlar_tum = _dc_notlar_getir_tum()
 
     if _df_cari_dc.empty:
         st.info("Henüz cari kayıt yok.")
@@ -4172,19 +4199,60 @@ elif aktif == "detay_cari":
 
     st.caption(f"{len(_df_goster)} müşteri")
 
-    # TABLO VERİSİ HAZIRLA — TEK SATIR / TEK SÜTUN, hücre içi çok satır serbest metin
+    # DÜZENLEME MODAL — Çıkış İl / Varış İl / Tür için dropdown form
+    _duzenle_cid = st.session_state.get("dc_duzenle_cid")
+    if _duzenle_cid:
+        _dc_row = _df_cari_dc[_df_cari_dc["id"]==_duzenle_cid]
+        if not _dc_row.empty:
+            _dc_firma_d = str(_dc_row.iloc[0].get("firma",""))
+            _kayit_d = _dc_kayitlar.get(_duzenle_cid, {})
+            with st.container(border=True):
+                st.markdown(f"### ✏️ {_dc_firma_d} — Rota Düzenle")
+                _cikis_eski = [x.strip() for x in (_kayit_d.get("cikis_il","") or "").split(",") if x.strip()]
+                _varis_eski = [x.strip() for x in (_kayit_d.get("varis_il","") or "").split(",") if x.strip()]
+                _tur_eski = [x.strip() for x in (_kayit_d.get("tur","") or "").split(",") if x.strip()]
+
+                _cikis_sec = st.multiselect("Çıkış İl", TR_81_IL, default=[x for x in _cikis_eski if x in TR_81_IL], key=f"dc_m_cikis_{_duzenle_cid}")
+                _varis_sec = st.multiselect("Varış İl", TR_81_IL, default=[x for x in _varis_eski if x in TR_81_IL], key=f"dc_m_varis_{_duzenle_cid}")
+                _tur_sec = st.multiselect("Tür", TUR_BAREM, default=[x for x in _tur_eski if x in TUR_BAREM], key=f"dc_m_tur_{_duzenle_cid}")
+                _ciro_metin = st.text_area("Ciro (her satıra bir değer, Enter ile ayırın)", value=(_kayit_d.get("ciro","") or "").replace(",","\n"), key=f"dc_m_ciro_{_duzenle_cid}", height=80)
+                _desi_metin = st.text_area("Desi-Kg (her satıra bir değer)", value=(_kayit_d.get("desi_kg","") or "").replace(",","\n"), key=f"dc_m_desi_{_duzenle_cid}", height=80)
+                _fiyat_metin = st.text_area("Fiyat (her satıra bir değer)", value=(_kayit_d.get("fiyat","") or "").replace(",","\n"), key=f"dc_m_fiyat_{_duzenle_cid}", height=80)
+
+                _bm1, _bm2 = st.columns(2)
+                if _bm1.button("💾 Kaydet", type="primary", use_container_width=True, key=f"dc_m_kaydet_{_duzenle_cid}"):
+                    _veri_modal = {
+                        "firma": _dc_firma_d,
+                        "cikis_il": ", ".join(_cikis_sec),
+                        "varis_il": ", ".join(_varis_sec),
+                        "tur": ", ".join(_tur_sec),
+                        "ciro": ", ".join([x.strip() for x in _ciro_metin.split("\n") if x.strip()]),
+                        "desi_kg": ", ".join([x.strip() for x in _desi_metin.split("\n") if x.strip()]),
+                        "fiyat": ", ".join([x.strip() for x in _fiyat_metin.split("\n") if x.strip()]),
+                        "guncelleyen": st.session_state.get("kullanici",""),
+                    }
+                    if _dc_kaydet_satir(_duzenle_cid, _veri_modal):
+                        st.session_state.pop("dc_duzenle_cid", None)
+                        st.success("✅ Kaydedildi!")
+                        st.rerun()
+                if _bm2.button("❌ Kapat", use_container_width=True, key=f"dc_m_kapat_{_duzenle_cid}"):
+                    st.session_state.pop("dc_duzenle_cid", None)
+                    st.rerun()
+            st.divider()
+
+    # TABLO VERİSİ HAZIRLA — cache'lenmiş veriden, ek Supabase çağrısı yok
     _tablo_satirlar = []
     for _idx, (___, _cr) in enumerate(_df_goster.iterrows(), start=1):
         _cid = int(_cr["id"])
         _kayit = _dc_kayitlar.get(_cid, {})
-        _notlar_ortak = _dc_notlar_getir(_cid)
-        _eski_notlar = "\n".join([f"{str(n.get('tarih',''))[:16]} ({n.get('olusturan','')}): {n.get('aciklama','')}" for n in _notlar_ortak]) if _notlar_ortak else ""
+        _notlar_bu = _dc_notlar_tum.get(_cid, [])
+        _eski_notlar = "\n".join([f"{str(n.get('tarih',''))[:16]} ({n.get('olusturan','')}): {n.get('aciklama','')}" for n in _notlar_bu]) if _notlar_bu else ""
 
         _hedef_otomatik = str(int(_cr.get("beklenen_ciro",0))) if _cr.get("beklenen_ciro",0) else ""
         _gercek_otomatik = str(int(_cr.get("gerceklesen_ciro",0))) if _cr.get("gerceklesen_ciro",0) else ""
 
         _tablo_satirlar.append({
-            "Seç": False,
+            "Düzenle": False,
             "Sıra": _idx,
             "Kayıt Tarihi": str(_cr.get("tarih","") or "")[:10],
             "ID": _cid,
@@ -4217,9 +4285,9 @@ elif aktif == "detay_cari":
         use_container_width=True,
         hide_index=True,
         height=min(700, 90 + len(_df_tablo)*44),
-        disabled=["Sıra","Kayıt Tarihi","ID","Firma","Yetkili","GSM","İl","İlçe","Eski Açıklama Notu"],
+        disabled=["Sıra","Kayıt Tarihi","ID","Firma","Yetkili","GSM","İl","İlçe","Çıkış İl","Varış İl","Ciro","Tür","Desi-Kg","Fiyat","Eski Açıklama Notu"],
         column_config={
-            "Seç": st.column_config.CheckboxColumn(width="small"),
+            "Düzenle": st.column_config.CheckboxColumn(width="small", help="İşaretleyip aşağıdaki butona basın"),
             "Sıra": st.column_config.NumberColumn(width="small"),
             "Kayıt Tarihi": st.column_config.TextColumn(width="small"),
             "ID": st.column_config.NumberColumn(width="small"),
@@ -4242,7 +4310,15 @@ elif aktif == "detay_cari":
         key="dc_data_editor"
     )
 
-    if st.button("💾 Tüm Değişiklikleri Kaydet", type="primary", use_container_width=True, key="dc_kaydet_tum"):
+    # Düzenle işaretlenen satır için modal aç
+    _isaretli = _edited[_edited["Düzenle"] == True]
+    if not _isaretli.empty:
+        _ilk_id = int(_isaretli.iloc[0]["ID"])
+        if st.session_state.get("dc_duzenle_cid") != _ilk_id:
+            st.session_state["dc_duzenle_cid"] = _ilk_id
+            st.rerun()
+
+    if st.button("💾 Tüm Değişiklikleri Kaydet (Durum/Aşama/Not/Tarih)", type="primary", use_container_width=True, key="dc_kaydet_tum"):
         _basarili = 0
         _hatali = 0
         for _i, _row in _edited.iterrows():
@@ -4250,8 +4326,7 @@ elif aktif == "detay_cari":
             _eski_satir = _df_tablo.iloc[_i]
 
             _degisti = any(str(_row[_c]) != str(_eski_satir[_c]) for _c in [
-                "Çıkış İl","Varış İl","Ciro","Tür","Desi-Kg","Fiyat","Durum","Aşama",
-                "Hedef Ciro","Gerçekleşen","fark","Başarı yuzdesi","Açıklama Yaz","Randevu İşlem Tarih"
+                "Durum","Aşama","Hedef Ciro","Gerçekleşen","fark","Başarı yuzdesi","Açıklama Yaz","Randevu İşlem Tarih"
             ])
             if not _degisti:
                 continue
@@ -4260,14 +4335,15 @@ elif aktif == "detay_cari":
             if _yeni_not:
                 _dc_not_ekle(_cid_e, str(_row["Firma"]), _yeni_not)
 
+            _kayit_mevcut = _dc_kayitlar.get(_cid_e, {})
             _veri_kayit = {
                 "firma": str(_row["Firma"]),
-                "cikis_il": str(_row.get("Çıkış İl","") or ""),
-                "varis_il": str(_row.get("Varış İl","") or ""),
-                "ciro": str(_row.get("Ciro","") or ""),
-                "tur": str(_row.get("Tür","") or ""),
-                "desi_kg": str(_row.get("Desi-Kg","") or ""),
-                "fiyat": str(_row.get("Fiyat","") or ""),
+                "cikis_il": _kayit_mevcut.get("cikis_il","") or "",
+                "varis_il": _kayit_mevcut.get("varis_il","") or "",
+                "ciro": _kayit_mevcut.get("ciro","") or "",
+                "tur": _kayit_mevcut.get("tur","") or "",
+                "desi_kg": _kayit_mevcut.get("desi_kg","") or "",
+                "fiyat": _kayit_mevcut.get("fiyat","") or "",
                 "durum": str(_row.get("Durum","") or ""),
                 "asama": str(_row.get("Aşama","") or ""),
                 "hedef_ciro": str(_row.get("Hedef Ciro","") or ""),
