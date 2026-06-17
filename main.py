@@ -3659,8 +3659,9 @@ elif aktif == "excel":
             if "firma" not in df_yukl.columns:
                 st.error("❌ Zorunlu sütun eksik: firma")
             else:
-                st.success(f"✅ {len(df_yukl)} satır okundu. Önizleme:")
-                st.dataframe(df_yukl.head(10), use_container_width=True, hide_index=True)
+                st.success(f"✅ {len(df_yukl)} satır okundu.")
+                with st.expander("Önizleme (ilk 10 satır)"):
+                    st.dataframe(df_yukl.head(10), use_container_width=True, hide_index=True)
                 _ekl1, _ekl2 = st.columns(2)
                 if _ekl1.button("✅ Sisteme Aktar", type="primary", use_container_width=True, key="excel_aktar_btn"):
                     st.write("🔄 İşlem başladı...")
