@@ -821,7 +821,7 @@ def parse_para(s):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "detay_cari", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -830,8 +830,8 @@ _TAB_ETIKETLER = {
     "ozel_teklif": "⭐ Özel Teklif",
     "excel": "📥 Excel Aktar",
     "kisiler": "📞 Telefon Kişiler",
-        "analiz": "🔍 Müşteri Analizi",
     "analiz": "🔍 Müşteri Analizi",
+    "detay_cari": "📊 Detay Cari Liste",
     "randevu": "📅 Randevular",
     "kullanici": "👥 Kullanıcı Yönetimi",
     "mesajlar": "💬 Mesajlar",
@@ -903,6 +903,11 @@ def save_menu_tercihi(kullanici, sira):
             idx = sira.index("liste") + 1
             sira.insert(idx, "analiz")
         except: sira.append("analiz")
+    if "detay_cari" not in sira:
+        try:
+            idx = sira.index("analiz") + 1
+            sira.insert(idx, "detay_cari")
+        except: sira.append("detay_cari")
 
     try:
         sb_m = get_sb_client()
@@ -4093,6 +4098,180 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{padding:2px 8px!impo
                 st.rerun()
             else:
                 st.error(f"❌ Kayıt hatası: {_err}")
+
+elif aktif == "detay_cari":
+    sayfa_log("detay_cari")
+    import json as _dcj
+    from datetime import date as _dcd
+
+    st.markdown("## 📊 Detay Cari Liste — Çalışma Tablosu")
+    st.markdown("<small style='color:#64748b;'>Sistemdeki tüm cari müşteriler — rota, fiyat ve not takibi için çalışma tablosu</small>", unsafe_allow_html=True)
+
+    def _dc_sb():
+        return get_sb_service() or get_sb_client()
+
+    def _dc_getir_tum():
+        try:
+            sb = _dc_sb()
+            if sb:
+                r = sb.table("musteri_calisma_tablosu").select("*").execute()
+                return {row["cari_id"]: row for row in r.data} if r.data else {}
+        except Exception as e:
+            st.error(f"Veri çekme hatası: {e}")
+        return {}
+
+    def _dc_kaydet(cari_id, veri):
+        try:
+            sb = _dc_sb()
+            if sb:
+                ex = sb.table("musteri_calisma_tablosu").select("id").eq("cari_id", cari_id).execute()
+                if ex.data:
+                    sb.table("musteri_calisma_tablosu").update(veri).eq("cari_id", cari_id).execute()
+                else:
+                    veri["cari_id"] = cari_id
+                    sb.table("musteri_calisma_tablosu").insert(veri).execute()
+                return True, ""
+        except Exception as e:
+            return False, str(e)
+        return False, "Bağlantı yok"
+
+    # VERİ YÜKLE
+    _df_cari_dc = get_cari_listesi()
+    _dc_kayitlar = _dc_getir_tum()
+
+    if _df_cari_dc.empty:
+        st.info("Henüz cari kayıt yok.")
+        st.stop()
+
+    st.caption(f"{len(_df_cari_dc)} müşteri listeleniyor")
+
+    # ARAMA / FİLTRE
+    _dcf1, _dcf2 = st.columns([3,1])
+    _dc_ara = _dcf1.text_input("Firma ara", key="dc_ara", placeholder="firma adı...")
+    _dc_sadece_notlu = _dcf2.checkbox("Sadece notlu", key="dc_notlu")
+
+    _df_goster = _df_cari_dc.copy()
+    if _dc_ara:
+        _df_goster = _df_goster[_df_goster["firma"].str.contains(_dc_ara, case=False, na=False)]
+    if _dc_sadece_notlu:
+        _notlu_idler = [cid for cid, k in _dc_kayitlar.items() if k.get("aciklama") or k.get("not_arsiv")]
+        _df_goster = _df_goster[_df_goster["id"].isin(_notlu_idler)]
+
+    st.divider()
+
+    DURUM_OPTS = ["--","Takip","Aktif","Anlaşma","Beklemede","İlgisiz","Deneme"]
+    ASAMA_OPTS = ["--","İlk Temas","Görüşme","Teklif","Deneme","Anlaşma","Kayıp"]
+    TUR_OPTS = ["Koli","Palet","Çarpan","Parsiyel","TIR"]
+
+    for _dci, (___, _cr) in enumerate(_df_goster.iterrows()):
+        _cid = int(_cr["id"])
+        _firma_dc = str(_cr.get("firma","?"))
+        _kayit = _dc_kayitlar.get(_cid, {})
+
+        _not_arsiv = []
+        try:
+            _not_arsiv = _dcj.loads(_kayit.get("not_arsiv","[]") or "[]")
+        except: pass
+
+        _durum_r = _kayit.get("durum","--") or "--"
+        _baslik_extra = f" · {_durum_r}" if _durum_r != "--" else ""
+        _not_sayisi = len(_not_arsiv)
+
+        with st.expander(f"**{_firma_dc}**{_baslik_extra}" + (f" · 📝 {_not_sayisi} not" if _not_sayisi else "")):
+            # SABİT BİLGİLER (cari listeden, salt okunur)
+            st.markdown(f"""<div style='background:#f8fafc;border-radius:8px;padding:8px 12px;margin-bottom:10px;font-size:12px;color:#64748b;'>
+            <b>ID:</b> {_cid} &nbsp;·&nbsp; <b>Yetkili:</b> {_cr.get('yetkili','—') or '—'} &nbsp;·&nbsp;
+            <b>GSM:</b> {_cr.get('gsm','—') or '—'} &nbsp;·&nbsp; <b>İl:</b> {_cr.get('il','—') or '—'} &nbsp;·&nbsp;
+            <b>İlçe:</b> {_cr.get('ilce','—') or '—'}
+            </div>""", unsafe_allow_html=True)
+
+            # ROTA TABLOSU (çıkış il, varış il, ciro, tür, desi-kg, fiyat)
+            st.markdown("**🚚 Rota / Fiyat Bilgileri**")
+            _cikis_key = f"dc_cikis_rows_{_cid}"
+            if _cikis_key not in st.session_state:
+                try:
+                    st.session_state[_cikis_key] = _dcj.loads(_kayit.get("rotalar","[]") or "[]") or [{"cikis":"","varis":"","ciro":"","tur":"Koli","desi":"","fiyat":""}]
+                except:
+                    st.session_state[_cikis_key] = [{"cikis":"","varis":"","ciro":"","tur":"Koli","desi":"","fiyat":""}]
+
+            _il_listesi = ["--","İstanbul","Ankara","İzmir","Bursa","Manisa","Çorlu/Çerkezköy","Konya","Kocaeli","Adana","Şehiriçi","Tüm TR"]
+            st.caption("Çıkış İl | Varış İl | Ciro (₺) | Tür | Desi-Kg | Fiyat (₺)")
+            for _ri in range(len(st.session_state[_cikis_key])):
+                _rs = st.session_state[_cikis_key][_ri]
+                _rc = st.columns([1.2,1.2,0.9,0.9,1,0.9,0.3])
+                _rs["cikis"] = _rc[0].selectbox("", _il_listesi, index=_il_listesi.index(_rs.get("cikis","--")) if _rs.get("cikis","--") in _il_listesi else 0, key=f"dc_cikis_{_cid}_{_ri}", label_visibility="collapsed")
+                _rs["varis"] = _rc[1].selectbox("", _il_listesi, index=_il_listesi.index(_rs.get("varis","--")) if _rs.get("varis","--") in _il_listesi else 0, key=f"dc_varis_{_cid}_{_ri}", label_visibility="collapsed")
+                _rs["ciro"] = _rc[2].text_input("", value=_rs.get("ciro",""), key=f"dc_ciro_{_cid}_{_ri}", placeholder="₺", label_visibility="collapsed")
+                _rs["tur"] = _rc[3].selectbox("", TUR_OPTS, index=TUR_OPTS.index(_rs.get("tur","Koli")) if _rs.get("tur","Koli") in TUR_OPTS else 0, key=f"dc_tur_{_cid}_{_ri}", label_visibility="collapsed")
+                _rs["desi"] = _rc[4].text_input("", value=_rs.get("desi",""), key=f"dc_desi_{_cid}_{_ri}", placeholder="00-30", label_visibility="collapsed")
+                _rs["fiyat"] = _rc[5].text_input("", value=_rs.get("fiyat",""), key=f"dc_fiyat_{_cid}_{_ri}", placeholder="₺", label_visibility="collapsed")
+                if _rc[6].button("×", key=f"dc_rdel_{_cid}_{_ri}") and len(st.session_state[_cikis_key]) > 1:
+                    st.session_state[_cikis_key].pop(_ri); st.rerun()
+            if st.button("+ Rota Ekle", key=f"dc_rota_ekle_{_cid}"):
+                st.session_state[_cikis_key].append({"cikis":"","varis":"","ciro":"","tur":"Koli","desi":"","fiyat":""}); st.rerun()
+
+            st.divider()
+
+            # DURUM / AŞAMA / HEDEF
+            _dc1, _dc2, _dc3, _dc4 = st.columns(4)
+            _durum_v = _dc1.selectbox("Durum", DURUM_OPTS, index=DURUM_OPTS.index(_durum_r) if _durum_r in DURUM_OPTS else 0, key=f"dc_durum_{_cid}")
+            _asama_r = _kayit.get("asama","--") or "--"
+            _asama_v = _dc2.selectbox("Aşama", ASAMA_OPTS, index=ASAMA_OPTS.index(_asama_r) if _asama_r in ASAMA_OPTS else 0, key=f"dc_asama_{_cid}")
+            _hedef_v = _dc3.text_input("Hedef Ciro (₺)", value=str(_kayit.get("hedef_ciro","") or ""), key=f"dc_hedef_{_cid}", placeholder="₺")
+            _gercek_v = _dc4.text_input("Gerçekleşen (₺)", value=str(_kayit.get("gerceklesen","") or ""), key=f"dc_gercek_{_cid}", placeholder="₺")
+
+            try:
+                _hv = float((_hedef_v or "0").replace(".","").replace(",","."))
+                _gv = float((_gercek_v or "0").replace(".","").replace(",","."))
+                _fark_v = _gv - _hv
+                _basari_v = (_gv/_hv*100) if _hv > 0 else 0
+            except:
+                _fark_v = 0; _basari_v = 0
+
+            _dc5, _dc6 = st.columns(2)
+            _dc5.metric("Fark", f"{_fark_v:+,.0f} ₺")
+            _dc6.metric("Başarı %", f"{_basari_v:.0f}%")
+
+            _randevu_v = st.date_input("Randevu / İşlem Tarihi", key=f"dc_randevu_{_cid}",
+                value=_dcd.fromisoformat(_kayit["randevu_tar"]) if _kayit.get("randevu_tar") else _dcd.today())
+
+            st.divider()
+
+            # NOT — ARŞİVLİ
+            st.markdown("**📝 Açıklama / Not**")
+            if _not_arsiv:
+                st.markdown("<div style='max-height:160px;overflow-y:auto;background:#f8fafc;border-radius:8px;padding:8px 12px;margin-bottom:8px;'>", unsafe_allow_html=True)
+                for _na in reversed(_not_arsiv):
+                    st.markdown(f"<div style='font-size:12px;color:#334155;padding:4px 0;border-bottom:0.5px solid #e2e8f0;'><b>{_na.get('tarih','')}</b> — {_na.get('not','')}</div>", unsafe_allow_html=True)
+                st.markdown("</div>", unsafe_allow_html=True)
+            else:
+                st.caption("Henüz not yok.")
+
+            _yeni_not_v = st.text_area("Yeni not ekle", key=f"dc_not_{_cid}", placeholder="not yaz, kaydedince arşive eklenir...", height=70)
+
+            if st.button("💾 Kaydet", key=f"dc_kaydet_{_cid}", type="primary"):
+                _yeni_arsiv = list(_not_arsiv)
+                if _yeni_not_v and _yeni_not_v.strip():
+                    _yeni_arsiv.append({"tarih": str(_dcd.today()), "not": _yeni_not_v.strip(), "yazan": st.session_state.get("kullanici","")})
+
+                _veri_dc = {
+                    "firma": _firma_dc,
+                    "rotalar": _dcj.dumps(st.session_state.get(_cikis_key, []), ensure_ascii=False),
+                    "durum": _durum_v,
+                    "asama": _asama_v,
+                    "hedef_ciro": _hedef_v,
+                    "gerceklesen": _gercek_v,
+                    "randevu_tar": str(_randevu_v),
+                    "not_arsiv": _dcj.dumps(_yeni_arsiv, ensure_ascii=False),
+                    "guncelleyen": st.session_state.get("kullanici",""),
+                }
+                _ok_dc, _err_dc = _dc_kaydet(_cid, _veri_dc)
+                if _ok_dc:
+                    st.success(f"✅ {_firma_dc} kaydedildi!")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Hata: {_err_dc}")
+
 
 elif aktif == "whatsapp":
     import requests as _wa_req
