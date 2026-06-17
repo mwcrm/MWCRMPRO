@@ -1013,6 +1013,8 @@ section[data-testid="stSidebar"] div[data-testid="stExpander"] > div { padding: 
 div[data-testid="stVerticalBlock"] > div { gap: 0.3rem !important; }
 footer { visibility: hidden !important; }
 header { visibility: hidden !important; }
+/* Sidebar toggle butonu görünsün */
+button[data-testid="collapsedControl"] { display: flex !important; visibility: visible !important; }
 div[data-testid="stToolbar"] { display: none !important; }
 div[data-testid="stDecoration"] { display: none !important; }
 div[data-testid="stStatusWidget"] { display: none !important; }
