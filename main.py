@@ -3631,20 +3631,34 @@ elif aktif == "excel":
                         firma = str(row.get("firma","") or "").strip()
                         if not firma:
                             continue
+
+                        def _temiz_str(v):
+                            if v is None or (isinstance(v, float) and pd.isna(v)):
+                                return ""
+                            return str(v)
+
+                        def _temiz_float(v):
+                            try:
+                                if v is None or (isinstance(v, float) and pd.isna(v)):
+                                    return 0.0
+                                return float(v)
+                            except:
+                                return 0.0
+
                         kayitlar.append({
                             "firma": firma,
-                            "yetkili": str(row.get("yetkili","") or ""),
-                            "gsm": str(row.get("gsm","") or ""),
-                            "sabit": str(row.get("sabit","") or ""),
-                            "email": str(row.get("email","") or ""),
-                            "adres": str(row.get("adres","") or ""),
-                            "ilce": str(row.get("ilce","") or ""),
-                            "il": str(row.get("il","") or ""),
-                            "durum": str(row.get("durum","Hedef") or "Hedef"),
-                            "temsilci": str(row.get("temsilci","") or ""),
-                            "islem_asamasi": str(row.get("islem_asamasi","İlk Temas") or "İlk Temas"),
-                            "beklenen_ciro": float(row.get("beklenen_ciro",0) or 0),
-                            "gerceklesen_ciro": float(row.get("gerceklesen_ciro",0) or 0),
+                            "yetkili": _temiz_str(row.get("yetkili","")),
+                            "gsm": _temiz_str(row.get("gsm","")),
+                            "sabit": _temiz_str(row.get("sabit","")),
+                            "email": _temiz_str(row.get("email","")),
+                            "adres": _temiz_str(row.get("adres","")),
+                            "ilce": _temiz_str(row.get("ilce","")),
+                            "il": _temiz_str(row.get("il","")),
+                            "durum": _temiz_str(row.get("durum","Hedef")) or "Hedef",
+                            "temsilci": _temiz_str(row.get("temsilci","")),
+                            "islem_asamasi": _temiz_str(row.get("islem_asamasi","İlk Temas")) or "İlk Temas",
+                            "beklenen_ciro": _temiz_float(row.get("beklenen_ciro",0)),
+                            "gerceklesen_ciro": _temiz_float(row.get("gerceklesen_ciro",0)),
                             "olusturan": st.session_state.get("kullanici",""),
                             "silindi": 0
                         })
