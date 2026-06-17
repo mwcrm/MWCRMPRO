@@ -961,6 +961,7 @@ with st.sidebar:
     st.markdown("""
 <style>
 section[data-testid="stSidebar"] { padding-top: 0.5rem !important; transform: translateX(0px) !important; }
+button[data-testid="collapsedControl"] { display: none !important; }
 section[data-testid="stSidebar"] .stButton>button {
     text-align: left !important;
     justify-content: flex-start !important;
