@@ -4104,21 +4104,7 @@ elif aktif == "detay_cari":
     import json as _dcj
 
     st.markdown("## 📊 Detay Cari Liste — Çalışma Tablosu")
-    st.markdown("<small style='color:#64748b;'>Sistemdeki tüm cari müşteriler — Excel gibi düzenlenebilir tablo. Çoklu değer için hücrede Shift+Enter ile alt satıra geçin.</small>", unsafe_allow_html=True)
-
-    TR_81_IL = ["Adana","Adıyaman","Afyonkarahisar","Ağrı","Amasya","Ankara","Antalya","Artvin","Aydın","Balıkesir",
-        "Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa","Çanakkale","Çankırı","Çorum","Denizli",
-        "Diyarbakır","Edirne","Elazığ","Erzincan","Erzurum","Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari",
-        "Hatay","Isparta","Mersin","İstanbul","İzmir","Kars","Kastamonu","Kayseri","Kırklareli","Kırşehir",
-        "Kocaeli","Konya","Kütahya","Malatya","Manisa","Kahramanmaraş","Mardin","Muğla","Muş","Nevşehir",
-        "Niğde","Ordu","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas","Tekirdağ","Tokat",
-        "Trabzon","Tunceli","Şanlıurfa","Uşak","Van","Yozgat","Zonguldak","Aksaray","Bayburt","Karaman",
-        "Kırıkkale","Batman","Şırnak","Bartın","Ardahan","Iğdır","Yalova","Karabük","Kilis","Osmaniye","Düzce"]
-    TUR_BAREM = ["Koli","Palet","Çarpan","Parsiyel","TIR","Ambar Kargo","Dış Nakliye"]
-
-    with st.expander("ℹ️ Referans listeler — il ve tür baremleri", expanded=False):
-        st.caption("İl seçimi: " + ", ".join(TR_81_IL[:15]) + " ... (81 il, hücreye yazarken kullanabilirsiniz)")
-        st.caption("Tür baremleri: " + ", ".join(TUR_BAREM))
+    st.markdown("<small style='color:#64748b;'>Sistemdeki tüm cari müşteriler tek tabloda. Hücreye çoklu değer yazarken Shift+Enter ile alt satıra geçin.</small>", unsafe_allow_html=True)
 
     def _dc_sb():
         return get_sb_service() or get_sb_client()
@@ -4134,7 +4120,6 @@ elif aktif == "detay_cari":
         return {}
 
     def _dc_notlar_getir(cari_id):
-        """Ortak not arşivi — cari_aciklamalar tablosundan (cari kart, cari liste, detay liste hepsi burayı paylaşır)"""
         try:
             sb = _dc_sb()
             if sb:
@@ -4148,9 +4133,7 @@ elif aktif == "detay_cari":
             sb = _dc_sb()
             if sb:
                 sb.table("cari_aciklamalar").insert({
-                    "cari_id": cari_id,
-                    "cari_adi": firma,
-                    "aciklama": metin,
+                    "cari_id": cari_id, "cari_adi": firma, "aciklama": metin,
                     "olusturan": st.session_state.get("kullanici","")
                 }).execute()
                 return True
@@ -4182,7 +4165,6 @@ elif aktif == "detay_cari":
         st.info("Henüz cari kayıt yok.")
         st.stop()
 
-    # ARAMA
     _dc_ara = st.text_input("Firma ara", key="dc_ara", placeholder="firma adı ile filtrele...")
     _df_goster = _df_cari_dc.copy()
     if _dc_ara:
@@ -4190,7 +4172,7 @@ elif aktif == "detay_cari":
 
     st.caption(f"{len(_df_goster)} müşteri")
 
-    # TABLO VERİSİNİ HAZIRLA
+    # TABLO VERİSİ HAZIRLA — TEK SATIR / TEK SÜTUN, hücre içi çok satır serbest metin
     _tablo_satirlar = []
     for _idx, (___, _cr) in enumerate(_df_goster.iterrows(), start=1):
         _cid = int(_cr["id"])
@@ -4198,7 +4180,11 @@ elif aktif == "detay_cari":
         _notlar_ortak = _dc_notlar_getir(_cid)
         _eski_notlar = "\n".join([f"{str(n.get('tarih',''))[:16]} ({n.get('olusturan','')}): {n.get('aciklama','')}" for n in _notlar_ortak]) if _notlar_ortak else ""
 
+        _hedef_otomatik = str(int(_cr.get("beklenen_ciro",0))) if _cr.get("beklenen_ciro",0) else ""
+        _gercek_otomatik = str(int(_cr.get("gerceklesen_ciro",0))) if _cr.get("gerceklesen_ciro",0) else ""
+
         _tablo_satirlar.append({
+            "Seç": False,
             "Sıra": _idx,
             "Kayıt Tarihi": str(_cr.get("tarih","") or "")[:10],
             "ID": _cid,
@@ -4215,35 +4201,43 @@ elif aktif == "detay_cari":
             "Fiyat": _kayit.get("fiyat","") or "",
             "Durum": _kayit.get("durum","") or str(_cr.get("durum","") or ""),
             "Aşama": _kayit.get("asama","") or str(_cr.get("islem_asamasi","") or ""),
-            "Hedef Ciro": _kayit.get("hedef_ciro","") or (str(int(_cr.get("beklenen_ciro",0))) if _cr.get("beklenen_ciro",0) else ""),
-            "Gerçekleşen": _kayit.get("gerceklesen","") or (str(int(_cr.get("gerceklesen_ciro",0))) if _cr.get("gerceklesen_ciro",0) else ""),
-            "Fark": _kayit.get("fark","") or "",
-            "Başarı %": _kayit.get("basari","") or "",
+            "Hedef Ciro": _kayit.get("hedef_ciro","") or _hedef_otomatik,
+            "Gerçekleşen": _kayit.get("gerceklesen","") or _gercek_otomatik,
+            "fark": _kayit.get("fark","") or "",
+            "Başarı yuzdesi": _kayit.get("basari","") or "",
             "Açıklama Yaz": "",
             "Eski Açıklama Notu": _eski_notlar,
-            "Randevu/İşlem Tarihi": _kayit.get("randevu_tar","") or "",
+            "Randevu İşlem Tarih": _kayit.get("randevu_tar","") or "",
         })
 
     _df_tablo = pd.DataFrame(_tablo_satirlar)
-
-    st.caption("💡 Çoklu değerleri virgülle ayırarak yazın (örn: İstanbul, Ankara, Bursa). Yeni not eklerseniz eski notlar silinmez, arşivlenir.")
 
     _edited = st.data_editor(
         _df_tablo,
         use_container_width=True,
         hide_index=True,
-        height=min(600, 80 + len(_df_tablo)*45),
+        height=min(700, 90 + len(_df_tablo)*44),
         disabled=["Sıra","Kayıt Tarihi","ID","Firma","Yetkili","GSM","İl","İlçe","Eski Açıklama Notu"],
         column_config={
-            "Randevu/İşlem Tarihi": st.column_config.TextColumn(width="medium"),
-            "Açıklama Yaz": st.column_config.TextColumn(width="medium"),
-            "Eski Açıklama Notu": st.column_config.TextColumn(width="large"),
+            "Seç": st.column_config.CheckboxColumn(width="small"),
+            "Sıra": st.column_config.NumberColumn(width="small"),
+            "Kayıt Tarihi": st.column_config.TextColumn(width="small"),
+            "ID": st.column_config.NumberColumn(width="small"),
             "Çıkış İl": st.column_config.TextColumn(width="medium"),
             "Varış İl": st.column_config.TextColumn(width="medium"),
             "Ciro": st.column_config.TextColumn(width="medium"),
-            "Tür": st.column_config.TextColumn(width="medium", help="Koli, Palet, Çarpan vb — virgülle ayırın"),
+            "Tür": st.column_config.TextColumn(width="medium"),
             "Desi-Kg": st.column_config.TextColumn(width="medium"),
-            "Fiyat": st.column_config.TextColumn(width="medium"),
+            "Fiyat": st.column_config.TextColumn(width="small"),
+            "Durum": st.column_config.TextColumn(width="small"),
+            "Aşama": st.column_config.TextColumn(width="small"),
+            "Hedef Ciro": st.column_config.TextColumn(width="small"),
+            "Gerçekleşen": st.column_config.TextColumn(width="small"),
+            "fark": st.column_config.TextColumn(width="small"),
+            "Başarı yuzdesi": st.column_config.TextColumn(width="small"),
+            "Açıklama Yaz": st.column_config.TextColumn(width="medium"),
+            "Eski Açıklama Notu": st.column_config.TextColumn(width="large"),
+            "Randevu İşlem Tarih": st.column_config.TextColumn(width="medium"),
         },
         key="dc_data_editor"
     )
@@ -4257,12 +4251,10 @@ elif aktif == "detay_cari":
 
             _degisti = any(str(_row[_c]) != str(_eski_satir[_c]) for _c in [
                 "Çıkış İl","Varış İl","Ciro","Tür","Desi-Kg","Fiyat","Durum","Aşama",
-                "Hedef Ciro","Gerçekleşen","Fark","Başarı %","Açıklama Yaz","Randevu/İşlem Tarihi"
+                "Hedef Ciro","Gerçekleşen","fark","Başarı yuzdesi","Açıklama Yaz","Randevu İşlem Tarih"
             ])
             if not _degisti:
                 continue
-
-            _kayit_e = _dc_kayitlar.get(_cid_e, {})
 
             _yeni_not = str(_row.get("Açıklama Yaz","") or "").strip()
             if _yeni_not:
@@ -4280,9 +4272,9 @@ elif aktif == "detay_cari":
                 "asama": str(_row.get("Aşama","") or ""),
                 "hedef_ciro": str(_row.get("Hedef Ciro","") or ""),
                 "gerceklesen": str(_row.get("Gerçekleşen","") or ""),
-                "fark": str(_row.get("Fark","") or ""),
-                "basari": str(_row.get("Başarı %","") or ""),
-                "randevu_tar": str(_row.get("Randevu/İşlem Tarihi","") or ""),
+                "fark": str(_row.get("fark","") or ""),
+                "basari": str(_row.get("Başarı yuzdesi","") or ""),
+                "randevu_tar": str(_row.get("Randevu İşlem Tarih","") or ""),
                 "guncelleyen": st.session_state.get("kullanici",""),
             }
             if _dc_kaydet_satir(_cid_e, _veri_kayit):
