@@ -3663,7 +3663,16 @@ elif aktif == "excel":
                 st.dataframe(df_yukl.head(10), use_container_width=True, hide_index=True)
                 _ekl1, _ekl2 = st.columns(2)
                 if _ekl1.button("✅ Sisteme Aktar", type="primary", use_container_width=True, key="excel_aktar_btn"):
-                    _mevcut_firmalar = set(df_ck["firma"].str.strip().str.lower()) if not df_ck.empty else set()
+                    st.write("🔄 İşlem başladı...")
+                    try:
+                        _mevcut_firmalar = set()
+                        if not df_ck.empty and "firma" in df_ck.columns:
+                            for _f in df_ck["firma"].fillna("").astype(str):
+                                _mevcut_firmalar.add(_f.strip().lower())
+                        st.write(f"✓ {len(_mevcut_firmalar)} mevcut firma yüklendi")
+                    except Exception as _e0:
+                        st.error(f"Mevcut firma listesi hatası: {_e0}")
+                        _mevcut_firmalar = set()
                     _eklenecekler = []
                     _atlanan = 0
                     _atlanan_listesi = []
