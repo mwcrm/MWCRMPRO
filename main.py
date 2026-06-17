@@ -3651,6 +3651,7 @@ elif aktif == "excel":
 
                     toplam = len(kayitlar)
                     basarili = 0
+                    hatalar = []
                     BATCH = 25
                     bar = st.progress(0)
                     durum_text = st.empty()
@@ -3661,11 +3662,15 @@ elif aktif == "excel":
                             sb.table("cari_kartlar").insert(parca).execute()
                             basarili += len(parca)
                         except Exception as e:
-                            durum_text.error(f"Hata (satır {i+1}-{i+len(parca)}): {e}")
+                            hatalar.append(f"Satır {i+1}-{i+len(parca)}: {e}")
                         bar.progress(min((i+BATCH)/toplam, 1.0))
                         durum_text.text(f"{min(i+BATCH,toplam)}/{toplam} işlendi, {basarili} eklendi")
 
                     st.success(f"🎉 Tamamlandı! {basarili}/{toplam} kayıt eklendi.")
+                    if hatalar:
+                        st.error(f"❌ {len(hatalar)} grup hata verdi:")
+                        for h in hatalar:
+                            st.code(h)
 
 
 elif aktif == "analiz":
