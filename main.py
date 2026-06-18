@@ -2083,19 +2083,52 @@ elif aktif == "liste":
 
     import json as _json_ls
 
-    # ── TÜMÜ GÖSTER ──────────────────────────────────────────────────────────
-    # Kolon sırası — session_state'den geri yükle (Streamlit data_editor kalıcı kolon sırası)
+    # ── TÜMÜ GÖSTER — tablo sol, not paneli sağ ──────────────────────────────
     _kayitli_sira = st.session_state.get("_cl_kolon_sira", [])
     _aktif_col_order = _kayitli_sira if _kayitli_sira else col_order
 
-    edited_df = st.data_editor(
-        df_edit,
-        use_container_width=True,
-        num_rows="fixed",
-        column_config=col_config,
-        column_order=_aktif_col_order,
-        key="cari_editor"
-    )
+    # Sağda not paneli açık mı?
+    _not_panel_id = st.session_state.get("_cl_not_panel_id")
+
+    _tbl_col, _not_col = st.columns([3, 1]) if _not_panel_id else st.columns([1, 0.001])
+
+    with _tbl_col:
+        edited_df = st.data_editor(
+            df_edit,
+            use_container_width=True,
+            num_rows="fixed",
+            column_config=col_config,
+            column_order=_aktif_col_order,
+            key="cari_editor"
+        )
+
+    with _not_col:
+        if _not_panel_id:
+            _panel_notlar = _not_detay.get(str(_not_panel_id), [])
+            _panel_firma = ""
+            _panel_rows = df_edit[df_edit["id"] == int(_not_panel_id)]
+            if not _panel_rows.empty:
+                _panel_firma = str(_panel_rows.iloc[0].get("firma",""))
+            st.markdown(
+                f"<div style='border:1.5px solid #3b82f6;border-radius:10px;padding:12px 14px;"
+                f"background:white;height:100%'>"
+                f"<div style='font-size:12px;font-weight:600;color:#1e40af;margin-bottom:8px'>"
+                f"📋 {_panel_firma[:20]} — {len(_panel_notlar)} not"
+                f"</div>"
+                + "".join([
+                    f"<div style='border-left:3px solid #3b82f6;padding:7px 10px;margin:5px 0;"
+                    f"border-radius:0 6px 6px 0;background:#f8fafc'>"
+                    f"<div style='font-size:11px;color:#94a3b8;margin-bottom:2px'>📅 {_nn.get('tarih','')} · 👤 {_nn.get('kim','')}</div>"
+                    f"<div style='color:#1e293b;font-size:12px'>{str(_nn.get('metin','')).replace('<','&lt;').replace('>','&gt;')}</div>"
+                    f"</div>"
+                    for _nn in _panel_notlar
+                ])
+                + "</div>",
+                unsafe_allow_html=True
+            )
+            if st.button("✕ Kapat", key="cl_not_panel_kapat", use_container_width=True):
+                st.session_state.pop("_cl_not_panel_id", None)
+                st.rerun()
 
     # Kolon sırası değiştiyse session_state'e kaydet
     try:
@@ -2126,50 +2159,17 @@ elif aktif == "liste":
     secili_sayi = len(secili_df)
     secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
 
-    # 📨 Not okuma — 📋 Notlar kolonuna tıklayınca (satır seçilince) hemen altında açılır
+    # Tek satır seçilince — notu varsa sağ paneli aç
     if secili_sayi == 1:
-        _not_id = int(secili_idler[0]) if secili_idler else 0
-        if _not_id:
-            _not_firma = df_f[df_f["id"]==_not_id].iloc[0].get("firma","") if not df_f[df_f["id"]==_not_id].empty else ""
-            _not_cid_str = str(_not_id)
-            _cached_notlar = _not_detay.get(_not_cid_str, [])
-            if _cached_notlar:
-                st.markdown(
-                    f"<div style='border:1.5px solid #3b82f6;border-radius:10px;padding:14px 18px;margin:4px 0 10px 0;background:white'>"
-                    f"<div style='font-size:13px;font-weight:600;color:#1e40af;margin-bottom:10px'>📋 {_not_firma} — {len(_cached_notlar)} not</div>"
-                    + "".join([
-                        f"<div style='border-left:3px solid #3b82f6;padding:8px 12px;margin:6px 0;border-radius:0 6px 6px 0;background:#f8fafc'>"
-                        f"<span style='color:#94a3b8;font-size:11px'>📅 {_nn.get('tarih','')} · 👤 {_nn.get('kim','')}</span>"
-                        f"<div style='color:#1e293b;font-size:13px;margin-top:3px'>{str(_nn.get('metin','')).replace('<','&lt;').replace('>','&gt;')}</div>"
-                        f"</div>"
-                        for _nn in _cached_notlar
-                    ])
-                    + "</div>",
-                    unsafe_allow_html=True
-                )
-            else:
-                try:
-                    if sb_liste:
-                        _not_r = sb_liste.table("cari_aciklamalar").select("*").eq("cari_id",_not_id).order("tarih",desc=True).execute()
-                        _not_df = pd.DataFrame(_not_r.data) if _not_r.data else pd.DataFrame()
-                        if not _not_df.empty:
-                            st.markdown(
-                                f"<div style='border:1.5px solid #3b82f6;border-radius:10px;padding:14px 18px;margin:4px 0 10px 0;background:white'>"
-                                f"<div style='font-size:13px;font-weight:600;color:#1e40af;margin-bottom:10px'>📋 {_not_firma} — {len(_not_df)} not</div>"
-                                + "".join([
-                                    f"<div style='border-left:3px solid #3b82f6;padding:8px 12px;margin:6px 0;border-radius:0 6px 6px 0;background:#f8fafc'>"
-                                    f"<span style='color:#94a3b8;font-size:11px'>📅 {fmt_tarih(_nr.get('tarih',''))} · 👤 {_nr.get('olusturan','')}</span>"
-                                    f"<div style='color:#1e293b;font-size:13px;margin-top:3px'>{str(_nr.get('aciklama','')).replace('<','&lt;').replace('>','&gt;')}</div>"
-                                    f"</div>"
-                                    for _, _nr in _not_df.iterrows()
-                                ])
-                                + "</div>",
-                                unsafe_allow_html=True
-                            )
-                        else:
-                            st.info(f"📭 {_not_firma} için henüz not yok.")
-                except: pass
-
+        _sel_id = int(secili_idler[0])
+        if _not_detay.get(str(_sel_id)):
+            if st.session_state.get("_cl_not_panel_id") != _sel_id:
+                st.session_state["_cl_not_panel_id"] = _sel_id
+                st.rerun()
+    elif secili_sayi == 0 and st.session_state.get("_cl_not_panel_id"):
+        # Seçim kalkarsa paneli kapat
+        st.session_state.pop("_cl_not_panel_id", None)
+        st.rerun()
 
 
     # ── BUTONLAR ──────────────────────────────────────────────────────────────
