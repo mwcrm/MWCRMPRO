@@ -4598,74 +4598,53 @@ elif aktif == "analiz":
         st.divider()
 
 
-        # ── STREAMLIT KAYDET BUTONU (gizli trigger) ──────────────────────
-        st.markdown("---")
-        _kc1,_kc2,_kc3,_kc4,_kc5 = st.columns(5)
-        _kaydet_btn = _kc1.button(
-            f"💾 {'Güncelle' if _duzenle else 'Kaydet'}",
-            type="primary", use_container_width=True, key="an_kaydet_main"
-        )
-        _kc2.button("📄 Spot Teklif", use_container_width=True, key="an_spot2",
+
+        # ── KAYDET BAR ────────────────────────────────────────────────────────
+        _sb1,_sb2,_sb3,_sb4,_sb5 = st.columns(5)
+        if _sb1.button(f"💾 {'Güncelle' if _duzenle else 'Kaydet'}", type="primary",
+                       use_container_width=True, key="an_kaydet_main"):
+            st.session_state["an_kaydet_trigger"] = True
+            st.rerun()
+        _sb2.button("📄 Spot Teklif", use_container_width=True, key="an_spot",
             on_click=lambda: st.session_state.update({"aktif_tab":"teklif","teklif_musteri_onsel":_firma}))
-        _kc3.button("⭐ Özel Teklif", use_container_width=True, key="an_ozel_t2",
+        _sb3.button("⭐ Özel Teklif", use_container_width=True, key="an_ozel_t",
             on_click=lambda: st.session_state.update({"aktif_tab":"ozel_teklif","teklif_musteri_onsel":_firma}))
-        if _duzenle and _kc5.button("🗑 Sil", use_container_width=True, key="an_sil_btn2"):
+        _tel_c = str(st.session_state.get("an_iletisim", _mv("iletisim","")) or "").replace(" ","").replace("-","")
+        if _tel_c and "@" not in _tel_c:
+            if _tel_c.startswith("0"): _tel_c = "90"+_tel_c[1:]
+            _sb4.markdown(f"<a href='https://wa.me/{_tel_c}' target='_blank'><button style='width:100%;padding:6px;font-size:12px;border:none;background:#25d366;color:white;border-radius:6px;cursor:pointer'>💬 WA</button></a>", unsafe_allow_html=True)
+        if _duzenle and _sb5.button("🗑 Sil", use_container_width=True, key="an_sil_btn"):
             if _an_sil(_firma):
                 if _ik in st.session_state: del st.session_state[_ik]
                 st.success("Silindi!"); st.rerun()
+        _gs2 = lambda k: ", ".join(st.session_state.get(k, []))
+        _pot_val   = (st.session_state.get("an_t_pot") or ["orta"])[0]
+        _sonuc_val = (st.session_state.get("an_t_sonuc") or ["takip edilecek"])[0]
+        try: _bv = float((_an_bek or "0").replace(".","").replace(",","."))
+        except: _bv = 0
+        try: _gv = float((_an_ger or "0").replace(".","").replace(",","."))
+        except: _gv = 0
 
-        # ── FORM VERİLERİNİ SESSION'DAN OKU VE KAYDET ────────────────────
+        _kaydet_btn = st.session_state.get("an_kaydet_trigger", False)
         if _kaydet_btn:
-            # Pill session state'lerden topla (HTML'den değil, mevcut SS'den)
-            _gs2 = lambda k: ", ".join(st.session_state.get(k, []))
-            _an_yetkili   = st.session_state.get("_an_f_yetkili", _mv("yetkili",""))
-            _an_iletisim  = st.session_state.get("_an_f_iletisim", _mv("iletisim",_auto_tel))
-            _an_sektor    = st.session_state.get("_an_f_sektor", _mv("sektor","--"))
-            _an_bek       = st.session_state.get("_an_f_bek", str(int(float(_mv("bek_ciro",0) or 0))) if _mv("bek_ciro",0) else "")
-            _an_ger       = st.session_state.get("_an_f_ger", str(int(float(_mv("ger_ciro",0) or 0))) if _mv("ger_ciro",0) else "")
-            _an_not       = st.session_state.get("_an_f_not", _mv("not_alan",""))
-            _an_takip     = st.session_state.get("_an_f_takip", str(date.today()))
-            _an_sonraki   = st.session_state.get("_an_f_sonraki", _mv("sonraki_adim",""))
-            _an_fbek      = st.session_state.get("_an_f_fbek", _mv("fiyat_bek",""))
-            _an_ozel      = st.session_state.get("_an_f_ozel", _mv("ozel_istek",""))
-
-            try: _bv = float((_an_bek or "0").replace(".","").replace(",","."))
-            except: _bv = 0
-            try: _gv = float((_an_ger or "0").replace(".","").replace(",","."))
-            except: _gv = 0
-
-            _pot_val = (st.session_state.get("an_t_pot") or ["orta"])[0]
-            _sonuc_val = (st.session_state.get("an_t_sonuc") or ["takip edilecek"])[0]
-
+            st.session_state.pop("an_kaydet_trigger", None)
             _veri = {
-                "yetkili":       _an_yetkili,
-                "iletisim":      _an_iletisim,
-                "sektor":        _an_sektor,
-                "amac":          _gs2("an_t_amac"),
-                "mdurum":        _gs2("an_t_mdurum"),
-                "bek_ciro":      _bv,
-                "ger_ciro":      _gv,
-                "kaynak":        _gs2("an_t_kaynak"),
-                "kargo":         _gs2("an_t_kargo"),
-                "urun":          _gs2("an_t_urun"),
-                "odeme":         _gs2("an_t_odeme"),
-                "teklif_tur":    _gs2("an_t_fiyattur"),
-                "beklenti":      _gs2("an_t_beklenti"),
-                "engel":         _gs2("an_t_engel"),
-                "sonuc":         _sonuc_val,
-                "sonraki_adim":  _gs2("an_t_sonraki") or _an_sonraki,
-                "sik":           _gs2("an_t_sik"),
-                "potansiyel":    _pot_val,
-                "not_alan":      _an_not,
-                "takip_tar":     str(_an_takip),
-                "fiyat_bek":     _an_fbek,
-                "ozel_istek":    _an_ozel,
-                "karar":         _gs2("an_t_karar"),
-                "sure":          _gs2("an_t_sure"),
-                "bolge":         _aj.dumps(st.session_state.get("an_bolge_rows",[]), ensure_ascii=False),
-                "rakip":         _aj.dumps(st.session_state.get("an_rakip_rows",[]), ensure_ascii=False),
-                "fiyat_tablo":   _aj.dumps(st.session_state.get("an_fiyat_rows",[]), ensure_ascii=False),
-                "olusturan":     st.session_state.get("kullanici",""),
+                "yetkili":      _an_yetkili,   "iletisim":   _an_iletisim,
+                "sektor":       _an_sektor,     "amac":       _gs2("an_t_amac"),
+                "mdurum":       _gs2("an_t_mdurum"), "bek_ciro": _bv, "ger_ciro": _gv,
+                "kaynak":       _gs2("an_t_kaynak"), "urun":    _gs2("an_t_urun"),
+                "kargo":        _gs2("an_t_kargo"),  "odeme":   _gs2("an_t_odeme"),
+                "teklif_tur":   _gs2("an_t_fiyattur"), "beklenti": _gs2("an_t_beklenti"),
+                "engel":        _gs2("an_t_engel"),  "sonuc":   _sonuc_val,
+                "sonraki_adim": _gs2("an_t_sonraki") or _an_sonraki,
+                "sik":          _gs2("an_t_sik"),    "potansiyel": _pot_val,
+                "not_alan":     _an_not,             "takip_tar": str(_an_takip),
+                "fiyat_bek":    _an_fbek,            "ozel_istek": _an_ozel,
+                "karar":        _gs2("an_t_karar"),  "sure":    _gs2("an_t_sure"),
+                "bolge":        _aj.dumps(st.session_state.get("an_bolge_rows",[]), ensure_ascii=False),
+                "rakip":        _aj.dumps(st.session_state.get("an_rakip_rows",[]), ensure_ascii=False),
+                "fiyat_tablo":  _aj.dumps(st.session_state.get("an_fiyat_rows",[]), ensure_ascii=False),
+                "olusturan":    st.session_state.get("kullanici",""),
             }
             _ok, _err = _an_kaydet(_firma, _veri)
             if _ok:
