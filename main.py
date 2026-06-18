@@ -721,7 +721,21 @@ button[data-testid="collapsedControl"]{display:none!important;}
 button[kind="header"]{display:none!important;}
 .st-emotion-cache-zq5wmm{display:none!important;}
 .st-emotion-cache-1lna32f{display:none!important;}
+.mw-not-wrap{display:inline-block;position:relative;cursor:pointer;}
+.mw-not-ikon{display:inline-flex;align-items:center;gap:3px;font-size:12px;color:#2563eb;background:#eff6ff;padding:2px 8px;border-radius:20px;border:0.5px solid #bfdbfe;white-space:nowrap;user-select:none;}
+.mw-not-ikon:hover{background:#dbeafe;}
+.mw-not-tooltip{display:none;position:absolute;left:0;top:calc(100%% + 4px);z-index:9999;background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:10px 14px;min-width:260px;max-width:340px;font-size:12px;color:#374151;}
+.mw-not-wrap:hover .mw-not-tooltip{display:block;}
+.mw-not-satir{padding:6px 0;border-bottom:0.5px solid #f1f5f9;line-height:1.5;}
+.mw-not-satir:last-child{border-bottom:none;padding-bottom:0;}
+.mw-not-meta{font-size:11px;color:#94a3b8;margin-bottom:2px;}
+.mw-not-metin{color:#1e293b;}
+.mw-not-daha{font-size:11px;color:#94a3b8;margin-top:6px;font-style:italic;}
 </style>""", unsafe_allow_html=True)
+
+st.markdown("""<script>
+(function(){setInterval(function(){try{var _=window.parent.document.title;}catch(e){}},270000);})();
+</script>""", unsafe_allow_html=True)
 
 # ── EKRAN AYARLARI UYGULA ────────────────────────────────────────────────────
 _e_r1      = st.session_state.get("_ekran_r1","")
@@ -2024,13 +2038,23 @@ elif aktif == "liste":
         df_edit["aciklama"] = ""
     df_edit["aciklama"] = df_edit["aciklama"].fillna("").astype(str).replace("nan","")
 
-    # Her firma için not sayısını göster
+    # Her firma için not sayısı + içerik (hover için)
+    _not_detay = {}  # {cari_id: [{tarih, olusturan, aciklama}, ...]}
     if sb_liste:
         try:
-            _res_notlar = sb_liste.table("cari_aciklamalar").select("cari_id").execute()
+            _res_notlar = sb_liste.table("cari_aciklamalar").select("cari_id,tarih,olusturan,aciklama").execute()
             if _res_notlar.data:
                 import collections
                 _not_sayac = collections.Counter([str(r["cari_id"]) for r in _res_notlar.data])
+                for _nr in _res_notlar.data:
+                    _ncid = str(_nr.get("cari_id",""))
+                    if _ncid not in _not_detay:
+                        _not_detay[_ncid] = []
+                    _not_detay[_ncid].append({
+                        "tarih": str(_nr.get("tarih",""))[:16],
+                        "kim": str(_nr.get("olusturan","") or ""),
+                        "metin": str(_nr.get("aciklama","") or ""),
+                    })
                 df_edit["📨 Notlar"] = df_edit["id"].apply(lambda x: f"📨 {_not_sayac.get(str(int(x)),0)}" if _not_sayac.get(str(int(x)),0) > 0 else "")
             else:
                 df_edit["📨 Notlar"] = ""
@@ -2065,6 +2089,52 @@ elif aktif == "liste":
             st.session_state["_cl_kolon_sira"] = _col_order_now
     except:
         pass
+
+    # ── NOT HOVER PANEL — inline style, CSS class bağımlılığı yok ────────────
+    _hover_html_parts = []
+    for _, _hr in df_edit.iterrows():
+        try:
+            _hcid = str(int(_hr["id"]))
+        except:
+            continue
+        _hnotlar = _not_detay.get(_hcid)
+        if not _hnotlar: continue
+        _hfirma = str(_hr.get("firma","") or "")[:30]
+        _hsayi = len(_hnotlar)
+        _tooltip_satirlar = ""
+        for _hn in _hnotlar[:3]:
+            _hmetin = str(_hn.get("metin","")).replace("<","&lt;").replace(">","&gt;").replace("'","&#39;")[:120]
+            _tooltip_satirlar += (
+                f"<div style='padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:12px;line-height:1.5'>"
+                f"<div style='font-size:11px;color:#94a3b8;margin-bottom:2px'>📅 {_hn.get('tarih','')} · 👤 {_hn.get('kim','')}</div>"
+                f"<div style='color:#1e293b'>{_hmetin}</div>"
+                f"</div>"
+            )
+        if _hsayi > 3:
+            _tooltip_satirlar += f"<div style='font-size:11px;color:#94a3b8;margin-top:4px;font-style:italic'>+ {_hsayi-3} not daha...</div>"
+        _hover_html_parts.append(
+            f"<span onmouseenter=\"this.querySelector('.mw-tip').style.display='block'\" "
+            f"onmouseleave=\"this.querySelector('.mw-tip').style.display='none'\" "
+            f"style='display:inline-block;position:relative;cursor:pointer;margin:2px'>"
+            f"<span style='display:inline-flex;align-items:center;gap:3px;font-size:12px;color:#2563eb;"
+            f"background:#eff6ff;padding:3px 10px;border-radius:20px;border:1px solid #bfdbfe;"
+            f"white-space:nowrap;user-select:none'>📋 {_hsayi} &nbsp;·&nbsp; {_hfirma}</span>"
+            f"<div class='mw-tip' style='display:none;position:absolute;left:0;top:calc(100%% + 4px);"
+            f"z-index:9999;background:white;border:1px solid #e2e8f0;border-radius:8px;"
+            f"padding:10px 14px;min-width:280px;max-width:360px;box-shadow:0 4px 12px rgba(0,0,0,0.08)'>"
+            f"{_tooltip_satirlar}"
+            f"</div>"
+            f"</span>"
+        )
+
+    if _hover_html_parts:
+        import streamlit.components.v1 as _components
+        _panel_html = (
+            "<div style='display:flex;flex-wrap:wrap;gap:4px;padding:8px 0'>"
+            + "".join(_hover_html_parts)
+            + "</div>"
+        )
+        _components.html(_panel_html, height=60 + (len(_hover_html_parts) // 6) * 36, scrolling=False)
 
     # Her render'da tüm tabloyu session_state'e kaydet
     try:
@@ -4689,7 +4759,47 @@ elif aktif == "detay_cari":
         key="dc_data_editor"
     )
 
-    _bk1, _bk2 = st.columns(2)
+    # ── DETAY CARİ — NOT HOVER PANEL ──────────────────────────────────────────
+    _dc_hover_parts = []
+    for _dch in _tablo_satirlar:
+        _dch_cid = int(_dch["ID"])
+        _dch_notlar = _dc_notlar_tum.get(_dch_cid, [])
+        if not _dch_notlar: continue
+        _dch_firma = str(_dch["Firma"])[:30]
+        _dch_sayi = len(_dch_notlar)
+        _dch_tooltip = ""
+        for _dn in _dch_notlar[:3]:
+            _dm = str(_dn.get("aciklama","")).replace("<","&lt;").replace(">","&gt;").replace("'","&#39;")[:120]
+            _dch_tooltip += (
+                f"<div style='padding:5px 0;border-bottom:1px solid #f1f5f9;font-size:12px;line-height:1.5'>"
+                f"<div style='font-size:11px;color:#94a3b8;margin-bottom:2px'>📅 {str(_dn.get('tarih',''))[:16]} · 👤 {_dn.get('olusturan','')}</div>"
+                f"<div style='color:#1e293b'>{_dm}</div>"
+                f"</div>"
+            )
+        if _dch_sayi > 3:
+            _dch_tooltip += f"<div style='font-size:11px;color:#94a3b8;margin-top:4px;font-style:italic'>+ {_dch_sayi-3} not daha...</div>"
+        _dc_hover_parts.append(
+            f"<span onmouseenter=\"this.querySelector('.mw-tip').style.display='block'\" "
+            f"onmouseleave=\"this.querySelector('.mw-tip').style.display='none'\" "
+            f"style='display:inline-block;position:relative;cursor:pointer;margin:2px'>"
+            f"<span style='display:inline-flex;align-items:center;gap:3px;font-size:12px;color:#2563eb;"
+            f"background:#eff6ff;padding:3px 10px;border-radius:20px;border:1px solid #bfdbfe;"
+            f"white-space:nowrap;user-select:none'>📋 {_dch_sayi} &nbsp;·&nbsp; {_dch_firma}</span>"
+            f"<div class='mw-tip' style='display:none;position:absolute;left:0;top:calc(100%% + 4px);"
+            f"z-index:9999;background:white;border:1px solid #e2e8f0;border-radius:8px;"
+            f"padding:10px 14px;min-width:280px;max-width:360px;box-shadow:0 4px 12px rgba(0,0,0,0.08)'>"
+            f"{_dch_tooltip}"
+            f"</div>"
+            f"</span>"
+        )
+    if _dc_hover_parts:
+        import streamlit.components.v1 as _components_dc
+        _dc_panel_html = (
+            "<div style='display:flex;flex-wrap:wrap;gap:4px;padding:8px 0'>"
+            + "".join(_dc_hover_parts)
+            + "</div>"
+        )
+        _components_dc.html(_dc_panel_html, height=60 + (len(_dc_hover_parts) // 6) * 36, scrolling=False)
 
     if _bk1.button("💾 Tüm Değişiklikleri Kaydet", type="primary", use_container_width=True, key="dc_kaydet_tum"):
         _basarili = 0
