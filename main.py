@@ -4208,15 +4208,40 @@ elif aktif == "detay_cari":
         if _df_henuz_yok.empty:
             st.caption("Tüm cari müşteriler zaten bu listede.")
         else:
-            _yeni_opts = ["-- Seçin --"] + [f"[{int(r['id'])}] {r['firma']}" for _,r in _df_henuz_yok.iterrows()]
-            _yeni_sec = st.selectbox("Müşteri seç", _yeni_opts, key="dc_yeni_musteri_sec")
-            if st.button("Listeye Ekle", key="dc_yeni_musteri_ekle_btn"):
-                if _yeni_sec != "-- Seçin --":
-                    _yeni_cid = int(_yeni_sec.split("]")[0].replace("[","").strip())
+            _yeni_opts_cok = [f"[{int(r['id'])}] {r['firma']}" for _,r in _df_henuz_yok.iterrows()]
+            _yeni_sec_cok = st.multiselect("Müşteri seç (birden fazla seçebilirsiniz)", _yeni_opts_cok, key="dc_yeni_musteri_sec_cok")
+
+            _ek1, _ek2 = st.columns(2)
+            if _ek1.button(f"Seçilenleri Ekle ({len(_yeni_sec_cok)})", key="dc_yeni_musteri_ekle_btn", disabled=len(_yeni_sec_cok)==0):
+                _eklenen_say = 0
+                for _ys in _yeni_sec_cok:
+                    _yeni_cid = int(_ys.split("]")[0].replace("[","").strip())
                     _yeni_firma_adi = str(_df_henuz_yok[_df_henuz_yok["id"]==_yeni_cid].iloc[0]["firma"])
-                    _dc_kaydet_satir(_yeni_cid, {"firma": _yeni_firma_adi, "guncelleyen": st.session_state.get("kullanici","")})
-                    st.success(f"✅ {_yeni_firma_adi} eklendi!")
-                    st.rerun()
+                    if _dc_kaydet_satir(_yeni_cid, {"firma": _yeni_firma_adi, "guncelleyen": st.session_state.get("kullanici","")}):
+                        _eklenen_say += 1
+                st.success(f"✅ {_eklenen_say} müşteri eklendi!")
+                st.rerun()
+            if _ek2.button(f"🔁 Tüm Cari Listeyi Ekle ({len(_df_henuz_yok)})", key="dc_tum_ekle_btn"):
+                _eklenen_say2 = 0
+                for _, _hr in _df_henuz_yok.iterrows():
+                    if _dc_kaydet_satir(int(_hr["id"]), {"firma": str(_hr["firma"]), "guncelleyen": st.session_state.get("kullanici","")}):
+                        _eklenen_say2 += 1
+                st.success(f"✅ {_eklenen_say2} müşteri eklendi!")
+                st.rerun()
+
+    # MÜKERRER MÜŞTERİ TESPİTİ
+    with st.expander("🔍 Mükerrer (Aynı İsimli) Müşterileri Bul"):
+        _firma_gruplari = _df_cari_dc.groupby(_df_cari_dc["firma"].str.strip().str.upper())["id"].apply(list)
+        _mukerrerler = {k: v for k, v in _firma_gruplari.items() if len(v) > 1}
+        if not _mukerrerler:
+            st.caption("Mükerrer müşteri bulunamadı.")
+        else:
+            st.warning(f"{len(_mukerrerler)} mükerrer firma adı bulundu. Hangisini sileceğinize siz karar verin — silme işlemi Cari Liste sayfasından yapılır.")
+            for _fadi, _idler in _mukerrerler.items():
+                _satirlar = _df_cari_dc[_df_cari_dc["id"].isin(_idler)]
+                st.markdown(f"**{_fadi}**")
+                for _, _sr in _satirlar.iterrows():
+                    st.caption(f"[{int(_sr['id'])}] {_sr['firma']} — {_sr.get('il','') or ''} {_sr.get('ilce','') or ''} — {_sr.get('gsm','') or ''} — kayıt: {str(_sr.get('tarih','') or '')[:10]}")
 
     if _df_goster.empty:
         st.info("Henüz bu çalışma tablosunda müşteri yok. Yukarıdan ekleyin.")
