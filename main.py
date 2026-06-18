@@ -4358,31 +4358,44 @@ elif aktif == "analiz":
 
         # Session init
         if _ik not in st.session_state:
+            _bolge_raw = _mvj("bolge")
+            if isinstance(_bolge_raw, dict):
+                _bolge_init     = _bolge_raw.get("satirlar", [])
+                _yetkili_ek_init= _bolge_raw.get("yetkili_ek", [])
+                _urun_init      = [x.strip() for x in _bolge_raw.get("urun","").split(",") if x.strip()]
+                _kargo_init     = [x.strip() for x in _bolge_raw.get("kargo","").split(",") if x.strip()]
+                _fiyattur_init  = [x.strip() for x in _bolge_raw.get("fiyattur","").split(",") if x.strip()]
+                _odeme_init     = [x.strip() for x in _bolge_raw.get("odeme","").split(",") if x.strip()]
+            else:
+                _bolge_init     = _bolge_raw if isinstance(_bolge_raw, list) else []
+                _yetkili_ek_init= []
+                _urun_init      = _mvl("urun") or ["koli"]
+                _kargo_init     = _mvl("kargo")
+                _fiyattur_init  = _mvl("teklif_tur")
+                _odeme_init     = _mvl("odeme")
+
             for _k,_d in [
                 ("an_t_amac",     _mvl("amac")),
                 ("an_t_mdurum",   _mvl("mdurum") or ["yeni"]),
                 ("an_t_kaynak",   _mvl("kaynak")),
-                ("an_t_urun",     _mvl("urun") or ["koli"]),
-                ("an_t_kargo",    _mvl("kargo")),
-                ("an_t_fiyattur", _mvl("teklif_tur")),
-                ("an_t_odeme",    _mvl("odeme")),
+                ("an_t_urun",     _urun_init),
+                ("an_t_kargo",    _kargo_init),
+                ("an_t_fiyattur", _fiyattur_init),
+                ("an_t_odeme",    _odeme_init),
                 ("an_t_beklenti", _mvl("beklenti")),
                 ("an_t_engel",    _mvl("engel")),
                 ("an_t_sonuc",    _mvl("sonuc") or ["takip edilecek"]),
                 ("an_t_sonraki",  _mvl("sonraki_adim")),
                 ("an_t_sik",      _mvl("sik")),
-                ("an_t_gecis",    _mvl("gecis")),
                 ("an_t_karar",    _mvl("karar") or ["yetkili kendisi"]),
                 ("an_t_sure",     _mvl("sure") or ["belirsiz"]),
-                ("an_t_arac",     _mvl("arac") or ["hayır dışarıdan"]),
-                ("an_t_saha",     _mvl("saha")),
                 ("an_t_pot",      _mvl("potansiyel") or ["orta"]),
             ]:
                 st.session_state[_k] = _d
-            st.session_state["an_bolge_rows"] = _mvj("bolge") or [{"il":"","urun":"koli","adet":"","ciro":"","siklik":"haftalık"}]
-            st.session_state["an_rakip_rows"] = _mvj("rakip") or [{"firma":"","fiyat":"","durum":"orta","sebep":""}]
-            st.session_state["an_fiyat_rows"] = _mvj("fiyat_tablo") or []
-            st.session_state["an_yetkili_rows"] = _mvj("yetkili_ek") or []
+            st.session_state["an_bolge_rows"]   = _bolge_init or [{"il":"","urun":"koli","adet":"","ciro":"","siklik":"haftalık"}]
+            st.session_state["an_rakip_rows"]   = _mvj("rakip") or [{"firma":"","fiyat":"","durum":"orta","sebep":""}]
+            st.session_state["an_fiyat_rows"]   = []
+            st.session_state["an_yetkili_rows"] = _yetkili_ek_init
             st.session_state[_ik] = True
 
         # ── WIZARD FORM ───────────────────────────────────────────────────────
@@ -4592,23 +4605,34 @@ elif aktif == "analiz":
         except: _gv=0
         if st.session_state.get("an_kaydet_trigger"):
             st.session_state.pop("an_kaydet_trigger",None)
+            # urun, kargo, fiyattur, odeme, yetkili_ek → bolge JSON'una dahil et
+            _bolge_data = {
+                "satirlar":  st.session_state.get("an_bolge_rows",[]),
+                "urun":      _gs2("an_t_urun"),
+                "kargo":     _gs2("an_t_kargo"),
+                "fiyattur":  _gs2("an_t_fiyattur"),
+                "odeme":     _gs2("an_t_odeme"),
+                "yetkili_ek": st.session_state.get("an_yetkili_rows",[]),
+            }
             _veri={
                 "yetkili":_an_yetkili,"iletisim":_an_iletisim,"sektor":_an_sektor,
-                "yetkili_ek": _aj.dumps(st.session_state.get("an_yetkili_rows",[]),ensure_ascii=False),
                 "amac":_gs2("an_t_amac"),"mdurum":_gs2("an_t_mdurum"),"bek_ciro":_bv,"ger_ciro":_gv,
-                "kaynak":_gs2("an_t_kaynak"),"urun":_gs2("an_t_urun"),"kargo":_gs2("an_t_kargo"),
-                "odeme":_gs2("an_t_odeme"),"teklif_tur":_gs2("an_t_fiyattur"),
+                "kaynak":_gs2("an_t_kaynak"),
                 "beklenti":_gs2("an_t_beklenti"),"engel":_gs2("an_t_engel"),"sonuc":_sonuc_val,
                 "sonraki_adim":_gs2("an_t_sonraki") or _an_sonraki,"sik":_gs2("an_t_sik"),
                 "potansiyel":_pot_val,"not_alan":_an_not,"takip_tar":str(_an_takip),
                 "fiyat_bek":_an_fbek,"ozel_istek":_an_ozel,
                 "karar":_gs2("an_t_karar"),"sure":_gs2("an_t_sure"),
-                "bolge":_aj.dumps(st.session_state.get("an_bolge_rows",[]),ensure_ascii=False),
+                "bolge":_aj.dumps(_bolge_data,ensure_ascii=False),
                 "rakip":_aj.dumps(st.session_state.get("an_rakip_rows",[]),ensure_ascii=False),
-                "fiyat_tablo":_aj.dumps(st.session_state.get("an_fiyat_rows",[]),ensure_ascii=False),
                 "olusturan":st.session_state.get("kullanici",""),
             }
-            _ok,_err=_an_kaydet(_firma,_veri)
+            # Sadece DB'de var olan kolonları gönder
+            _GECERLI_KOLONLAR = {"yetkili","iletisim","sektor","amac","mdurum","bek_ciro","ger_ciro",
+                "kaynak","beklenti","engel","sonuc","sonraki_adim","sik","potansiyel","not_alan",
+                "takip_tar","fiyat_bek","ozel_istek","karar","sure","bolge","rakip","olusturan","firma","tarih"}
+            _veri_temiz = {k:v for k,v in _veri.items() if k in _GECERLI_KOLONLAR}
+            _ok,_err=_an_kaydet(_firma,_veri_temiz)
             if _ok:
                 st.success(f"✅ **{_firma}** analizi {'güncellendi' if _duzenle else 'kaydedildi'}!")
                 st.balloons()
