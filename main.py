@@ -4248,12 +4248,12 @@ elif aktif == "detay_cari":
                 _grup_satirlar = _df_cari_dc[_df_cari_dc["id"].isin(_grup_idler)]
 
                 @st.cache_data(ttl=30)
-                def _dc_kayit_sayilari(cid):
+                def _dc_kayit_sayilari(cid, firma_adi):
                     try:
                         sb_m = get_sb_service() or get_sb_client()
                         if sb_m:
                             _n1 = len(sb_m.table("cari_aciklamalar").select("id").eq("cari_id", cid).execute().data or [])
-                            _n2 = len(sb_m.table("musteri_analiz").select("id").eq("cari_id", cid).execute().data or [])
+                            _n2 = len(sb_m.table("musteri_analiz").select("id").eq("firma", firma_adi).execute().data or [])
                             return _n1, _n2
                     except: pass
                     return 0, 0
@@ -4263,7 +4263,7 @@ elif aktif == "detay_cari":
                 _id_listesi = list(_grup_satirlar["id"])
                 for _ci, (_, _gr) in enumerate(_grup_satirlar.iterrows()):
                     _gcid = int(_gr["id"])
-                    _nnot, _nanaliz = _dc_kayit_sayilari(_gcid)
+                    _nnot, _nanaliz = _dc_kayit_sayilari(_gcid, str(_gr.get("firma","")))
                     with _kart_cols[_ci]:
                         st.markdown(f"**ID [{_gcid}]**")
                         st.caption(f"📅 Kayıt: {str(_gr.get('tarih','') or '')[:10]}")
@@ -4293,8 +4293,7 @@ elif aktif == "detay_cari":
                             if _r_not.data:
                                 sb_birlestir.table("cari_aciklamalar").update({"cari_id": _kalacak_id}).eq("cari_id", _sid).execute()
                                 _tasinan += len(_r_not.data)
-                            # analizleri taşı
-                            sb_birlestir.table("musteri_analiz").update({"cari_id": _kalacak_id}).eq("cari_id", _sid).execute()
+                            # analiz kayıtları zaten firma adına bağlı, aynı isim olduğu için otomatik kalıyor — taşımaya gerek yok
                             # çalışma tablosu kaydını sil (varsa)
                             sb_birlestir.table("musteri_calisma_tablosu").delete().eq("cari_id", _sid).execute()
                             # cari kartı soft-delete yap
