@@ -3373,16 +3373,16 @@ elif aktif == "teklif":
 
     _firma_def = str(secili_musteri["firma"]) if secili_musteri is not None else ""
     if "hedef_mus" not in st.session_state or st.session_state.get("son_secili_id") != _secim:
-        st.session_state["hedef_mus"]    = _firma_def
-        st.session_state["gsm_manuel"]   = gsm_kayitli
-        st.session_state["email_manuel"] = email_kayitli
+        st.session_state["hedef_mus"]  = _firma_def
         st.session_state["son_secili_id"] = _secim
-        st.rerun()
+        for _k in ["gsm_manuel","email_manuel"]: st.session_state.pop(_k, None)
+        st.session_state["_tek_gsm_pref"]   = gsm_kayitli
+        st.session_state["_tek_email_pref"] = email_kayitli
 
     hedef_musteri = _tr[3].text_input("", key="hedef_mus", placeholder="Müşteri Adı", label_visibility="collapsed")
     vade          = _tr[4].text_input("", placeholder="Vade...", key="vade", label_visibility="collapsed")
-    gsm_manuel    = _tr[5].text_input("", placeholder="05xxxxxxxxx", key="gsm_manuel", label_visibility="collapsed")
-    email_manuel  = _tr[6].text_input("", placeholder="Email", key="email_manuel", label_visibility="collapsed")
+    gsm_manuel    = _tr[5].text_input("", value=st.session_state.pop("_tek_gsm_pref", st.session_state.get("gsm_manuel","")), placeholder="05xxxxxxxxx", key="gsm_manuel", label_visibility="collapsed")
+    email_manuel  = _tr[6].text_input("", value=st.session_state.pop("_tek_email_pref", st.session_state.get("email_manuel","")), placeholder="Email", key="email_manuel", label_visibility="collapsed")
 
     # WA numara işle
     gsm_temiz = re.sub(r"[\s\-\(\)+]","", gsm_manuel)
@@ -3738,20 +3738,21 @@ elif aktif == "ozel_teklif":
     if "oz2_duz_musteri" in st.session_state:
         _oz_fdef = st.session_state.pop("oz2_duz_musteri")
         st.session_state["oz2_hedef"] = _oz_fdef
-        st.session_state["oz2_wa"]    = _oz_gsm
-        st.session_state["oz2_email"] = _oz_eml
-    elif "oz2_hedef" not in st.session_state or st.session_state.get("oz2_son_sec") != _oz_sec:
+        for _k in ["oz2_wa","oz2_email"]: st.session_state.pop(_k, None)
+        st.session_state["_oz2_gsm_pref"] = _oz_gsm
+        st.session_state["_oz2_eml_pref"] = _oz_eml
+    elif st.session_state.get("oz2_son_sec") != _oz_sec:
         st.session_state["oz2_hedef"]   = _oz_fdef
-        st.session_state["oz2_wa"]      = _oz_gsm
-        st.session_state["oz2_email"]   = _oz_eml
         st.session_state["oz2_son_sec"] = _oz_sec
-        st.rerun()
+        for _k in ["oz2_wa","oz2_email"]: st.session_state.pop(_k, None)
+        st.session_state["_oz2_gsm_pref"] = _oz_gsm
+        st.session_state["_oz2_eml_pref"] = _oz_eml
 
     _oz_hedef = _ozr[3].text_input("", key="oz2_hedef", placeholder="Hedef Müşteri", label_visibility="collapsed")
     _oz_vade  = _ozr[4].text_input("", placeholder="Vade...", key="oz2_vade", label_visibility="collapsed")
     _oz_not   = _ozr[5].text_input("", placeholder="Not...", key="oz2_not", label_visibility="collapsed")
-    _oz_wa_no = _ozr[6].text_input("", placeholder="05xxxxxxxxx", key="oz2_wa", label_visibility="collapsed")
-    _oz_email = _ozr[7].text_input("", placeholder="Email", key="oz2_email", label_visibility="collapsed")
+    _oz_wa_no = _ozr[6].text_input("", value=st.session_state.pop("_oz2_gsm_pref", st.session_state.get("oz2_wa","")), placeholder="05xxxxxxxxx", key="oz2_wa", label_visibility="collapsed")
+    _oz_email = _ozr[7].text_input("", value=st.session_state.pop("_oz2_eml_pref", st.session_state.get("oz2_email","")), placeholder="Email", key="oz2_email", label_visibility="collapsed")
 
     st.divider()
 
