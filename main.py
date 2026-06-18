@@ -2106,35 +2106,6 @@ elif aktif == "liste":
     except:
         pass
 
-    # ── NOT PANELİ — her firma bir buton, tıklayınca popover açılır ──────────
-    _notlu_firmalar = []
-    for _, _hr in df_edit.iterrows():
-        try:
-            _hcid = str(int(_hr["id"]))
-        except:
-            continue
-        _hnotlar = _not_detay.get(_hcid)
-        if _hnotlar:
-            _notlu_firmalar.append((_hcid, str(_hr.get("firma","") or ""), _hnotlar))
-
-    if _notlu_firmalar:
-        # Her satıra 4 firma sığdır
-        _cols_per_row = 4
-        for _chunk_start in range(0, len(_notlu_firmalar), _cols_per_row):
-            _chunk = _notlu_firmalar[_chunk_start:_chunk_start+_cols_per_row]
-            _pop_cols = st.columns(_cols_per_row)
-            for _ci, (_ncid, _nfirma, _nnotlar) in enumerate(_chunk):
-                with _pop_cols[_ci].popover(f"📋 {len(_nnotlar)} · {_nfirma[:22]}", use_container_width=True):
-                    for _nn in _nnotlar:
-                        st.markdown(
-                            f"<div style='border-left:3px solid #3b82f6;padding:8px 12px;"
-                            f"margin:4px 0;border-radius:0 6px 6px 0;font-size:13px'>"
-                            f"<span style='color:#94a3b8;font-size:11px'>📅 {_nn.get('tarih','')} · 👤 {_nn.get('kim','')}</span>"
-                            f"<br>{str(_nn.get('metin','')).replace('<','&lt;').replace('>','&gt;')}"
-                            f"</div>",
-                            unsafe_allow_html=True
-                        )
-
     # Her render'da tüm tabloyu session_state'e kaydet
     try:
         _kv = edited_df.copy()
@@ -2155,27 +2126,49 @@ elif aktif == "liste":
     secili_sayi = len(secili_df)
     secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
 
-    # 📨 Not okuma — tek satır seçilince notları altında göster
+    # 📨 Not okuma — 📋 Notlar kolonuna tıklayınca (satır seçilince) hemen altında açılır
     if secili_sayi == 1:
         _not_id = int(secili_idler[0]) if secili_idler else 0
         if _not_id:
             _not_firma = df_f[df_f["id"]==_not_id].iloc[0].get("firma","") if not df_f[df_f["id"]==_not_id].empty else ""
-            try:
-                if sb_liste:
-                    _not_r = sb_liste.table("cari_aciklamalar").select("*").eq("cari_id",_not_id).order("tarih",desc=True).execute()
-                    _not_df = pd.DataFrame(_not_r.data) if _not_r.data else pd.DataFrame()
-                else:
-                    _not_df = pd.DataFrame()
-                if not _not_df.empty:
-                    st.markdown(f"#### 📨 {_not_firma} — Notlar ({len(_not_df)})")
-                    for _, _nr in _not_df.iterrows():
-                        _nt = fmt_tarih(_nr.get("tarih",""))
-                        _nk = str(_nr.get("olusturan",""))
-                        _na = str(_nr.get("aciklama",""))
-                        st.markdown(f"<div style='background:var(--color-background-secondary);border-left:3px solid var(--color-border-secondary);padding:10px 14px;margin:6px 0;border-radius:0 8px 8px 0;font-size:13px'><span style='color:var(--color-text-tertiary);font-size:11px'>📅 {_nt} · 👤 {_nk}</span><br>{_na}</div>", unsafe_allow_html=True)
-                elif sb_liste:
-                    st.info(f"📭 {_not_firma} için henüz not yok.")
-            except: pass
+            _not_cid_str = str(_not_id)
+            _cached_notlar = _not_detay.get(_not_cid_str, [])
+            if _cached_notlar:
+                st.markdown(
+                    f"<div style='border:1.5px solid #3b82f6;border-radius:10px;padding:14px 18px;margin:4px 0 10px 0;background:white'>"
+                    f"<div style='font-size:13px;font-weight:600;color:#1e40af;margin-bottom:10px'>📋 {_not_firma} — {len(_cached_notlar)} not</div>"
+                    + "".join([
+                        f"<div style='border-left:3px solid #3b82f6;padding:8px 12px;margin:6px 0;border-radius:0 6px 6px 0;background:#f8fafc'>"
+                        f"<span style='color:#94a3b8;font-size:11px'>📅 {_nn.get('tarih','')} · 👤 {_nn.get('kim','')}</span>"
+                        f"<div style='color:#1e293b;font-size:13px;margin-top:3px'>{str(_nn.get('metin','')).replace('<','&lt;').replace('>','&gt;')}</div>"
+                        f"</div>"
+                        for _nn in _cached_notlar
+                    ])
+                    + "</div>",
+                    unsafe_allow_html=True
+                )
+            else:
+                try:
+                    if sb_liste:
+                        _not_r = sb_liste.table("cari_aciklamalar").select("*").eq("cari_id",_not_id).order("tarih",desc=True).execute()
+                        _not_df = pd.DataFrame(_not_r.data) if _not_r.data else pd.DataFrame()
+                        if not _not_df.empty:
+                            st.markdown(
+                                f"<div style='border:1.5px solid #3b82f6;border-radius:10px;padding:14px 18px;margin:4px 0 10px 0;background:white'>"
+                                f"<div style='font-size:13px;font-weight:600;color:#1e40af;margin-bottom:10px'>📋 {_not_firma} — {len(_not_df)} not</div>"
+                                + "".join([
+                                    f"<div style='border-left:3px solid #3b82f6;padding:8px 12px;margin:6px 0;border-radius:0 6px 6px 0;background:#f8fafc'>"
+                                    f"<span style='color:#94a3b8;font-size:11px'>📅 {fmt_tarih(_nr.get('tarih',''))} · 👤 {_nr.get('olusturan','')}</span>"
+                                    f"<div style='color:#1e293b;font-size:13px;margin-top:3px'>{str(_nr.get('aciklama','')).replace('<','&lt;').replace('>','&gt;')}</div>"
+                                    f"</div>"
+                                    for _, _nr in _not_df.iterrows()
+                                ])
+                                + "</div>",
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            st.info(f"📭 {_not_firma} için henüz not yok.")
+                except: pass
 
 
 
