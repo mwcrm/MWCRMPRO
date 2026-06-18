@@ -3324,6 +3324,18 @@ elif aktif == "teklif":
     sayfa_log("teklif")
     import json, re, io
 
+    _tt1, _tt2 = st.columns(2)
+    if _tt1.button("📄 Spot Teklif", use_container_width=True, type="primary", key="tt_spot"):
+        pass  # zaten burdayız
+    if _tt2.button("⭐ Özel Teklif", use_container_width=True, key="tt_ozel"):
+        st.session_state["aktif_tab"] = "ozel_teklif"
+        # Seçili müşteriyi taşı
+        if st.session_state.get("teklif_musteri","") != "-- Müşteri Seçin --":
+            _tt_firma = st.session_state.get("hedef_mus","")
+            if _tt_firma:
+                st.session_state["teklif_musteri_onsel"] = _tt_firma
+        st.rerun()
+
     st.markdown("## 📄 Spot Teklif")
 
     # ── TEK SATIR: FİLTRE + MÜŞTERİ + BİLGİLER ──────────────────────────────
@@ -3344,10 +3356,7 @@ elif aktif == "teklif":
             _onsel_row = _onsel_rows.iloc[0]
             _onsel_val = f"[{int(_onsel_row['id'])}] {_onsel_row['firma']} ({_onsel_row['durum']})"
             st.session_state["teklif_musteri"] = _onsel_val
-            # GSM/email güncellenmesi için son_secili_id'yi sıfırla
-            st.session_state.pop("son_secili_id", None)
-            st.session_state["gsm_manuel"]   = str(_onsel_row.get("gsm","") or "")
-            st.session_state["email_manuel"] = str(_onsel_row.get("email","") or "")
+            st.session_state.pop("son_secili_id", None)  # force update
 
     _tr = st.columns([1, 2.5, 0.3, 1.5, 1, 1, 1])
     _t_fil = _tr[0].selectbox("", ["Tümü","Aktif","Hedef","Pasif"], key="teklif_fil", label_visibility="collapsed")
@@ -3372,17 +3381,18 @@ elif aktif == "teklif":
         except Exception as _e: st.error(f"Seçim hatası: {_e}")
 
     _firma_def = str(secili_musteri["firma"]) if secili_musteri is not None else ""
-    if "hedef_mus" not in st.session_state or st.session_state.get("son_secili_id") != _secim:
-        st.session_state["hedef_mus"]  = _firma_def
+    if st.session_state.get("son_secili_id") != _secim:
+        st.session_state["hedef_mus"]     = _firma_def
         st.session_state["son_secili_id"] = _secim
-        for _k in ["gsm_manuel","email_manuel"]: st.session_state.pop(_k, None)
-        st.session_state["_tek_gsm_pref"]   = gsm_kayitli
-        st.session_state["_tek_email_pref"] = email_kayitli
+
+    # GSM/Email — müşteri başına unique key ile value= her zaman çalışır
+    _gsm_key   = f"gsm_manuel_{_secim}"
+    _email_key = f"email_manuel_{_secim}"
 
     hedef_musteri = _tr[3].text_input("", key="hedef_mus", placeholder="Müşteri Adı", label_visibility="collapsed")
     vade          = _tr[4].text_input("", placeholder="Vade...", key="vade", label_visibility="collapsed")
-    gsm_manuel    = _tr[5].text_input("", value=st.session_state.pop("_tek_gsm_pref", st.session_state.get("gsm_manuel","")), placeholder="05xxxxxxxxx", key="gsm_manuel", label_visibility="collapsed")
-    email_manuel  = _tr[6].text_input("", value=st.session_state.pop("_tek_email_pref", st.session_state.get("email_manuel","")), placeholder="Email", key="email_manuel", label_visibility="collapsed")
+    gsm_manuel    = _tr[5].text_input("", value=gsm_kayitli, placeholder="05xxxxxxxxx", key=_gsm_key, label_visibility="collapsed")
+    email_manuel  = _tr[6].text_input("", value=email_kayitli, placeholder="Email", key=_email_key, label_visibility="collapsed")
 
     # WA numara işle
     gsm_temiz = re.sub(r"[\s\-\(\)+]","", gsm_manuel)
@@ -3738,21 +3748,19 @@ elif aktif == "ozel_teklif":
     if "oz2_duz_musteri" in st.session_state:
         _oz_fdef = st.session_state.pop("oz2_duz_musteri")
         st.session_state["oz2_hedef"] = _oz_fdef
-        for _k in ["oz2_wa","oz2_email"]: st.session_state.pop(_k, None)
-        st.session_state["_oz2_gsm_pref"] = _oz_gsm
-        st.session_state["_oz2_eml_pref"] = _oz_eml
+        st.session_state["oz2_son_sec"] = _oz_sec
     elif st.session_state.get("oz2_son_sec") != _oz_sec:
         st.session_state["oz2_hedef"]   = _oz_fdef
         st.session_state["oz2_son_sec"] = _oz_sec
-        for _k in ["oz2_wa","oz2_email"]: st.session_state.pop(_k, None)
-        st.session_state["_oz2_gsm_pref"] = _oz_gsm
-        st.session_state["_oz2_eml_pref"] = _oz_eml
+
+    _oz_gsm_key   = f"oz2_wa_{_oz_sec}"
+    _oz_email_key = f"oz2_email_{_oz_sec}"
 
     _oz_hedef = _ozr[3].text_input("", key="oz2_hedef", placeholder="Hedef Müşteri", label_visibility="collapsed")
     _oz_vade  = _ozr[4].text_input("", placeholder="Vade...", key="oz2_vade", label_visibility="collapsed")
     _oz_not   = _ozr[5].text_input("", placeholder="Not...", key="oz2_not", label_visibility="collapsed")
-    _oz_wa_no = _ozr[6].text_input("", value=st.session_state.pop("_oz2_gsm_pref", st.session_state.get("oz2_wa","")), placeholder="05xxxxxxxxx", key="oz2_wa", label_visibility="collapsed")
-    _oz_email = _ozr[7].text_input("", value=st.session_state.pop("_oz2_eml_pref", st.session_state.get("oz2_email","")), placeholder="Email", key="oz2_email", label_visibility="collapsed")
+    _oz_wa_no = _ozr[6].text_input("", value=_oz_gsm, placeholder="05xxxxxxxxx", key=_oz_gsm_key, label_visibility="collapsed")
+    _oz_email = _ozr[7].text_input("", value=_oz_eml, placeholder="Email", key=_oz_email_key, label_visibility="collapsed")
 
     st.divider()
 
@@ -4617,10 +4625,14 @@ elif aktif == "analiz":
                 st.session_state["an_kaydet_trigger"]=True; st.rerun()
 
         _ab1,_ab2,_ab3=st.columns(3)
-        _ab1.button("📄 Spot Teklif",use_container_width=True,key="an_spot",
-            on_click=lambda: st.session_state.update({"aktif_tab":"teklif","teklif_musteri_onsel":_firma}))
-        _ab2.button("⭐ Özel Teklif",use_container_width=True,key="an_ozel_t",
-            on_click=lambda: st.session_state.update({"aktif_tab":"ozel_teklif","teklif_musteri_onsel":_firma}))
+        if _ab1.button("📄 Spot Teklif",use_container_width=True,key="an_spot"):
+            st.session_state["aktif_tab"] = "teklif"
+            st.session_state["teklif_musteri_onsel"] = _firma
+            st.rerun()
+        if _ab2.button("⭐ Özel Teklif",use_container_width=True,key="an_ozel_t"):
+            st.session_state["aktif_tab"] = "ozel_teklif"
+            st.session_state["teklif_musteri_onsel"] = _firma
+            st.rerun()
         if _duzenle and _ab3.button("🗑 Sil",use_container_width=True,key="an_sil_btn"):
             if _an_sil(_firma):
                 if _ik in st.session_state: del st.session_state[_ik]
