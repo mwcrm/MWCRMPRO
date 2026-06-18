@@ -2106,7 +2106,7 @@ elif aktif == "liste":
     except:
         pass
 
-    # ── NOT PANELİ — notlu firmalar tıklanabilir, açılınca notlar görünür ────────
+    # ── NOT PANELİ — her firma bir buton, tıklayınca popover açılır ──────────
     _notlu_firmalar = []
     for _, _hr in df_edit.iterrows():
         try:
@@ -2118,18 +2118,22 @@ elif aktif == "liste":
             _notlu_firmalar.append((_hcid, str(_hr.get("firma","") or ""), _hnotlar))
 
     if _notlu_firmalar:
-        st.markdown(f"**📋 Notlu Firmalar ({len(_notlu_firmalar)})**")
-        for _ncid, _nfirma, _nnotlar in _notlu_firmalar:
-            with st.expander(f"📋 {len(_nnotlar)} not · {_nfirma}", expanded=False):
-                for _nn in _nnotlar:
-                    st.markdown(
-                        f"<div style='background:#f8fafc;border-left:3px solid #3b82f6;padding:8px 12px;"
-                        f"margin:4px 0;border-radius:0 6px 6px 0;font-size:13px'>"
-                        f"<span style='color:#94a3b8;font-size:11px'>📅 {_nn.get('tarih','')} · 👤 {_nn.get('kim','')}</span>"
-                        f"<br>{str(_nn.get('metin','')).replace('<','&lt;').replace('>','&gt;')}"
-                        f"</div>",
-                        unsafe_allow_html=True
-                    )
+        # Her satıra 4 firma sığdır
+        _cols_per_row = 4
+        for _chunk_start in range(0, len(_notlu_firmalar), _cols_per_row):
+            _chunk = _notlu_firmalar[_chunk_start:_chunk_start+_cols_per_row]
+            _pop_cols = st.columns(_cols_per_row)
+            for _ci, (_ncid, _nfirma, _nnotlar) in enumerate(_chunk):
+                with _pop_cols[_ci].popover(f"📋 {len(_nnotlar)} · {_nfirma[:22]}", use_container_width=True):
+                    for _nn in _nnotlar:
+                        st.markdown(
+                            f"<div style='border-left:3px solid #3b82f6;padding:8px 12px;"
+                            f"margin:4px 0;border-radius:0 6px 6px 0;font-size:13px'>"
+                            f"<span style='color:#94a3b8;font-size:11px'>📅 {_nn.get('tarih','')} · 👤 {_nn.get('kim','')}</span>"
+                            f"<br>{str(_nn.get('metin','')).replace('<','&lt;').replace('>','&gt;')}"
+                            f"</div>",
+                            unsafe_allow_html=True
+                        )
 
     # Her render'da tüm tabloyu session_state'e kaydet
     try:
