@@ -1375,23 +1375,34 @@ elif aktif == "liste":
             _mr_tab1, _mr_tab2 = st.tabs(["📋 Toplu Karşılaştırma (hepsi)", "🔎 Tek Seçerek Karşılaştır"])
 
             with _mr_tab1:
-                @st.cache_data(ttl=30)
-                def _dc_kayit_sayilari_toplu(cid, firma_adi):
+                @st.cache_data(ttl=60)
+                def _dc_tum_not_analiz_sayilari():
+                    """Tek seferde tüm notları ve analizleri çek — N+1 sorgu sorununu önler"""
+                    _not_say = {}
+                    _analiz_say = {}
                     try:
                         sb_mt = get_sb_service() or get_sb_client()
                         if sb_mt:
-                            _n1 = len(sb_mt.table("cari_aciklamalar").select("id").eq("cari_id", cid).execute().data or [])
-                            _n2 = len(sb_mt.table("musteri_analiz").select("id").eq("firma", firma_adi).execute().data or [])
-                            return _n1, _n2
+                            _rn = sb_mt.table("cari_aciklamalar").select("cari_id").execute()
+                            if _rn.data:
+                                for _row in _rn.data:
+                                    _cid_n = _row.get("cari_id")
+                                    _not_say[_cid_n] = _not_say.get(_cid_n, 0) + 1
+                            _ra = sb_mt.table("musteri_analiz").select("firma").execute()
+                            if _ra.data:
+                                for _row in _ra.data:
+                                    _fad_n = _row.get("firma")
+                                    _analiz_say[_fad_n] = _analiz_say.get(_fad_n, 0) + 1
                     except: pass
-                    return 0, 0
+                    return _not_say, _analiz_say
+
+                _not_say_tum, _analiz_say_tum = _dc_tum_not_analiz_sayilari()
 
                 _toplu_satirlar = []
                 for _fadi_t, _idler_t in _mukerrerler.items():
                     _grup_t = df[df["id"].isin(_idler_t)]
                     for _, _gt in _grup_t.iterrows():
                         _gcid_t = int(_gt["id"])
-                        _nnot_t, _nanaliz_t = _dc_kayit_sayilari_toplu(_gcid_t, str(_gt.get("firma","")))
                         _toplu_satirlar.append({
                             "Firma Grubu": _fadi_t,
                             "ID": _gcid_t,
@@ -1401,12 +1412,19 @@ elif aktif == "liste":
                             "İl/İlçe": f"{_gt.get('il','') or ''} / {_gt.get('ilce','') or ''}",
                             "Segment": _gt.get("segment","") or "—",
                             "Durum/Aşama": f"{_gt.get('durum','') or ''} / {_gt.get('islem_asamasi','') or ''}",
-                            "Not Sayısı": _nnot_t,
-                            "Analiz Sayısı": _nanaliz_t,
+                            "Not Sayısı": _not_say_tum.get(_gcid_t, 0),
+                            "Analiz Sayısı": _analiz_say_tum.get(str(_gt.get("firma","")), 0),
                         })
                 _df_toplu = pd.DataFrame(_toplu_satirlar)
                 st.dataframe(_df_toplu, use_container_width=True, hide_index=True, height=min(600, 60+len(_df_toplu)*38))
-                st.caption("Birleştirme yapmak için 'Tek Seçerek Karşılaştır' sekmesine geçip ilgili grubu seçin.")
+
+                st.divider()
+                st.caption("Birleştirmek istediğiniz grubu seçin, direkt karşılaştırma paneli açılır:")
+                _mukerrer_opts_t1 = [f"{k} ({len(v)} kayıt)" for k, v in _mukerrerler.items()]
+                _secilen_grup_t1 = st.selectbox("Grup seç", ["-- Seçin --"] + _mukerrer_opts_t1, key="dc_mukerrer_grup_sec_t1")
+                if _secilen_grup_t1 != "-- Seçin --":
+                    st.session_state["dc_mukerrer_grup_sec"] = _secilen_grup_t1
+                    st.info("👉 'Tek Seçerek Karşılaştır' sekmesine geçin, grup otomatik seçili gelecek.")
 
             with _mr_tab2:
                 _mukerrer_opts = [f"{k} ({len(v)} kayıt)" for k, v in _mukerrerler.items()]
