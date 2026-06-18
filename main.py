@@ -1248,6 +1248,10 @@ if aktif == "yeni":
                 st.session_state.pop("duzenle_musteri", None)
 
     duzenle = st.session_state.get("duzenle_musteri")
+    # Formdaki widget key'lerini düzenlenen müşterinin ID'sine bağlıyoruz.
+    # Böylece farklı bir müşteriye geçildiğinde (veya yeni boş karta geçildiğinde)
+    # Streamlit eski session_state değerini değil, müşterinin GERÇEK verisini gösterir.
+    _form_id = str(duzenle.get("id")) if duzenle else "new"
 
     st.divider()
     if duzenle:
@@ -1273,44 +1277,44 @@ if aktif == "yeni":
     # ── İL / İLÇE form dışında — dinamik güncelleme için ───────────────────
     r2c1,r2c2,r2c3,r2c4,r2c5,r2c6 = st.columns(6)
     il_idx  = il_listesi.index(mevcut_il) if mevcut_il in il_listesi else 0
-    il      = r2c1.selectbox("İl", il_listesi, index=il_idx, key="yeni_il_dis")
+    il      = r2c1.selectbox("İl", il_listesi, index=il_idx, key=f"yeni_il_dis_{_form_id}")
     ilce_list = ILLER_ILCELER.get(il, [""])
     mevcut_ilce = duzenle.get("ilce","") if duzenle else ""
     if mevcut_ilce not in ilce_list: mevcut_ilce = ilce_list[0] if ilce_list else ""
     ilce_idx = ilce_list.index(mevcut_ilce) if mevcut_ilce in ilce_list else 0
-    ilce    = r2c2.selectbox("İlçe", ilce_list, index=ilce_idx, key="yeni_ilce_dis")
+    ilce    = r2c2.selectbox("İlçe", ilce_list, index=ilce_idx, key=f"yeni_ilce_dis_{_form_id}")
     durum_opts = ["Aktif","Hedef","Pasif"]
     durum_idx  = durum_opts.index(duzenle.get("durum","Aktif")) if duzenle and duzenle.get("durum","") in durum_opts else 0
-    durum   = r2c3.selectbox("Durum", durum_opts, index=durum_idx, key="yeni_durum_dis")
-    temsilci_dis = r2c4.text_input("Temsilci", value=duzenle.get("temsilci","") if duzenle else "", key="yeni_temsilci_dis", placeholder="Temsilci adı")
+    durum   = r2c3.selectbox("Durum", durum_opts, index=durum_idx, key=f"yeni_durum_dis_{_form_id}")
+    temsilci_dis = r2c4.text_input("Temsilci", value=duzenle.get("temsilci","") if duzenle else "", key=f"yeni_temsilci_dis_{_form_id}", placeholder="Temsilci adı")
     seg_opts = ["--","👑 A+","⭐ A","🔵 B","⚪ C"]
     seg_idx  = seg_opts.index(duzenle.get("segment","--")) if duzenle and duzenle.get("segment","--") in seg_opts else 0
-    segment  = r2c5.selectbox("Segment", seg_opts, index=seg_idx, key="yeni_seg_dis")
+    segment  = r2c5.selectbox("Segment", seg_opts, index=seg_idx, key=f"yeni_seg_dis_{_form_id}")
     _asama_default = duzenle.get("islem_asamasi") if duzenle else st.session_state.pop("varsayilan_asama", None)
     asama_idx = _asama_base.index(_asama_default) if _asama_default and _asama_default in _asama_base else 0
-    asama    = r2c6.selectbox("İşlem Aşaması", _asama_base, index=asama_idx, key="yeni_asama_dis")
+    asama    = r2c6.selectbox("İşlem Aşaması", _asama_base, index=asama_idx, key=f"yeni_asama_dis_{_form_id}")
 
     with st.form("yeni_kart_form"):
         # ── SATIR 1: Firma, Yetkili, GSM, Sabit Tel, E-Mail ─────────────────
         r1c1,r1c2,r1c3,r1c4,r1c5 = st.columns(5)
-        firma   = r1c1.text_input("Firma Adı *", value=duzenle.get("firma","") if duzenle else "", placeholder="Firma adı")
-        yetkili = r1c2.text_input("Yetkili",     value=duzenle.get("yetkili","") if duzenle else "", placeholder="Ad Soyad")
-        gsm     = r1c3.text_input("GSM",         value=fmt_tel(duzenle.get("gsm","")) if duzenle else "", placeholder="05xx xxx xx xx")
-        sabit   = r1c4.text_input("Sabit Tel",   value=fmt_tel(duzenle.get("sabit","")) if duzenle else "", placeholder="0212 xxx xx xx")
-        email   = r1c5.text_input("E-Mail",      value=duzenle.get("email","") if duzenle else "", placeholder="mail@firma.com")
+        firma   = r1c1.text_input("Firma Adı *", value=duzenle.get("firma","") if duzenle else "", placeholder="Firma adı", key=f"yeni_firma_{_form_id}")
+        yetkili = r1c2.text_input("Yetkili",     value=duzenle.get("yetkili","") if duzenle else "", placeholder="Ad Soyad", key=f"yeni_yetkili_{_form_id}")
+        gsm     = r1c3.text_input("GSM",         value=fmt_tel(duzenle.get("gsm","")) if duzenle else "", placeholder="05xx xxx xx xx", key=f"yeni_gsm_{_form_id}")
+        sabit   = r1c4.text_input("Sabit Tel",   value=fmt_tel(duzenle.get("sabit","")) if duzenle else "", placeholder="0212 xxx xx xx", key=f"yeni_sabit_{_form_id}")
+        email   = r1c5.text_input("E-Mail",      value=duzenle.get("email","") if duzenle else "", placeholder="mail@firma.com", key=f"yeni_email_{_form_id}")
         temsilci = temsilci_dis  # form dışından al
 
         # ── SATIR 3: Adres, Açıklama ─────────────────────────────────────────
         r3c1, r3c2 = st.columns(2)
-        adres    = r3c1.text_area("Adres", value=duzenle.get("adres","") if duzenle else "", height=70)
-        notlar_v = r3c2.text_area("📝 Açıklama", value=str(duzenle.get("aciklama","") or "") if duzenle else "", height=70, key="yeni_notlar")
+        adres    = r3c1.text_area("Adres", value=duzenle.get("adres","") if duzenle else "", height=70, key=f"yeni_adres_{_form_id}")
+        notlar_v = r3c2.text_area("📝 Açıklama", value=str(duzenle.get("aciklama","") or "") if duzenle else "", height=70, key=f"yeni_notlar_{_form_id}")
 
         # ── SATIR 4: Ciro ────────────────────────────────────────────────────
         cc1,cc2,cc3,cc4 = st.columns(4)
         bek_val = duzenle.get("beklenen_ciro",0) if duzenle else 0
         ger_val = duzenle.get("gerceklesen_ciro",0) if duzenle else 0
-        bek_str = cc1.text_input("Beklenen Ciro (₺)", value=fmt_para(bek_val).replace(" ₺",""), placeholder="0", key="bek_ciro_str")
-        ger_str = cc2.text_input("Gerçekleşen Ciro (₺)", value=fmt_para(ger_val).replace(" ₺",""), placeholder="0", key="ger_ciro_str")
+        bek_str = cc1.text_input("Beklenen Ciro (₺)", value=fmt_para(bek_val).replace(" ₺",""), placeholder="0", key=f"bek_ciro_str_{_form_id}")
+        ger_str = cc2.text_input("Gerçekleşen Ciro (₺)", value=fmt_para(ger_val).replace(" ₺",""), placeholder="0", key=f"ger_ciro_str_{_form_id}")
         beklenen_ciro    = parse_para(bek_str)
         gerceklesen_ciro = parse_para(ger_str)
         fark  = gerceklesen_ciro - beklenen_ciro
@@ -1321,12 +1325,12 @@ if aktif == "yeni":
         btn_label = "💾 Güncelle" if duzenle else "💾 Cari Kartı Kaydet"
         if st.form_submit_button(btn_label, type="primary", use_container_width=True):
             # Form dışındaki değerleri session_state'den al
-            _il_kayit    = st.session_state.get("yeni_il_dis", il)
-            _ilce_kayit  = st.session_state.get("yeni_ilce_dis", ilce)
-            _durum_kayit = st.session_state.get("yeni_durum_dis", durum)
-            _seg_kayit   = st.session_state.get("yeni_seg_dis", "--")
-            _asama_kayit = st.session_state.get("yeni_asama_dis", asama)
-            _tem_kayit   = st.session_state.get("yeni_temsilci_dis", temsilci)
+            _il_kayit    = st.session_state.get(f"yeni_il_dis_{_form_id}", il)
+            _ilce_kayit  = st.session_state.get(f"yeni_ilce_dis_{_form_id}", ilce)
+            _durum_kayit = st.session_state.get(f"yeni_durum_dis_{_form_id}", durum)
+            _seg_kayit   = st.session_state.get(f"yeni_seg_dis_{_form_id}", "--")
+            _asama_kayit = st.session_state.get(f"yeni_asama_dis_{_form_id}", asama)
+            _tem_kayit   = st.session_state.get(f"yeni_temsilci_dis_{_form_id}", temsilci)
             if not firma:
                 st.warning("Firma adı boş bırakılamaz!")
             elif duzenle:
