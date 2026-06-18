@@ -4346,6 +4346,8 @@ elif aktif == "detay_cari":
         if _hatali:
             st.error(f"❌ {_hatali} müşteride hata oluştu.")
         if _basarili or _hatali:
+            if "dc_data_editor" in st.session_state:
+                del st.session_state["dc_data_editor"]
             st.rerun()
         else:
             st.info("Değişiklik bulunamadı.")
