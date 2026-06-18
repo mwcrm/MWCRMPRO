@@ -2090,7 +2090,11 @@ elif aktif == "liste":
     # Sağda not paneli açık mı?
     _not_panel_id = st.session_state.get("_cl_not_panel_id")
 
-    _tbl_col, _not_col = st.columns([3, 1]) if _not_panel_id else st.columns([1, 0.001])
+    if _not_panel_id:
+        _tbl_col, _not_col = st.columns([3, 1])
+    else:
+        _tbl_col = st.container()
+        _not_col = None
 
     with _tbl_col:
         edited_df = st.data_editor(
@@ -2102,19 +2106,17 @@ elif aktif == "liste":
             key="cari_editor"
         )
 
-    with _not_col:
-        if _not_panel_id:
+    if _not_panel_id and _not_col:
+        with _not_col:
             _panel_notlar = _not_detay.get(str(_not_panel_id), [])
             _panel_firma = ""
             _panel_rows = df_edit[df_edit["id"] == int(_not_panel_id)]
             if not _panel_rows.empty:
                 _panel_firma = str(_panel_rows.iloc[0].get("firma",""))
             st.markdown(
-                f"<div style='border:1.5px solid #3b82f6;border-radius:10px;padding:12px 14px;"
-                f"background:white;height:100%'>"
-                f"<div style='font-size:12px;font-weight:600;color:#1e40af;margin-bottom:8px'>"
-                f"📋 {_panel_firma[:20]} — {len(_panel_notlar)} not"
-                f"</div>"
+                f"<div style='border:1.5px solid #3b82f6;border-radius:10px;padding:12px 14px;background:white'>"
+                f"<div style='font-size:12px;font-weight:600;color:#1e40af;margin-bottom:8px'>📋 {_panel_firma[:22]}<br>"
+                f"<span style='font-weight:400;color:#64748b'>{len(_panel_notlar)} not</span></div>"
                 + "".join([
                     f"<div style='border-left:3px solid #3b82f6;padding:7px 10px;margin:5px 0;"
                     f"border-radius:0 6px 6px 0;background:#f8fafc'>"
@@ -2123,12 +2125,10 @@ elif aktif == "liste":
                     f"</div>"
                     for _nn in _panel_notlar
                 ])
+                + "<div style='font-size:11px;color:#94a3b8;margin-top:8px'>Satırı tekrar seç → kapanır</div>"
                 + "</div>",
                 unsafe_allow_html=True
             )
-            if st.button("✕ Kapat", key="cl_not_panel_kapat", use_container_width=True):
-                st.session_state.pop("_cl_not_panel_id", None)
-                st.rerun()
 
     # Kolon sırası değiştiyse session_state'e kaydet
     try:
@@ -4720,36 +4720,85 @@ elif aktif == "detay_cari":
 
     _df_tablo = pd.DataFrame(_tablo_satirlar)
 
-    _edited = st.data_editor(
-        _df_tablo,
-        use_container_width=True,
-        hide_index=True,
-        num_rows="fixed",
-        height=min(700, 90 + len(_df_tablo)*40),
-        disabled=["Sıra","Kayıt Tarihi","ID","Firma","Yetkili","GSM","İl","İlçe","Segment","Eski Açıklama Notu"],
-        column_config={
-            "Sil": st.column_config.CheckboxColumn(width="small", help="İşaretleyip aşağıdaki 'Seçilenleri Sil' butonuna basın"),
-            "Sıra": st.column_config.NumberColumn(width="small"),
-            "Kayıt Tarihi": st.column_config.TextColumn(width="small"),
-            "ID": st.column_config.NumberColumn(width="small"),
-            "Çıkış İl": st.column_config.TextColumn(width="medium", help="virgülle ayırın"),
-            "Varış İl": st.column_config.TextColumn(width="medium", help="virgülle ayırın"),
-            "Ciro": st.column_config.TextColumn(width="medium", help="virgülle ayırın"),
-            "Tür": st.column_config.TextColumn(width="medium"),
-            "Desi-Kg": st.column_config.TextColumn(width="medium"),
-            "Fiyat": st.column_config.TextColumn(width="small"),
-            "Durum": st.column_config.TextColumn(width="small"),
-            "Aşama": st.column_config.TextColumn(width="small"),
-            "Hedef Ciro": st.column_config.TextColumn(width="small"),
-            "Gerçekleşen": st.column_config.TextColumn(width="small"),
-            "fark": st.column_config.TextColumn(width="small"),
-            "Başarı yuzdesi": st.column_config.TextColumn(width="small"),
-            "Açıklama Yaz": st.column_config.TextColumn(width="medium"),
-            "Eski Açıklama Notu": st.column_config.TextColumn(width="large"),
-            "Randevu İşlem Tarih": st.column_config.TextColumn(width="medium"),
-        },
-        key="dc_data_editor"
-    )
+    # ── DETAY CARİ NOT PANELİ ────────────────────────────────────────────────
+    _dc_not_panel_id = st.session_state.get("_dc_not_panel_id")
+
+    if _dc_not_panel_id:
+        _dc_tbl_col, _dc_not_col = st.columns([3, 1])
+    else:
+        _dc_tbl_col = st.container()
+        _dc_not_col = None
+
+    with _dc_tbl_col:
+        _edited = st.data_editor(
+            _df_tablo,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="fixed",
+            height=min(700, 90 + len(_df_tablo)*40),
+            disabled=["Sıra","Kayıt Tarihi","ID","Firma","Yetkili","GSM","İl","İlçe","Segment","Eski Açıklama Notu"],
+            column_config={
+                "Sil": st.column_config.CheckboxColumn(width="small", help="İşaretleyip aşağıdaki 'Seçilenleri Sil' butonuna basın"),
+                "Sıra": st.column_config.NumberColumn(width="small"),
+                "Kayıt Tarihi": st.column_config.TextColumn(width="small"),
+                "ID": st.column_config.NumberColumn(width="small"),
+                "Çıkış İl": st.column_config.TextColumn(width="medium", help="virgülle ayırın"),
+                "Varış İl": st.column_config.TextColumn(width="medium", help="virgülle ayırın"),
+                "Ciro": st.column_config.TextColumn(width="medium", help="virgülle ayırın"),
+                "Tür": st.column_config.TextColumn(width="medium"),
+                "Desi-Kg": st.column_config.TextColumn(width="medium"),
+                "Fiyat": st.column_config.TextColumn(width="small"),
+                "Durum": st.column_config.TextColumn(width="small"),
+                "Aşama": st.column_config.TextColumn(width="small"),
+                "Hedef Ciro": st.column_config.TextColumn(width="small"),
+                "Gerçekleşen": st.column_config.TextColumn(width="small"),
+                "fark": st.column_config.TextColumn(width="small"),
+                "Başarı yuzdesi": st.column_config.TextColumn(width="small"),
+                "Açıklama Yaz": st.column_config.TextColumn(width="medium"),
+                "Eski Açıklama Notu": st.column_config.TextColumn(width="large"),
+                "Randevu İşlem Tarih": st.column_config.TextColumn(width="medium"),
+            },
+            key="dc_data_editor"
+        )
+
+    # Detay cari — seçili satır not paneli
+    _dc_secili = _edited[_edited.get("Sil", False) == True] if "Sil" in _edited.columns else pd.DataFrame()
+    # Tek satır seçili + notu var → paneli aç
+    if len(_dc_secili) == 1:
+        _dc_sel_id = int(_dc_secili.iloc[0]["ID"])
+        _dc_sel_notlar = _dc_notlar_tum.get(_dc_sel_id, [])
+        if _dc_sel_notlar and st.session_state.get("_dc_not_panel_id") != _dc_sel_id:
+            st.session_state["_dc_not_panel_id"] = _dc_sel_id
+            st.rerun()
+        elif not _dc_sel_notlar:
+            st.session_state.pop("_dc_not_panel_id", None)
+    elif len(_dc_secili) == 0 and st.session_state.get("_dc_not_panel_id"):
+        st.session_state.pop("_dc_not_panel_id", None)
+        st.rerun()
+
+    if _dc_not_panel_id and _dc_not_col:
+        with _dc_not_col:
+            _dc_pnotlar = _dc_notlar_tum.get(int(_dc_not_panel_id), [])
+            _dc_pfirma = ""
+            _dc_prows = _df_tablo[_df_tablo["ID"] == int(_dc_not_panel_id)]
+            if not _dc_prows.empty:
+                _dc_pfirma = str(_dc_prows.iloc[0].get("Firma",""))
+            st.markdown(
+                f"<div style='border:1.5px solid #3b82f6;border-radius:10px;padding:12px 14px;background:white'>"
+                f"<div style='font-size:12px;font-weight:600;color:#1e40af;margin-bottom:8px'>📋 {_dc_pfirma[:22]}<br>"
+                f"<span style='font-weight:400;color:#64748b'>{len(_dc_pnotlar)} not</span></div>"
+                + "".join([
+                    f"<div style='border-left:3px solid #3b82f6;padding:7px 10px;margin:5px 0;"
+                    f"border-radius:0 6px 6px 0;background:#f8fafc'>"
+                    f"<div style='font-size:11px;color:#94a3b8;margin-bottom:2px'>📅 {fmt_tarih(_dn.get('tarih',''))} · 👤 {_dn.get('olusturan','')}</div>"
+                    f"<div style='color:#1e293b;font-size:12px'>{str(_dn.get('aciklama','')).replace('<','&lt;').replace('>','&gt;')}</div>"
+                    f"</div>"
+                    for _dn in _dc_pnotlar
+                ])
+                + "<div style='font-size:11px;color:#94a3b8;margin-top:8px'>Satırı tekrar seç → kapanır</div>"
+                + "</div>",
+                unsafe_allow_html=True
+            )
 
     _bk1, _bk2 = st.columns(2)
 
