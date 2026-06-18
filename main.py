@@ -868,6 +868,22 @@ def parse_para(s):
     except:
         return 0.0
 
+def fmt_tarih(v):
+    """Herhangi bir tarih string'ini 22.06.2026 formatına çevirir"""
+    if not v: return ""
+    s = str(v).strip()
+    if not s or s in ["nan","None",""]: return ""
+    try:
+        # 2026-06-22 veya 2026-06-22T... → 22.06.2026
+        if len(s) >= 10 and s[4] == "-":
+            return f"{s[8:10]}.{s[5:7]}.{s[:4]}"
+        # Zaten 22.06.2026 formatındaysa
+        if len(s) >= 10 and s[2] == "." and s[5] == ".":
+            return s[:10]
+    except:
+        pass
+    return s[:10]
+
 
 
 _TAB_LISTESI_DEFAULT = ["yeni", "liste", "detay_cari", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor"]
@@ -1478,7 +1494,7 @@ elif aktif == "liste":
                             "Sil": False,
                             "Firma Grubu": _fadi_t,
                             "ID": _gcid_t,
-                            "Kayıt Tarihi": str(_gt.get("tarih","") or "")[:10],
+                            "Kayıt Tarihi": fmt_tarih(_gt.get("tarih","")),
                             "Yetkili": _gt.get("yetkili","") or "—",
                             "GSM": _gt.get("gsm","") or "—",
                             "İl/İlçe": f"{_gt.get('il','') or ''} / {_gt.get('ilce','') or ''}",
@@ -1556,7 +1572,7 @@ elif aktif == "liste":
                         _nnot, _nanaliz = _dc_kayit_sayilari(_gcid, str(_gr.get("firma","")))
                         with _kart_cols[_ci]:
                             st.markdown(f"**ID [{_gcid}]**")
-                            st.caption(f"📅 Kayıt: {str(_gr.get('tarih','') or '')[:10]}")
+                            st.caption(f"📅 Kayıt: {fmt_tarih(_gr.get('tarih',''))}")
                             _m_yetkili = st.text_input("Yetkili", value=_gr.get("yetkili","") or "", key=f"dc_mk_yetkili_{_gcid}")
                             _m_gsm = st.text_input("GSM", value=_gr.get("gsm","") or "", key=f"dc_mk_gsm_{_gcid}")
                             _m_il = st.text_input("İl", value=_gr.get("il","") or "", key=f"dc_mk_il_{_gcid}")
@@ -1978,7 +1994,7 @@ elif aktif == "liste":
                 st.markdown(f"**{len(_df_ac)} kayıt — tıkla aç:**")
                 for _, _row in _df_ac.iterrows():
                     _rid   = _row.get("id", 0)
-                    _tarih = str(_row.get("tarih",""))[:16]
+                    _tarih = fmt_tarih(_row.get("tarih",""))
                     _kim   = str(_row.get("olusturan",""))
                     _txt   = str(_row.get("aciklama",""))
                     with st.expander(f"📅 {_tarih}  👤 {_kim}  · {_txt[:50]}{'...' if len(_txt)>50 else ''}"):
@@ -2051,7 +2067,7 @@ elif aktif == "liste":
                     if _ncid not in _not_detay:
                         _not_detay[_ncid] = []
                     _not_detay[_ncid].append({
-                        "tarih": str(_nr.get("tarih",""))[:16],
+                        "tarih": fmt_tarih(_nr.get("tarih","")),
                         "kim": str(_nr.get("olusturan","") or ""),
                         "metin": str(_nr.get("aciklama","") or ""),
                     })
@@ -2149,7 +2165,7 @@ elif aktif == "liste":
                 if not _not_df.empty:
                     st.markdown(f"#### 📨 {_not_firma} — Notlar ({len(_not_df)})")
                     for _, _nr in _not_df.iterrows():
-                        _nt = str(_nr.get("tarih",""))[:16]
+                        _nt = fmt_tarih(_nr.get("tarih",""))
                         _nk = str(_nr.get("olusturan",""))
                         _na = str(_nr.get("aciklama",""))
                         st.markdown(f"<div style='background:var(--color-background-secondary);border-left:3px solid var(--color-border-secondary);padding:10px 14px;margin:6px 0;border-radius:0 8px 8px 0;font-size:13px'><span style='color:var(--color-text-tertiary);font-size:11px'>📅 {_nt} · 👤 {_nk}</span><br>{_na}</div>", unsafe_allow_html=True)
@@ -3587,13 +3603,13 @@ elif aktif == "teklif":
                 st.info("Henüz kayıtlı teklif yok.")
             else:
                 _tek_opts = ["-- Teklif Seçin --"] + [
-                    f"[{int(r['id'])}] {r.get('musteri_adi','')} | {str(r.get('tarih',''))[:10]}"
+                    f"[{int(r['id'])}] {r.get('musteri_adi','')} | {fmt_tarih(r.get('tarih',''))}"
                     for _,r in df_tek.iterrows()]
                 _sec_tek = st.selectbox("Teklif Seç:", _tek_opts, key="tek_sec")
                 if _sec_tek != "-- Teklif Seçin --" and "[" in _sec_tek:
                     _tek_id = int(_sec_tek.split("]")[0].replace("[","").strip())
                     _tek_row = df_tek[df_tek["id"]==_tek_id].iloc[0]
-                    st.caption(f"📅 {str(_tek_row.get('tarih',''))[:16]} · 👤 {_tek_row.get('olusturan','')} · 📝 {_tek_row.get('notlar','')}")
+                    st.caption(f"📅 {fmt_tarih(_tek_row.get('tarih',''))} · 👤 {_tek_row.get('olusturan','')} · 📝 {_tek_row.get('notlar','')}")
                     try:
                         _data = json.loads(_tek_row.get("satirlar","{}"))
                         if "teklif" in _data and _data["teklif"]:
@@ -3929,14 +3945,14 @@ elif aktif == "ozel_teklif":
                 st.info("Henüz kayıtlı özel teklif yok.")
             else:
                 _oz_tek_opts = ["-- Teklif Seçin --"] + [
-                    f"[{int(r['id'])}] {r.get('musteri_adi','')} | {str(r.get('tarih',''))[:10]}"
+                    f"[{int(r['id'])}] {r.get('musteri_adi','')} | {fmt_tarih(r.get('tarih',''))}"
                     for _,r in _oz_df_tek2.iterrows()]
                 _oz_tek_sec = st.selectbox("Teklif Seç:", _oz_tek_opts, key="oz2_tek_sec")
 
                 if _oz_tek_sec != "-- Teklif Seçin --" and "[" in _oz_tek_sec:
                     _oz_tid = int(_oz_tek_sec.split("]")[0].replace("[","").strip())
                     _oz_trow = _oz_df_tek2[_oz_df_tek2["id"]==_oz_tid].iloc[0]
-                    st.caption(f"📅 {str(_oz_trow.get('tarih',''))[:16]} · 👤 {_oz_trow.get('olusturan','')} · 📝 {_oz_trow.get('notlar','')}")
+                    st.caption(f"📅 {fmt_tarih(_oz_trow.get('tarih',''))} · 👤 {_oz_trow.get('olusturan','')} · 📝 {_oz_trow.get('notlar','')}")
                     try:
                         _oz_data = _ozj.loads(_oz_trow.get("satirlar","{}"))
                         _oz_grp_k = _oz_data.get("grp",[])
@@ -4217,7 +4233,7 @@ div[data-testid="stHorizontalBlock"] button[kind="primary"]{padding:2px 8px!impo
         st.caption(f"{len(_dff)} analiz")
         for _ai, (___, _ar) in enumerate(_dff.iterrows()):
             _pic = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(str(_ar.get("potansiyel","")),"-")
-            with st.expander(f"{_pic} **{_ar.get('firma','?')}** · {str(_ar.get('tarih',''))[:10]} · {_ar.get('sonuc','')} · {_ar.get('potansiyel','')}"):
+            with st.expander(f"{_pic} **{_ar.get('firma','?')}** · {fmt_tarih(_ar.get('tarih',''))} · {_ar.get('sonuc','')} · {_ar.get('potansiyel','')}"):
                 _c1,_c2,_c3,_c4 = st.columns(4)
                 _c1.metric("Potansiyel", _ar.get("potansiyel","—"))
                 _c2.metric("Beklenen Ciro", f"{float(_ar.get('bek_ciro',0) or 0):,.0f} ₺")
@@ -4680,7 +4696,7 @@ elif aktif == "detay_cari":
         _tablo_satirlar.append({
             "Sil": False,
             "Sıra": _idx,
-            "Kayıt Tarihi": str(_cr.get("tarih","") or "")[:10],
+            "Kayıt Tarihi": fmt_tarih(_cr.get("tarih","")),
             "ID": _cid,
             "Firma": str(_cr.get("firma","")),
             "Yetkili": str(_cr.get("yetkili","") or ""),
@@ -5571,81 +5587,90 @@ elif aktif == "randevu":
                         }
             except: _ciro_map = {}
 
-            # ── SATIR SATIR LİSTE — st.dataframe (sürüklenebilir) ───────────
+            # ── DÜZENLENEBILIR RANDEVU LİSTESİ ──────────────────────────────
+            _sonuc_opts = ["—","Bitti","Devam Ediyor","Gidilmedi","İptal"]
+            _gorev_opts = ["Ziyaret","Arama","Değerlendirme","Kazanıldı","Kaybedildi","Devam Ediyor","Whatsapp Mesaj","E-mail","Yeni Tarihe Ertele"]
+
             _df_goster = pd.DataFrame([{
-                "ID": int(r.get("id",0) or 0),
-                "Tarih": str(r.get("randevu_tarihi",""))[5:].replace("-","."),
-                "Müşteri": str(r.get("musteri_adi","") or ""),
-                "Bölge": str(r.get("bolge","") or ""),
-                "Görev": str(r.get("gorev","") or ""),
-                "Sonuç": str(r.get("sonuc","") or ""),
-                "Hedef ₺": float(_ciro_map.get(str(r.get("musteri_adi","")),{"hedef":0})["hedef"]),
+                "ID":       int(r.get("id",0) or 0),
+                "Tarih":    fmt_tarih(r.get("randevu_tarihi","")),
+                "Saat":     str(r.get("randevu_saati","") or ""),
+                "Müşteri":  str(r.get("musteri_adi","") or ""),
+                "Bölge":    str(r.get("bolge","") or ""),
+                "Görev":    str(r.get("gorev","") or ""),
+                "Sonuç":    str(r.get("sonuc","") or "—"),
+                "Açıklama": str(r.get("aciklama","") or ""),
+                "Temsilci": str(r.get("temsilci","") or ""),
+                "Hedef ₺":  float(_ciro_map.get(str(r.get("musteri_adi","")),{"hedef":0})["hedef"]),
                 "Gerçek ₺": float(_ciro_map.get(str(r.get("musteri_adi","")),{"gercek":0})["gercek"]),
-                "Fark ₺": float(_ciro_map.get(str(r.get("musteri_adi","")),{"gercek":0})["gercek"]) - float(_ciro_map.get(str(r.get("musteri_adi","")),{"hedef":0})["hedef"]),
+                "Fark ₺":   float(_ciro_map.get(str(r.get("musteri_adi","")),{"gercek":0})["gercek"]) - float(_ciro_map.get(str(r.get("musteri_adi","")),{"hedef":0})["hedef"]),
             } for _,r in df_rand.iterrows()])
 
-            st.dataframe(
+            # id→index map (kaydetmek için)
+            _rand_id_list = [int(r.get("id",0)) for _,r in df_rand.iterrows()]
+
+            _edited_rand = st.data_editor(
                 _df_goster,
                 use_container_width=True,
                 hide_index=True,
+                num_rows="fixed",
                 column_config={
-                    "ID":       st.column_config.NumberColumn("ID", width="small"),
-                    "Tarih":    st.column_config.TextColumn("Tarih", width="small"),
+                    "ID":       st.column_config.NumberColumn("ID", width="small", disabled=True),
+                    "Tarih":    st.column_config.TextColumn("Tarih", width="small", help="GG.AA.YYYY"),
+                    "Saat":     st.column_config.TextColumn("Saat", width="small"),
                     "Müşteri":  st.column_config.TextColumn("Müşteri", width="large"),
                     "Bölge":    st.column_config.TextColumn("Bölge"),
-                    "Görev":    st.column_config.TextColumn("Görev", width="small"),
-                    "Sonuç":    st.column_config.TextColumn("Sonuç", width="small"),
-                    "Hedef ₺":  st.column_config.NumberColumn("Hedef ₺", format="%.0f ₺"),
-                    "Gerçek ₺": st.column_config.NumberColumn("Gerçek ₺", format="%.0f ₺"),
-                    "Fark ₺":   st.column_config.NumberColumn("Fark ₺", format="%.0f ₺"),
+                    "Görev":    st.column_config.SelectboxColumn("Görev", options=_gorev_opts, width="medium"),
+                    "Sonuç":    st.column_config.SelectboxColumn("Sonuç", options=_sonuc_opts, width="small"),
+                    "Açıklama": st.column_config.TextColumn("Açıklama", width="large"),
+                    "Temsilci": st.column_config.TextColumn("Temsilci", width="medium"),
+                    "Hedef ₺":  st.column_config.NumberColumn("Hedef ₺", format="%.0f ₺", disabled=True),
+                    "Gerçek ₺": st.column_config.NumberColumn("Gerçek ₺", format="%.0f ₺", disabled=True),
+                    "Fark ₺":   st.column_config.NumberColumn("Fark ₺", format="%.0f ₺", disabled=True),
                 },
-                key="rand_df_goster"
+                key="rand_editor"
             )
 
-            # Düzenle — selectbox ile
-            _edit_sec = st.selectbox("✏️ Düzenlenecek randevu seç:", ["—"] + [f"[{int(r['id'])}] {r['musteri_adi']} — {str(r.get('randevu_tarihi',''))[:10]}" for _,r in df_rand.iterrows()], key="rand_edit_sec", label_visibility="collapsed")
-            if _edit_sec != "—":
-                _edit_id = int(_edit_sec.split("]")[0].replace("[","").strip())
-                _edit_row = df_rand[df_rand["id"]==_edit_id]
-                if not _edit_row.empty:
-                    st.session_state["rand_duz_row"] = _edit_row.iloc[0].to_dict()
-
-            if False:  # eski döngü placeholder — form aşağıda
-                _tablo_html = ""
-            # Düzenleme formu
-            if st.session_state.get("rand_duz_row"):
-                _edit_id = st.session_state["rand_duz_row"].get("id")
-                _rid = _edit_id
-                row_d = st.session_state["rand_duz_row"]
-                with st.form(f"rand_duz_form_{_rid}"):
-                        dd1,dd2,dd3,dd4 = st.columns(4)
-                        d_tarih    = dd1.text_input("Tarih:", value=str(row_d.get("randevu_tarihi","")))
-                        d_saat     = dd2.text_input("Saat:", value=str(row_d.get("randevu_saati","")))
-                        d_bolge    = dd3.text_input("Bölge:", value=str(row_d.get("bolge","")))
-                        d_temsilci = dd4.text_input("Temsilci:", value=str(row_d.get("temsilci","")))
-                        dd5,dd6 = st.columns(2)
-                        d_gorev = dd5.text_input("Görev:", value=str(row_d.get("gorev","")))
-                        d_sonuc_opts = ["—","Bitti","Devam Ediyor","Gidilmedi","İptal"]
-                        d_sonuc_idx  = d_sonuc_opts.index(row_d.get("sonuc","—")) if row_d.get("sonuc") in d_sonuc_opts else 0
-                        d_sonuc    = dd6.selectbox("Sonuç:", d_sonuc_opts, index=d_sonuc_idx)
-                        d_aciklama = st.text_area("Açıklama:", value=str(row_d.get("aciklama","")), height=60)
-                        _fb1,_fb2,_fb3 = st.columns(3)
-                        if _fb1.form_submit_button("💾 Kaydet", use_container_width=True, type="primary"):
-                            db_update("randevular",{"randevu_tarihi":d_tarih,"randevu_saati":d_saat,
-                                "bolge":d_bolge,"gorev":d_gorev,"temsilci":d_temsilci,
-                                "sonuc":d_sonuc if d_sonuc!="—" else "","aciklama":d_aciklama},
-                                "id",_rid)
-                            try: db_read.clear()
-                            except: pass
-                            st.session_state.pop("rand_duz_row",None)
-                            st.success("✅ Güncellendi!"); st.rerun()
-                        if _fb2.form_submit_button("🗑️ Sil", use_container_width=True):
-                            _sb_rd = get_sb_client()
-                            if _sb_rd: _sb_rd.table("randevular").delete().eq("id",_rid).execute()
-                            st.session_state.pop("rand_duz_row",None)
-                            st.success("🗑️ Silindi!"); st.rerun()
-                        if _fb3.form_submit_button("İptal", use_container_width=True):
-                            st.session_state.pop("rand_duz_row",None); st.rerun()
+            # Kaydet butonu
+            if st.button("💾 Değişiklikleri Kaydet", type="primary", use_container_width=True, key="rand_kaydet"):
+                _rand_editor_state = st.session_state.get("rand_editor", {})
+                _rand_edited_rows  = _rand_editor_state.get("edited_rows", {})
+                _rand_kayit = 0
+                for _idx_s, _degis in _rand_edited_rows.items():
+                    try:
+                        _idx = int(_idx_s)
+                        _rid = _rand_id_list[_idx] if _idx < len(_rand_id_list) else 0
+                        if not _rid: continue
+                        _guncelle = {}
+                        if "Tarih" in _degis:
+                            # GG.AA.YYYY → YYYY-MM-DD (DB formatı)
+                            _t = str(_degis["Tarih"]).strip()
+                            if len(_t) == 10 and _t[2] == "." and _t[5] == ".":
+                                _guncelle["randevu_tarihi"] = f"{_t[6:]}-{_t[3:5]}-{_t[:2]}"
+                            else:
+                                _guncelle["randevu_tarihi"] = _t
+                        if "Saat" in _degis:     _guncelle["randevu_saati"] = str(_degis["Saat"])
+                        if "Bölge" in _degis:    _guncelle["bolge"] = str(_degis["Bölge"])
+                        if "Görev" in _degis:    _guncelle["gorev"] = str(_degis["Görev"])
+                        if "Sonuç" in _degis:    _guncelle["sonuc"] = str(_degis["Sonuç"]) if _degis["Sonuç"] != "—" else ""
+                        if "Açıklama" in _degis: _guncelle["aciklama"] = str(_degis["Açıklama"])
+                        if "Temsilci" in _degis: _guncelle["temsilci"] = str(_degis["Temsilci"])
+                        if not _guncelle: continue
+                        _sb_rand = get_sb_client()
+                        if _sb_rand:
+                            _sb_rand.table("randevular").update(_guncelle).eq("id", _rid).execute()
+                        else:
+                            db_update("randevular", _guncelle, "id", _rid)
+                        _rand_kayit += 1
+                    except Exception as _re:
+                        st.error(f"Hata (satır {_idx_s}): {_re}")
+                if _rand_kayit:
+                    try: db_read.clear()
+                    except: pass
+                    st.success(f"✅ {_rand_kayit} randevu güncellendi!")
+                    st.rerun()
+                else:
+                    st.info("Değişiklik yok.")
 
             # Excel
             _buf_r = _rio.BytesIO(); df_rand.to_excel(_buf_r,index=False); _buf_r.seek(0)
@@ -6318,7 +6343,7 @@ elif aktif == "randevu":
                 if not _df_notlar.empty:
                     for _, _nr in _df_notlar.iterrows():
                         _nid   = _nr.get("id", 0)
-                        _ntarih = str(_nr.get("tarih",""))[:16]
+                        _ntarih = fmt_tarih(_nr.get("tarih",""))
                         _nkim  = str(_nr.get("olusturan",""))
                         _nmetin = str(_nr.get("aciklama",""))
                         _nozet = _nmetin[:60] + ("..." if len(_nmetin)>60 else "")
