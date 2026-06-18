@@ -982,6 +982,16 @@ if not st.session_state.get("giris", False):
     giris_ekrani()
     st.stop()
 
+# ── SİSTEM AÇIK KALSIN — timeout yok ──────────────────────────────────────────
+# Streamlit oturumu kullanıcı kapatana kadar aktif kalır; ekstra keep-alive gerekmez.
+# st.session_state["giris"] = True zaten set, yeniden giriş istenmez.
+
+# ── CARİ LİSTE KOLON DURUM BAŞLAT ────────────────────────────────────────────
+if "_cl_kolon_genislik" not in st.session_state:
+    st.session_state["_cl_kolon_genislik"] = {}
+if "_cl_kolon_sira" not in st.session_state:
+    st.session_state["_cl_kolon_sira"] = []
+
 # Versiyon kontrolü — sadece admin olmayanlara
 if st.session_state.get("rol") != "admin":
     try:
@@ -1656,7 +1666,10 @@ elif aktif == "liste":
     for i, (_ad, _sayi) in enumerate(_d_veri):
         _em = _DURUM_EMOJI.get(_ad, "🔹")
         if _d_cols[i].button(f"{_em} {_ad}\n{_sayi}", key=f"dur_btn_{i}", use_container_width=True):
-            st.session_state["fil_durum"] = "Tümü" if _ad == "Toplam" else _ad
+            if _ad == "Toplam":
+                st.session_state["_cl_fil_durum_multi"] = []
+            else:
+                st.session_state["_cl_fil_durum_multi"] = [_ad]
             st.rerun()
 
     # Aşama satırı
@@ -1666,30 +1679,87 @@ elif aktif == "liste":
         for i, (_an, _ac) in enumerate(_a_veri):
             _em2 = _ASAMA_EMOJI.get(_an, "🔸")
             if _a_cols[i].button(f"{_em2} {_an}\n{_ac}", key=f"asm_btn_{i}", use_container_width=True):
-                st.session_state["fil_asama"] = _an
+                st.session_state["_cl_fil_asama_multi"] = [_an]
                 st.rerun()
 
-    # ── FİLTRE TEK SATIR ─────────────────────────────────────────────────────
-    _fc = st.columns([1,1,2,2,1,1,0.3,0.6])
-    filtre_asama = _fc[0].selectbox("", ["Aşama: Tümü"]+tum_asama_opts, key="fil_asama", label_visibility="collapsed")
-    filtre_durum = _fc[1].selectbox("", ["Durum: Tümü"]+tum_durum_opts, key="fil_durum", label_visibility="collapsed")
-    filtre_seg   = _fc[4].selectbox("", ["Segment: Tümü","👑 A+","⭐ A","🔵 B","⚪ C","Segmentsiz"], key="fil_seg", label_visibility="collapsed")
-    siralama_kol = _fc[5].selectbox("", ["Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z"], key="siralama_kol", label_visibility="collapsed")
+    # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
+    with st.expander("🔍 Filtreler & Arama", expanded=st.session_state.get("_cl_fil_acik", True)):
+        st.session_state["_cl_fil_acik"] = True  # expander açık kalsın
+        _frow1 = st.columns([2,1,1,1,1,1])
+        ara_txt = _frow1[0].text_input("", placeholder="🔍 Firma, yetkili, il, gsm...", key="ara_liste", label_visibility="collapsed")
 
+        # Asama multiselect
+        _asama_sec = _frow1[1].multiselect(
+            "Aşama", tum_asama_opts,
+            default=st.session_state.get("_cl_fil_asama_multi", []),
+            key="_cl_fil_asama_multi", placeholder="Aşama seç..."
+        )
+        # Durum multiselect
+        _durum_sec = _frow1[2].multiselect(
+            "Durum", tum_durum_opts,
+            default=st.session_state.get("_cl_fil_durum_multi", []),
+            key="_cl_fil_durum_multi", placeholder="Durum seç..."
+        )
+        # Segment
+        filtre_seg = _frow1[3].selectbox(
+            "Segment", ["Tümü","👑 A+","⭐ A","🔵 B","⚪ C","Segmentsiz"],
+            key="fil_seg", label_visibility="visible"
+        )
+        # İl multiselect
+        _il_opts = sorted(df["il"].dropna().astype(str).unique().tolist()) if "il" in df.columns else []
+        _il_sec = _frow1[4].multiselect(
+            "İl", _il_opts,
+            default=st.session_state.get("_cl_fil_il_multi", []),
+            key="_cl_fil_il_multi", placeholder="İl seç..."
+        )
+        # Temsilci multiselect
+        _tem_opts = sorted(df["temsilci"].dropna().astype(str).unique().tolist()) if "temsilci" in df.columns else []
+        _tem_sec = _frow1[5].multiselect(
+            "Temsilci", _tem_opts,
+            default=st.session_state.get("_cl_fil_temsilci_multi", []),
+            key="_cl_fil_temsilci_multi", placeholder="Temsilci seç..."
+        )
+
+        _frow2 = st.columns([2,1,1])
+        siralama_kol = _frow2[0].selectbox(
+            "Sıralama", ["Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z"],
+            key="siralama_kol", label_visibility="visible"
+        )
+        if _frow2[1].button("🗑️ Filtreleri Temizle", use_container_width=True, key="cl_fil_temizle"):
+            for _fk in ["_cl_fil_asama_multi","_cl_fil_durum_multi","_cl_fil_il_multi","_cl_fil_temsilci_multi","fil_seg","ara_liste"]:
+                st.session_state.pop(_fk, None)
+            st.rerun()
+
+    # Filtre uygula
     df_f = df.copy()
-    if filtre_asama != "Aşama: Tümü": df_f = df_f[df_f["islem_asamasi"]==filtre_asama]
-    if filtre_durum  != "Durum: Tümü": df_f = df_f[df_f["durum"]==filtre_durum]
-    if filtre_seg != "Segment: Tümü":
+    if ara_txt:
+        df_f = df_f[df_f.apply(lambda r: ara_txt.lower() in str(r).lower(), axis=1)]
+    if _asama_sec:
+        df_f = df_f[df_f["islem_asamasi"].isin(_asama_sec)]
+    if _durum_sec:
+        df_f = df_f[df_f["durum"].isin(_durum_sec)]
+    if filtre_seg != "Tümü":
         df_f["_seg_tmp"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
         if filtre_seg == "Segmentsiz": df_f = df_f[df_f["_seg_tmp"]==""]
         else: df_f = df_f[df_f["_seg_tmp"]==filtre_seg]
+    if _il_sec:
+        df_f = df_f[df_f["il"].astype(str).isin(_il_sec)]
+    if _tem_sec:
+        df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
 
     # Segment hesapla ve sırala
     df_f["_seg_goster"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
     _seg_sira = {"👑 A+":0,"⭐ A":1,"🔵 B":2,"⚪ C":3,"":4}
     df_f["_seg_sira"] = df_f["_seg_goster"].map(lambda s: _seg_sira.get(s,4))
     df_f = df_f.sort_values(["_seg_sira","firma"], ascending=[True,True]).reset_index(drop=True)
+    if siralama_kol == "Firma A-Z":      df_f = df_f.sort_values("firma", ascending=True)
+    elif siralama_kol == "Firma Z-A":    df_f = df_f.sort_values("firma", ascending=False)
+    elif siralama_kol == "İl A-Z" and "il" in df_f.columns:       df_f = df_f.sort_values("il", ascending=True)
+    elif siralama_kol == "Temsilci A-Z" and "temsilci" in df_f.columns: df_f = df_f.sort_values("temsilci", ascending=True)
+    df_f = df_f.reset_index(drop=True)
 
+    # Müşteri seçici + aktif filtre özeti
+    _fc_row = st.columns([3,1,0.6])
     kart_opts = ["-- Müşteri Seçin --"] + [
         f"[{int(r['id'])}] {r['_seg_goster']+' ' if r['_seg_goster'] else ''}{r['firma']} | {r.get('il','')} | {r.get('islem_asamasi','')}"
         for _, r in df_f.iterrows()
@@ -1697,21 +1767,17 @@ elif aktif == "liste":
     if st.session_state.get("kart_sec_reset"):
         st.session_state.pop("kart_sec_reset", None)
         st.session_state.pop("kart_sec", None)
-    secili_kart = _fc[2].selectbox("", kart_opts, key="kart_sec", label_visibility="collapsed")
-    ara_txt      = _fc[3].text_input("", placeholder="🔍 Firma, yetkili, il...", key="ara_liste", label_visibility="collapsed")
-
-    if ara_txt: df_f = df_f[df_f.apply(lambda r: ara_txt.lower() in str(r).lower(), axis=1)]
-    if siralama_kol == "Firma A-Z":      df_f = df_f.sort_values("firma", ascending=True)
-    elif siralama_kol == "Firma Z-A":    df_f = df_f.sort_values("firma", ascending=False)
-    elif siralama_kol == "İl A-Z" and "il" in df_f.columns:       df_f = df_f.sort_values("il", ascending=True)
-    elif siralama_kol == "Temsilci A-Z" and "temsilci" in df_f.columns: df_f = df_f.sort_values("temsilci", ascending=True)
-    df_f = df_f.reset_index(drop=True)
-
+    secili_kart = _fc_row[0].selectbox("", kart_opts, key="kart_sec", label_visibility="collapsed")
     if secili_kart != "-- Müşteri Seçin --":
-        if _fc[5].button("❌", key="kart_sec_temizle", use_container_width=True, help="Temizle"):
+        if _fc_row[1].button("❌ Temizle", key="kart_sec_temizle", use_container_width=True):
             st.session_state["kart_sec_reset"] = True
             st.rerun()
-    _fc[6].markdown(f"<small style='color:gray'>{len(df_f)} kayıt</small>", unsafe_allow_html=True)
+    _aktif_fil_sayisi = sum([
+        bool(ara_txt), bool(_asama_sec), bool(_durum_sec),
+        filtre_seg != "Tümü", bool(_il_sec), bool(_tem_sec)
+    ])
+    _fil_badge = f" 🔵 {_aktif_fil_sayisi} filtre aktif" if _aktif_fil_sayisi else ""
+    _fc_row[2].markdown(f"<small style='color:gray'>{len(df_f)} kayıt{_fil_badge}</small>", unsafe_allow_html=True)
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
         try:
             kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
@@ -1965,16 +2031,27 @@ elif aktif == "liste":
     import json as _json_ls
 
     # ── TÜMÜ GÖSTER ──────────────────────────────────────────────────────────
-    _df_sayfa = df_edit.copy()
+    # Kolon sırası — session_state'den geri yükle (Streamlit data_editor kalıcı kolon sırası)
+    _kayitli_sira = st.session_state.get("_cl_kolon_sira", [])
+    _aktif_col_order = _kayitli_sira if _kayitli_sira else col_order
 
     edited_df = st.data_editor(
-        _df_sayfa,
+        df_edit,
         use_container_width=True,
         num_rows="fixed",
         column_config=col_config,
-        column_order=col_order,
+        column_order=_aktif_col_order,
         key="cari_editor"
     )
+
+    # Kolon sırası değiştiyse session_state'e kaydet
+    try:
+        _editor_meta = st.session_state.get("cari_editor", {})
+        _col_order_now = _editor_meta.get("column_order", [])
+        if _col_order_now:
+            st.session_state["_cl_kolon_sira"] = _col_order_now
+    except:
+        pass
 
     # Her render'da tüm tabloyu session_state'e kaydet
     try:
@@ -2031,7 +2108,11 @@ elif aktif == "liste":
     else:
         _do_kaydet = False
 
-    btn_k, btn_a, btn_s = st.columns(3)
+    btn_k, btn_a, btn_s, btn_kolon = st.columns(4)
+    with btn_kolon:
+        if st.button("🔄 Kolon Sırasını Sıfırla", use_container_width=True, key="cl_kolon_sifirla"):
+            st.session_state.pop("_cl_kolon_sira", None)
+            st.rerun()
     with btn_k:
         if st.button("💾 Değişiklikleri Kaydet", use_container_width=True, type="primary", key="liste_kaydet"):
             st.session_state["_kaydet_flag"] = True
@@ -2135,6 +2216,42 @@ elif aktif == "liste":
                 try: db_read.clear()
                 except: pass
                 st.success("✅ Silindi!"); st.rerun()
+
+    # ── FİLTRELENMİŞ FİRMALARA TOPLU NOT / ÇALIŞMA ───────────────────────────
+    if len(df_f) > 0:
+        with st.expander(f"📝 Filtrelenmiş {len(df_f)} Firmaya Toplu Not / Çalışma Ekle", expanded=False):
+            st.caption(f"Şu an filtrede görünen **{len(df_f)} firma**ya aynı notu/çalışmayı ekleyebilirsiniz.")
+            _toplu_not_col1, _toplu_not_col2 = st.columns([3,1])
+            _toplu_not_metni = _toplu_not_col1.text_area(
+                "Not metni:", height=80,
+                placeholder="Örn: 'Mayıs kampanyası bilgilendirmesi yapıldı'",
+                key="toplu_not_metni"
+            )
+            _toplu_not_kim = st.session_state.get("kullanici", "")
+            if _toplu_not_col2.button(f"💾 {len(df_f)} Firmaya Ekle", use_container_width=True, key="toplu_not_kaydet", type="primary"):
+                if _toplu_not_metni and _toplu_not_metni.strip():
+                    _toplu_eklenen = 0
+                    _toplu_hata = 0
+                    for _, _tf in df_f.iterrows():
+                        try:
+                            _tcid = int(_tf["id"])
+                            if sb_liste:
+                                sb_liste.table("cari_aciklamalar").insert({
+                                    "cari_id": _tcid,
+                                    "cari_adi": str(_tf.get("firma","")),
+                                    "aciklama": _toplu_not_metni.strip(),
+                                    "olusturan": _toplu_not_kim,
+                                }).execute()
+                            _toplu_eklenen += 1
+                        except:
+                            _toplu_hata += 1
+                    if _toplu_eklenen:
+                        st.success(f"✅ {_toplu_eklenen} firmaya not eklendi!" + (f" (Hata: {_toplu_hata})" if _toplu_hata else ""))
+                        st.rerun()
+                    else:
+                        st.error("Not eklenemedi.")
+                else:
+                    st.warning("Not metni boş olamaz!")
 
     st.divider()
 elif aktif == "kullanici":
