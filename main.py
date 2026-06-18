@@ -1486,14 +1486,30 @@ elif aktif == "liste":
                         with _kart_cols[_ci]:
                             st.markdown(f"**ID [{_gcid}]**")
                             st.caption(f"📅 Kayıt: {str(_gr.get('tarih','') or '')[:10]}")
-                            st.caption(f"👤 Yetkili: {_gr.get('yetkili','') or '—'}")
-                            st.caption(f"📱 GSM: {_gr.get('gsm','') or '—'}")
-                            st.caption(f"📍 {_gr.get('il','') or '—'} / {_gr.get('ilce','') or '—'}")
-                            st.caption(f"🏷 Segment: {_gr.get('segment','') or '—'}")
-                            st.caption(f"📊 Durum: {_gr.get('durum','') or '—'} / {_gr.get('islem_asamasi','') or '—'}")
+                            _m_yetkili = st.text_input("Yetkili", value=_gr.get("yetkili","") or "", key=f"dc_mk_yetkili_{_gcid}")
+                            _m_gsm = st.text_input("GSM", value=_gr.get("gsm","") or "", key=f"dc_mk_gsm_{_gcid}")
+                            _m_il = st.text_input("İl", value=_gr.get("il","") or "", key=f"dc_mk_il_{_gcid}")
+                            _m_ilce = st.text_input("İlçe", value=_gr.get("ilce","") or "", key=f"dc_mk_ilce_{_gcid}")
+                            _m_segment = st.text_input("Segment", value=_gr.get("segment","") or "", key=f"dc_mk_segment_{_gcid}")
+                            _m_durum = st.text_input("Durum", value=_gr.get("durum","") or "", key=f"dc_mk_durum_{_gcid}")
+                            _m_asama = st.text_input("Aşama", value=_gr.get("islem_asamasi","") or "", key=f"dc_mk_asama_{_gcid}")
                             st.caption(f"💰 Hedef: {_gr.get('beklenen_ciro',0) or 0} ₺")
                             st.caption(f"📝 Not sayısı: **{_nnot}**")
                             st.caption(f"🔍 Analiz sayısı: **{_nanaliz}**")
+
+                            if st.button("💾 Bu Kartı Güncelle", key=f"dc_mukerrer_guncelle_{_gcid}", use_container_width=True):
+                                try:
+                                    sb_guncelle = get_sb_service() or get_sb_client()
+                                    sb_guncelle.table("cari_kartlar").update({
+                                        "yetkili": _m_yetkili, "gsm": _m_gsm, "il": _m_il, "ilce": _m_ilce,
+                                        "segment": _m_segment, "durum": _m_durum, "islem_asamasi": _m_asama,
+                                    }).eq("id", _gcid).execute()
+                                    try: get_cari_listesi.clear()
+                                    except: pass
+                                    st.success(f"✅ [{_gcid}] güncellendi!")
+                                    st.rerun()
+                                except Exception as _eguncelle:
+                                    st.error(f"Güncelleme hatası: {_eguncelle}")
 
                             if st.button(f"🗑 Bunu Sil", key=f"dc_mukerrer_sil_{_gcid}", use_container_width=True):
                                 _kalacak_id = [i for i in _id_listesi if i != _gcid][0] if len(_id_listesi) == 2 else None
