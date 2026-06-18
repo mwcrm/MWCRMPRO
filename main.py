@@ -3336,6 +3336,16 @@ elif aktif == "teklif":
 
     _df_m  = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
 
+    # ── Analiz sayfasından gelen otomatik müşteri seçimi ─────────────────────
+    _onsel_firma = st.session_state.pop("teklif_musteri_onsel", None)
+    if _onsel_firma:
+        # Firma adından ID'yi bul ve teklif_musteri key'ini set et
+        _onsel_rows = _df_m[_df_m["firma"] == _onsel_firma]
+        if not _onsel_rows.empty:
+            _onsel_row = _onsel_rows.iloc[0]
+            _onsel_val = f"[{int(_onsel_row['id'])}] {_onsel_row['firma']} ({_onsel_row['durum']})"
+            st.session_state["teklif_musteri"] = _onsel_val
+
     _tr = st.columns([1, 2.5, 0.3, 1.5, 1, 1, 1])
     _t_fil = _tr[0].selectbox("", ["Tümü","Aktif","Hedef","Pasif"], key="teklif_fil", label_visibility="collapsed")
     _df_mf = _df_m if _t_fil == "Tümü" else _df_m[_df_m["durum"] == _t_fil]
@@ -3682,6 +3692,15 @@ elif aktif == "ozel_teklif":
 
     # ── MÜŞTERİ + BİLGİLER — TEK SATIR ─────────────────────────────────────
     _oz_dfm = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
+
+    # Analiz sayfasından gelen otomatik seçim
+    _oz_onsel = st.session_state.pop("teklif_musteri_onsel", None)
+    if _oz_onsel:
+        _oz_onsel_rows = _oz_dfm[_oz_dfm["firma"] == _oz_onsel]
+        if not _oz_onsel_rows.empty:
+            _oz_onsel_row = _oz_onsel_rows.iloc[0]
+            st.session_state["oz2_musteri"] = f"[{int(_oz_onsel_row['id'])}] {_oz_onsel_row['firma']} ({_oz_onsel_row['durum']})"
+
     if st.session_state.get("oz2_mus_reset"):
         st.session_state.pop("oz2_mus_reset", None)
         st.session_state.pop("oz2_musteri", None)
