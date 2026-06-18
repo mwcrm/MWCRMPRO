@@ -3339,12 +3339,15 @@ elif aktif == "teklif":
     # ── Analiz sayfasından gelen otomatik müşteri seçimi ─────────────────────
     _onsel_firma = st.session_state.pop("teklif_musteri_onsel", None)
     if _onsel_firma:
-        # Firma adından ID'yi bul ve teklif_musteri key'ini set et
         _onsel_rows = _df_m[_df_m["firma"] == _onsel_firma]
         if not _onsel_rows.empty:
             _onsel_row = _onsel_rows.iloc[0]
             _onsel_val = f"[{int(_onsel_row['id'])}] {_onsel_row['firma']} ({_onsel_row['durum']})"
             st.session_state["teklif_musteri"] = _onsel_val
+            # GSM/email güncellenmesi için son_secili_id'yi sıfırla
+            st.session_state.pop("son_secili_id", None)
+            st.session_state["gsm_manuel"]   = str(_onsel_row.get("gsm","") or "")
+            st.session_state["email_manuel"] = str(_onsel_row.get("email","") or "")
 
     _tr = st.columns([1, 2.5, 0.3, 1.5, 1, 1, 1])
     _t_fil = _tr[0].selectbox("", ["Tümü","Aktif","Hedef","Pasif"], key="teklif_fil", label_visibility="collapsed")
@@ -3734,15 +3737,19 @@ elif aktif == "ozel_teklif":
     if "oz2_duz_musteri" in st.session_state:
         _oz_fdef = st.session_state.pop("oz2_duz_musteri")
         st.session_state["oz2_hedef"] = _oz_fdef
+        st.session_state["oz2_wa"]    = _oz_gsm
+        st.session_state["oz2_email"] = _oz_eml
     elif "oz2_hedef" not in st.session_state or st.session_state.get("oz2_son_sec") != _oz_sec:
         st.session_state["oz2_hedef"] = _oz_fdef
+        st.session_state["oz2_wa"]    = _oz_gsm
+        st.session_state["oz2_email"] = _oz_eml
         st.session_state["oz2_son_sec"] = _oz_sec
 
     _oz_hedef = _ozr[3].text_input("", key="oz2_hedef", placeholder="Hedef Müşteri", label_visibility="collapsed")
     _oz_vade  = _ozr[4].text_input("", placeholder="Vade...", key="oz2_vade", label_visibility="collapsed")
     _oz_not   = _ozr[5].text_input("", placeholder="Not...", key="oz2_not", label_visibility="collapsed")
-    _oz_wa_no = _ozr[6].text_input("", value=_oz_gsm, placeholder="05xxxxxxxxx", key="oz2_wa", label_visibility="collapsed")
-    _oz_email = _ozr[7].text_input("", value=_oz_eml, placeholder="Email", key="oz2_email", label_visibility="collapsed")
+    _oz_wa_no = _ozr[6].text_input("", placeholder="05xxxxxxxxx", key="oz2_wa", label_visibility="collapsed")
+    _oz_email = _ozr[7].text_input("", placeholder="Email", key="oz2_email", label_visibility="collapsed")
 
     st.divider()
 
