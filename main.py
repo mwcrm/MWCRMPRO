@@ -1241,6 +1241,10 @@ if aktif == "yeni":
             if not row_s.empty:
                 r_d = row_s.iloc[0]
                 bulunan = {str(k): ("" if str(v) in ["nan","None","NaT"] else str(v)) for k,v in r_d.items()}
+                if not bulunan.get("gsm"):
+                    bulunan["gsm"] = str(r_d.get("telefon") or r_d.get("tel") or "")
+                if not bulunan.get("sabit"):
+                    bulunan["sabit"] = str(r_d.get("sabit_hat") or "")
                 st.session_state["duzenle_musteri"] = bulunan
                 st.success(f"✅ **{bulunan.get('firma')}** (ID: {bulunan.get('id')})")
             else:
@@ -1794,6 +1798,12 @@ elif aktif == "liste":
                 d2 = {str(k):(None if str(v) in ["nan","None","NaT"] else v) for k,v in kart_row.items()}
                 for _k in ["firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","aciklama"]:
                     if _k in d2: d2[_k] = "" if d2[_k] is None else str(d2[_k])
+                # GSM/Sabit bazı eski kayıtlarda farklı sütunlarda olabiliyor (telefon/tel/sabit_hat) —
+                # detay kartındaki gösterimle aynı fallback'i burada da uyguluyoruz, yoksa form boş açılır.
+                if not d2.get("gsm"):
+                    d2["gsm"] = str(kart_row.get("telefon") or kart_row.get("tel") or "")
+                if not d2.get("sabit"):
+                    d2["sabit"] = str(kart_row.get("sabit_hat") or "")
                 st.session_state["duzenle_musteri"] = d2
                 st.session_state["aktif_tab"] = "yeni"; st.rerun()
             if _ax2.button("📄 Teklif", key=f"kt_{kart_id}", use_container_width=True, type="primary"):
