@@ -4314,21 +4314,40 @@ elif aktif == "analiz":
                 _c2.metric("Beklenen Ciro", f"{float(_ar.get('bek_ciro',0) or 0):,.0f} ₺")
                 _c3.metric("Gerçekleşen", f"{float(_ar.get('ger_ciro',0) or 0):,.0f} ₺")
                 _c4.metric("Sonuç", _ar.get("sonuc","—"))
+                _ar_firma    = str(_ar.get("firma","") or "—")
+                _ar_yetkili  = str(_ar.get("yetkili","") or "—")
+                _ar_iletisim = str(_ar.get("iletisim","") or "—")
+                _ar_sektor   = str(_ar.get("sektor","") or "—")
+                _ar_kaynak   = str(_ar.get("kaynak","") or "—")
+                _ar_beklenti = str(_ar.get("beklenti","") or "—")
+                _ar_engel    = str(_ar.get("engel","") or "—")
+                _ar_not      = str(_ar.get("not_alan","") or "—")
+                _ar_sonraki  = str(_ar.get("sonraki_adim","") or "—")
+                # nan temizle
+                for _v in ["nan","None",""]:
+                    _ar_yetkili  = "—" if _ar_yetkili  == _v else _ar_yetkili
+                    _ar_iletisim = "—" if _ar_iletisim == _v else _ar_iletisim
+                    _ar_sektor   = "—" if _ar_sektor   == _v else _ar_sektor
+                    _ar_kaynak   = "—" if _ar_kaynak   == _v else _ar_kaynak
+                    _ar_beklenti = "—" if _ar_beklenti == _v else _ar_beklenti
+                    _ar_engel    = "—" if _ar_engel    == _v else _ar_engel
+                    _ar_not      = "—" if _ar_not      == _v else _ar_not
+                    _ar_sonraki  = "—" if _ar_sonraki  == _v else _ar_sonraki
+
                 st.markdown(f"""| | |
 |---|---|
-| **Firma / Yetkili** | {_ar.get("firma","—")} · {_ar.get("yetkili","—")} · {_ar.get("iletisim","—")} |
-| **Sektör / Kaynak** | {_ar.get("sektor","—")} · {_ar.get("kaynak","—")} |
-| **Kargo / Fatura** | {_ar.get("kargo","—")} · {_ar.get("fatura","—")} |
-| **Beklenti / Engel** | {_ar.get("beklenti","—")} · {_ar.get("engel","—")} |
-| **Not** | {_ar.get("not_alan","—")} |
-| **Sonraki Adım** | {_ar.get("sonraki_adim","—")} · {fmt_tarih(_ar.get("takip_tar",""))} |""")
-                _b1,_b2,_b3,_b4 = st.columns(4)
+| **Firma / Yetkili** | {_ar_firma} · {_ar_yetkili} · {_ar_iletisim} |
+| **Sektör / Kaynak** | {_ar_sektor} · {_ar_kaynak} |
+| **Beklenti / Engel** | {_ar_beklenti} · {_ar_engel} |
+| **Not** | {_ar_not} |
+| **Sonraki Adım** | {_ar_sonraki} · {fmt_tarih(_ar.get("takip_tar",""))} |""")
+
+                _b1,_b2,_b3,_b4,_b5 = st.columns(5)
                 if _b1.button("✏️ Düzenle", key=f"duz_{_ai}", use_container_width=True):
                     st.session_state["an_duzenle_firma"] = str(_ar.get("firma",""))
                     _ik2 = f"an_init_{_ar.get('firma','')}"
                     for _kk in [_ik2,"an_fiyat_rows","an_bolge_rows","an_avm_rows","an_rakip_rows"]:
                         if _kk in st.session_state: del st.session_state[_kk]
-                    # pill custom temizle
                     for _pk in list(st.session_state.keys()):
                         if _pk.endswith("_custom"): del st.session_state[_pk]
                     st.rerun()
@@ -4336,11 +4355,15 @@ elif aktif == "analiz":
                 if _tel2 and "@" not in _tel2:
                     if _tel2.startswith("0"): _tel2 = "90"+_tel2[1:]
                     _b2.markdown(f"<a href='https://wa.me/{_tel2}' target='_blank'><button style='width:100%%;padding:5px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;'>💬 WA</button></a>", unsafe_allow_html=True)
-                if _b3.button("📄 Teklif", key=f"tek_{_ai}", use_container_width=True):
+                if _b3.button("📄 Spot Teklif", key=f"tek_{_ai}", use_container_width=True):
                     st.session_state["aktif_tab"] = "teklif"
                     st.session_state["teklif_musteri_onsel"] = str(_ar.get("firma",""))
                     st.rerun()
-                if _b4.button("🗑 Sil", key=f"sil_{_ai}", use_container_width=True):
+                if _b4.button("⭐ Özel Teklif", key=f"oztk_{_ai}", use_container_width=True):
+                    st.session_state["aktif_tab"] = "ozel_teklif"
+                    st.session_state["teklif_musteri_onsel"] = str(_ar.get("firma",""))
+                    st.rerun()
+                if _b5.button("🗑 Sil", key=f"sil_{_ai}", use_container_width=True):
                     if _an_sil(str(_ar.get("firma",""))): st.success("Silindi!"); st.rerun()
 
         st.divider()
