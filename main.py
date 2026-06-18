@@ -1464,34 +1464,33 @@ elif aktif == "liste":
                             st.caption(f"📝 Not sayısı: **{_nnot}**")
                             st.caption(f"🔍 Analiz sayısı: **{_nanaliz}**")
 
-                    st.divider()
-                    st.markdown("**Hangi kayıt kalsın?**")
-                    _kalacak_opts = [f"[{int(r['id'])}] kalsın, diğerleri silinsin" for _,r in _grup_satirlar.iterrows()]
-                    _kalacak_sec = st.radio("", _kalacak_opts, key=f"dc_mukerrer_kalacak_{_grup_adi}", label_visibility="collapsed")
+                            if st.button(f"🗑 Bunu Sil", key=f"dc_mukerrer_sil_{_gcid}", use_container_width=True):
+                                _kalacak_id = [i for i in _id_listesi if i != _gcid][0] if len(_id_listesi) == 2 else None
+                                try:
+                                    sb_birlestir = get_sb_service() or get_sb_client()
+                                    _tasinan = 0
+                                    if _kalacak_id:
+                                        # notları kalan kayda taşı
+                                        _r_not = sb_birlestir.table("cari_aciklamalar").select("id").eq("cari_id", _gcid).execute()
+                                        if _r_not.data:
+                                            sb_birlestir.table("cari_aciklamalar").update({"cari_id": _kalacak_id}).eq("cari_id", _gcid).execute()
+                                            _tasinan = len(_r_not.data)
+                                    # çalışma tablosu kaydını sil (varsa)
+                                    sb_birlestir.table("musteri_calisma_tablosu").delete().eq("cari_id", _gcid).execute()
+                                    # cari kartı soft-delete yap
+                                    sb_birlestir.table("cari_kartlar").update({"silindi": 1}).eq("id", _gcid).execute()
+                                    try: get_cari_listesi.clear()
+                                    except: pass
+                                    if _tasinan:
+                                        st.success(f"✅ [{_gcid}] silindi! {_tasinan} not [{_kalacak_id}]'e taşındı.")
+                                    else:
+                                        st.success(f"✅ [{_gcid}] silindi!")
+                                    st.rerun()
+                                except Exception as _esil:
+                                    st.error(f"Silme hatası: {_esil}")
 
-                    if st.button("🔗 Birleştir (notları taşı, diğerlerini sil)", type="primary", key=f"dc_mukerrer_birlestir_{_grup_adi}"):
-                        _kalacak_id = _id_listesi[_kalacak_opts.index(_kalacak_sec)]
-                        _silinecek_idler = [i for i in _id_listesi if i != _kalacak_id]
-                        try:
-                            sb_birlestir = get_sb_service() or get_sb_client()
-                            _tasinan = 0
-                            for _sid in _silinecek_idler:
-                                # notları taşı
-                                _r_not = sb_birlestir.table("cari_aciklamalar").select("id").eq("cari_id", _sid).execute()
-                                if _r_not.data:
-                                    sb_birlestir.table("cari_aciklamalar").update({"cari_id": _kalacak_id}).eq("cari_id", _sid).execute()
-                                    _tasinan += len(_r_not.data)
-                                # analiz kayıtları zaten firma adına bağlı, aynı isim olduğu için otomatik kalıyor — taşımaya gerek yok
-                                # çalışma tablosu kaydını sil (varsa)
-                                sb_birlestir.table("musteri_calisma_tablosu").delete().eq("cari_id", _sid).execute()
-                                # cari kartı soft-delete yap
-                                sb_birlestir.table("cari_kartlar").update({"silindi": 1}).eq("id", _sid).execute()
-                            try: get_cari_listesi.clear()
-                            except: pass
-                            st.success(f"✅ Birleştirildi! {_tasinan} not taşındı, {len(_silinecek_idler)} mükerrer kayıt silindi (kalan: [{_kalacak_id}]).")
-                            st.rerun()
-                        except Exception as _ebirlestir:
-                            st.error(f"Birleştirme hatası: {_ebirlestir}")
+                    if len(_id_listesi) > 2:
+                        st.caption("💡 3+ kayıt olduğu için, sildikten sonra kalan kayıtlar arasında tekrar seçim yapabilirsiniz. Notlar otomatik taşınmaz, manuel kontrol edin.")
 
                 st.divider()
                 st.caption("Tüm mükerrer gruplar:")
