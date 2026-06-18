@@ -4382,6 +4382,7 @@ elif aktif == "analiz":
             st.session_state["an_bolge_rows"] = _mvj("bolge") or [{"il":"","urun":"koli","adet":"","ciro":"","siklik":"haftalık"}]
             st.session_state["an_rakip_rows"] = _mvj("rakip") or [{"firma":"","fiyat":"","durum":"orta","sebep":""}]
             st.session_state["an_fiyat_rows"] = _mvj("fiyat_tablo") or []
+            st.session_state["an_yetkili_rows"] = _mvj("yetkili_ek") or []
             st.session_state[_ik] = True
 
         # ── WIZARD FORM ───────────────────────────────────────────────────────
@@ -4463,6 +4464,22 @@ elif aktif == "analiz":
             _an_iletisim = _k7.text_input("Tel / E-posta",value=_mv("iletisim",_auto_tel2),key="an_iletisim",placeholder="05xx / mail@...")
             _sl = ["--","Tekstil","Gıda","Otomotiv","Elektronik","İnşaat","E-ticaret","AVM/Perakende","Kimya","Mobilya","Medikal","Kozmetik","Tarım","Diğer"]
             _an_sektor = _k8.selectbox("Sektör",_sl,index=_sl.index(_mv("sektor","--")) if _mv("sektor","--") in _sl else 0,key="an_sektor")
+
+            # ── Ek yetkili satırları (+ ile eklenebilir) ──────────────────
+            st.caption("Ek Yetkili / Kişi")
+            _yk_rows = st.session_state.get("an_yetkili_rows", [])
+            _sl2 = ["--","Tekstil","Gıda","Otomotiv","Elektronik","İnşaat","E-ticaret","AVM/Perakende","Kimya","Mobilya","Medikal","Kozmetik","Tarım","Diğer"]
+            for _yi in range(len(_yk_rows)):
+                _yr = _yk_rows[_yi]
+                _yc = st.columns([2,2,2,0.3])
+                _yk_rows[_yi]["yetkili"]  = _yc[0].text_input("",value=_yr.get("yetkili",""),key=f"yk_y_{_yi}",placeholder="Ad Soyad · Ünvan",label_visibility="collapsed")
+                _yk_rows[_yi]["iletisim"] = _yc[1].text_input("",value=_yr.get("iletisim",""),key=f"yk_i_{_yi}",placeholder="Tel / E-posta",label_visibility="collapsed")
+                _yk_rows[_yi]["sektor"]   = _yc[2].selectbox("",_sl2,index=_sl2.index(_yr.get("sektor","--")) if _yr.get("sektor","--") in _sl2 else 0,key=f"yk_s_{_yi}",label_visibility="collapsed")
+                if _yc[3].button("✕",key=f"yk_del_{_yi}"):
+                    _yk_rows.pop(_yi); st.session_state["an_yetkili_rows"]=_yk_rows; st.rerun()
+            st.session_state["an_yetkili_rows"] = _yk_rows
+            if st.button("＋ Yetkili / Kişi Ekle", key="yk_ekle"):
+                st.session_state["an_yetkili_rows"].append({"yetkili":"","iletisim":"","sektor":"--"}); st.rerun()
         else:
             _an_tarih=date.today(); _an_saat=None; _an_temsilci=_mv("olusturan","")
             _auto_tel2 = str(_cari_row.get("gsm","") or "") if _cari_row is not None else ""
@@ -4577,6 +4594,7 @@ elif aktif == "analiz":
             st.session_state.pop("an_kaydet_trigger",None)
             _veri={
                 "yetkili":_an_yetkili,"iletisim":_an_iletisim,"sektor":_an_sektor,
+                "yetkili_ek": _aj.dumps(st.session_state.get("an_yetkili_rows",[]),ensure_ascii=False),
                 "amac":_gs2("an_t_amac"),"mdurum":_gs2("an_t_mdurum"),"bek_ciro":_bv,"ger_ciro":_gv,
                 "kaynak":_gs2("an_t_kaynak"),"urun":_gs2("an_t_urun"),"kargo":_gs2("an_t_kargo"),
                 "odeme":_gs2("an_t_odeme"),"teklif_tur":_gs2("an_t_fiyattur"),
