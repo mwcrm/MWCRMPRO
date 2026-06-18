@@ -1372,79 +1372,116 @@ elif aktif == "liste":
         else:
             st.warning(f"{len(_mukerrerler)} mükerrer firma adı bulundu.")
 
-            _mukerrer_opts = [f"{k} ({len(v)} kayıt)" for k, v in _mukerrerler.items()]
-            _secilen_grup = st.selectbox("İncelenecek grup", ["-- Seçin --"] + _mukerrer_opts, key="dc_mukerrer_grup_sec")
+            _mr_tab1, _mr_tab2 = st.tabs(["📋 Toplu Karşılaştırma (hepsi)", "🔎 Tek Seçerek Karşılaştır"])
 
-            if _secilen_grup != "-- Seçin --":
-                _grup_adi = list(_mukerrerler.keys())[_mukerrer_opts.index(_secilen_grup)]
-                _grup_idler = _mukerrerler[_grup_adi]
-                _grup_satirlar = df[df["id"].isin(_grup_idler)]
-
+            with _mr_tab1:
                 @st.cache_data(ttl=30)
-                def _dc_kayit_sayilari(cid, firma_adi):
+                def _dc_kayit_sayilari_toplu(cid, firma_adi):
                     try:
-                        sb_m = get_sb_service() or get_sb_client()
-                        if sb_m:
-                            _n1 = len(sb_m.table("cari_aciklamalar").select("id").eq("cari_id", cid).execute().data or [])
-                            _n2 = len(sb_m.table("musteri_analiz").select("id").eq("firma", firma_adi).execute().data or [])
+                        sb_mt = get_sb_service() or get_sb_client()
+                        if sb_mt:
+                            _n1 = len(sb_mt.table("cari_aciklamalar").select("id").eq("cari_id", cid).execute().data or [])
+                            _n2 = len(sb_mt.table("musteri_analiz").select("id").eq("firma", firma_adi).execute().data or [])
                             return _n1, _n2
                     except: pass
                     return 0, 0
 
-                st.markdown(f"#### {_grup_adi} — karşılaştırma")
-                _kart_cols = st.columns(len(_grup_satirlar))
-                _id_listesi = list(_grup_satirlar["id"])
-                for _ci, (_, _gr) in enumerate(_grup_satirlar.iterrows()):
-                    _gcid = int(_gr["id"])
-                    _nnot, _nanaliz = _dc_kayit_sayilari(_gcid, str(_gr.get("firma","")))
-                    with _kart_cols[_ci]:
-                        st.markdown(f"**ID [{_gcid}]**")
-                        st.caption(f"📅 Kayıt: {str(_gr.get('tarih','') or '')[:10]}")
-                        st.caption(f"👤 Yetkili: {_gr.get('yetkili','') or '—'}")
-                        st.caption(f"📱 GSM: {_gr.get('gsm','') or '—'}")
-                        st.caption(f"📍 {_gr.get('il','') or '—'} / {_gr.get('ilce','') or '—'}")
-                        st.caption(f"🏷 Segment: {_gr.get('segment','') or '—'}")
-                        st.caption(f"📊 Durum: {_gr.get('durum','') or '—'} / {_gr.get('islem_asamasi','') or '—'}")
-                        st.caption(f"💰 Hedef: {_gr.get('beklenen_ciro',0) or 0} ₺")
-                        st.caption(f"📝 Not sayısı: **{_nnot}**")
-                        st.caption(f"🔍 Analiz sayısı: **{_nanaliz}**")
+                _toplu_satirlar = []
+                for _fadi_t, _idler_t in _mukerrerler.items():
+                    _grup_t = df[df["id"].isin(_idler_t)]
+                    for _, _gt in _grup_t.iterrows():
+                        _gcid_t = int(_gt["id"])
+                        _nnot_t, _nanaliz_t = _dc_kayit_sayilari_toplu(_gcid_t, str(_gt.get("firma","")))
+                        _toplu_satirlar.append({
+                            "Firma Grubu": _fadi_t,
+                            "ID": _gcid_t,
+                            "Kayıt Tarihi": str(_gt.get("tarih","") or "")[:10],
+                            "Yetkili": _gt.get("yetkili","") or "—",
+                            "GSM": _gt.get("gsm","") or "—",
+                            "İl/İlçe": f"{_gt.get('il','') or ''} / {_gt.get('ilce','') or ''}",
+                            "Segment": _gt.get("segment","") or "—",
+                            "Durum/Aşama": f"{_gt.get('durum','') or ''} / {_gt.get('islem_asamasi','') or ''}",
+                            "Not Sayısı": _nnot_t,
+                            "Analiz Sayısı": _nanaliz_t,
+                        })
+                _df_toplu = pd.DataFrame(_toplu_satirlar)
+                st.dataframe(_df_toplu, use_container_width=True, hide_index=True, height=min(600, 60+len(_df_toplu)*38))
+                st.caption("Birleştirme yapmak için 'Tek Seçerek Karşılaştır' sekmesine geçip ilgili grubu seçin.")
+
+            with _mr_tab2:
+                _mukerrer_opts = [f"{k} ({len(v)} kayıt)" for k, v in _mukerrerler.items()]
+                _secilen_grup = st.selectbox("İncelenecek grup", ["-- Seçin --"] + _mukerrer_opts, key="dc_mukerrer_grup_sec")
+
+                if _secilen_grup != "-- Seçin --":
+                    _grup_adi = list(_mukerrerler.keys())[_mukerrer_opts.index(_secilen_grup)]
+                    _grup_idler = _mukerrerler[_grup_adi]
+                    _grup_satirlar = df[df["id"].isin(_grup_idler)]
+
+                    @st.cache_data(ttl=30)
+                    def _dc_kayit_sayilari(cid, firma_adi):
+                        try:
+                            sb_m = get_sb_service() or get_sb_client()
+                            if sb_m:
+                                _n1 = len(sb_m.table("cari_aciklamalar").select("id").eq("cari_id", cid).execute().data or [])
+                                _n2 = len(sb_m.table("musteri_analiz").select("id").eq("firma", firma_adi).execute().data or [])
+                                return _n1, _n2
+                        except: pass
+                        return 0, 0
+
+                    st.markdown(f"#### {_grup_adi} — karşılaştırma")
+                    _kart_cols = st.columns(len(_grup_satirlar))
+                    _id_listesi = list(_grup_satirlar["id"])
+                    for _ci, (_, _gr) in enumerate(_grup_satirlar.iterrows()):
+                        _gcid = int(_gr["id"])
+                        _nnot, _nanaliz = _dc_kayit_sayilari(_gcid, str(_gr.get("firma","")))
+                        with _kart_cols[_ci]:
+                            st.markdown(f"**ID [{_gcid}]**")
+                            st.caption(f"📅 Kayıt: {str(_gr.get('tarih','') or '')[:10]}")
+                            st.caption(f"👤 Yetkili: {_gr.get('yetkili','') or '—'}")
+                            st.caption(f"📱 GSM: {_gr.get('gsm','') or '—'}")
+                            st.caption(f"📍 {_gr.get('il','') or '—'} / {_gr.get('ilce','') or '—'}")
+                            st.caption(f"🏷 Segment: {_gr.get('segment','') or '—'}")
+                            st.caption(f"📊 Durum: {_gr.get('durum','') or '—'} / {_gr.get('islem_asamasi','') or '—'}")
+                            st.caption(f"💰 Hedef: {_gr.get('beklenen_ciro',0) or 0} ₺")
+                            st.caption(f"📝 Not sayısı: **{_nnot}**")
+                            st.caption(f"🔍 Analiz sayısı: **{_nanaliz}**")
+
+                    st.divider()
+                    st.markdown("**Hangi kayıt kalsın?**")
+                    _kalacak_opts = [f"[{int(r['id'])}] kalsın, diğerleri silinsin" for _,r in _grup_satirlar.iterrows()]
+                    _kalacak_sec = st.radio("", _kalacak_opts, key=f"dc_mukerrer_kalacak_{_grup_adi}", label_visibility="collapsed")
+
+                    if st.button("🔗 Birleştir (notları taşı, diğerlerini sil)", type="primary", key=f"dc_mukerrer_birlestir_{_grup_adi}"):
+                        _kalacak_id = _id_listesi[_kalacak_opts.index(_kalacak_sec)]
+                        _silinecek_idler = [i for i in _id_listesi if i != _kalacak_id]
+                        try:
+                            sb_birlestir = get_sb_service() or get_sb_client()
+                            _tasinan = 0
+                            for _sid in _silinecek_idler:
+                                # notları taşı
+                                _r_not = sb_birlestir.table("cari_aciklamalar").select("id").eq("cari_id", _sid).execute()
+                                if _r_not.data:
+                                    sb_birlestir.table("cari_aciklamalar").update({"cari_id": _kalacak_id}).eq("cari_id", _sid).execute()
+                                    _tasinan += len(_r_not.data)
+                                # analiz kayıtları zaten firma adına bağlı, aynı isim olduğu için otomatik kalıyor — taşımaya gerek yok
+                                # çalışma tablosu kaydını sil (varsa)
+                                sb_birlestir.table("musteri_calisma_tablosu").delete().eq("cari_id", _sid).execute()
+                                # cari kartı soft-delete yap
+                                sb_birlestir.table("cari_kartlar").update({"silindi": 1}).eq("id", _sid).execute()
+                            try: get_cari_listesi.clear()
+                            except: pass
+                            st.success(f"✅ Birleştirildi! {_tasinan} not taşındı, {len(_silinecek_idler)} mükerrer kayıt silindi (kalan: [{_kalacak_id}]).")
+                            st.rerun()
+                        except Exception as _ebirlestir:
+                            st.error(f"Birleştirme hatası: {_ebirlestir}")
 
                 st.divider()
-                st.markdown("**Hangi kayıt kalsın?**")
-                _kalacak_opts = [f"[{int(r['id'])}] kalsın, diğerleri silinsin" for _,r in _grup_satirlar.iterrows()]
-                _kalacak_sec = st.radio("", _kalacak_opts, key=f"dc_mukerrer_kalacak_{_grup_adi}", label_visibility="collapsed")
-
-                if st.button("🔗 Birleştir (notları taşı, diğerlerini sil)", type="primary", key=f"dc_mukerrer_birlestir_{_grup_adi}"):
-                    _kalacak_id = _id_listesi[_kalacak_opts.index(_kalacak_sec)]
-                    _silinecek_idler = [i for i in _id_listesi if i != _kalacak_id]
-                    try:
-                        sb_birlestir = get_sb_service() or get_sb_client()
-                        _tasinan = 0
-                        for _sid in _silinecek_idler:
-                            # notları taşı
-                            _r_not = sb_birlestir.table("cari_aciklamalar").select("id").eq("cari_id", _sid).execute()
-                            if _r_not.data:
-                                sb_birlestir.table("cari_aciklamalar").update({"cari_id": _kalacak_id}).eq("cari_id", _sid).execute()
-                                _tasinan += len(_r_not.data)
-                            # analiz kayıtları zaten firma adına bağlı, aynı isim olduğu için otomatik kalıyor — taşımaya gerek yok
-                            # çalışma tablosu kaydını sil (varsa)
-                            sb_birlestir.table("musteri_calisma_tablosu").delete().eq("cari_id", _sid).execute()
-                            # cari kartı soft-delete yap
-                            sb_birlestir.table("cari_kartlar").update({"silindi": 1}).eq("id", _sid).execute()
-                        try: get_cari_listesi.clear()
-                        except: pass
-                        st.success(f"✅ Birleştirildi! {_tasinan} not taşındı, {len(_silinecek_idler)} mükerrer kayıt silindi (kalan: [{_kalacak_id}]).")
-                        st.rerun()
-                    except Exception as _ebirlestir:
-                        st.error(f"Birleştirme hatası: {_ebirlestir}")
-
-            st.divider()
-            st.caption("Tüm mükerrer gruplar:")
-            for _fadi, _idler in _mukerrerler.items():
-                _satirlar = df[df["id"].isin(_idler)]
-                st.markdown(f"**{_fadi}**")
-                for _, _sr in _satirlar.iterrows():
-                    st.caption(f"[{int(_sr['id'])}] {_sr['firma']} — {_sr.get('il','') or ''} {_sr.get('ilce','') or ''} — {_sr.get('gsm','') or ''} — kayıt: {str(_sr.get('tarih','') or '')[:10]}")
+                st.caption("Tüm mükerrer gruplar:")
+                for _fadi, _idler in _mukerrerler.items():
+                    _satirlar = df[df["id"].isin(_idler)]
+                    st.markdown(f"**{_fadi}**")
+                    for _, _sr in _satirlar.iterrows():
+                        st.caption(f"[{int(_sr['id'])}] {_sr['firma']} — {_sr.get('il','') or ''} {_sr.get('ilce','') or ''} — {_sr.get('gsm','') or ''} — kayıt: {str(_sr.get('tarih','') or '')[:10]}")
 
 
     for _kol in ["aciklama","adres","notlar"]:
