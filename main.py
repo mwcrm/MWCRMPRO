@@ -80,6 +80,19 @@ def segment_renk(seg):
 def get_supabase():
     return get_sb_client()
 
+def _telefon_temizle(seri):
+    """5413578020.0 gibi float telefonları 5413578020 string'ine çevirir"""
+    def _tek(v):
+        if v is None:
+            return ""
+        s = str(v).strip()
+        if s.lower() in ["nan", "none", ""]:
+            return ""
+        if s.endswith(".0"):
+            s = s[:-2]
+        return s
+    return seri.apply(_tek)
+
 @st.cache_data(ttl=60)
 def get_cari_listesi():
     """60 sn cache'li cari listesi"""
@@ -87,12 +100,20 @@ def get_cari_listesi():
     if sb:
         try:
             res = sb.table("cari_kartlar").select("*").neq("silindi",1).order("firma").execute()
-            return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+            _df_g = pd.DataFrame(res.data) if res.data else pd.DataFrame()
+            if not _df_g.empty:
+                for _tk in ["gsm","sabit"]:
+                    if _tk in _df_g.columns:
+                        _df_g[_tk] = _telefon_temizle(_df_g[_tk])
+            return _df_g
         except: pass
     try:
         conn = get_conn()
         df = pd.read_sql("SELECT * FROM cari_kartlar WHERE silindi=0 OR silindi='0' OR silindi IS NULL ORDER BY firma", conn)
         conn.close()
+        for _tk in ["gsm","sabit"]:
+            if _tk in df.columns:
+                df[_tk] = _telefon_temizle(df[_tk])
         return df
     except:
         return pd.DataFrame()
@@ -1362,6 +1383,11 @@ elif aktif == "liste":
             raise Exception()
     except:
         df = db_read("cari_kartlar", extra_sql="WHERE silindi=0 OR silindi='0' OR silindi IS NULL ORDER BY tarih DESC")
+
+    if not df.empty:
+        for _tk in ["gsm","sabit"]:
+            if _tk in df.columns:
+                df[_tk] = _telefon_temizle(df[_tk])
 
     with st.expander("🔍 Mükerrer (Aynı İsimli) Müşterileri Bul ve Birleştir"):
         _firma_gruplari = df.groupby(df["firma"].str.strip().str.upper())["id"].apply(list)
@@ -3822,6 +3848,14 @@ elif aktif == "excel":
                                 return ""
                             return str(v)
 
+                        def _temiz_tel(v):
+                            if v is None or (isinstance(v, float) and pd.isna(v)):
+                                return ""
+                            s = str(v).strip()
+                            if s.endswith(".0"):
+                                s = s[:-2]
+                            return s
+
                         def _temiz_float(v):
                             try:
                                 if v is None or (isinstance(v, float) and pd.isna(v)):
@@ -3833,8 +3867,8 @@ elif aktif == "excel":
                         kayitlar.append({
                             "firma": firma,
                             "yetkili": _temiz_str(row.get("yetkili","")),
-                            "gsm": _temiz_str(row.get("gsm","")),
-                            "sabit": _temiz_str(row.get("sabit","")),
+                            "gsm": _temiz_tel(row.get("gsm","")),
+                            "sabit": _temiz_tel(row.get("sabit","")),
                             "email": _temiz_str(row.get("email","")),
                             "adres": _temiz_str(row.get("adres","")),
                             "ilce": _temiz_str(row.get("ilce","")),
