@@ -3370,13 +3370,15 @@ elif aktif == "teklif":
 
     _firma_def = str(secili_musteri["firma"]) if secili_musteri is not None else ""
     if "hedef_mus" not in st.session_state or st.session_state.get("son_secili_id") != _secim:
-        st.session_state["hedef_mus"] = _firma_def
+        st.session_state["hedef_mus"]    = _firma_def
+        st.session_state["gsm_manuel"]   = gsm_kayitli
+        st.session_state["email_manuel"] = email_kayitli
         st.session_state["son_secili_id"] = _secim
 
     hedef_musteri = _tr[3].text_input("", key="hedef_mus", placeholder="Müşteri Adı", label_visibility="collapsed")
     vade          = _tr[4].text_input("", placeholder="Vade...", key="vade", label_visibility="collapsed")
-    gsm_manuel    = _tr[5].text_input("", value=gsm_kayitli, placeholder="05xxxxxxxxx", key="gsm_manuel", label_visibility="collapsed")
-    email_manuel  = _tr[6].text_input("", value=email_kayitli, placeholder="Email", key="email_manuel", label_visibility="collapsed")
+    gsm_manuel    = _tr[5].text_input("", placeholder="05xxxxxxxxx", key="gsm_manuel", label_visibility="collapsed")
+    email_manuel  = _tr[6].text_input("", placeholder="Email", key="email_manuel", label_visibility="collapsed")
 
     # WA numara işle
     gsm_temiz = re.sub(r"[\s\-\(\)+]","", gsm_manuel)
