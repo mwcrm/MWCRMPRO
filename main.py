@@ -1685,7 +1685,7 @@ elif aktif == "liste":
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
     with st.expander("🔍 Filtreler & Arama", expanded=st.session_state.get("_cl_fil_acik", True)):
         st.session_state["_cl_fil_acik"] = True  # expander açık kalsın
-        _frow1 = st.columns([2,1,1,1,1,1])
+        _frow1 = st.columns([2,1,1,1,1,1,1])
         ara_txt = _frow1[0].text_input("", placeholder="🔍 Firma, yetkili, il, gsm...", key="ara_liste", label_visibility="collapsed")
 
         # Asama multiselect
@@ -1712,9 +1712,20 @@ elif aktif == "liste":
             default=st.session_state.get("_cl_fil_il_multi", []),
             key="_cl_fil_il_multi", placeholder="İl seç..."
         )
+        # İlçe multiselect — seçili ile göre dinamik filtrele
+        if _il_sec:
+            _ilce_opts = sorted(df[df["il"].astype(str).isin(_il_sec)]["ilce"].dropna().astype(str).unique().tolist()) if "ilce" in df.columns else []
+        else:
+            _ilce_opts = sorted(df["ilce"].dropna().astype(str).unique().tolist()) if "ilce" in df.columns else []
+        _ilce_opts = [x for x in _ilce_opts if x and x not in ["nan","None",""]]
+        _ilce_sec = _frow1[5].multiselect(
+            "İlçe", _ilce_opts,
+            default=[x for x in st.session_state.get("_cl_fil_ilce_multi", []) if x in _ilce_opts],
+            key="_cl_fil_ilce_multi", placeholder="İlçe seç..."
+        )
         # Temsilci multiselect
         _tem_opts = sorted(df["temsilci"].dropna().astype(str).unique().tolist()) if "temsilci" in df.columns else []
-        _tem_sec = _frow1[5].multiselect(
+        _tem_sec = _frow1[6].multiselect(
             "Temsilci", _tem_opts,
             default=st.session_state.get("_cl_fil_temsilci_multi", []),
             key="_cl_fil_temsilci_multi", placeholder="Temsilci seç..."
@@ -1726,7 +1737,7 @@ elif aktif == "liste":
             key="siralama_kol", label_visibility="visible"
         )
         if _frow2[1].button("🗑️ Filtreleri Temizle", use_container_width=True, key="cl_fil_temizle"):
-            for _fk in ["_cl_fil_asama_multi","_cl_fil_durum_multi","_cl_fil_il_multi","_cl_fil_temsilci_multi","fil_seg","ara_liste"]:
+            for _fk in ["_cl_fil_asama_multi","_cl_fil_durum_multi","_cl_fil_il_multi","_cl_fil_ilce_multi","_cl_fil_temsilci_multi","fil_seg","ara_liste"]:
                 st.session_state.pop(_fk, None)
             st.rerun()
 
@@ -1744,6 +1755,8 @@ elif aktif == "liste":
         else: df_f = df_f[df_f["_seg_tmp"]==filtre_seg]
     if _il_sec:
         df_f = df_f[df_f["il"].astype(str).isin(_il_sec)]
+    if _ilce_sec:
+        df_f = df_f[df_f["ilce"].astype(str).isin(_ilce_sec)]
     if _tem_sec:
         df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
 
@@ -1774,7 +1787,7 @@ elif aktif == "liste":
             st.rerun()
     _aktif_fil_sayisi = sum([
         bool(ara_txt), bool(_asama_sec), bool(_durum_sec),
-        filtre_seg != "Tümü", bool(_il_sec), bool(_tem_sec)
+        filtre_seg != "Tümü", bool(_il_sec), bool(_ilce_sec), bool(_tem_sec)
     ])
     _fil_badge = f" 🔵 {_aktif_fil_sayisi} filtre aktif" if _aktif_fil_sayisi else ""
     _fc_row[2].markdown(f"<small style='color:gray'>{len(df_f)} kayıt{_fil_badge}</small>", unsafe_allow_html=True)
