@@ -827,6 +827,18 @@ def fmt_tel(n):
         return s
     except: return ""
 
+def _duzenleme_form_key_temizle(fid):
+    """Belirli bir müşteri ID'sine ait düzenleme formu widget key'lerini
+    session_state'ten siler. Düzenle her tıklandığında çağrılmalı —
+    yoksa eskiden o key'e yapışmış (boş veya yanlış) değer, yeni
+    value= parametresini görmezden gelip ekranda kalmaya devam eder."""
+    _alanlar = ["yeni_il_dis","yeni_ilce_dis","yeni_durum_dis","yeni_temsilci_dis",
+                "yeni_seg_dis","yeni_asama_dis","yeni_firma","yeni_yetkili",
+                "yeni_gsm","yeni_sabit","yeni_email","yeni_adres","yeni_notlar",
+                "bek_ciro_str","ger_ciro_str"]
+    for _a in _alanlar:
+        st.session_state.pop(f"{_a}_{fid}", None)
+
 def parse_para(s):
     """1.000.000,50 → 1000000.50"""
     try:
@@ -1245,6 +1257,7 @@ if aktif == "yeni":
                     bulunan["gsm"] = str(r_d.get("telefon") or r_d.get("tel") or "")
                 if not bulunan.get("sabit"):
                     bulunan["sabit"] = str(r_d.get("sabit_hat") or "")
+                _duzenleme_form_key_temizle(str(bulunan.get("id","")))
                 st.session_state["duzenle_musteri"] = bulunan
                 st.success(f"✅ **{bulunan.get('firma')}** (ID: {bulunan.get('id')})")
             else:
@@ -1804,6 +1817,7 @@ elif aktif == "liste":
                     d2["gsm"] = str(kart_row.get("telefon") or kart_row.get("tel") or "")
                 if not d2.get("sabit"):
                     d2["sabit"] = str(kart_row.get("sabit_hat") or "")
+                _duzenleme_form_key_temizle(str(kart_id))
                 st.session_state["duzenle_musteri"] = d2
                 st.session_state["aktif_tab"] = "yeni"; st.rerun()
             if _ax2.button("📄 Teklif", key=f"kt_{kart_id}", use_container_width=True, type="primary"):
