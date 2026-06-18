@@ -4731,11 +4731,11 @@ body{{background:#f1f5f9;padding:8px;color:#1e293b;font-size:13px;}}
 <div id="kaydet_output" style="display:none;margin-top:8px;background:#dcfce7;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;color:#16a34a;font-weight:500;text-align:center"></div>
 
 <script>
-var STATE = {ps_json};
-var BOLGE = {_bolge_json};
-var RAKIP = {_rakip_json};
-var OPEN = {{}};
-var DONE = {{}};
+var STATE = """ + _ps_json + """;
+var BOLGE = """ + _bolge_json + """;
+var RAKIP = """ + _rakip_json + """;
+var OPEN = {};
+var DONE = {};
 
 // ── PILL ──────────────────────────────────────────────────────────────────
 function tp(el, key) {{
