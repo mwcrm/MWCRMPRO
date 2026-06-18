@@ -1404,6 +1404,7 @@ elif aktif == "liste":
                     for _, _gt in _grup_t.iterrows():
                         _gcid_t = int(_gt["id"])
                         _toplu_satirlar.append({
+                            "Sil": False,
                             "Firma Grubu": _fadi_t,
                             "ID": _gcid_t,
                             "Kayıt Tarihi": str(_gt.get("tarih","") or "")[:10],
@@ -1416,10 +1417,40 @@ elif aktif == "liste":
                             "Analiz Sayısı": _analiz_say_tum.get(str(_gt.get("firma","")), 0),
                         })
                 _df_toplu = pd.DataFrame(_toplu_satirlar)
-                st.dataframe(_df_toplu, use_container_width=True, hide_index=True, height=min(600, 60+len(_df_toplu)*38))
+                _edited_toplu = st.data_editor(
+                    _df_toplu,
+                    use_container_width=True,
+                    hide_index=True,
+                    num_rows="fixed",
+                    height=min(600, 60+len(_df_toplu)*38),
+                    disabled=["Firma Grubu","ID","Kayıt Tarihi","Yetkili","GSM","İl/İlçe","Segment","Durum/Aşama","Not Sayısı","Analiz Sayısı"],
+                    column_config={"Sil": st.column_config.CheckboxColumn(width="small", help="İşaretleyip aşağıdaki butona basın")},
+                    key="dc_mukerrer_toplu_editor"
+                )
+
+                _isaretli_toplu = _edited_toplu[_edited_toplu["Sil"] == True]
+                if st.button(f"🗑 İşaretlenen {len(_isaretli_toplu)} Kaydı Sil", type="primary", use_container_width=True, key="dc_mukerrer_toplu_sil_btn", disabled=len(_isaretli_toplu)==0):
+                    _silinen_t = 0
+                    _hata_t = 0
+                    sb_toplu_sil = get_sb_service() or get_sb_client()
+                    for _, _isr in _isaretli_toplu.iterrows():
+                        _sid_t = int(_isr["ID"])
+                        try:
+                            sb_toplu_sil.table("musteri_calisma_tablosu").delete().eq("cari_id", _sid_t).execute()
+                            sb_toplu_sil.table("cari_kartlar").update({"silindi": 1}).eq("id", _sid_t).execute()
+                            _silinen_t += 1
+                        except Exception as _et:
+                            _hata_t += 1
+                    try: get_cari_listesi.clear()
+                    except: pass
+                    if _silinen_t:
+                        st.success(f"✅ {_silinen_t} kayıt silindi! (Notlar taşınmadı — tek tek silmek isterseniz 'Tek Seçerek Karşılaştır' sekmesini kullanın)")
+                    if _hata_t:
+                        st.error(f"❌ {_hata_t} kayıt silinemedi.")
+                    st.rerun()
 
                 st.divider()
-                st.caption("Birleştirmek istediğiniz grubu seçin, direkt karşılaştırma paneli açılır:")
+                st.caption("Birleştirmek (not taşıyarak) istediğiniz grubu seçin, direkt karşılaştırma paneli açılır:")
                 _mukerrer_opts_t1 = [f"{k} ({len(v)} kayıt)" for k, v in _mukerrerler.items()]
                 _secilen_grup_t1 = st.selectbox("Grup seç", ["-- Seçin --"] + _mukerrer_opts_t1, key="dc_mukerrer_grup_sec_t1")
                 if _secilen_grup_t1 != "-- Seçin --":
