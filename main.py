@@ -4129,14 +4129,883 @@ elif aktif == "excel":
 elif aktif == "analiz":
     sayfa_log("analiz")
     import json as _aj
+    from datetime import date, time as _time
 
-    st.markdown("## 🔍 Müşteri Görüşme Analizi")
-
-    # CSS
+    # ── CSS ───────────────────────────────────────────────────────────────────
     st.markdown("""<style>
-div[data-testid="stHorizontalBlock"] button[kind="secondary"]{padding:2px 8px!important;font-size:11px!important;border-radius:12px!important;min-height:26px!important;background:#f8fafc!important;border:0.5px solid #e2e8f0!important;color:#64748b!important;}
-div[data-testid="stHorizontalBlock"] button[kind="primary"]{padding:2px 8px!important;font-size:11px!important;border-radius:12px!important;min-height:26px!important;background:#eff6ff!important;border:0.5px solid #93c5fd!important;color:#1d4ed8!important;}
+.an-irow{background:white;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:8px;overflow:visible;}
+.an-irow.done{border-color:#bbf7d0;}
+.an-hdr{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;cursor:pointer;gap:8px;border-radius:12px;}
+.an-hdr:hover{background:#f8fafc;}
+.an-title{font-size:13px;font-weight:600;color:#374151;}
+.an-status{font-size:11px;color:#94a3b8;flex-shrink:0;}
+.an-status.ok{color:#16a34a;font-weight:500;}
+.an-body{padding:14px 16px;border-top:1px solid #f1f5f9;}
+.an-label{font-size:11px;color:#64748b;font-weight:500;margin:8px 0 4px;display:block;}
+.an-label:first-child{margin-top:0;}
+.an-pills{display:flex;flex-wrap:wrap;gap:4px;align-items:center;}
+.an-pill{padding:4px 11px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;user-select:none;display:inline-flex;align-items:center;gap:3px;}
+.an-pill:hover{border-color:#93c5fd;}
+.an-pill.on{background:#eff6ff;border-color:#93c5fd;color:#1d4ed8;font-weight:500;}
+.an-pill.custom{background:#fef9c3;border-color:#fde047;color:#92400e;}
+.an-pill.custom.on{background:#fef08a;}
+.an-plus{width:26px;height:26px;border-radius:50%;border:1.5px dashed #93c5fd;background:#f0f9ff;color:#3b82f6;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;vertical-align:middle;}
+.an-plus:hover{background:#dbeafe;}
+.an-addinp{display:none;align-items:center;gap:5px;margin-top:6px;}
+.an-addinp.open{display:flex;}
+.an-inp{border:1.5px solid #3b82f6;border-radius:20px;padding:4px 12px;font-size:12px;outline:none;width:170px;}
+.an-ok{padding:4px 12px;background:#3b82f6;color:white;border:none;border-radius:20px;font-size:12px;cursor:pointer;}
+.an-no{padding:4px 8px;background:white;color:#94a3b8;border:1px solid #e2e8f0;border-radius:20px;font-size:12px;cursor:pointer;}
+.an-sopts{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;}
+.an-sopt{padding:5px 12px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;}
+.an-sopt.on{background:#0f172a;color:white;border-color:#0f172a;}
+.an-tbl{width:100%%;border-collapse:collapse;font-size:12px;margin-top:6px;}
+.an-tbl th{background:#f8fafc;color:#64748b;padding:6px 8px;text-align:left;border-bottom:1px solid #e2e8f0;font-size:11px;}
+.an-tbl td{padding:4px 5px;border-bottom:1px solid #f1f5f9;}
+.an-tbl td input,.an-tbl td select{border:1px solid #e2e8f0;border-radius:6px;padding:4px 7px;font-size:12px;width:100%%;outline:none;}
+.an-save-bar{background:white;border:1px solid #e2e8f0;border-radius:12px;padding:12px 16px;display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;}
 </style>""", unsafe_allow_html=True)
+
+    # ── DB FONKSIYONLARI ──────────────────────────────────────────────────────
+    def _sb(): return get_sb_service() or get_sb_client()
+
+    def _an_kaydet(firma, veri):
+        try:
+            sb = _sb()
+            if sb:
+                ex = sb.table("musteri_analiz").select("id").eq("firma", firma).execute()
+                if ex.data:
+                    sb.table("musteri_analiz").update(veri).eq("firma", firma).execute()
+                else:
+                    veri["firma"] = firma
+                    sb.table("musteri_analiz").insert(veri).execute()
+                return True, ""
+        except Exception as e:
+            return False, str(e)
+        return False, "Bağlantı yok"
+
+    def _an_getir(firma):
+        try:
+            sb = _sb()
+            if sb:
+                r = sb.table("musteri_analiz").select("*").eq("firma", firma).execute()
+                return r.data[0] if r.data else None
+        except: pass
+        return None
+
+    def _an_liste():
+        try:
+            sb = _sb()
+            if sb:
+                r = sb.table("musteri_analiz").select("id,firma,potansiyel,sonuc,tarih,yetkili,iletisim,sektor,kaynak,kargo,beklenti,engel,not_alan,sonraki_adim,takip_tar,bek_ciro,ger_ciro").order("tarih", desc=True).limit(500).execute()
+                if r.data:
+                    df = pd.DataFrame(r.data)
+                    return df[df["firma"].notna() & (df["firma"] != "")]
+        except Exception as e:
+            st.error(f"Liste hatası: {e}")
+        return pd.DataFrame()
+
+    def _an_sil(firma):
+        try:
+            sb = _sb()
+            if sb:
+                sb.table("musteri_analiz").delete().eq("firma", firma).execute()
+                return True
+        except: pass
+        return False
+
+    def _gs(key): return ", ".join(st.session_state.get(key, []))
+    def _mv(k, d=""):  return (_mv_data or {}).get(k) or d
+    def _mvl(k):
+        v = _mv(k, "")
+        return [x.strip() for x in v.split(",") if x.strip()] if v else []
+    def _mvj(k):
+        try: return _aj.loads(_mv(k, "[]") or "[]")
+        except: return []
+
+    # ── PILL HTML YARDIMCISI ──────────────────────────────────────────────────
+    def _pill_html(group_key, defaults, custom_key=None, label=""):
+        """HTML tabanlı pill widget — Streamlit components.html ile render edilir"""
+        sel = st.session_state.get(group_key, defaults)
+        customs = st.session_state.get(custom_key or f"{group_key}_custom", [])
+        all_opts = defaults + [c for c in customs if c not in defaults]
+        pills_html = ""
+        for o in all_opts:
+            is_on = o in sel
+            is_custom = o not in defaults
+            cls = "an-pill" + (" on" if is_on else "") + (" custom" if is_custom else "")
+            x = f' <span style="font-size:10px;cursor:pointer;opacity:.6" onclick="rmCustom(this,\'{group_key}\',\'{o}\')">✕</span>' if is_custom else ""
+            pills_html += f'<div class="{cls}" onclick="tp(this,\'{group_key}\',\'{o}\')">{o}{x}</div>\n'
+        add_id = f"addinp_{group_key}"
+        html = f"""
+<div style="font-size:11px;color:#64748b;font-weight:500;margin-bottom:5px">{label}</div>
+<div class="an-pills" id="pg_{group_key}">
+{pills_html}
+<button class="an-plus" onclick="oa('{add_id}')">+</button>
+</div>
+<div class="an-addinp" id="{add_id}">
+  <input class="an-inp" id="inp_{group_key}" placeholder="ekle..." onkeydown="if(event.key==='Enter')addp('{group_key}','{add_id}')">
+  <button class="an-ok" onclick="addp('{group_key}','{add_id}')">Ekle</button>
+  <button class="an-no" onclick="ca('{add_id}')">İptal</button>
+</div>"""
+        return html
+
+    # ── TÜM ANALİZLER LİSTESİ ────────────────────────────────────────────────
+    st.markdown("## 🔍 Müşteri Görüşme Analizi")
+    _df_tum = _an_liste()
+
+    if not _df_tum.empty:
+        st.markdown("### 📋 Tüm Analizler")
+        _f1,_f2,_f3 = st.columns(3)
+        _ff = _f1.text_input("Firma ara", key="an_ff", placeholder="firma adı...")
+        _fs = _f2.selectbox("Sonuç", ["Tümü","takip edilecek","teklif verildi","anlaşma yapıldı","beklemede","ilgisiz"], key="an_fs")
+        _fp = _f3.selectbox("Potansiyel", ["Tümü","çok yüksek","yüksek","orta","düşük","çok düşük"], key="an_fp")
+        _dff = _df_tum.copy()
+        if _ff: _dff = _dff[_dff["firma"].str.contains(_ff, case=False, na=False)]
+        if _fs != "Tümü": _dff = _dff[_dff["sonuc"] == _fs]
+        if _fp != "Tümü": _dff = _dff[_dff["potansiyel"] == _fp]
+        st.caption(f"{len(_dff)} analiz")
+
+        _pic_map = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}
+        for _ai, (_, _ar) in enumerate(_dff.iterrows()):
+            _pic = _pic_map.get(str(_ar.get("potansiyel","")),"-")
+            with st.expander(f"{_pic} **{_ar.get('firma','?')}** · {fmt_tarih(_ar.get('tarih',''))} · {_ar.get('sonuc','')} · {_ar.get('potansiyel','')}"):
+                _c1,_c2,_c3,_c4 = st.columns(4)
+                _c1.metric("Potansiyel", _ar.get("potansiyel","—"))
+                _c2.metric("Beklenen Ciro", f"{float(_ar.get('bek_ciro',0) or 0):,.0f} ₺")
+                _c3.metric("Gerçekleşen", f"{float(_ar.get('ger_ciro',0) or 0):,.0f} ₺")
+                _c4.metric("Sonuç", _ar.get("sonuc","—"))
+                st.markdown(f"""| | |
+|---|---|
+| **Firma / Yetkili** | {_ar.get("firma","—")} · {_ar.get("yetkili","—")} · {_ar.get("iletisim","—")} |
+| **Sektör / Kaynak** | {_ar.get("sektor","—")} · {_ar.get("kaynak","—")} |
+| **Kargo / Fatura** | {_ar.get("kargo","—")} · {_ar.get("fatura","—")} |
+| **Beklenti / Engel** | {_ar.get("beklenti","—")} · {_ar.get("engel","—")} |
+| **Not** | {_ar.get("not_alan","—")} |
+| **Sonraki Adım** | {_ar.get("sonraki_adim","—")} · {fmt_tarih(_ar.get("takip_tar",""))} |""")
+                _b1,_b2,_b3,_b4 = st.columns(4)
+                if _b1.button("✏️ Düzenle", key=f"duz_{_ai}", use_container_width=True):
+                    st.session_state["an_duzenle_firma"] = str(_ar.get("firma",""))
+                    _ik2 = f"an_init_{_ar.get('firma','')}"
+                    for _kk in [_ik2,"an_fiyat_rows","an_bolge_rows","an_avm_rows","an_rakip_rows"]:
+                        if _kk in st.session_state: del st.session_state[_kk]
+                    # pill custom temizle
+                    for _pk in list(st.session_state.keys()):
+                        if _pk.endswith("_custom"): del st.session_state[_pk]
+                    st.rerun()
+                _tel2 = str(_ar.get("iletisim","") or "").replace(" ","").replace("-","")
+                if _tel2 and "@" not in _tel2:
+                    if _tel2.startswith("0"): _tel2 = "90"+_tel2[1:]
+                    _b2.markdown(f"<a href='https://wa.me/{_tel2}' target='_blank'><button style='width:100%%;padding:5px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;'>💬 WA</button></a>", unsafe_allow_html=True)
+                if _b3.button("📄 Teklif", key=f"tek_{_ai}", use_container_width=True):
+                    st.session_state["aktif_tab"] = "teklif"
+                    st.session_state["teklif_musteri_onsel"] = str(_ar.get("firma",""))
+                    st.rerun()
+                if _b4.button("🗑 Sil", key=f"sil_{_ai}", use_container_width=True):
+                    if _an_sil(str(_ar.get("firma",""))): st.success("Silindi!"); st.rerun()
+
+        st.divider()
+        _sc1,_sc2,_sc3,_sc4,_sc5 = st.columns(5)
+        _sc1.metric("Toplam", len(_df_tum))
+        _sc2.metric("Yüksek Pot.", len(_df_tum[_df_tum["potansiyel"].isin(["yüksek","çok yüksek"])]))
+        _sc3.metric("Takip Bekleyen", len(_df_tum[_df_tum["sonuc"]=="takip edilecek"]))
+        _sc4.metric("Anlaşma", len(_df_tum[_df_tum["sonuc"]=="anlaşma yapıldı"]))
+        try: _sc5.metric("Beklenen Ciro", f"{_df_tum['bek_ciro'].sum():,.0f} ₺")
+        except: pass
+        st.divider()
+
+    # ── YENİ / DÜZENLE FORMU ─────────────────────────────────────────────────
+    st.markdown("### ✏️ Analiz Formu")
+    _df_cari = get_cari_listesi()
+    _col1, _col2 = st.columns([3,1])
+    _opts = ["-- Seçin --"] + [f"[{int(r['id'])}] {r['firma']}" for _,r in _df_cari.iterrows()]
+    _sec = _col1.selectbox("Müşteri seç", _opts, key="an_cari_sec")
+    _yaz = _col2.text_input("veya firma adı", key="an_firma_yaz", placeholder="Manuel...",
+        value=st.session_state.pop("an_duzenle_firma",""))
+
+    _firma = ""
+    _cari_row = None
+    if _sec != "-- Seçin --" and "[" in _sec:
+        _cid = int(_sec.split("]")[0].replace("[","").strip())
+        _cr = _df_cari[_df_cari["id"]==_cid]
+        if not _cr.empty:
+            _cari_row = _cr.iloc[0]
+            _firma = str(_cari_row.get("firma",""))
+    elif _yaz.strip():
+        _firma = _yaz.strip()
+
+    if not _firma:
+        st.warning("⚠️ Müşteri seçin veya firma adı yazın.")
+    else:
+        _mv_data = _an_getir(_firma)
+        _duzenle = _mv_data is not None
+        _ik = f"an_init_{_firma}"
+
+        # Başlık + düzenle/sil
+        _hc1, _hc2 = st.columns([4,1])
+        with _hc1:
+            if _duzenle:
+                st.success(f"✅ **{_firma}** — kayıtlı analiz düzenleniyor")
+            else:
+                st.info(f"🆕 **{_firma}** — yeni analiz")
+        with _hc2:
+            if _duzenle:
+                if st.button("🗑 Analizi Sil", use_container_width=True, key="an_sil_hdr"):
+                    if _an_sil(_firma):
+                        for _kk in [_ik,"an_fiyat_rows","an_bolge_rows","an_avm_rows","an_rakip_rows"]:
+                            if _kk in st.session_state: del st.session_state[_kk]
+                        st.success("Silindi!"); st.rerun()
+
+        # Session init
+        if _ik not in st.session_state:
+            for _k,_d in [
+                ("an_t_amac",     _mvl("amac")),
+                ("an_t_mdurum",   _mvl("mdurum") or ["yeni"]),
+                ("an_t_kaynak",   _mvl("kaynak")),
+                ("an_t_urun",     _mvl("urun") or ["koli"]),
+                ("an_t_kargo",    _mvl("kargo")),
+                ("an_t_fiyattur", _mvl("teklif_tur")),
+                ("an_t_odeme",    _mvl("odeme")),
+                ("an_t_beklenti", _mvl("beklenti")),
+                ("an_t_engel",    _mvl("engel")),
+                ("an_t_sonuc",    _mvl("sonuc") or ["takip edilecek"]),
+                ("an_t_sonraki",  _mvl("sonraki_adim")),
+                ("an_t_sik",      _mvl("sik")),
+                ("an_t_gecis",    _mvl("gecis")),
+                ("an_t_karar",    _mvl("karar") or ["yetkili kendisi"]),
+                ("an_t_sure",     _mvl("sure") or ["belirsiz"]),
+                ("an_t_arac",     _mvl("arac") or ["hayır dışarıdan"]),
+                ("an_t_saha",     _mvl("saha")),
+                ("an_t_pot",      _mvl("potansiyel") or ["orta"]),
+            ]:
+                st.session_state[_k] = _d
+            st.session_state["an_bolge_rows"] = _mvj("bolge") or [{"il":"","urun":"koli","adet":"","ciro":"","siklik":"haftalık"}]
+            st.session_state["an_rakip_rows"] = _mvj("rakip") or [{"firma":"","fiyat":"","durum":"orta","sebep":""}]
+            st.session_state["an_fiyat_rows"] = _mvj("fiyat_tablo") or []
+            st.session_state[_ik] = True
+
+        # ── SHARED JS + PILL STATE ────────────────────────────────────────────
+        # Pill state'i session_state'den oku — JS ile senkronize edilecek
+        # st.components.html ile interaktif HTML render et
+
+        import streamlit.components.v1 as _comp
+
+        # Pill state'leri JSON olarak hazırla
+        _pill_state = {
+            "an_t_amac":     st.session_state.get("an_t_amac",[]),
+            "an_t_mdurum":   st.session_state.get("an_t_mdurum",[]),
+            "an_t_kaynak":   st.session_state.get("an_t_kaynak",[]),
+            "an_t_urun":     st.session_state.get("an_t_urun",[]),
+            "an_t_kargo":    st.session_state.get("an_t_kargo",[]),
+            "an_t_fiyattur": st.session_state.get("an_t_fiyattur",[]),
+            "an_t_odeme":    st.session_state.get("an_t_odeme",[]),
+            "an_t_beklenti": st.session_state.get("an_t_beklenti",[]),
+            "an_t_engel":    st.session_state.get("an_t_engel",[]),
+            "an_t_sonuc":    st.session_state.get("an_t_sonuc",[]),
+            "an_t_sonraki":  st.session_state.get("an_t_sonraki",[]),
+            "an_t_sik":      st.session_state.get("an_t_sik",[]),
+            "an_t_karar":    st.session_state.get("an_t_karar",[]),
+            "an_t_sure":     st.session_state.get("an_t_sure",[]),
+            "an_t_pot":      st.session_state.get("an_t_pot",["orta"]),
+        }
+        _ps_json = _aj.dumps(_pill_state, ensure_ascii=False)
+
+        _bolge_json = _aj.dumps(st.session_state.get("an_bolge_rows",[]), ensure_ascii=False)
+        _rakip_json = _aj.dumps(st.session_state.get("an_rakip_rows",[]), ensure_ascii=False)
+
+        _auto_tel = str(_cari_row.get("gsm","") or _cari_row.get("email","") or "") if _cari_row is not None else ""
+        _mv_yetkili = _mv("yetkili","")
+        _mv_iletisim = _mv("iletisim", _auto_tel)
+        _mv_sektor = _mv("sektor","--")
+        _mv_tarih = str(_mv("tarih", str(date.today())))[:10]
+        _mv_saat = str(_mv("saat", ""))[:5] or ""
+        _mv_temsilci = _mv("olusturan", st.session_state.get("kullanici",""))
+        _mv_bek = str(int(float(_mv("bek_ciro",0) or 0))) if _mv("bek_ciro",0) else ""
+        _mv_ger = str(int(float(_mv("ger_ciro",0) or 0))) if _mv("ger_ciro",0) else ""
+        _mv_not = _mv("not_alan","").replace("`","'").replace("\\","\\\\")
+        _mv_takip = str(_mv("takip_tar", str(date.today())))[:10]
+        _mv_sonraki_txt = _mv("sonraki_adim","").replace("`","'")
+        _mv_ozel = _mv("ozel_istek","").replace("`","'")
+        _mv_depo = _mv("depo","").replace("`","'")
+        _mv_fbek = _mv("fiyat_bek","").replace("`","'")
+
+        _sl_opts = ["--","Tekstil","Gıda","Otomotiv","Elektronik","İnşaat","E-ticaret","AVM/Perakende","Kimya","Mobilya","Medikal","Kozmetik","Tarım","Diğer"]
+        _sl_html = "".join([f'<option value="{s}" {"selected" if s==_mv_sektor else ""}>{s}</option>' for s in _sl_opts])
+        _urun_opts = ["koli","palet","parsiyel","TIR/komple","soğuk zincir","ADR/tehlikeli","ambar kargo","dış nakliye"]
+        _kargo_opts = ["koli","palet","dorse","ambar","AVM","dış nakliye","soğuk zincir"]
+        _fiyattur_opts = ["spot","anlaşmalı","ihale","paket fiyat","yıllık kontrat"]
+        _odeme_opts = ["nakit","çek","havale","vadeli","kredi kartı"]
+        _beklenti_opts = ["düşük fiyat","uzun vade","spot fiyat","hız/dakiklik","hizmet kalitesi","alım saati","bölge kapsamı","takip sistemi","sigorta","AVM girişi"]
+        _engel_opts = ["fiyat","vade","rakip teklifi","karar verici","bölge eksikliği","güven","alışkanlık"]
+        _sonuc_opts = ["takip edilecek","teklif verildi","beklemede","ilgisiz","randevu verildi","anlaşma yapıldı"]
+        _sonraki_opts = ["fiyat teklifi gönder","tekrar ara","randevu al","numune gönder","sözleşme hazırla","demo yap"]
+        _amac_opts = ["yeni müşteri kazanım","zam görüşmesi","nezaket ziyareti","erken potansiyel","kayıp müşteri geri kazanım","mevcut müşteri analizi","rakip takibi","pazar araştırması"]
+        _kaynak_opts = ["soğuk arama","referans","linkedin","internet/forum","ziyaret","fuar","sosyal medya","eski müşteri"]
+        _mdurum_opts = ["yeni","mevcut","eski","rakip firmanın müşterisi"]
+        _pot_opts = ["çok düşük","düşük","orta","yüksek","çok yüksek"]
+        _sik_opts = ["hasar","geç teslimat","fiyat yüksek","iletişim zayıf","takip yok","kayıp kargo","AVM girişi yok"]
+        _karar_opts = ["yetkili kendisi","üst yönetim","komite","bilinmiyor"]
+        _sure_opts = ["acil (bu hafta)","kısa (1 ay)","uzun (3+ ay)","belirsiz"]
+
+        def _pills_js(key, opts):
+            """JS için pill HTML üretici"""
+            html = ""
+            sel = _pill_state.get(key, [])
+            for o in opts:
+                cls = "an-pill on" if o in sel else "an-pill"
+                html += f'<div class="{cls}" onclick="tp(this,\'{key}\')">{o}</div>'
+            html += f'<button class="an-plus" onclick="oa(\'add_{key}\')">+</button>'
+            html += f'<div class="an-addinp" id="add_{key}"><input class="an-inp" id="inp_{key}" placeholder="ekle..." onkeydown="if(event.key===\'Enter\')addp(\'{key}\')"><button class="an-ok" onclick="addp(\'{key}\')">Ekle</button><button class="an-no" onclick="ca(\'add_{key}\')">İptal</button></div>'
+            return f'<div class="an-pills" id="pg_{key}">{html}</div>'
+
+        def _sopt_js(key, opts, tek=True):
+            sel = _pill_state.get(key, [])
+            fn = f"so(this,'{key}')" if tek else f"tp(this,'{key}')"
+            html = ""
+            for o in opts:
+                cls = "an-sopt on" if o in sel else "an-sopt"
+                html += f'<div class="{cls}" onclick="{fn}">{o}</div>'
+            return f'<div class="an-sopts">{html}</div>'
+
+        def _tbl_rows(rows, cols_def):
+            """Tablo satırı HTML"""
+            html = ""
+            for i, row in enumerate(rows):
+                html += f'<tr id="tr_{i}">'
+                for col in cols_def:
+                    k, ph = col["key"], col.get("ph","")
+                    val = str(row.get(k,""))
+                    if "opts" in col:
+                        sel_html = "".join([f'<option value="{o}" {"selected" if o==val else ""}>{o}</option>' for o in col["opts"]])
+                        html += f'<td><select id="{k}_{i}" onchange="updRow(\'bolge\',{i},\'{k}\',this.value)">{sel_html}</select></td>'
+                    else:
+                        html += f'<td><input id="{k}_{i}" value="{val}" placeholder="{ph}" oninput="updRow(\'bolge\',{i},\'{k}\',this.value)"></td>'
+                html += f'<td><button class="an-del-row" onclick="delRow(\'bolge\',{i})">✕</button></td>'
+                html += '</tr>'
+            return html
+
+        _bolge_rows_data = st.session_state.get("an_bolge_rows",[])
+        _rakip_rows_data = st.session_state.get("an_rakip_rows",[])
+
+        _bolge_cols = [
+            {"key":"il","ph":"İl"},
+            {"key":"urun","opts":["koli","palet","dorse","ambar","AVM"]},
+            {"key":"adet","ph":"adet/ay"},
+            {"key":"ciro","ph":"₺"},
+            {"key":"siklik","opts":["haftalık","günlük","aylık","düzensiz"]},
+        ]
+
+        _bolge_tbl_html = _tbl_rows(_bolge_rows_data, _bolge_cols)
+
+        _rakip_cols_html = ""
+        for i, row in enumerate(_rakip_rows_data):
+            _rd = ["güçlü","orta","zayıf"]
+            _rsel = "".join([f'<option value="{o}" {"selected" if o==row.get("durum","orta") else ""}>{o}</option>' for o in _rd])
+            _rakip_cols_html += f'''<tr id="rtr_{i}">
+              <td><input id="rfirma_{i}" value="{row.get('firma','')}" placeholder="rakip firma" oninput="updRow('rakip',{i},'firma',this.value)"></td>
+              <td><input id="rfiyat_{i}" value="{row.get('fiyat','')}" placeholder="₺/desi" oninput="updRow('rakip',{i},'fiyat',this.value)"></td>
+              <td><select id="rdurum_{i}" onchange="updRow('rakip',{i},'durum',this.value)">{_rsel}</select></td>
+              <td><input id="rsebep_{i}" value="{row.get('sebep','')}" placeholder="sebep" oninput="updRow('rakip',{i},'sebep',this.value)"></td>
+              <td><button class="an-del-row" onclick="delRow('rakip',{i})">✕</button></td>
+            </tr>'''
+
+        _form_html = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+*{{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}}
+body{{background:#f1f5f9;padding:8px;color:#1e293b;font-size:13px;}}
+.an-irow{{background:white;border:1px solid #e2e8f0;border-radius:12px;margin-bottom:8px;overflow:visible;}}
+.an-irow.done{{border-color:#bbf7d0;}}
+.an-hdr{{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;cursor:pointer;gap:8px;border-radius:12px;}}
+.an-hdr:hover{{background:#f8fafc;}}
+.an-title{{font-size:13px;font-weight:600;color:#374151;display:flex;align-items:center;gap:6px;}}
+.an-status{{font-size:11px;color:#94a3b8;flex-shrink:0;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}}
+.an-status.ok{{color:#16a34a;font-weight:500;}}
+.an-body{{padding:14px 16px;border-top:1px solid #f1f5f9;}}
+.an-label{{font-size:11px;color:#64748b;font-weight:500;margin:10px 0 4px;display:block;}}
+.an-label:first-child{{margin-top:0;}}
+.an-pills{{display:flex;flex-wrap:wrap;gap:4px;align-items:center;}}
+.an-pill{{padding:4px 11px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;user-select:none;display:inline-flex;align-items:center;gap:3px;}}
+.an-pill:hover{{border-color:#93c5fd;}}
+.an-pill.on{{background:#eff6ff;border-color:#93c5fd;color:#1d4ed8;font-weight:500;}}
+.an-pill.custom{{background:#fef9c3;border-color:#fde047;color:#92400e;}}
+.an-pill.custom.on{{background:#fef08a;}}
+.an-px{{font-size:10px;cursor:pointer;opacity:.5;margin-left:2px;}}
+.an-px:hover{{opacity:1;color:#dc2626;}}
+.an-plus{{width:26px;height:26px;border-radius:50%;border:1.5px dashed #93c5fd;background:#f0f9ff;color:#3b82f6;font-size:16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;}}
+.an-plus:hover{{background:#dbeafe;}}
+.an-addinp{{display:none;align-items:center;gap:5px;margin-top:6px;}}
+.an-addinp.open{{display:flex;}}
+.an-inp{{border:1.5px solid #3b82f6;border-radius:20px;padding:4px 12px;font-size:12px;outline:none;width:170px;}}
+.an-ok{{padding:4px 12px;background:#3b82f6;color:white;border:none;border-radius:20px;font-size:12px;cursor:pointer;}}
+.an-no{{padding:4px 8px;background:white;color:#94a3b8;border:1px solid #e2e8f0;border-radius:20px;font-size:12px;cursor:pointer;}}
+.an-sopts{{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;}}
+.an-sopt{{padding:5px 12px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid #e2e8f0;background:#f8fafc;color:#64748b;}}
+.an-sopt.on{{background:#0f172a;color:white;border-color:#0f172a;}}
+.an-tbl{{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px;}}
+.an-tbl th{{background:#f8fafc;color:#64748b;padding:6px 8px;text-align:left;border-bottom:1px solid #e2e8f0;font-size:11px;}}
+.an-tbl td{{padding:4px 5px;border-bottom:1px solid #f1f5f9;}}
+.an-tbl td input,.an-tbl td select{{border:1px solid #e2e8f0;border-radius:6px;padding:4px 7px;font-size:12px;width:100%;outline:none;}}
+.an-del-row{{background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px;padding:2px 6px;}}
+.an-del-row:hover{{color:#dc2626;}}
+.add-row-btn{{font-size:11px;color:#3b82f6;cursor:pointer;background:none;border:none;padding:5px 0;margin-top:4px;}}
+.tamam-btn{{padding:6px 16px;background:#0f172a;color:white;border:none;border-radius:8px;font-size:11px;font-weight:500;cursor:pointer;float:right;margin-top:10px;}}
+.clearfix::after{{content:'';display:table;clear:both;}}
+.an-field{{width:100%;border:1px solid #e2e8f0;border-radius:8px;padding:7px 10px;font-size:12px;color:#1e293b;outline:none;}}
+.an-field:focus{{border-color:#3b82f6;}}
+.an-row{{display:flex;gap:8px;margin-top:8px;}}
+.an-col{{flex:1;}}
+.an-save-bar{{background:white;border:1px solid #e2e8f0;border-radius:12px;padding:12px 16px;display:flex;gap:8px;align-items:center;margin-top:8px;flex-wrap:wrap;}}
+.save-btn{{padding:9px 22px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:none;}}
+.save-main{{background:#0f172a;color:white;}}
+.save-sec{{background:white;color:#374151;border:1px solid #e2e8f0;}}
+.save-wa{{background:#25d366;color:white;}}
+.prog-txt{{font-size:11px;color:#94a3b8;margin-left:auto;}}
+</style>
+</head>
+<body>
+
+<!-- 1. ANALİZ AMACI -->
+<div class="an-irow" id="row_amac">
+  <div class="an-hdr" onclick="tog('amac')">
+    <div class="an-title">🎯 Analiz Amacı</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="an-status" id="st_amac">{", ".join(_pill_state.get("an_t_amac",[])) or "boş"}</div>
+      <div id="ar_amac" style="color:#94a3b8;transition:.15s">▼</div>
+    </div>
+  </div>
+  <div class="an-body" id="bd_amac" style="display:none">
+    <span class="an-label">Görüşme sebebi</span>
+    {_pills_js("an_t_amac", _amac_opts)}
+    <span class="an-label">Müşteri durumu</span>
+    {_sopt_js("an_t_mdurum", _mdurum_opts)}
+    <div class="an-row">
+      <div class="an-col"><span class="an-label">Beklenen ciro (₺/ay)</span><input class="an-field" id="bek_ciro" value="{_mv_bek}" placeholder="₺/ay" oninput="calcFark()"></div>
+      <div class="an-col"><span class="an-label">Gerçekleşen ciro (₺/ay)</span><input class="an-field" id="ger_ciro" value="{_mv_ger}" placeholder="₺/ay" oninput="calcFark()"></div>
+      <div class="an-col"><span class="an-label">Fark</span><input class="an-field" id="fark_ciro" value="" placeholder="otomatik" readonly style="background:#f8fafc"></div>
+    </div>
+    <button class="tamam-btn" onclick="kapat('amac','an_t_amac')">Tamam ✓</button>
+    <div class="clearfix"></div>
+  </div>
+</div>
+
+<!-- 2. KAYNAK & MÜŞTERİ -->
+<div class="an-irow" id="row_kaynak">
+  <div class="an-hdr" onclick="tog('kaynak')">
+    <div class="an-title">🔍 Kaynak & Müşteri</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="an-status" id="st_kaynak">boş</div>
+      <div id="ar_kaynak" style="color:#94a3b8;transition:.15s">▼</div>
+    </div>
+  </div>
+  <div class="an-body" id="bd_kaynak" style="display:none">
+    <div class="an-row">
+      <div class="an-col"><span class="an-label">Görüşme tarihi</span><input class="an-field" id="an_tarih" value="{_mv_tarih}" type="date"></div>
+      <div class="an-col"><span class="an-label">Saat</span><input class="an-field" id="an_saat" value="{_mv_saat}" placeholder="09:00"></div>
+      <div class="an-col"><span class="an-label">Temsilci</span><input class="an-field" id="an_temsilci" value="{_mv_temsilci}"></div>
+    </div>
+    <span class="an-label">Nereden bulundu?</span>
+    {_pills_js("an_t_kaynak", _kaynak_opts)}
+    <div class="an-row">
+      <div class="an-col"><span class="an-label">Yetkili / Ünvan</span><input class="an-field" id="an_yetkili" value="{_mv_yetkili}" placeholder="Ad Soyad · Ünvan"></div>
+      <div class="an-col"><span class="an-label">Tel / E-posta</span><input class="an-field" id="an_iletisim" value="{_mv_iletisim}" placeholder="05xx / mail@..."></div>
+      <div class="an-col"><span class="an-label">Sektör</span><select class="an-field" id="an_sektor">{_sl_html}</select></div>
+    </div>
+    <button class="tamam-btn" onclick="kapat('kaynak','an_t_kaynak')">Tamam ✓</button>
+    <div class="clearfix"></div>
+  </div>
+</div>
+
+<!-- 3. ÜRÜN, HACİM & CİRO -->
+<div class="an-irow" id="row_urun">
+  <div class="an-hdr" onclick="tog('urun')">
+    <div class="an-title">📦 Ürün, Hacim & Ciro</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="an-status" id="st_urun">boş</div>
+      <div id="ar_urun" style="color:#94a3b8;transition:.15s">▼</div>
+    </div>
+  </div>
+  <div class="an-body" id="bd_urun" style="display:none">
+    <span class="an-label">Gönderi türü</span>
+    {_pills_js("an_t_urun", _urun_opts)}
+    <span class="an-label" style="margin-top:10px">İl bazlı hacim & ciro tablosu</span>
+    <table class="an-tbl" id="bolge_tbl">
+      <thead><tr><th>İl</th><th>Ürün türü</th><th>Adet/ay</th><th>Ciro (₺)</th><th>Sıklık</th><th></th></tr></thead>
+      <tbody id="bolge_body">{_bolge_tbl_html}</tbody>
+    </table>
+    <button class="add-row-btn" onclick="addBolgeRow()">+ Satır ekle</button>
+    <span class="an-label">Fiyat teklif türü</span>
+    {_pills_js("an_t_fiyattur", _fiyattur_opts)}
+    <span class="an-label">Ödeme türü</span>
+    {_pills_js("an_t_odeme", _odeme_opts)}
+    <button class="tamam-btn" onclick="kapat('urun','an_t_urun')">Tamam ✓</button>
+    <div class="clearfix"></div>
+  </div>
+</div>
+
+<!-- 4. BEKLENTİ & ENGEL -->
+<div class="an-irow" id="row_beklenti">
+  <div class="an-hdr" onclick="tog('beklenti')">
+    <div class="an-title">💬 Beklenti, Engel & Sonuç</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="an-status" id="st_beklenti">boş</div>
+      <div id="ar_beklenti" style="color:#94a3b8;transition:.15s">▼</div>
+    </div>
+  </div>
+  <div class="an-body" id="bd_beklenti" style="display:none">
+    <span class="an-label">Müşteri beklentisi</span>
+    {_pills_js("an_t_beklenti", _beklenti_opts)}
+    <span class="an-label">Engel</span>
+    {_pills_js("an_t_engel", _engel_opts)}
+    <span class="an-label">Sonuç</span>
+    {_pills_js("an_t_sonuc", _sonuc_opts)}
+    <span class="an-label">Sonraki adım</span>
+    {_pills_js("an_t_sonraki", _sonraki_opts)}
+    <span class="an-label">Fiyat beklentisi</span>
+    <input class="an-field" id="fiyat_bek" value="{_mv_fbek}" placeholder="₺/desi — isteğe bağlı">
+    <span class="an-label">Özel istek</span>
+    <input class="an-field" id="ozel_istek" value="{_mv_ozel}" placeholder="varsa yaz...">
+    <button class="tamam-btn" onclick="kapat('beklenti','an_t_sonuc')">Tamam ✓</button>
+    <div class="clearfix"></div>
+  </div>
+</div>
+
+<!-- 5. RAKİP -->
+<div class="an-irow" id="row_rakip">
+  <div class="an-hdr" onclick="tog('rakip')">
+    <div class="an-title">⚔️ Rakip & Sorunlar</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="an-status" id="st_rakip">boş</div>
+      <div id="ar_rakip" style="color:#94a3b8;transition:.15s">▼</div>
+    </div>
+  </div>
+  <div class="an-body" id="bd_rakip" style="display:none">
+    <table class="an-tbl">
+      <thead><tr><th>Rakip Firma</th><th>₺/desi</th><th>Güç</th><th>Sebep</th><th></th></tr></thead>
+      <tbody id="rakip_body">{_rakip_cols_html}</tbody>
+    </table>
+    <button class="add-row-btn" onclick="addRakipRow()">+ Rakip ekle</button>
+    <span class="an-label" style="margin-top:10px">Müşteri şikayetleri</span>
+    {_pills_js("an_t_sik", _sik_opts)}
+    <button class="tamam-btn" onclick="kapat('rakip','an_t_sik')">Tamam ✓</button>
+    <div class="clearfix"></div>
+  </div>
+</div>
+
+<!-- 6. NOT & DEĞERLENDİRME -->
+<div class="an-irow" id="row_not">
+  <div class="an-hdr" onclick="tog('not')">
+    <div class="an-title">💡 Not & Değerlendirme</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="an-status" id="st_not">boş</div>
+      <div id="ar_not" style="color:#94a3b8;transition:.15s">▼</div>
+    </div>
+  </div>
+  <div class="an-body" id="bd_not" style="display:none">
+    <span class="an-label">Potansiyel</span>
+    {_sopt_js("an_t_pot", _pot_opts)}
+    <span class="an-label">Karar verici</span>
+    {_sopt_js("an_t_karar", _karar_opts)}
+    <span class="an-label">Karar süresi</span>
+    {_sopt_js("an_t_sure", _sure_opts)}
+    <span class="an-label">Görüşme notu</span>
+    <textarea class="an-field" id="an_not" rows="3" placeholder="Görüşme detaylarını yaz...">{_mv_not}</textarea>
+    <div class="an-row">
+      <div class="an-col"><span class="an-label">Takip tarihi</span><input class="an-field" id="an_takip" type="date" value="{_mv_takip}"></div>
+      <div class="an-col"><span class="an-label">Sonraki adım notu</span><input class="an-field" id="an_sonraki_txt" value="{_mv_sonraki_txt}" placeholder="isteğe bağlı..."></div>
+    </div>
+    <button class="tamam-btn" onclick="kapat('not','an_t_pot')">Tamam ✓</button>
+    <div class="clearfix"></div>
+  </div>
+</div>
+
+<!-- SAVE BAR -->
+<div class="an-save-bar">
+  <button class="save-btn save-main" onclick="kaydet()">💾 {"Güncelle" if _duzenle else "Kaydet"}</button>
+  <button class="save-btn save-sec" onclick="window.parent.postMessage({{type:'streamlit:setComponentValue',value:{{action:'spot',firma:'{_firma}'}}}}, '*')">📄 Spot Teklif</button>
+  <button class="save-btn save-sec" onclick="window.parent.postMessage({{type:'streamlit:setComponentValue',value:{{action:'ozel',firma:'{_firma}'}}}}, '*')">⭐ Özel Teklif</button>
+  <button class="save-btn save-wa" onclick="waGit()">💬 WA</button>
+  <div class="prog-txt" id="prog_txt">0/6 bölüm</div>
+</div>
+
+<div id="kaydet_output" style="display:none;margin-top:8px;background:#dcfce7;border:1px solid #bbf7d0;border-radius:8px;padding:10px 14px;color:#16a34a;font-weight:500;text-align:center"></div>
+
+<script>
+var STATE = {ps_json};
+var BOLGE = {_bolge_json};
+var RAKIP = {_rakip_json};
+var OPEN = {{}};
+var DONE = {{}};
+
+// ── PILL ──────────────────────────────────────────────────────────────────
+function tp(el, key) {{
+  el.classList.toggle('on');
+  var val = el.textContent.replace('✕','').trim();
+  if(!STATE[key]) STATE[key] = [];
+  var idx = STATE[key].indexOf(val);
+  if(idx > -1) STATE[key].splice(idx,1); else STATE[key].push(val);
+}}
+
+function so(el, key) {{
+  el.parentElement.querySelectorAll('.an-sopt').forEach(function(e){{e.classList.remove('on');}});
+  el.classList.add('on');
+  var val = el.textContent.trim();
+  STATE[key] = [val];
+}}
+
+function oa(id) {{
+  var w = document.getElementById(id);
+  w.classList.add('open');
+  w.querySelector('input').focus();
+}}
+function ca(id) {{
+  var w = document.getElementById(id);
+  w.classList.remove('open');
+  w.querySelector('input').value = '';
+}}
+
+function addp(key) {{
+  var aid = 'add_' + key;
+  var inp = document.getElementById('inp_' + key);
+  var val = inp.value.trim();
+  if(!val) return;
+  var g = document.getElementById('pg_' + key);
+  var pb = g.querySelector('.an-plus');
+  var p = document.createElement('div');
+  p.className = 'an-pill custom on';
+  p.innerHTML = val + ' <span class="an-px" onclick="rmCustom(this,\\''+key+'\\')">✕</span>';
+  p.onclick = function(e) {{ if(!e.target.classList.contains('an-px')) tp(p, key); }};
+  g.insertBefore(p, pb);
+  if(!STATE[key]) STATE[key] = [];
+  STATE[key].push(val);
+  ca(aid);
+}}
+
+function rmCustom(span, key) {{
+  var pill = span.parentElement;
+  var val = pill.textContent.replace('✕','').trim();
+  pill.remove();
+  if(STATE[key]) STATE[key] = STATE[key].filter(function(v){{return v!==val;}});
+}}
+
+// ── SECTION TOGGLE ────────────────────────────────────────────────────────
+function tog(id) {{
+  OPEN[id] = !OPEN[id];
+  document.getElementById('bd_' + id).style.display = OPEN[id] ? 'block' : 'none';
+  document.getElementById('ar_' + id).style.transform = OPEN[id] ? 'rotate(180deg)' : '';
+}}
+
+function kapat(id, stateKey) {{
+  OPEN[id] = false;
+  document.getElementById('bd_' + id).style.display = 'none';
+  document.getElementById('ar_' + id).style.transform = '';
+  var st = document.getElementById('st_' + id);
+  var vals = STATE[stateKey] || [];
+  var summary = vals.slice(0,3).join(', ') + (vals.length > 3 ? '...' : '');
+  st.textContent = summary || '✓ dolduruldu';
+  st.className = 'an-status ok';
+  document.getElementById('row_' + id).classList.add('done');
+  DONE[id] = true;
+  updProg();
+}}
+
+function updProg() {{
+  var c = Object.keys(DONE).length;
+  document.getElementById('prog_txt').textContent = c + '/6 bölüm dolduruldu';
+}}
+
+// ── CİRO FARK ────────────────────────────────────────────────────────────
+function calcFark() {{
+  var b = parseFloat((document.getElementById('bek_ciro').value||'0').replace(/\\./g,'').replace(',','.'));
+  var g = parseFloat((document.getElementById('ger_ciro').value||'0').replace(/\\./g,'').replace(',','.'));
+  var f = document.getElementById('fark_ciro');
+  if(b > 0 && g > 0) f.value = (g >= b ? '+' : '') + (g - b).toLocaleString('tr-TR') + ' ₺';
+  else f.value = '';
+}}
+calcFark();
+
+// ── BÖLGE TABLOSU ─────────────────────────────────────────────────────────
+function updRow(tbl, i, key, val) {{
+  if(tbl === 'bolge') BOLGE[i][key] = val;
+  else RAKIP[i][key] = val;
+}}
+
+function delRow(tbl, i) {{
+  if(tbl === 'bolge') {{
+    if(BOLGE.length <= 1) return;
+    BOLGE.splice(i, 1);
+    renderBolge();
+  }} else {{
+    if(RAKIP.length <= 1) return;
+    RAKIP.splice(i, 1);
+    renderRakip();
+  }}
+}}
+
+function addBolgeRow() {{
+  BOLGE.push({{il:'',urun:'koli',adet:'',ciro:'',siklik:'haftalık'}});
+  renderBolge();
+}}
+
+function addRakipRow() {{
+  RAKIP.push({{firma:'',fiyat:'',durum:'orta',sebep:''}});
+  renderRakip();
+}}
+
+function renderBolge() {{
+  var urunOpts = ['koli','palet','dorse','ambar','AVM'];
+  var siklOpts = ['haftalık','günlük','aylık','düzensiz'];
+  var html = '';
+  BOLGE.forEach(function(row, i) {{
+    var uSel = urunOpts.map(function(o){{return '<option value="'+o+'"'+(o===row.urun?' selected':'')+'>'+o+'</option>';}}).join('');
+    var sSel = siklOpts.map(function(o){{return '<option value="'+o+'"'+(o===row.siklik?' selected':'')+'>'+o+'</option>';}}).join('');
+    html += '<tr><td><input value="'+(row.il||'')+'" placeholder="İl" oninput="updRow(\'bolge\','+i+',\'il\',this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 7px;font-size:12px;width:100%"></td>';
+    html += '<td><select onchange="updRow(\'bolge\','+i+',\'urun\',this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 7px;font-size:12px;width:100%">'+uSel+'</select></td>';
+    html += '<td><input value="'+(row.adet||'')+'" placeholder="adet" oninput="updRow(\'bolge\','+i+',\'adet\',this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 7px;font-size:12px;width:100%"></td>';
+    html += '<td><input value="'+(row.ciro||'')+'" placeholder="₺" oninput="updRow(\'bolge\','+i+',\'ciro\',this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 7px;font-size:12px;width:100%"></td>';
+    html += '<td><select onchange="updRow(\'bolge\','+i+',\'siklik\',this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 7px;font-size:12px;width:100%">'+sSel+'</select></td>';
+    html += '<td><button onclick="delRow(\'bolge\','+i+')" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px">✕</button></td></tr>';
+  }});
+  document.getElementById('bolge_body').innerHTML = html;
+}}
+
+function renderRakip() {{
+  var durumOpts = ['güçlü','orta','zayıf'];
+  var html = '';
+  RAKIP.forEach(function(row, i) {{
+    var dSel = durumOpts.map(function(o){{return '<option value="'+o+'"'+(o===row.durum?' selected':'')+'>'+o+'</option>';}}).join('');
+    html += '<tr>';
+    html += '<td><input value="'+(row.firma||'')+'" placeholder="rakip firma" oninput="updRow(\'rakip\','+i+',\'firma\',this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 7px;font-size:12px;width:100%"></td>';
+    html += '<td><input value="'+(row.fiyat||'')+'" placeholder="₺/desi" oninput="updRow(\'rakip\','+i+',\'fiyat\',this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 7px;font-size:12px;width:100%"></td>';
+    html += '<td><select onchange="updRow(\'rakip\','+i+',\'durum\',this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 7px;font-size:12px;width:100%">'+dSel+'</select></td>';
+    html += '<td><input value="'+(row.sebep||'')+'" placeholder="sebep" oninput="updRow(\'rakip\','+i+',\'sebep\',this.value)" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 7px;font-size:12px;width:100%"></td>';
+    html += '<td><button onclick="delRow(\'rakip\','+i+')" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:14px">✕</button></td></tr>';
+  }});
+  document.getElementById('rakip_body').innerHTML = html;
+}}
+
+// ── KAYDET ────────────────────────────────────────────────────────────────
+function kaydet() {{
+  var payload = {{
+    action: 'kaydet',
+    firma: '{_firma}',
+    ps: STATE,
+    bolge: BOLGE,
+    rakip: RAKIP,
+    bek_ciro: document.getElementById('bek_ciro').value,
+    ger_ciro: document.getElementById('ger_ciro').value,
+    tarih: document.getElementById('an_tarih').value,
+    saat: document.getElementById('an_saat').value,
+    temsilci: document.getElementById('an_temsilci').value,
+    yetkili: document.getElementById('an_yetkili').value,
+    iletisim: document.getElementById('an_iletisim').value,
+    sektor: document.getElementById('an_sektor').value,
+    not_alan: document.getElementById('an_not').value,
+    takip_tar: document.getElementById('an_takip').value,
+    sonraki_txt: document.getElementById('an_sonraki_txt').value,
+    fiyat_bek: document.getElementById('fiyat_bek').value,
+    ozel_istek: document.getElementById('ozel_istek').value,
+  }};
+  window.parent.postMessage({{type:'streamlit:setComponentValue', value: payload}}, '*');
+  document.getElementById('kaydet_output').style.display='block';
+  document.getElementById('kaydet_output').textContent = '✅ Veriler Streamlit\'e gönderildi — Kaydet butonuna basın...';
+  // Streamlit form submit
+  window.parent.document.querySelectorAll('button[kind="primary"]').forEach(function(b){{
+    if(b.textContent.includes('Kaydet') || b.textContent.includes('Güncelle')) b.click();
+  }});
+}}
+
+function waGit() {{
+  var tel = document.getElementById('an_iletisim').value.replace(/[^0-9]/g,'');
+  if(!tel) {{ alert('Tel/e-posta boş'); return; }}
+  if(tel.startsWith('0')) tel = '90' + tel.substring(1);
+  window.open('https://wa.me/' + tel, '_blank');
+}}
+</script>
+</body></html>"""
+
+        # ── COMPONENT RENDER ───────────────────────────────────────────────
+        _comp_result = _comp.html(_form_html, height=950, scrolling=True)
+
+        # ── STREAMLIT KAYDET BUTONU (gizli trigger) ──────────────────────
+        st.markdown("---")
+        _kc1,_kc2,_kc3,_kc4,_kc5 = st.columns(5)
+        _kaydet_btn = _kc1.button(
+            f"💾 {'Güncelle' if _duzenle else 'Kaydet'}",
+            type="primary", use_container_width=True, key="an_kaydet_main"
+        )
+        _kc2.button("📄 Spot Teklif", use_container_width=True, key="an_spot2",
+            on_click=lambda: st.session_state.update({"aktif_tab":"teklif","teklif_musteri_onsel":_firma}))
+        _kc3.button("⭐ Özel Teklif", use_container_width=True, key="an_ozel_t2",
+            on_click=lambda: st.session_state.update({"aktif_tab":"ozel_teklif","teklif_musteri_onsel":_firma}))
+        if _duzenle and _kc5.button("🗑 Sil", use_container_width=True, key="an_sil_btn2"):
+            if _an_sil(_firma):
+                if _ik in st.session_state: del st.session_state[_ik]
+                st.success("Silindi!"); st.rerun()
+
+        # ── FORM VERİLERİNİ SESSION'DAN OKU VE KAYDET ────────────────────
+        if _kaydet_btn:
+            # Pill session state'lerden topla (HTML'den değil, mevcut SS'den)
+            _gs2 = lambda k: ", ".join(st.session_state.get(k, []))
+            _an_yetkili   = st.session_state.get("_an_f_yetkili", _mv("yetkili",""))
+            _an_iletisim  = st.session_state.get("_an_f_iletisim", _mv("iletisim",_auto_tel))
+            _an_sektor    = st.session_state.get("_an_f_sektor", _mv("sektor","--"))
+            _an_bek       = st.session_state.get("_an_f_bek", str(int(float(_mv("bek_ciro",0) or 0))) if _mv("bek_ciro",0) else "")
+            _an_ger       = st.session_state.get("_an_f_ger", str(int(float(_mv("ger_ciro",0) or 0))) if _mv("ger_ciro",0) else "")
+            _an_not       = st.session_state.get("_an_f_not", _mv("not_alan",""))
+            _an_takip     = st.session_state.get("_an_f_takip", str(date.today()))
+            _an_sonraki   = st.session_state.get("_an_f_sonraki", _mv("sonraki_adim",""))
+            _an_fbek      = st.session_state.get("_an_f_fbek", _mv("fiyat_bek",""))
+            _an_ozel      = st.session_state.get("_an_f_ozel", _mv("ozel_istek",""))
+
+            try: _bv = float((_an_bek or "0").replace(".","").replace(",","."))
+            except: _bv = 0
+            try: _gv = float((_an_ger or "0").replace(".","").replace(",","."))
+            except: _gv = 0
+
+            _pot_val = (st.session_state.get("an_t_pot") or ["orta"])[0]
+            _sonuc_val = (st.session_state.get("an_t_sonuc") or ["takip edilecek"])[0]
+
+            _veri = {
+                "yetkili":       _an_yetkili,
+                "iletisim":      _an_iletisim,
+                "sektor":        _an_sektor,
+                "amac":          _gs2("an_t_amac"),
+                "mdurum":        _gs2("an_t_mdurum"),
+                "bek_ciro":      _bv,
+                "ger_ciro":      _gv,
+                "kaynak":        _gs2("an_t_kaynak"),
+                "kargo":         _gs2("an_t_kargo"),
+                "urun":          _gs2("an_t_urun"),
+                "odeme":         _gs2("an_t_odeme"),
+                "teklif_tur":    _gs2("an_t_fiyattur"),
+                "beklenti":      _gs2("an_t_beklenti"),
+                "engel":         _gs2("an_t_engel"),
+                "sonuc":         _sonuc_val,
+                "sonraki_adim":  _gs2("an_t_sonraki") or _an_sonraki,
+                "sik":           _gs2("an_t_sik"),
+                "potansiyel":    _pot_val,
+                "not_alan":      _an_not,
+                "takip_tar":     str(_an_takip),
+                "fiyat_bek":     _an_fbek,
+                "ozel_istek":    _an_ozel,
+                "karar":         _gs2("an_t_karar"),
+                "sure":          _gs2("an_t_sure"),
+                "bolge":         _aj.dumps(st.session_state.get("an_bolge_rows",[]), ensure_ascii=False),
+                "rakip":         _aj.dumps(st.session_state.get("an_rakip_rows",[]), ensure_ascii=False),
+                "fiyat_tablo":   _aj.dumps(st.session_state.get("an_fiyat_rows",[]), ensure_ascii=False),
+                "olusturan":     st.session_state.get("kullanici",""),
+            }
+            _ok, _err = _an_kaydet(_firma, _veri)
+            if _ok:
+                st.success(f"✅ **{_firma}** analizi {'güncellendi' if _duzenle else 'kaydedildi'}!")
+                st.balloons()
+                if _ik in st.session_state: del st.session_state[_ik]
+                try: db_read.clear()
+                except: pass
+                st.rerun()
+            else:
+                st.error(f"❌ Kayıt hatası: {_err}")
 
     # DB FONKSIYONLARI
     def _sb():
