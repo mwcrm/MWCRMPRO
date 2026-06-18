@@ -3377,6 +3377,7 @@ elif aktif == "teklif":
         st.session_state["gsm_manuel"]   = gsm_kayitli
         st.session_state["email_manuel"] = email_kayitli
         st.session_state["son_secili_id"] = _secim
+        st.rerun()
 
     hedef_musteri = _tr[3].text_input("", key="hedef_mus", placeholder="Müşteri Adı", label_visibility="collapsed")
     vade          = _tr[4].text_input("", placeholder="Vade...", key="vade", label_visibility="collapsed")
@@ -3740,10 +3741,11 @@ elif aktif == "ozel_teklif":
         st.session_state["oz2_wa"]    = _oz_gsm
         st.session_state["oz2_email"] = _oz_eml
     elif "oz2_hedef" not in st.session_state or st.session_state.get("oz2_son_sec") != _oz_sec:
-        st.session_state["oz2_hedef"] = _oz_fdef
-        st.session_state["oz2_wa"]    = _oz_gsm
-        st.session_state["oz2_email"] = _oz_eml
+        st.session_state["oz2_hedef"]   = _oz_fdef
+        st.session_state["oz2_wa"]      = _oz_gsm
+        st.session_state["oz2_email"]   = _oz_eml
         st.session_state["oz2_son_sec"] = _oz_sec
+        st.rerun()
 
     _oz_hedef = _ozr[3].text_input("", key="oz2_hedef", placeholder="Hedef Müşteri", label_visibility="collapsed")
     _oz_vade  = _ozr[4].text_input("", placeholder="Vade...", key="oz2_vade", label_visibility="collapsed")
