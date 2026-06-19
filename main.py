@@ -2410,11 +2410,11 @@ elif aktif == "kullanici":
     )
 
     if st.session_state.get("rol") == "admin":
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar"])
     elif _surum_yetkisi:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar"])
     else:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5_ekran = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🎨 Ekran Ayarları"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5_ekran, kul_tab_tanim = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🎨 Ekran Ayarları","⚙️ Tanımlar"])
         kul_tab5 = None
 
     with kul_tab1:
@@ -3027,6 +3027,76 @@ function updateBot(v){{
 3. **🚀 Yayınla** → kullanıcılar yeni sürüme geçer
 4. Sorun çıkarsa **🔄 Geri Al** → önceki sürüme dön
                 """)
+
+    # ── ⚙️ TANIMLAR TABÜ — AŞAMA & DURUM YÖNETİMİ ───────────────────────────
+    with kul_tab_tanim:
+        st.markdown("### ⚙️ Aşama & Durum Tanımları")
+        _sb_tan = get_sb_client()
+
+        def _tan_liste(tip):
+            try:
+                if _sb_tan:
+                    r = _sb_tan.table("sistem_tanimlar").select("deger").eq("tip",tip).order("sira").execute()
+                    return [d["deger"] for d in r.data] if r.data else []
+            except: return []
+
+        def _tan_ekle(tip, deger):
+            try:
+                if _sb_tan:
+                    mevcut = _sb_tan.table("sistem_tanimlar").select("sira").eq("tip",tip).order("sira",desc=True).limit(1).execute()
+                    sira = (mevcut.data[0]["sira"] + 1) if mevcut.data else 1
+                    _sb_tan.table("sistem_tanimlar").insert({"tip":tip,"deger":deger,"sira":sira}).execute()
+                    return True
+            except: return False
+
+        def _tan_sil(tip, deger):
+            try:
+                if _sb_tan:
+                    _sb_tan.table("sistem_tanimlar").delete().eq("tip",tip).eq("deger",deger).execute()
+                    return True
+            except: return False
+
+        _ta1, _ta2 = st.columns(2)
+
+        # AŞAMA
+        with _ta1:
+            st.markdown("**🔄 Aşama Yönetimi**")
+            _asama_listesi = _tan_liste("asama")
+            _ea1, _ea2 = st.columns([3,1])
+            _yeni_asama = _ea1.text_input("", placeholder="Yeni aşama adı...", key="kul_yeni_asama", label_visibility="collapsed")
+            if _ea2.button("➕ Ekle", key="kul_asama_ekle", use_container_width=True):
+                if _yeni_asama.strip():
+                    if _yeni_asama.strip() in _asama_listesi:
+                        st.warning("Bu aşama zaten var!")
+                    elif _tan_ekle("asama", _yeni_asama.strip()):
+                        st.success(f"✅ '{_yeni_asama}' eklendi!"); st.rerun()
+            st.caption(f"{len(_asama_listesi)} aşama")
+            for _a in _asama_listesi:
+                _ac1, _ac2 = st.columns([4,1])
+                _ac1.markdown(f"🔸 **{_a}**")
+                if _ac2.button("🗑", key=f"asil_{_a}", use_container_width=True, help="Sil"):
+                    if _tan_sil("asama", _a):
+                        st.success(f"'{_a}' silindi!"); st.rerun()
+
+        # DURUM
+        with _ta2:
+            st.markdown("**📊 Durum Yönetimi**")
+            _durum_listesi = _tan_liste("durum")
+            _ed1, _ed2 = st.columns([3,1])
+            _yeni_durum = _ed1.text_input("", placeholder="Yeni durum adı...", key="kul_yeni_durum", label_visibility="collapsed")
+            if _ed2.button("➕ Ekle", key="kul_durum_ekle", use_container_width=True):
+                if _yeni_durum.strip():
+                    if _yeni_durum.strip() in _durum_listesi:
+                        st.warning("Bu durum zaten var!")
+                    elif _tan_ekle("durum", _yeni_durum.strip()):
+                        st.success(f"✅ '{_yeni_durum}' eklendi!"); st.rerun()
+            st.caption(f"{len(_durum_listesi)} durum")
+            for _d in _durum_listesi:
+                _dc1, _dc2 = st.columns([4,1])
+                _dc1.markdown(f"🔹 **{_d}**")
+                if _dc2.button("🗑", key=f"dsil2_{_d}", use_container_width=True, help="Sil"):
+                    if _tan_sil("durum", _d):
+                        st.success(f"'{_d}' silindi!"); st.rerun()
 
 elif aktif == "rapor":
     sayfa_log("rapor")
