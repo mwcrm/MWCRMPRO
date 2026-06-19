@@ -5849,7 +5849,7 @@ elif aktif == "randevu":
     st.markdown("## 📅 Randevular")
 
     # ── TÜM RANDEVULARI YİKLE ────────────────────────────────────────────────
-    df_rand_all = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC, randevu_saati ASC")
+    df_rand_all = db_read("randevular", extra_sql="ORDER BY randevu_tarihi ASC, randevu_saati ASC")
     bugun_str = datetime.now().strftime("%Y-%m-%d")
 
     # ── iki sekme ─────────────────────────────────────────────────────────────
@@ -5950,11 +5950,12 @@ elif aktif == "randevu":
             # ── DÜZENLENEBILIR RANDEVU LİSTESİ ──────────────────────────────
             _sonuc_opts = ["—","Bitti","Devam Ediyor","Gidilmedi","İptal"]
             _gorev_opts = ["Ziyaret","Arama","Değerlendirme","Kazanıldı","Kaybedildi","Devam Ediyor","Whatsapp Mesaj","E-mail","Yeni Tarihe Ertele"]
+            _saat_opts  = [f"{h:02d}:{m:02d}" for h in range(9,21) for m in (0,15,30,45)]
 
             _df_goster = pd.DataFrame([{
                 "ID":       int(r.get("id",0) or 0),
                 "Tarih":    fmt_tarih(r.get("randevu_tarihi","")),
-                "Saat":     str(r.get("randevu_saati","") or ""),
+                "Saat":     str(r.get("randevu_saati","") or "09:00")[:5],
                 "Müşteri":  str(r.get("musteri_adi","") or ""),
                 "Bölge":    str(r.get("bolge","") or ""),
                 "Görev":    str(r.get("gorev","") or ""),
@@ -5977,7 +5978,7 @@ elif aktif == "randevu":
                 column_config={
                     "ID":       st.column_config.NumberColumn("ID", width="small", disabled=True),
                     "Tarih":    st.column_config.TextColumn("Tarih", width="small", help="GG.AA.YYYY"),
-                    "Saat":     st.column_config.TextColumn("Saat", width="small"),
+                    "Saat":     st.column_config.SelectboxColumn("Saat", options=_saat_opts, width="small"),
                     "Müşteri":  st.column_config.TextColumn("Müşteri", width="large"),
                     "Bölge":    st.column_config.TextColumn("Bölge"),
                     "Görev":    st.column_config.SelectboxColumn("Görev", options=_gorev_opts, width="medium"),
@@ -6064,7 +6065,8 @@ elif aktif == "randevu":
                 key="rand_musteri")
             rc1,rc2,rc3 = st.columns(3)
             rand_tarih    = rc1.date_input("Tarih*:", value=datetime.now().date(), key="rand_tarih")
-            rand_saat     = rc2.time_input("Saat*:", key="rand_saat")
+            _rand_saat_opts = [f"{h:02d}:{m:02d}" for h in range(9,21) for m in (0,15,30,45)]
+            rand_saat     = rc2.selectbox("Saat*:", _rand_saat_opts, index=4, key="rand_saat")  # default 10:00
             rand_bolge    = rc3.text_input("Bölge:", placeholder="İstanbul Beykoz")
             rc4,rc5,rc6 = st.columns(3)
             rand_gorev    = rc4.selectbox("Görev*:", ["Ziyaret","Arama","Değerlendirme","Kazanıldı","Kaybedildi","Devam Ediyor","Whatsapp Mesaj","E-mail","Yeni Tarihe Ertele"])
