@@ -3408,6 +3408,9 @@ elif aktif == "teklif":
 
     st.markdown("## 📄 Spot Teklif")
 
+    if st.session_state.pop("_tek_kopyalandi", False):
+        st.info("📋 Teklif kopyalandı — fiyatlar yüklendi. Müşteriyi seçip kaydedin.")
+
     # ── TEK SATIR: FİLTRE + MÜŞTERİ + BİLGİLER ──────────────────────────────
     _df_cari_tek = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
 
@@ -3711,14 +3714,26 @@ elif aktif == "teklif":
                             if "birim_fiyat" in _df_t.columns: _df_t["birim_fiyat"] = _df_t["birim_fiyat"].apply(lambda x: fmt_para(float(x or 0)))
                             st.dataframe(_df_t, use_container_width=True, hide_index=True)
                     except: st.text(str(_tek_row.get("satirlar","")))
-                    _ak1,_ak2,_ak3 = st.columns(3)
+                    _ak1,_ak2,_ak3,_ak4 = st.columns(4)
                     with _ak1.expander("✏️ Not Güncelle"):
                         _yn = st.text_area("Not:",value=str(_tek_row.get("notlar","")),height=70,key=f"tek_not_{_tek_id}")
                         if st.button("💾 Kaydet",key=f"tek_not_btn_{_tek_id}",use_container_width=True):
                             db_update("teklifler",{"notlar":_yn},"id",_tek_id); st.success("✅"); st.rerun()
-                    if _ak2.button("🗃️ Arşivle",key=f"tek_arsiv_{_tek_id}",use_container_width=True):
+                    if _ak2.button("📋 Kopyala", key=f"tek_kopyala_{_tek_id}", use_container_width=True):
+                        try:
+                            import json as _tkj
+                            _kop_data = _tkj.loads(_tek_row.get("satirlar","{}"))
+                            # Spot teklif satırlarını session'a yükle, müşteri sıfırla
+                            st.session_state["_tek_kop_data"] = _kop_data
+                            st.session_state.pop("teklif_musteri", None)
+                            st.session_state.pop("hedef_mus", None)
+                            st.session_state.pop("son_secili_id", None)
+                            st.session_state["_tek_kopyalandi"] = True
+                            st.rerun()
+                        except Exception as _ke: st.error(f"Kopyalama hatası: {_ke}")
+                    if _ak3.button("🗃️ Arşivle",key=f"tek_arsiv_{_tek_id}",use_container_width=True):
                         db_update("teklifler",{"arsivlendi":1},"id",_tek_id); st.success("✅ Arşivlendi!"); st.rerun()
-                    if _ak3.button("🗑️ Sil",key=f"tek_sil_{_tek_id}",use_container_width=True,type="primary"):
+                    if _ak4.button("🗑️ Sil",key=f"tek_sil_{_tek_id}",use_container_width=True,type="primary"):
                         _sb_d=get_sb_client()
                         if _sb_d: _sb_d.table("teklifler").delete().eq("id",_tek_id).execute()
                         st.success("🗑️ Silindi!"); st.rerun()
@@ -3731,6 +3746,8 @@ elif aktif == "ozel_teklif":
     import json as _ozj, re as _ozre
 
     st.markdown("## ⭐ Özel Teklif")
+    if st.session_state.pop("_oz2_kopyalandi", False):
+        st.info("📋 Teklif kopyalandı — fiyatlar yüklendi. Müşteriyi seçip kaydedin.")
     if st.button("🔄 Formu Sıfırla", key="oz2_sifirla"):
         for _k in ["oz2_grp","oz2_duz_id","oz2_duz_musteri","oz2_hedef","oz2_son_sec","oz2_musteri","oz2_wa_mesaj","oz2_fil"]:
             st.session_state.pop(_k, None)
@@ -4079,7 +4096,7 @@ elif aktif == "ozel_teklif":
                                 _sr[6].caption(fmt_para(float(_os2.get("fiyat",0) or 0)))
                     except: pass
 
-                    _eak1,_eak2,_eak3 = st.columns(3)
+                    _eak1,_eak2,_eak3,_eak4 = st.columns(4)
                     if _eak1.button("✏️ Düzenle", key="oz2_duzenle_btn", use_container_width=True, type="primary"):
                         try:
                             _oz_data2 = _ozj.loads(_oz_trow.get("satirlar","{}"))
@@ -4090,12 +4107,27 @@ elif aktif == "ozel_teklif":
                             st.session_state.pop("oz2_son_sec",None)
                             st.rerun()
                         except Exception as _oe: st.error(f"Hata: {_oe}")
-                    with _eak2.expander("📝 Not Güncelle"):
+
+                    if _eak2.button("📋 Kopyala", key=f"oz2_kopyala_{_oz_tid}", use_container_width=True):
+                        try:
+                            _oz_data_kop = _ozj.loads(_oz_trow.get("satirlar","{}"))
+                            # Aynı satırları yükle ama ID sıfırla — yeni müşteri seçilecek
+                            st.session_state["oz2_grp"] = _oz_data_kop.get("grp",[])
+                            st.session_state.pop("oz2_duz_id", None)       # yeni kayıt olarak
+                            st.session_state.pop("oz2_duz_musteri", None)
+                            st.session_state.pop("oz2_hedef", None)
+                            st.session_state.pop("oz2_son_sec", None)
+                            st.session_state.pop("oz2_musteri", None)
+                            st.session_state["_oz2_kopyalandi"] = True
+                            st.rerun()
+                        except Exception as _oe: st.error(f"Kopyalama hatası: {_oe}")
+
+                    with _eak3.expander("📝 Not Güncelle"):
                         _oz_yn = st.text_area("Not:",value=str(_oz_trow.get("notlar","")),height=70,key=f"oz2_not_up_{_oz_tid}")
                         if st.button("💾 Kaydet",key=f"oz2_not_btn_{_oz_tid}",use_container_width=True):
                             db_update("teklifler",{"notlar":_oz_yn},"id",_oz_tid)
                             st.success("✅"); st.rerun()
-                    if _eak3.button("🗑️ Sil",key="oz2_tek_sil",use_container_width=True):
+                    if _eak4.button("🗑️ Sil",key="oz2_tek_sil",use_container_width=True):
                         _sb_d=get_sb_client()
                         if _sb_d: _sb_d.table("teklifler").delete().eq("id",_oz_tid).execute()
                         st.success("🗑️ Silindi!"); st.rerun()
