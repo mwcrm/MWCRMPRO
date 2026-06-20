@@ -886,7 +886,7 @@ def fmt_tarih(v):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "detay_cari", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "detay_cari", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -901,6 +901,7 @@ _TAB_ETIKETLER = {
     "kullanici": "👥 Kullanıcı Yönetimi",
     "mesajlar": "💬 Mesajlar",
     "admin_rapor": "📊 Rapor Tasarla",
+    "harita": "🗺️ Müşteri Haritası",
 }
 
 def get_menu_tercihi(kullanici):
@@ -4394,9 +4395,23 @@ elif aktif == "analiz":
     # ── SEKME SİSTEMİ ─────────────────────────────────────────────────────────
     st.markdown("## 🔍 Müşteri Görüşme Analizi")
     st.markdown("""<style>
-div[data-testid="stHorizontalBlock"] button[kind="secondary"] p {
+/* Analiz liste satır butonları - sola dayalı */
+section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-secondary"]) 
+  div:first-child button {
     text-align: left !important;
     justify-content: flex-start !important;
+    padding-left: 14px !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseButton-secondary"])
+  div:first-child button p {
+    text-align: left !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
 }
 </style>""", unsafe_allow_html=True)
 
@@ -4659,7 +4674,7 @@ div[data-testid="stHorizontalBlock"] button[kind="secondary"] p {
 
             _lc1, _lc2, _lc3 = st.columns([7, 1, 1])
             if _lc1.button(
-                f"{_dot_renk}  {_ar_firma}    {_ar_tarih} · {_ar_pot} · {_ar_sonuc}",
+                f"{_dot_renk}  {_ar_firma}   ·   {_ar_tarih}   ·   {_ar_pot}   ·   {_ar_sonuc}",
                 key=f"an_ac_{_ai}", use_container_width=True
             ):
                 st.session_state["an_detay_firma"] = _ar_firma
@@ -7310,6 +7325,85 @@ elif aktif == "admin_rapor":
 
 
 
+elif aktif == "harita":
+    sayfa_log("harita")
+    import json as _hj
+    st.markdown("## 🗺️ Müşteri Haritası")
+    _hdf = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+    if _hdf.empty:
+        st.warning("Cari listede müşteri bulunamadı.")
+    else:
+        _hc1,_hc2,_hc3 = st.columns(3)
+        _h_durum = _hc1.multiselect("Durum filtrele", sorted(_hdf["durum"].dropna().unique().tolist()) if "durum" in _hdf.columns else [], key="h_durum")
+        _h_seg   = _hc2.multiselect("Segment", sorted(_hdf["segment"].dropna().unique().tolist()) if "segment" in _hdf.columns else [], key="h_seg")
+        _h_tem   = _hc3.multiselect("Temsilci", sorted(_hdf["temsilci"].dropna().unique().tolist()) if "temsilci" in _hdf.columns else [], key="h_tem")
+        _hdf_f = _hdf.copy()
+        if _h_durum and "durum" in _hdf_f.columns: _hdf_f = _hdf_f[_hdf_f["durum"].isin(_h_durum)]
+        if _h_seg   and "segment" in _hdf_f.columns: _hdf_f = _hdf_f[_hdf_f["segment"].isin(_h_seg)]
+        if _h_tem   and "temsilci" in _hdf_f.columns: _hdf_f = _hdf_f[_hdf_f["temsilci"].isin(_h_tem)]
+        _il_col = "il" if "il" in _hdf_f.columns else ("sehir" if "sehir" in _hdf_f.columns else None)
+        _hm1,_hm2,_hm3,_hm4 = st.columns(4)
+        _hm1.metric("Toplam", len(_hdf_f))
+        if _il_col:
+            _hm2.metric("Aktif İl", int(_hdf_f[_il_col].dropna().nunique()))
+            _en_yogun = _hdf_f[_il_col].value_counts().index[0] if not _hdf_f[_il_col].dropna().empty else "—"
+            _hm3.metric("En Yoğun", _en_yogun)
+        _hm4.metric("Filtrelenen", len(_hdf_f))
+        try:
+            import folium
+            from folium.plugins import MarkerCluster
+            import streamlit.components.v1 as _hcomp
+            import random
+            _hmap = folium.Map(location=[39.0,35.0], zoom_start=6, tiles="OpenStreetMap")
+            _IL_KOOR = {
+                "İstanbul":[41.015,28.979],"Ankara":[39.920,32.854],"İzmir":[38.423,27.143],
+                "Bursa":[40.183,29.067],"Antalya":[36.897,30.713],"Adana":[37.000,35.321],
+                "Konya":[37.872,32.485],"Gaziantep":[37.066,37.383],"Mersin":[36.812,34.641],
+                "Kayseri":[38.732,35.487],"Eskişehir":[39.776,30.521],"Diyarbakır":[37.914,40.230],
+                "Samsun":[41.286,36.330],"Denizli":[37.774,29.086],"Kocaeli":[40.765,29.940],
+                "Balıkesir":[39.648,27.882],"Malatya":[38.355,38.309],"Tekirdağ":[40.978,27.515],
+                "Sakarya":[40.769,30.394],"Trabzon":[41.002,39.716],"Manisa":[38.619,27.429],
+                "Çanakkale":[40.144,26.408],"Edirne":[41.677,26.556],"Aydın":[37.856,27.845],
+                "Muğla":[37.215,28.364],"Gebze":[40.802,29.430],"Şanlıurfa":[37.158,38.791],
+                "Erzurum":[39.905,41.270],"Uşak":[38.682,29.408],"Afyon":[38.757,30.540],
+                "Kırklareli":[41.735,27.225],"Çorum":[40.549,34.955],"Ordu":[40.984,37.877],
+            }
+            _RENK = {"Portföy":"blue","Hedef":"green","Tekrar Ara":"orange","İlk Temas":"lightblue","Pasif":"gray","Teklif":"purple","Aktif":"darkgreen"}
+            _cluster = MarkerCluster().add_to(_hmap)
+            for _, _hr in _hdf_f.iterrows():
+                _il = str(_hr.get(_il_col,"") or "") if _il_col else ""
+                _firma = str(_hr.get("firma","") or "—")
+                _durum = str(_hr.get("durum","") or "—")
+                _seg   = str(_hr.get("segment","") or "—")
+                _tem   = str(_hr.get("temsilci","") or "—")
+                _tel   = str(_hr.get("gsm","") or "—")
+                _ilce  = str(_hr.get("ilce","") or "")
+                _koor  = None
+                for _k,_v in _IL_KOOR.items():
+                    if _k.lower() in _il.lower() or _il.lower() in _k.lower():
+                        random.seed(hash(_firma))
+                        _koor = [_v[0]+random.uniform(-0.25,0.25), _v[1]+random.uniform(-0.25,0.25)]
+                        break
+                if not _koor: continue
+                _popup = f"<div style='font-family:sans-serif;min-width:200px'><b style='font-size:13px'>{_firma}</b><br><table style='font-size:11px;margin-top:6px'><tr><td style='color:#64748b'>İl/İlçe</td><td>&nbsp;{_il} / {_ilce}</td></tr><tr><td style='color:#64748b'>Durum</td><td>&nbsp;<b>{_durum}</b></td></tr><tr><td style='color:#64748b'>Segment</td><td>&nbsp;{_seg}</td></tr><tr><td style='color:#64748b'>Temsilci</td><td>&nbsp;{_tem}</td></tr><tr><td style='color:#64748b'>Tel</td><td>&nbsp;{_tel}</td></tr></table></div>"
+                folium.Marker(location=_koor, popup=folium.Popup(_popup,max_width=280), tooltip=_firma,
+                    icon=folium.Icon(color=_RENK.get(_durum,"red"), icon="building", prefix="fa")).add_to(_cluster)
+            if _il_col:
+                for _il_adi, _sayi in _hdf_f[_il_col].value_counts().items():
+                    if _il_adi in _IL_KOOR:
+                        folium.CircleMarker(location=_IL_KOOR[_il_adi], radius=min(int(_sayi**0.5*4),40),
+                            color="#1d4ed8", fill=True, fill_color="#1d4ed8", fill_opacity=0.12,
+                            weight=2, opacity=0.35, tooltip=f"{_il_adi}: {_sayi} müşteri").add_to(_hmap)
+            _hcomp.html(_hmap._repr_html_(), height=520, scrolling=False)
+        except ImportError:
+            st.warning("Folium yükleniyor... Lütfen bekleyin ve sayfayı yenileyin.")
+        except Exception as _he:
+            st.error(f"Harita hatası: {_he}")
+        if _il_col and not _hdf_f.empty:
+            st.divider()
+            st.markdown("**📊 İl Bazlı Özet**")
+            _il_g = _hdf_f.groupby(_il_col).size().reset_index(name="Müşteri Sayısı").sort_values("Müşteri Sayısı",ascending=False).head(20)
+            st.dataframe(_il_g, use_container_width=True, hide_index=True)
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
