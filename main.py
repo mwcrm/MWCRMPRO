@@ -4640,11 +4640,12 @@ elif aktif == "analiz":
             _ar_pot     = str(_ar.get("potansiyel","") or "")
             _ar_sonuc   = str(_ar.get("sonuc","") or "")
             _ar_tarih   = fmt_tarih(_ar.get("tarih",""))
-            _dot_clr    = _pot_renk.get(_ar_pot,"#94a3b8")
-            _bek_v      = float(_ar.get("bek_ciro",0) or 0)
-            _ger_v      = float(_ar.get("ger_ciro",0) or 0)
+            _dot_renk   = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(_ar_pot,"⚪")
 
-            # Bölge JSON parse
+            with st.expander(f"{_dot_renk} **{_ar_firma}** · {_ar_tarih} · {_ar_pot} · {_ar_sonuc}", expanded=False):
+                _dot_clr = {"çok yüksek":"#22c55e","yüksek":"#22c55e","orta":"#f59e0b","düşük":"#ef4444","çok düşük":"#ef4444"}.get(_ar_pot,"#94a3b8")
+                _bek_v   = float(_ar.get("bek_ciro",0) or 0)
+                _ger_v   = float(_ar.get("ger_ciro",0) or 0)
             try:
                 _br_raw = _ar.get("bolge","")
                 _br_obj = __import__("json").loads(_br_raw) if isinstance(_br_raw,str) and _br_raw else _br_raw
@@ -4705,25 +4706,13 @@ elif aktif == "analiz":
                 _sonraki_blok = ""
 
             _kart_html = f"""
-<div style='background:white;border:0.5px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px;font-family:-apple-system,sans-serif'>
+<div style='font-family:-apple-system,sans-serif'>
 
-  <div style='display:flex;align-items:center;justify-content:space-between;padding:14px 18px;gap:12px;flex-wrap:wrap'>
-    <div style='display:flex;align-items:center;gap:10px'>
-      <span style='width:10px;height:10px;border-radius:50%;background:{_dot_clr};display:inline-block;flex-shrink:0'></span>
-      <span style='font-size:15px;font-weight:500;color:#0f172a'>{_ar_firma}</span>
-      <span style='font-size:12px;color:#94a3b8'>{_ar_tarih}</span>
-    </div>
-    <div style='display:flex;gap:6px;flex-wrap:wrap'>
-      <span style='font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500;background:#eaf3de;color:#3b6d11'>{_ar_pot} potansiyel</span>
-      <span style='font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500;background:#e6f1fb;color:#185fa5'>{_ar_sonuc}</span>
-    </div>
-  </div>
-
-  <div style='display:grid;grid-template-columns:repeat(4,1fr);border-top:0.5px solid #e2e8f0'>
-    <div style='padding:12px 16px;border-right:0.5px solid #e2e8f0'><div style='font-size:11px;color:#64748b;margin-bottom:4px'>Potansiyel</div><div style='font-size:17px;font-weight:500;color:#0f172a'>{_ar_pot.title() if _ar_pot else "—"}</div></div>
-    <div style='padding:12px 16px;border-right:0.5px solid #e2e8f0'><div style='font-size:11px;color:#64748b;margin-bottom:4px'>Beklenen ciro</div><div style='font-size:17px;font-weight:500;color:#0f172a'>{_bek_v:,.0f} ₺</div></div>
-    <div style='padding:12px 16px;border-right:0.5px solid #e2e8f0'><div style='font-size:11px;color:#64748b;margin-bottom:4px'>Gerçekleşen</div><div style='font-size:17px;font-weight:500;color:#0f172a'>{_ger_v:,.0f} ₺</div></div>
-    <div style='padding:12px 16px'><div style='font-size:11px;color:#64748b;margin-bottom:4px'>Sonuç</div><div style='font-size:14px;font-weight:500;color:#0f172a'>{_ar_sonuc.title() if _ar_sonuc else "—"}</div></div>
+  <div style='display:grid;grid-template-columns:repeat(4,1fr);border:0.5px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:10px'>
+    <div style='padding:10px 14px;border-right:0.5px solid #e2e8f0'><div style='font-size:10px;color:#64748b;margin-bottom:3px'>Potansiyel</div><div style='font-size:15px;font-weight:500'>{_ar_pot.title() if _ar_pot else "—"}</div></div>
+    <div style='padding:10px 14px;border-right:0.5px solid #e2e8f0'><div style='font-size:10px;color:#64748b;margin-bottom:3px'>Beklenen ciro</div><div style='font-size:15px;font-weight:500'>{_bek_v:,.0f} ₺</div></div>
+    <div style='padding:10px 14px;border-right:0.5px solid #e2e8f0'><div style='font-size:10px;color:#64748b;margin-bottom:3px'>Gerçekleşen</div><div style='font-size:15px;font-weight:500'>{_ger_v:,.0f} ₺</div></div>
+    <div style='padding:10px 14px'><div style='font-size:10px;color:#64748b;margin-bottom:3px'>Sonuç</div><div style='font-size:13px;font-weight:500'>{_ar_sonuc.title() if _ar_sonuc else "—"}</div></div>
   </div>
 
   <div style='border-top:0.5px solid #e2e8f0'>
