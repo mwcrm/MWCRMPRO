@@ -7350,56 +7350,142 @@ elif aktif == "harita":
             _en_yogun = _hdf_f[_il_col].value_counts().index[0] if not _hdf_f[_il_col].dropna().empty else "—"
             _hm3.metric("En Yoğun", _en_yogun)
         _hm4.metric("Filtrelenen", len(_hdf_f))
-        try:
-            import folium
-            from folium.plugins import MarkerCluster
-            import streamlit.components.v1 as _hcomp
-            import random
-            _hmap = folium.Map(location=[39.0,35.0], zoom_start=6, tiles="OpenStreetMap")
-            _IL_KOOR = {
-                "İstanbul":[41.015,28.979],"Ankara":[39.920,32.854],"İzmir":[38.423,27.143],
-                "Bursa":[40.183,29.067],"Antalya":[36.897,30.713],"Adana":[37.000,35.321],
-                "Konya":[37.872,32.485],"Gaziantep":[37.066,37.383],"Mersin":[36.812,34.641],
-                "Kayseri":[38.732,35.487],"Eskişehir":[39.776,30.521],"Diyarbakır":[37.914,40.230],
-                "Samsun":[41.286,36.330],"Denizli":[37.774,29.086],"Kocaeli":[40.765,29.940],
-                "Balıkesir":[39.648,27.882],"Malatya":[38.355,38.309],"Tekirdağ":[40.978,27.515],
-                "Sakarya":[40.769,30.394],"Trabzon":[41.002,39.716],"Manisa":[38.619,27.429],
-                "Çanakkale":[40.144,26.408],"Edirne":[41.677,26.556],"Aydın":[37.856,27.845],
-                "Muğla":[37.215,28.364],"Gebze":[40.802,29.430],"Şanlıurfa":[37.158,38.791],
-                "Erzurum":[39.905,41.270],"Uşak":[38.682,29.408],"Afyon":[38.757,30.540],
-                "Kırklareli":[41.735,27.225],"Çorum":[40.549,34.955],"Ordu":[40.984,37.877],
-            }
-            _RENK = {"Portföy":"blue","Hedef":"green","Tekrar Ara":"orange","İlk Temas":"lightblue","Pasif":"gray","Teklif":"purple","Aktif":"darkgreen"}
-            _cluster = MarkerCluster().add_to(_hmap)
-            for _, _hr in _hdf_f.iterrows():
-                _il = str(_hr.get(_il_col,"") or "") if _il_col else ""
-                _firma = str(_hr.get("firma","") or "—")
-                _durum = str(_hr.get("durum","") or "—")
-                _seg   = str(_hr.get("segment","") or "—")
-                _tem   = str(_hr.get("temsilci","") or "—")
-                _tel   = str(_hr.get("gsm","") or "—")
-                _ilce  = str(_hr.get("ilce","") or "")
-                _koor  = None
+        import streamlit.components.v1 as _hcomp
+        import json as _hj, random, hashlib
+
+        _il_col = "il" if "il" in _hdf_f.columns else None
+
+        _IL_KOOR = {
+            "adana":[37.000,35.321],"adıyaman":[37.764,38.276],"afyonkarahisar":[38.757,30.540],
+            "ağrı":[39.720,43.051],"aksaray":[38.369,34.036],"amasya":[40.655,35.833],
+            "ankara":[39.920,32.854],"antalya":[36.897,30.713],"artvin":[41.182,41.818],
+            "aydın":[37.856,27.845],"balıkesir":[39.648,27.882],"bartın":[41.635,32.337],
+            "batman":[37.881,41.132],"bilecik":[40.142,29.979],"bolu":[40.576,31.579],
+            "burdur":[37.720,30.291],"bursa":[40.183,29.067],"çanakkale":[40.144,26.408],
+            "çankırı":[40.601,33.613],"çorum":[40.549,34.955],"denizli":[37.774,29.086],
+            "diyarbakır":[37.914,40.230],"düzce":[40.844,31.157],"edirne":[41.677,26.556],
+            "elazığ":[38.674,39.223],"erzincan":[39.750,39.492],"erzurum":[39.905,41.270],
+            "eskişehir":[39.776,30.521],"gaziantep":[37.066,37.383],"giresun":[40.912,38.390],
+            "hatay":[36.406,36.341],"ısparta":[37.764,30.556],"istanbul":[41.015,28.979],
+            "izmir":[38.423,27.143],"kahramanmaraş":[37.575,36.922],"karabük":[41.200,32.627],
+            "karaman":[37.181,33.215],"kars":[40.608,43.097],"kastamonu":[41.376,33.776],
+            "kayseri":[38.732,35.487],"kırıkkale":[39.847,33.516],"kırklareli":[41.735,27.225],
+            "kırşehir":[39.145,34.160],"kilis":[36.718,37.121],"kocaeli":[40.765,29.940],
+            "konya":[37.872,32.485],"kütahya":[39.424,29.983],"malatya":[38.355,38.309],
+            "manisa":[38.619,27.429],"mardin":[37.313,40.735],"mersin":[36.812,34.641],
+            "muğla":[37.215,28.364],"muş":[38.744,41.501],"nevşehir":[38.625,34.724],
+            "niğde":[37.969,34.679],"ordu":[40.984,37.877],"osmaniye":[37.074,36.247],
+            "rize":[41.024,40.523],"sakarya":[40.769,30.394],"samsun":[41.286,36.330],
+            "sinop":[42.023,35.154],"sivas":[39.748,37.015],"şanlıurfa":[37.158,38.791],
+            "şırnak":[37.418,42.491],"tekirdağ":[40.978,27.515],"tokat":[40.313,36.554],
+            "trabzon":[41.002,39.716],"tunceli":[39.108,39.547],"uşak":[38.682,29.408],
+            "van":[38.494,43.380],"yalova":[40.655,29.277],"yozgat":[39.818,34.815],
+            "zonguldak":[41.456,31.789],"gebze":[40.802,29.430],"izmit":[40.765,29.940],
+            "afyon":[38.757,30.540],"antep":[37.066,37.383],"maraş":[37.575,36.922],
+        }
+        _ILCE_KOOR = {
+            "kadıköy":[40.991,29.024],"beşiktaş":[41.042,29.009],"şişli":[41.061,28.987],
+            "beyoğlu":[41.037,28.974],"fatih":[41.019,28.950],"üsküdar":[41.023,29.013],
+            "kartal":[40.889,29.185],"pendik":[40.876,29.256],"maltepe":[40.935,29.148],
+            "ataşehir":[40.982,29.112],"çekmeköy":[41.036,29.174],"sancaktepe":[41.000,29.233],
+            "sultanbeyli":[40.962,29.261],"tuzla":[40.821,29.297],"beykoz":[41.130,29.095],
+            "sarıyer":[41.167,29.054],"eyüpsultan":[41.073,28.935],"gaziosmanpaşa":[41.067,28.908],
+            "bağcılar":[41.040,28.856],"bahçelievler":[41.003,28.861],"bakırköy":[40.979,28.875],
+            "bayrampaşa":[41.052,28.912],"esenler":[41.043,28.876],"güngören":[41.016,28.870],
+            "küçükçekmece":[41.006,28.779],"avcılar":[40.979,28.722],"arnavutköy":[41.186,28.740],
+            "başakşehir":[41.093,28.803],"beylikdüzü":[40.979,28.640],"büyükçekmece":[41.022,28.588],
+            "çatalca":[41.144,28.461],"esenyurt":[41.035,28.670],"silivri":[41.073,28.246],
+            "sultangazi":[41.104,28.873],"zeytinburnu":[41.001,28.903],"nilüfer":[40.213,28.964],
+            "osmangazi":[40.198,29.055],"yıldırım":[40.191,29.098],"izmit":[40.765,29.940],
+            "gebze":[40.802,29.430],"darıca":[40.762,29.572],"dilovası":[40.762,29.540],
+            "körfez":[40.762,29.800],"çerkezköy":[41.290,27.990],"çorlu":[41.161,27.803],
+            "lüleburgaz":[41.405,27.353],"tuzla":[40.821,29.297],"pendik":[40.876,29.256],
+            "ümraniye":[41.016,29.123],"paşabahçe":[41.118,29.090],"anadolu":[41.000,29.100],
+        }
+        _DURUM_RENK = {
+            "Portföy":"#1d4ed8","Hedef":"#15803d","Tekrar Ara":"#d97706",
+            "İlk Temas":"#0891b2","Pasif":"#6b7280","Teklif":"#7c3aed",
+            "Aktif":"#15803d","Negatif Portföy":"#dc2626","Kazanıldı":"#16a34a",
+        }
+        _pins = []
+        for _, _hr in _hdf_f.iterrows():
+            _il   = str(_hr.get("il","")    or "").strip().lower()
+            _ilce = str(_hr.get("ilce","")  or "").strip().lower()
+            _firma= str(_hr.get("firma","") or "?").replace("'","&#39;").replace('"','&quot;')
+            _durum= str(_hr.get("durum","") or "—")
+            _seg  = str(_hr.get("segment","") or "—")
+            _tem  = str(_hr.get("temsilci","") or "—")
+            _tel  = str(_hr.get("gsm","")   or "—")
+            _adrs = str(_hr.get("adres","") or "—").replace("'","&#39;").replace('"','&quot;')
+            _lat, _lng = None, None
+            if _ilce and _ilce in _ILCE_KOOR:
+                _lat, _lng = _ILCE_KOOR[_ilce]
+            elif _il and _il in _IL_KOOR:
+                _lat, _lng = _IL_KOOR[_il]
+            else:
                 for _k,_v in _IL_KOOR.items():
-                    if _k.lower() in _il.lower() or _il.lower() in _k.lower():
-                        random.seed(hash(_firma))
-                        _koor = [_v[0]+random.uniform(-0.25,0.25), _v[1]+random.uniform(-0.25,0.25)]
-                        break
-                if not _koor: continue
-                _popup = f"<div style='font-family:sans-serif;min-width:200px'><b style='font-size:13px'>{_firma}</b><br><table style='font-size:11px;margin-top:6px'><tr><td style='color:#64748b'>İl/İlçe</td><td>&nbsp;{_il} / {_ilce}</td></tr><tr><td style='color:#64748b'>Durum</td><td>&nbsp;<b>{_durum}</b></td></tr><tr><td style='color:#64748b'>Segment</td><td>&nbsp;{_seg}</td></tr><tr><td style='color:#64748b'>Temsilci</td><td>&nbsp;{_tem}</td></tr><tr><td style='color:#64748b'>Tel</td><td>&nbsp;{_tel}</td></tr></table></div>"
-                folium.Marker(location=_koor, popup=folium.Popup(_popup,max_width=280), tooltip=_firma,
-                    icon=folium.Icon(color=_RENK.get(_durum,"red"), icon="building", prefix="fa")).add_to(_cluster)
-            if _il_col:
-                for _il_adi, _sayi in _hdf_f[_il_col].value_counts().items():
-                    if _il_adi in _IL_KOOR:
-                        folium.CircleMarker(location=_IL_KOOR[_il_adi], radius=min(int(_sayi**0.5*4),40),
-                            color="#1d4ed8", fill=True, fill_color="#1d4ed8", fill_opacity=0.12,
-                            weight=2, opacity=0.35, tooltip=f"{_il_adi}: {_sayi} müşteri").add_to(_hmap)
-            _hcomp.html(_hmap._repr_html_(), height=520, scrolling=False)
-        except ImportError:
-            st.warning("Folium yükleniyor... Lütfen bekleyin ve sayfayı yenileyin.")
-        except Exception as _he:
-            st.error(f"Harita hatası: {_he}")
+                    if _k in _il or _il in _k:
+                        _lat, _lng = _v; break
+            if _lat is None: continue
+            _seed = int(hashlib.md5(_firma.encode()).hexdigest()[:8],16)
+            random.seed(_seed)
+            _lat += random.uniform(-0.02, 0.02)
+            _lng += random.uniform(-0.02, 0.02)
+            _renk = _DURUM_RENK.get(_durum, "#64748b")
+            _pins.append({"lat":round(_lat,5),"lng":round(_lng,5),"firma":_firma,
+                "durum":_durum,"renk":_renk,"seg":_seg,"tem":_tem,"tel":_tel,
+                "il":_il.title(),"ilce":_ilce.title(),"adres":_adrs})
+
+        _pins_json = _hj.dumps(_pins, ensure_ascii=False)
+        _harita_html = """<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/leaflet.markercluster.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+#map{width:100%;height:580px;}
+.pp{font-family:-apple-system,sans-serif;min-width:220px;}
+.pp h4{font-size:13px;font-weight:600;color:#0f172a;margin-bottom:6px;border-bottom:1px solid #f1f5f9;padding-bottom:5px;}
+.pp table{font-size:11px;width:100%;border-collapse:collapse;}
+.pp td{padding:3px 4px;} .pp td:first-child{color:#94a3b8;width:70px;}
+.pp td:last-child{font-weight:500;color:#1e293b;}
+#leg{position:absolute;bottom:24px;right:8px;z-index:1000;background:white;border-radius:8px;padding:10px 14px;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.12);}
+.li{display:flex;align-items:center;gap:6px;margin-top:4px;}
+.ld{width:10px;height:10px;border-radius:50%;}
+</style></head><body>
+<div id="map"></div><div id="leg"><b>Durum</b></div>
+<script>
+var pins = """ + _pins_json + """;
+var map = L.map('map').setView([39.5,33.0],6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:18}).addTo(map);
+var cl = L.markerClusterGroup({maxClusterRadius:50,spiderfyOnMaxZoom:true,showCoverageOnHover:false});
+var rnk={};
+pins.forEach(function(p){
+  rnk[p.durum]=p.renk;
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32">'
+    +'<path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z" fill="'+p.renk+'" stroke="white" stroke-width="1.5"/>'
+    +'<circle cx="12" cy="12" r="5" fill="white" opacity="0.9"/></svg>';
+  var ic=L.divIcon({html:svg,className:'',iconSize:[24,32],iconAnchor:[12,32],popupAnchor:[0,-30]});
+  var pop='<div class="pp"><h4>'+p.firma+'</h4><table>'
+    +'<tr><td>İl/İlçe</td><td>'+p.il+(p.ilce?' / '+p.ilce:'')+'</td></tr>'
+    +'<tr><td>Adres</td><td>'+p.adres+'</td></tr>'
+    +'<tr><td>Durum</td><td>'+p.durum+'</td></tr>'
+    +'<tr><td>Segment</td><td>'+p.seg+'</td></tr>'
+    +'<tr><td>Temsilci</td><td>'+p.tem+'</td></tr>'
+    +'<tr><td>Tel</td><td>'+p.tel+'</td></tr>'
+    +'</table></div>';
+  L.marker([p.lat,p.lng],{icon:ic}).bindPopup(pop,{maxWidth:280}).addTo(cl);
+});
+map.addLayer(cl);
+var leg=document.getElementById('leg');
+Object.entries(rnk).forEach(function(e){
+  leg.innerHTML+='<div class="li"><div class="ld" style="background:'+e[1]+'"></div><span>'+e[0]+'</span></div>';
+});
+</script></body></html>"""
+        _hcomp.html(_harita_html, height=590, scrolling=False)
         if _il_col and not _hdf_f.empty:
             st.divider()
             st.markdown("**📊 İl Bazlı Özet**")
