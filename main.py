@@ -7417,11 +7417,17 @@ elif aktif == "harita":
             "İlk Temas":"#0891b2","Pasif":"#6b7280","Teklif":"#7c3aed",
             "Aktif":"#15803d","Negatif Portföy":"#dc2626","Kazanıldı":"#16a34a",
         }
+        def _tr_lower(s):
+            """Türkçe karakterleri doğru küçült"""
+            return (s.replace("İ","i").replace("I","ı").replace("Ş","ş")
+                     .replace("Ğ","ğ").replace("Ü","ü").replace("Ö","ö")
+                     .replace("Ç","ç").lower().strip())
+
         _gorulen_firmalar = set()
         _pins = []
         for _, _hr in _hdf_f.iterrows():
-            _il   = str(_hr.get("il","")    or "").strip().lower()
-            _ilce = str(_hr.get("ilce","")  or "").strip().lower()
+            _il   = _tr_lower(str(_hr.get("il","")   or ""))
+            _ilce = _tr_lower(str(_hr.get("ilce","") or ""))
             _firma_ham = str(_hr.get("firma","") or "?")
             if _firma_ham in _gorulen_firmalar: continue
             _gorulen_firmalar.add(_firma_ham)
@@ -7432,18 +7438,23 @@ elif aktif == "harita":
             _tel  = str(_hr.get("gsm","")   or "—")
             _adrs = str(_hr.get("adres","") or "—").replace("'","&#39;").replace('"','&quot;')
             _lat, _lng = None, None
-            # Önce ilçe
+            # Önce ilçe — tam eşleşme
             if _ilce:
-                for _k,_v in _ILCE_KOOR.items():
-                    if _k == _ilce or _k in _ilce or _ilce in _k:
-                        _lat, _lng = _v; break
-            # Sonra il
+                if _ilce in _ILCE_KOOR:
+                    _lat, _lng = _ILCE_KOOR[_ilce]
+                else:
+                    for _k in _ILCE_KOOR:
+                        if _tr_lower(_k) == _ilce:
+                            _lat, _lng = _ILCE_KOOR[_k]; break
+            # Sonra il — tam eşleşme
             if _lat is None and _il:
-                for _k,_v in _IL_KOOR.items():
-                    if _k == _il or _k in _il or _il in _k:
-                        _lat, _lng = _v; break
+                if _il in _IL_KOOR:
+                    _lat, _lng = _IL_KOOR[_il]
+                else:
+                    for _k in _IL_KOOR:
+                        if _tr_lower(_k) == _il or _il[:5] == _tr_lower(_k)[:5]:
+                            _lat, _lng = _IL_KOOR[_k]; break
             if _lat is None: continue
-            # Küçük offset — üst üste gelmesin
             _seed = int(hashlib.md5(_firma_ham.encode()).hexdigest()[:8], 16)
             random.seed(_seed)
             _lat += random.uniform(-0.008, 0.008)
@@ -7451,7 +7462,7 @@ elif aktif == "harita":
             _renk = _DURUM_RENK.get(_durum, "#64748b")
             _pins.append({"lat":round(_lat,5),"lng":round(_lng,5),"firma":_firma,
                 "durum":_durum,"renk":_renk,"seg":_seg,"tem":_tem,"tel":_tel,
-                "il":_il.title(),"ilce":_ilce.title(),"adres":_adrs})
+                "il":str(_hr.get("il","")).title(),"ilce":str(_hr.get("ilce","")).title(),"adres":_adrs})
 
         _pins_json = _hj.dumps(_pins, ensure_ascii=False)
         _harita_html = """<!DOCTYPE html>
