@@ -4651,7 +4651,7 @@ elif aktif == "analiz":
                     _rakip_rows_html += f"<tr><td style='padding:7px 16px;font-size:12px;border-bottom:0.5px solid #f1f5f9'>{_rr.get('firma','—')}</td><td style='padding:7px 16px;font-size:12px;border-bottom:0.5px solid #f1f5f9;text-align:right'>{_rr.get('fiyat','—')}</td><td style='padding:7px 16px;border-bottom:0.5px solid #f1f5f9'>{_pill_html2(_rr.get('durum',''),_rg)}</td><td style='padding:7px 16px;font-size:12px;border-bottom:0.5px solid #f1f5f9;color:#64748b'>{_rr.get('sebep','—')}</td></tr>"
             except: pass
 
-            _ar_sonraki_txt = _pills(_ar.get("sonraki_adim",""))
+            _ar_sonraki_txt = " · ".join([x.strip() for x in str(_ar.get("sonraki_adim","") or "").split(",") if x.strip()])  or "—"
             _ar_takip_txt   = fmt_tarih(_ar.get("takip_tar",""))
             if _ar.get("sonraki_adim","") or _ar.get("takip_tar",""):
                 _sonraki_blok = f"<div style='display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#64748b;border-bottom:0.5px solid #f1f5f9'>📅 Sonraki adım: <strong style='color:#0f172a'>{_ar_sonraki_txt}</strong> → <strong style='color:#0f172a'>{_ar_takip_txt}</strong></div>"
