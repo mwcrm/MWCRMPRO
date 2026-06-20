@@ -7359,6 +7359,18 @@ elif aktif == "harita":
 
         _il_col = "il" if "il" in _hdf_f.columns else None
 
+        # Randevu verilerini çek
+        _rdf = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC")
+        _rand_acik = set()   # Devam ediyor
+        _rand_var  = set()   # Randevu olan (bitti dahil)
+        if not _rdf.empty:
+            for _, _rr in _rdf.iterrows():
+                _mn = str(_rr.get("musteri_adi","") or "").strip()
+                if not _mn: continue
+                _rand_var.add(_mn)
+                if str(_rr.get("sonuc","") or "") in ["Devam Ediyor","","—"] and str(_rr.get("sonuc","") or "") != "Bitti":
+                    _rand_acik.add(_mn)
+
         _IL_KOOR = {
             "adana":[37.000,35.321],"adıyaman":[37.764,38.276],"afyonkarahisar":[38.757,30.540],
             "ağrı":[39.720,43.051],"aksaray":[38.369,34.036],"amasya":[40.655,35.833],
@@ -7460,9 +7472,19 @@ elif aktif == "harita":
             _lat += random.uniform(-0.008, 0.008)
             _lng += random.uniform(-0.008, 0.008)
             _renk = _DURUM_RENK.get(_durum, "#64748b")
+            # Randevu varsa kırmızı override
+            if _firma_ham in _rand_acik:
+                _renk = "#dc2626"   # Açık randevu — parlak kırmızı
+                _rand_etiketi = "🔴 Açık Randevu"
+            elif _firma_ham in _rand_var:
+                _renk = "#f87171"   # Geçmiş randevu — açık kırmızı
+                _rand_etiketi = "🟠 Randevu Var"
+            else:
+                _rand_etiketi = ""
             _pins.append({"lat":round(_lat,5),"lng":round(_lng,5),"firma":_firma,
                 "durum":_durum,"renk":_renk,"seg":_seg,"tem":_tem,"tel":_tel,
-                "il":str(_hr.get("il","")).title(),"ilce":str(_hr.get("ilce","")).title(),"adres":_adrs})
+                "il":str(_hr.get("il","")).title(),"ilce":str(_hr.get("ilce","")).title(),
+                "adres":_adrs,"rand":_rand_etiketi})
 
         _pins_json = _hj.dumps(_pins, ensure_ascii=False)
         _harita_html = """<!DOCTYPE html>
@@ -7497,18 +7519,20 @@ pins.forEach(function(p){
     +'<path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z" fill="'+p.renk+'" stroke="white" stroke-width="1.5"/>'
     +'<circle cx="12" cy="12" r="5" fill="white" opacity="0.9"/></svg>';
   var ic=L.divIcon({html:svg,className:'',iconSize:[24,32],iconAnchor:[12,32],popupAnchor:[0,-30]});
-  var pop='<div class="pp"><h4>'+p.firma+'</h4><table>'
+  var pop='<div class="pp"><h4>'+p.firma+(p.rand?' <span style="font-size:11px;color:#dc2626">'+p.rand+'</span>':'')+'</h4><table>'
     +'<tr><td>İl/İlçe</td><td>'+p.il+(p.ilce?' / '+p.ilce:'')+'</td></tr>'
     +'<tr><td>Adres</td><td>'+p.adres+'</td></tr>'
     +'<tr><td>Durum</td><td>'+p.durum+'</td></tr>'
     +'<tr><td>Segment</td><td>'+p.seg+'</td></tr>'
     +'<tr><td>Temsilci</td><td>'+p.tem+'</td></tr>'
     +'<tr><td>Tel</td><td>'+p.tel+'</td></tr>'
+    +(p.rand?'<tr><td>Randevu</td><td><b style="color:#dc2626">'+p.rand+'</b></td></tr>':'')
     +'</table></div>';
   L.marker([p.lat,p.lng],{icon:ic}).bindPopup(pop,{maxWidth:280}).addTo(cl);
 });
 map.addLayer(cl);
 var leg=document.getElementById('leg');
+leg.innerHTML='<b>Durum</b><div class="li"><div class="ld" style="background:#dc2626"></div><span>🔴 Açık Randevu</span></div><div class="li"><div class="ld" style="background:#f87171"></div><span>Randevu Var</span></div>';
 Object.entries(rnk).forEach(function(e){
   leg.innerHTML+='<div class="li"><div class="ld" style="background:'+e[1]+'"></div><span>'+e[0]+'</span></div>';
 });
