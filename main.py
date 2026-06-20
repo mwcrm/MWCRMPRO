@@ -4391,23 +4391,39 @@ elif aktif == "analiz":
 </div>"""
         return html
 
-    # ── TÜM ANALİZLER LİSTESİ ────────────────────────────────────────────────
+    # ── SEKME SİSTEMİ ─────────────────────────────────────────────────────────
     st.markdown("## 🔍 Müşteri Görüşme Analizi")
-    _df_tum = _an_liste()
+    _an_tab1, _an_tab2 = st.tabs(["📋 Analiz Listesi", "✏️ Yeni / Düzenle"])
 
-    if not _df_tum.empty:
-        st.markdown("### 📋 Tüm Analizler")
-        _f1,_f2,_f3 = st.columns(3)
-        _ff = _f1.text_input("Firma ara", key="an_ff", placeholder="firma adı...")
-        _fs = _f2.selectbox("Sonuç", ["Tümü","takip edilecek","teklif verildi","anlaşma yapıldı","beklemede","ilgisiz"], key="an_fs")
-        _fp = _f3.selectbox("Potansiyel", ["Tümü","çok yüksek","yüksek","orta","düşük","çok düşük"], key="an_fp")
-        _dff = _df_tum.copy()
-        if _ff: _dff = _dff[_dff["firma"].str.contains(_ff, case=False, na=False)]
-        if _fs != "Tümü": _dff = _dff[_dff["sonuc"] == _fs]
-        if _fp != "Tümü": _dff = _dff[_dff["potansiyel"] == _fp]
-        st.caption(f"{len(_dff)} analiz")
+    # ── TAB 1: LİSTE ──────────────────────────────────────────────────────────
+    with _an_tab1:
+        _df_tum = _an_liste()
 
-        _pic_map = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}
+        if _df_tum.empty:
+            st.info("Henüz analiz kaydı yok. '✏️ Yeni / Düzenle' sekmesinden ekleyin.")
+        else:
+            # Filtreler
+            _f1,_f2,_f3 = st.columns(3)
+            _ff = _f1.text_input("Firma ara", key="an_ff", placeholder="firma adı...")
+            _fs = _f2.selectbox("Sonuç", ["Tümü","takip edilecek","teklif verildi","anlaşma yapıldı","beklemede","ilgisiz"], key="an_fs")
+            _fp = _f3.selectbox("Potansiyel", ["Tümü","çok yüksek","yüksek","orta","düşük","çok düşük"], key="an_fp")
+            _dff = _df_tum.copy()
+            if _ff: _dff = _dff[_dff["firma"].str.contains(_ff, case=False, na=False)]
+            if _fs != "Tümü": _dff = _dff[_dff["sonuc"] == _fs]
+            if _fp != "Tümü": _dff = _dff[_dff["potansiyel"] == _fp]
+
+            # Metrik özet
+            _sc1,_sc2,_sc3,_sc4,_sc5 = st.columns(5)
+            _sc1.metric("Toplam", len(_df_tum))
+            _sc2.metric("Yüksek Pot.", len(_df_tum[_df_tum["potansiyel"].isin(["yüksek","çok yüksek"])]))
+            _sc3.metric("Takip Bekleyen", len(_df_tum[_df_tum["sonuc"]=="takip edilecek"]))
+            _sc4.metric("Anlaşma", len(_df_tum[_df_tum["sonuc"]=="anlaşma yapıldı"]))
+            try: _sc5.metric("Beklenen Ciro", f"{_df_tum['bek_ciro'].sum():,.0f} ₺")
+            except: pass
+
+            st.caption(f"{len(_dff)} analiz")
+
+            _pic_map = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}
         # ── PDF ÜRETICI FONKSİYONU ───────────────────────────────────────────
         def _analiz_pdf(_ar):
             try:
@@ -4756,8 +4772,9 @@ elif aktif == "analiz":
             _kb1,_kb2,_kb3,_kb4,_kb5,_kb6 = st.columns(6)
             if _kb1.button("✏️ Düzenle", key=f"duz_{_ai}", use_container_width=True):
                 st.session_state["an_duzenle_firma"] = _ar_firma
+                st.session_state["an_aktif_tab"] = 1  # Form sekmesine geç
                 _ik2 = f"an_init_{_ar_firma}"
-                for _kk in [_ik2,"an_fiyat_rows","an_bolge_rows","an_avm_rows","an_rakip_rows"]:
+                for _kk in [_ik2,"an_fiyat_rows","an_bolge_rows","an_avm_rows","an_rakip_rows","an_grp"]:
                     if _kk in st.session_state: del st.session_state[_kk]
                 for _pk in list(st.session_state.keys()):
                     if _pk.endswith("_custom"): del st.session_state[_pk]
@@ -4785,17 +4802,10 @@ elif aktif == "analiz":
             st.markdown("---")
 
         st.divider()
-        _sc1,_sc2,_sc3,_sc4,_sc5 = st.columns(5)
-        _sc1.metric("Toplam", len(_df_tum))
-        _sc2.metric("Yüksek Pot.", len(_df_tum[_df_tum["potansiyel"].isin(["yüksek","çok yüksek"])]))
-        _sc3.metric("Takip Bekleyen", len(_df_tum[_df_tum["sonuc"]=="takip edilecek"]))
-        _sc4.metric("Anlaşma", len(_df_tum[_df_tum["sonuc"]=="anlaşma yapıldı"]))
-        try: _sc5.metric("Beklenen Ciro", f"{_df_tum['bek_ciro'].sum():,.0f} ₺")
-        except: pass
-        st.divider()
 
-    # ── YENİ / DÜZENLE FORMU ─────────────────────────────────────────────────
-    st.markdown("### ✏️ Analiz Formu")
+    # ── TAB 2: FORM ───────────────────────────────────────────────────────────
+    with _an_tab2:
+        st.markdown("### ✏️ Analiz Formu")
     _df_cari = get_cari_listesi()
     _col1, _col2 = st.columns([3,1])
     _opts = ["-- Seçin --"] + [f"[{int(r['id'])}] {r['firma']}" for _,r in _df_cari.iterrows()]
@@ -5206,53 +5216,6 @@ elif aktif == "analiz":
                 st.error(f"❌ Kayıt hatası: {_err}")
 
     # DB FONKSIYONLARI
-    def _sb():
-        return get_sb_service() or get_sb_client()
-
-    def _an_kaydet(firma, veri):
-        try:
-            sb = _sb()
-            if sb:
-                ex = sb.table("musteri_analiz").select("id").eq("firma", firma).execute()
-                if ex.data:
-                    sb.table("musteri_analiz").update(veri).eq("firma", firma).execute()
-                else:
-                    veri["firma"] = firma
-                    sb.table("musteri_analiz").insert(veri).execute()
-                return True, ""
-        except Exception as e:
-            return False, str(e)
-        return False, "Bağlantı yok"
-
-    def _an_getir(firma):
-        try:
-            sb = _sb()
-            if sb:
-                r = sb.table("musteri_analiz").select("*").eq("firma", firma).execute()
-                return r.data[0] if r.data else None
-        except: pass
-        return None
-
-    def _an_liste():
-        try:
-            sb = _sb()
-            if sb:
-                r = sb.table("musteri_analiz").select("id,firma,potansiyel,sonuc,tarih,yetkili,iletisim,sektor,kaynak,kargo,beklenti,engel,not_alan,sonraki_adim,takip_tar,bek_ciro,ger_ciro").order("tarih", desc=True).limit(500).execute()
-                if r.data:
-                    df = pd.DataFrame(r.data)
-                    return df[df["firma"].notna() & (df["firma"] != "")]
-        except Exception as e:
-            st.error(f"Liste hatası: {e}")
-        return pd.DataFrame()
-
-    def _an_sil(firma):
-        try:
-            sb = _sb()
-            if sb:
-                sb.table("musteri_analiz").delete().eq("firma", firma).execute()
-                return True
-        except: pass
-        return False
 
 elif aktif == "detay_cari":
     sayfa_log("detay_cari")
