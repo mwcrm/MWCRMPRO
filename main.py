@@ -4393,6 +4393,13 @@ elif aktif == "analiz":
 
     # ── SEKME SİSTEMİ ─────────────────────────────────────────────────────────
     st.markdown("## 🔍 Müşteri Görüşme Analizi")
+    st.markdown("""<style>
+div[data-testid="stHorizontalBlock"] button[kind="secondary"] p {
+    text-align: left !important;
+    justify-content: flex-start !important;
+}
+</style>""", unsafe_allow_html=True)
+
     _an_tab1, _an_tab2 = st.tabs(["📋 Analiz Listesi", "✏️ Yeni / Düzenle"])
 
     # ── YARDIMCI FONKSİYONLAR (her yerde kullanılır) ─────────────────────────
