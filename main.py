@@ -7384,53 +7384,66 @@ elif aktif == "harita":
             "afyon":[38.757,30.540],"antep":[37.066,37.383],"maraş":[37.575,36.922],
         }
         _ILCE_KOOR = {
-            "kadıköy":[40.991,29.024],"beşiktaş":[41.042,29.009],"şişli":[41.061,28.987],
-            "beyoğlu":[41.037,28.974],"fatih":[41.019,28.950],"üsküdar":[41.023,29.013],
-            "kartal":[40.889,29.185],"pendik":[40.876,29.256],"maltepe":[40.935,29.148],
-            "ataşehir":[40.982,29.112],"çekmeköy":[41.036,29.174],"sancaktepe":[41.000,29.233],
-            "sultanbeyli":[40.962,29.261],"tuzla":[40.821,29.297],"beykoz":[41.130,29.095],
-            "sarıyer":[41.167,29.054],"eyüpsultan":[41.073,28.935],"gaziosmanpaşa":[41.067,28.908],
-            "bağcılar":[41.040,28.856],"bahçelievler":[41.003,28.861],"bakırköy":[40.979,28.875],
-            "bayrampaşa":[41.052,28.912],"esenler":[41.043,28.876],"güngören":[41.016,28.870],
-            "küçükçekmece":[41.006,28.779],"avcılar":[40.979,28.722],"arnavutköy":[41.186,28.740],
-            "başakşehir":[41.093,28.803],"beylikdüzü":[40.979,28.640],"büyükçekmece":[41.022,28.588],
-            "çatalca":[41.144,28.461],"esenyurt":[41.035,28.670],"silivri":[41.073,28.246],
-            "sultangazi":[41.104,28.873],"zeytinburnu":[41.001,28.903],"nilüfer":[40.213,28.964],
-            "osmangazi":[40.198,29.055],"yıldırım":[40.191,29.098],"izmit":[40.765,29.940],
-            "gebze":[40.802,29.430],"darıca":[40.762,29.572],"dilovası":[40.762,29.540],
-            "körfez":[40.762,29.800],"çerkezköy":[41.290,27.990],"çorlu":[41.161,27.803],
-            "lüleburgaz":[41.405,27.353],"tuzla":[40.821,29.297],"pendik":[40.876,29.256],
-            "ümraniye":[41.016,29.123],"paşabahçe":[41.118,29.090],"anadolu":[41.000,29.100],
+            # İstanbul Avrupa
+            "bakırköy":[40.979,28.875],"bağcılar":[41.042,28.855],"bahçelievler":[41.000,28.858],
+            "bayrampaşa":[41.048,28.912],"beşiktaş":[41.042,29.009],"beylikdüzü":[40.981,28.642],
+            "beyoğlu":[41.031,28.975],"büyükçekmece":[41.019,28.583],"esenler":[41.044,28.875],
+            "esenyurt":[41.033,28.668],"eyüpsultan":[41.073,28.935],"fatih":[41.013,28.940],
+            "gaziosmanpaşa":[41.065,28.906],"güngören":[41.017,28.870],"küçükçekmece":[41.003,28.778],
+            "şişli":[41.058,28.985],"sultangazi":[41.105,28.872],"zeytinburnu":[40.999,28.900],
+            "arnavutköy":[41.182,28.735],"avcılar":[40.979,28.720],"başakşehir":[41.090,28.800],
+            "çatalca":[41.143,28.459],"silivri":[41.072,28.243],"sarıyer":[41.166,29.053],
+            # İstanbul Anadolu
+            "ataşehir":[40.982,29.120],"beykoz":[41.118,29.097],"çekmeköy":[41.034,29.172],
+            "kadıköy":[40.990,29.030],"kartal":[40.889,29.183],"maltepe":[40.933,29.150],
+            "pendik":[40.876,29.256],"sancaktepe":[40.998,29.231],"sultanbeyli":[40.963,29.262],
+            "tuzla":[40.820,29.298],"ümraniye":[41.015,29.124],"üsküdar":[41.022,29.025],
+            # Kocaeli
+            "gebze":[40.800,29.432],"izmit":[40.764,29.917],"darıca":[40.760,29.570],
+            "dilovası":[40.753,29.528],"körfez":[40.745,29.787],"gölcük":[40.651,29.823],
+            # Bursa
+            "nilüfer":[40.213,28.963],"osmangazi":[40.196,29.057],"yıldırım":[40.189,29.100],
+            # Tekirdağ
+            "çerkezköy":[41.289,27.988],"çorlu":[41.160,27.801],"lüleburgaz":[41.404,27.351],
+            # Diğer
+            "bornova":[38.466,27.215],"buca":[38.381,27.152],"karşıyaka":[38.459,27.108],
         }
         _DURUM_RENK = {
             "Portföy":"#1d4ed8","Hedef":"#15803d","Tekrar Ara":"#d97706",
             "İlk Temas":"#0891b2","Pasif":"#6b7280","Teklif":"#7c3aed",
             "Aktif":"#15803d","Negatif Portföy":"#dc2626","Kazanıldı":"#16a34a",
         }
+        _gorulen_firmalar = set()
         _pins = []
         for _, _hr in _hdf_f.iterrows():
             _il   = str(_hr.get("il","")    or "").strip().lower()
             _ilce = str(_hr.get("ilce","")  or "").strip().lower()
-            _firma= str(_hr.get("firma","") or "?").replace("'","&#39;").replace('"','&quot;')
+            _firma_ham = str(_hr.get("firma","") or "?")
+            if _firma_ham in _gorulen_firmalar: continue
+            _gorulen_firmalar.add(_firma_ham)
+            _firma= _firma_ham.replace("'","&#39;").replace('"','&quot;')
             _durum= str(_hr.get("durum","") or "—")
             _seg  = str(_hr.get("segment","") or "—")
             _tem  = str(_hr.get("temsilci","") or "—")
             _tel  = str(_hr.get("gsm","")   or "—")
             _adrs = str(_hr.get("adres","") or "—").replace("'","&#39;").replace('"','&quot;')
             _lat, _lng = None, None
-            if _ilce and _ilce in _ILCE_KOOR:
-                _lat, _lng = _ILCE_KOOR[_ilce]
-            elif _il and _il in _IL_KOOR:
-                _lat, _lng = _IL_KOOR[_il]
-            else:
+            # Önce ilçe
+            if _ilce:
+                for _k,_v in _ILCE_KOOR.items():
+                    if _k == _ilce or _k in _ilce or _ilce in _k:
+                        _lat, _lng = _v; break
+            # Sonra il
+            if _lat is None and _il:
                 for _k,_v in _IL_KOOR.items():
-                    if _k in _il or _il in _k:
+                    if _k == _il or _k in _il or _il in _k:
                         _lat, _lng = _v; break
             if _lat is None: continue
-            _seed = int(hashlib.md5(_firma.encode()).hexdigest()[:8],16)
+            # Küçük offset — üst üste gelmesin
+            _seed = int(hashlib.md5(_firma_ham.encode()).hexdigest()[:8], 16)
             random.seed(_seed)
-            _lat += random.uniform(-0.02, 0.02)
-            _lng += random.uniform(-0.02, 0.02)
+            _lat += random.uniform(-0.008, 0.008)
+            _lng += random.uniform(-0.008, 0.008)
             _renk = _DURUM_RENK.get(_durum, "#64748b")
             _pins.append({"lat":round(_lat,5),"lng":round(_lng,5),"firma":_firma,
                 "durum":_durum,"renk":_renk,"seg":_seg,"tem":_tem,"tel":_tel,
