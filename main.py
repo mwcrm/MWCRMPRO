@@ -4521,16 +4521,27 @@ elif aktif == "analiz":
                 elif isinstance(_bolge_raw2, list):
                     _bolge_rows2 = _bolge_raw2
                 if _bolge_rows2:
-                    _tbl_data = [["Güzergah & Desi","Tip","Adet","Fiyat (TL)","Periyot"]]
+                    _tbl_data = [["Güzergah & Desi","Tip","Adet","Rakip Fiyatı (TL)","Bizim Fiyatımız (TL)","Fark","Periyot"]]
                     for _br in _bolge_rows2:
+                        _rak = str(_br.get("rakip_fiyat","") or "—")
+                        _biz = str(_br.get("bizim_fiyat","") or _br.get("ciro","") or "—")
+                        _fark_pdf = "—"
+                        try:
+                            _rv2 = float(_rak.replace(",",".").replace("₺","").strip())
+                            _bv2 = float(_biz.replace(",",".").replace("₺","").strip())
+                            if _rv2 > 0 and _bv2 > 0:
+                                _fd = _rv2 - _bv2
+                                _fp = (_fd/_rv2)*100
+                                _fark_pdf = f"{'▼' if _fd>0 else '▲'} {abs(_fd):,.0f} (%{abs(_fp):.0f})"
+                        except: pass
                         _tbl_data.append([
                             str(_br.get("il","") or "—"),
                             str(_br.get("urun","") or "—"),
                             str(_br.get("adet","") or "—"),
-                            str(_br.get("ciro","") or "—"),
+                            _rak, _biz, _fark_pdf,
                             str(_br.get("siklik","") or "—"),
                         ])
-                    _bt = Table(_tbl_data, colWidths=[W*0.45,W*0.1,W*0.1,W*0.15,W*0.2])
+                    _bt = Table(_tbl_data, colWidths=[W*0.3,W*0.07,W*0.07,W*0.14,W*0.14,W*0.14,W*0.14])
                     _bt.setStyle(TableStyle([
                         ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#f8fafc")),
                         ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
@@ -4628,17 +4639,36 @@ elif aktif == "analiz":
             # Bölge tablosu HTML
             _tbl_rows_html = ""
             for _brow in _br_rows:
-                _brow_il   = str(_brow.get("il","") or "—")
-                _brow_urun = str(_brow.get("urun","") or "—")
-                _brow_adet = str(_brow.get("adet","") or "—")
-                _brow_ciro = str(_brow.get("ciro","") or "—")
-                _brow_sik  = str(_brow.get("siklik","") or "—")
+                _brow_il      = str(_brow.get("il","") or "—")
+                _brow_urun    = str(_brow.get("urun","") or "—")
+                _brow_adet    = str(_brow.get("adet","") or "—")
+                _brow_ciro    = str(_brow.get("ciro","") or "—")
+                _brow_sik     = str(_brow.get("siklik","") or "—")
+                _brow_rakip   = str(_brow.get("rakip_fiyat","") or "—")
+                _brow_bizim   = str(_brow.get("bizim_fiyat","") or _brow_ciro)
+                # Fark hesapla
+                _fark_html = ""
+                try:
+                    _rv = float(_brow_rakip.replace(",",".").replace("₺","").strip())
+                    _bv = float(_brow_bizim.replace(",",".").replace("₺","").strip())
+                    if _rv > 0 and _bv > 0:
+                        _fark = _rv - _bv
+                        _yuzde = (_fark/_rv)*100
+                        if _fark > 0:
+                            _fark_html = f"<span style='color:#15803d;font-weight:500'>▼ {_fark:,.0f} ₺ (%{_yuzde:.0f})</span>"
+                        elif _fark < 0:
+                            _fark_html = f"<span style='color:#dc2626;font-weight:500'>▲ {abs(_fark):,.0f} ₺ (%{abs(_yuzde):.0f})</span>"
+                        else:
+                            _fark_html = "<span style='color:#64748b'>Eşit</span>"
+                except: _fark_html = "—"
                 _pu = "green" if _brow_urun=="palet" else "amber" if _brow_urun in ["dorse","TIR/komple"] else "blue"
                 _tbl_rows_html += f"""<tr>
                   <td style='padding:8px 16px;border-bottom:0.5px solid #f1f5f9;font-size:12px;color:#1e293b'>{_brow_il}</td>
                   <td style='padding:8px 16px;border-bottom:0.5px solid #f1f5f9'>{_pill_html2(_brow_urun,_pu)}</td>
                   <td style='padding:8px 16px;border-bottom:0.5px solid #f1f5f9;font-size:12px;color:#1e293b;text-align:center'>{_brow_adet}</td>
-                  <td style='padding:8px 16px;border-bottom:0.5px solid #f1f5f9;font-size:12px;color:#1e293b;text-align:right'>{_brow_ciro}</td>
+                  <td style='padding:8px 16px;border-bottom:0.5px solid #f1f5f9;text-align:right'><span style='background:#fef9c3;border:0.5px solid #fde047;color:#854f0b;padding:2px 8px;border-radius:12px;font-size:12px'>{_brow_rakip}</span></td>
+                  <td style='padding:8px 16px;border-bottom:0.5px solid #f1f5f9;text-align:right'><span style='background:#dcfce7;border:0.5px solid #86efac;color:#15803d;padding:2px 8px;border-radius:12px;font-size:12px'>{_brow_bizim}</span></td>
+                  <td style='padding:8px 16px;border-bottom:0.5px solid #f1f5f9;text-align:right;font-size:12px'>{_fark_html}</td>
                   <td style='padding:8px 16px;border-bottom:0.5px solid #f1f5f9;font-size:12px;color:#64748b'>{_brow_sik}</td>
                 </tr>"""
 
@@ -4696,8 +4726,8 @@ elif aktif == "analiz":
   </div>
 
   <div style='border-top:0.5px solid #e2e8f0'>
-    <div style='padding:9px 18px;background:#f8fafc;font-size:11px;font-weight:500;color:#64748b;border-bottom:0.5px solid #e2e8f0'>③ ÜRÜN, HACİM & CİRO</div>
-    {'<table style="width:100%;border-collapse:collapse"><thead><tr><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;text-align:left;border-bottom:0.5px solid #e2e8f0">Güzergah & Desi</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;text-align:left;border-bottom:0.5px solid #e2e8f0">Tip</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;text-align:center;border-bottom:0.5px solid #e2e8f0">Adet</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;text-align:right;border-bottom:0.5px solid #e2e8f0">Fiyat (₺)</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;border-bottom:0.5px solid #e2e8f0">Periyot</th></tr></thead><tbody>' + _tbl_rows_html + '</tbody></table>' if _tbl_rows_html else '<div style="padding:12px 18px;font-size:12px;color:#94a3b8;font-style:italic">— henüz girilmedi</div>'}
+    <div style='padding:9px 18px;background:#f8fafc;font-size:11px;font-weight:500;color:#64748b;border-bottom:0.5px solid #e2e8f0'>③ ÜRÜN, HACİM & CİRO — Fiyat Karşılaştırması</div>
+    {'<table style="width:100%;border-collapse:collapse"><thead><tr><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;text-align:left;border-bottom:0.5px solid #e2e8f0">Güzergah & Desi</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;text-align:left;border-bottom:0.5px solid #e2e8f0">Tip</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;text-align:center;border-bottom:0.5px solid #e2e8f0">Adet</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#854f0b;font-weight:500;text-align:right;border-bottom:0.5px solid #e2e8f0">Rakip Fiyatı</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#15803d;font-weight:500;text-align:right;border-bottom:0.5px solid #e2e8f0">Bizim Fiyatımız</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;text-align:right;border-bottom:0.5px solid #e2e8f0">Fark</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;border-bottom:0.5px solid #e2e8f0">Periyot</th></tr></thead><tbody>' + _tbl_rows_html + '</tbody></table>' if _tbl_rows_html else '<div style="padding:12px 18px;font-size:12px;color:#94a3b8;font-style:italic">— henüz girilmedi</div>'}
   </div>
 
   <div style='border-top:0.5px solid #e2e8f0'>
@@ -4953,20 +4983,25 @@ elif aktif == "analiz":
             st.markdown("#### 📦 Ürün, Hacim & Ciro")
             _btn_an("an_t_urun",["koli","palet","parsiyel","TIR/komple","soğuk zincir","ADR/tehlikeli","ambar kargo","dış nakliye"],label="Gönderi türü")
             st.caption("İl bazlı hacim & ciro")
-            _bolge_rows = st.session_state.get("an_bolge_rows",[{"il":"","urun":"koli","adet":"","ciro":"","siklik":"haftalık"}])
+            _bolge_rows = st.session_state.get("an_bolge_rows",[{"il":"","urun":"koli","adet":"","ciro":"","siklik":"haftalık","rakip_fiyat":"","bizim_fiyat":""}])
             _urun_opts_t=["koli","palet","dorse","ambar","AVM"]; _sikl_opts_t=["haftalık","günlük","aylık","düzensiz"]
+            # Kolon başlıkları
+            _hc = st.columns([2,1,1,1,1,1,0.3])
+            for _hi,_hl in enumerate(["İl / Güzergah","Ürün","Adet","Periyot","🟡 Rakip ₺","🟢 Bizim ₺",""]):
+                _hc[_hi].markdown(f"<div style='font-size:10px;color:{'#854f0b' if _hi==4 else '#15803d' if _hi==5 else '#64748b'};font-weight:500;padding-bottom:2px'>{_hl}</div>", unsafe_allow_html=True)
             for _bi in range(len(_bolge_rows)):
-                _br=_bolge_rows[_bi]; _bc=st.columns([2,1,1,1,1,0.3])
-                _bolge_rows[_bi]["il"]     = _bc[0].text_input("",value=_br.get("il",""),key=f"bil_{_bi}",placeholder="İl",label_visibility="collapsed")
-                _bolge_rows[_bi]["urun"]   = _bc[1].selectbox("",_urun_opts_t,index=_urun_opts_t.index(_br.get("urun","koli")) if _br.get("urun","koli") in _urun_opts_t else 0,key=f"bur_{_bi}",label_visibility="collapsed")
-                _bolge_rows[_bi]["adet"]   = _bc[2].text_input("",value=_br.get("adet",""),key=f"bad_{_bi}",placeholder="adet/ay",label_visibility="collapsed")
-                _bolge_rows[_bi]["ciro"]   = _bc[3].text_input("",value=_br.get("ciro",""),key=f"bci_{_bi}",placeholder="₺",label_visibility="collapsed")
-                _bolge_rows[_bi]["siklik"] = _bc[4].selectbox("",_sikl_opts_t,index=_sikl_opts_t.index(_br.get("siklik","haftalık")) if _br.get("siklik","haftalık") in _sikl_opts_t else 0,key=f"bsk_{_bi}",label_visibility="collapsed")
-                if _bc[5].button("✕",key=f"bdel_{_bi}") and len(_bolge_rows)>1:
+                _br=_bolge_rows[_bi]; _bc=st.columns([2,1,1,1,1,1,0.3])
+                _bolge_rows[_bi]["il"]          = _bc[0].text_input("",value=_br.get("il",""),key=f"bil_{_bi}",placeholder="İl / Güzergah",label_visibility="collapsed")
+                _bolge_rows[_bi]["urun"]        = _bc[1].selectbox("",_urun_opts_t,index=_urun_opts_t.index(_br.get("urun","koli")) if _br.get("urun","koli") in _urun_opts_t else 0,key=f"bur_{_bi}",label_visibility="collapsed")
+                _bolge_rows[_bi]["adet"]        = _bc[2].text_input("",value=_br.get("adet",""),key=f"bad_{_bi}",placeholder="adet/ay",label_visibility="collapsed")
+                _bolge_rows[_bi]["siklik"]      = _bc[3].selectbox("",_sikl_opts_t,index=_sikl_opts_t.index(_br.get("siklik","haftalık")) if _br.get("siklik","haftalık") in _sikl_opts_t else 0,key=f"bsk_{_bi}",label_visibility="collapsed")
+                _bolge_rows[_bi]["rakip_fiyat"] = _bc[4].text_input("",value=_br.get("rakip_fiyat",""),key=f"brak_{_bi}",placeholder="Rakip ₺",label_visibility="collapsed")
+                _bolge_rows[_bi]["bizim_fiyat"] = _bc[5].text_input("",value=_br.get("bizim_fiyat",""),key=f"bbiz_{_bi}",placeholder="Bizim ₺",label_visibility="collapsed")
+                if _bc[6].button("✕",key=f"bdel_{_bi}") and len(_bolge_rows)>1:
                     _bolge_rows.pop(_bi); st.session_state["an_bolge_rows"]=_bolge_rows; st.rerun()
             st.session_state["an_bolge_rows"]=_bolge_rows
             if st.button("+ Satır ekle",key="bolge_ekle"):
-                st.session_state["an_bolge_rows"].append({"il":"","urun":"koli","adet":"","ciro":"","siklik":"haftalık"}); st.rerun()
+                st.session_state["an_bolge_rows"].append({"il":"","urun":"koli","adet":"","ciro":"","siklik":"haftalık","rakip_fiyat":"","bizim_fiyat":""}); st.rerun()
             _btn_an("an_t_fiyattur",["spot","anlaşmalı","ihale","paket fiyat","yıllık kontrat"],label="Fiyat teklif türü")
             _btn_an("an_t_odeme",["nakit","çek","havale","vadeli","kredi kartı"],label="Ödeme türü")
 
