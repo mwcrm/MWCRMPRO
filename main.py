@@ -7330,7 +7330,11 @@ elif aktif == "harita":
     sayfa_log("harita")
     import json as _hj
     st.markdown("## 🗺️ Müşteri Haritası")
-    _hdf = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+    _hdf_raw = db_read("cari_kartlar", extra_sql="ORDER BY firma")
+    if not _hdf_raw.empty and "silindi" in _hdf_raw.columns:
+        _hdf = _hdf_raw[~_hdf_raw["silindi"].isin([1, "1", True, "true"])]
+    else:
+        _hdf = _hdf_raw
     if _hdf.empty:
         st.warning("Cari listede müşteri bulunamadı.")
     else:
