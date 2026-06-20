@@ -4631,7 +4631,9 @@ elif aktif == "analiz":
             _sc2.metric("Yüksek Pot.", len(_df_tum[_df_tum["potansiyel"].isin(["yüksek","çok yüksek"])]))
             _sc3.metric("Takip Bekleyen", len(_df_tum[_df_tum["sonuc"]=="takip edilecek"]))
             _sc4.metric("Anlaşma", len(_df_tum[_df_tum["sonuc"]=="anlaşma yapıldı"]))
-            try: _sc5.metric("Beklenen Ciro", f"{_df_tum['bek_ciro'].sum():,.0f} ₺")
+            try:
+                _df_tum["bek_ciro"] = pd.to_numeric(_df_tum["bek_ciro"], errors="coerce").fillna(0)
+                _sc5.metric("Beklenen Ciro", f"{_df_tum['bek_ciro'].sum():,.0f} ₺")
             except: pass
 
             st.caption(f"{len(_dff)} analiz")
@@ -4648,35 +4650,28 @@ elif aktif == "analiz":
             _ar_tarih   = fmt_tarih(_ar.get("tarih",""))
             _dot_renk   = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(_ar_pot,"⚪")
 
-            _lc1, _lc2 = st.columns([9, 1])
-            _lc1.markdown(
-                f"<div onclick=\"\" style='background:white;border:0.5px solid #e2e8f0;border-radius:8px;"
-                f"padding:9px 16px;cursor:pointer;font-size:13px;color:#1e293b;display:flex;align-items:center;gap:8px'>"
-                f"<span>{_dot_renk}</span>"
-                f"<span style='font-weight:500'>{_ar_firma}</span>"
-                f"<span style='color:#94a3b8;font-size:11px'>· {_ar_tarih} · {_ar_pot} · {_ar_sonuc}</span>"
-                f"</div>", unsafe_allow_html=True
-            )
-            if _lc1.button("↗ Aç", key=f"an_ac_{_ai}", use_container_width=True,
-                           help=f"{_ar_firma} analizini aç"):
+            _lc1, _lc2, _lc3 = st.columns([7, 1, 1])
+            if _lc1.button(
+                f"{_dot_renk}  {_ar_firma}    {_ar_tarih} · {_ar_pot} · {_ar_sonuc}",
+                key=f"an_ac_{_ai}", use_container_width=True
+            ):
                 st.session_state["an_detay_firma"] = _ar_firma
                 st.rerun()
-            with _lc2:
+            if _lc2.button("↗ Aç", key=f"an_ac2_{_ai}", use_container_width=True):
+                st.session_state["an_detay_firma"] = _ar_firma
+                st.rerun()
+            with _lc3:
                 _sil_key = f"an_sil_onay_{_ai}"
                 if st.session_state.get(_sil_key):
-                    st.warning("Emin misin?")
                     _c1, _c2 = st.columns(2)
-                    if _c1.button("✓ Evet", key=f"an_sil_evet_{_ai}", use_container_width=True):
+                    if _c1.button("✓", key=f"an_sil_evet_{_ai}", use_container_width=True, help="Evet sil"):
                         if _an_sil(_ar_firma):
-                            st.session_state.pop(_sil_key, None)
-                            st.rerun()
-                    if _c2.button("✗ Hayır", key=f"an_sil_hayir_{_ai}", use_container_width=True):
-                        st.session_state.pop(_sil_key, None)
-                        st.rerun()
+                            st.session_state.pop(_sil_key, None); st.rerun()
+                    if _c2.button("✗", key=f"an_sil_hayir_{_ai}", use_container_width=True, help="İptal"):
+                        st.session_state.pop(_sil_key, None); st.rerun()
                 else:
                     if st.button("🗑 Sil", key=f"an_sil2_{_ai}", use_container_width=True):
-                        st.session_state[_sil_key] = True
-                        st.rerun()
+                        st.session_state[_sil_key] = True; st.rerun()
 
         st.divider()
 
