@@ -7516,8 +7516,12 @@ Object.entries(rnk).forEach(function(e){
         _hcomp.html(_harita_html, height=590, scrolling=False)
         if _il_col and not _hdf_f.empty:
             st.divider()
-            st.markdown("**📊 İl Bazlı Özet**")
-            _il_g = _hdf_f.groupby(_il_col).size().reset_index(name="Müşteri Sayısı").sort_values("Müşteri Sayısı",ascending=False).head(20)
+            st.markdown("**📊 İl / İlçe Bazlı Özet**")
+            _grp_cols = [c for c in [_il_col, "ilce"] if c in _hdf_f.columns]
+            _il_g = (_hdf_f.groupby(_grp_cols).size()
+                     .reset_index(name="Müşteri Sayısı")
+                     .sort_values(["Müşteri Sayısı"] + _grp_cols[:1], ascending=[False, True])
+                     .head(50))
             st.dataframe(_il_g, use_container_width=True, hide_index=True)
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
