@@ -4395,6 +4395,116 @@ elif aktif == "analiz":
     st.markdown("## 🔍 Müşteri Görüşme Analizi")
     _an_tab1, _an_tab2 = st.tabs(["📋 Analiz Listesi", "✏️ Yeni / Düzenle"])
 
+    # ── YARDIMCI FONKSİYONLAR (her yerde kullanılır) ─────────────────────────
+    def _pill_html2(txt, renk="gray"):
+        _renkler = {"blue":"#e6f1fb;color:#185fa5","green":"#eaf3de;color:#3b6d11",
+                    "red":"#fcebeb;color:#a32d2d","amber":"#faeeda;color:#854f0b",
+                    "gray":"#f1f5f9;color:#64748b"}
+        _stl = _renkler.get(renk, _renkler["gray"])
+        pills = [x.strip() for x in str(txt or "").split(",") if x.strip() and x.strip() not in ["nan","None"]]
+        if not pills: return "<span style='color:#94a3b8;font-style:italic'>— henüz girilmedi</span>"
+        _bg = _stl.split(";")[0]; _tc = _stl.split("color:")[1]
+        return "".join([f"<span style='display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;background:{_bg};color:{_tc};margin:2px'>{p}</span>" for p in pills])
+
+    def _val_html(v):
+        s = str(v or "").strip()
+        if s in ["","nan","None","—","--"]: return "<span style='color:#94a3b8;font-style:italic'>— henüz girilmedi</span>"
+        return f"<span style='color:var(--color-text-primary,#1e293b)'>{s}</span>"
+
+    def _analiz_pdf(_ar):
+        try:
+            from reportlab.lib.pagesizes import A4
+            from reportlab.lib.units import cm
+            from reportlab.lib.styles import ParagraphStyle
+            from reportlab.lib import colors
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+            import io, json as _pj
+            buf = io.BytesIO()
+            doc = SimpleDocTemplate(buf, pagesize=A4,
+                leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+            story = []
+            W = A4[0] - 4*cm
+            def _s(name, **kw):
+                base = {"fontName":"Helvetica","fontSize":10,"leading":14,"textColor":colors.HexColor("#1e293b")}
+                base.update(kw); return ParagraphStyle(name, **base)
+            def _p(txt, style): return Paragraph(str(txt or "").replace("&","&amp;").replace("<","&lt;"), style)
+            def _clean(v):
+                s = str(v or "").strip()
+                return "—" if s in ["","nan","None","—","--"] else s
+            def _pills(txt): return " · ".join([x.strip() for x in str(txt or "").split(",") if x.strip()]) or "—"
+            ST_TITLE  = _s("t", fontSize=16, fontName="Helvetica-Bold", leading=20, textColor=colors.HexColor("#0f172a"))
+            ST_SECTION= _s("sec", fontSize=10, fontName="Helvetica-Bold", textColor=colors.HexColor("#1d4ed8"), leading=14)
+            ST_KEY    = _s("key", fontSize=9, textColor=colors.HexColor("#64748b"), leading=12)
+            ST_VAL    = _s("val", fontSize=10, textColor=colors.HexColor("#1e293b"), leading=14)
+            ST_SMALL  = _s("sm", fontSize=8, textColor=colors.HexColor("#94a3b8"), leading=11)
+            _ar_d = _ar.to_dict() if hasattr(_ar, "to_dict") else _ar
+            _firma_pdf = _clean(_ar_d.get("firma",""))
+            _tarih_pdf = fmt_tarih(_ar_d.get("tarih",""))
+            _pot_pdf   = _clean(_ar_d.get("potansiyel",""))
+            _sonuc_pdf = _clean(_ar_d.get("sonuc",""))
+            _bek_pdf   = f"{float(_ar_d.get('bek_ciro',0) or 0):,.0f} TL"
+            _ger_pdf   = f"{float(_ar_d.get('ger_ciro',0) or 0):,.0f} TL"
+            story.append(_p(_firma_pdf, ST_TITLE))
+            story.append(Spacer(1,4))
+            story.append(_p(f"Analiz: {_tarih_pdf}  |  Potansiyel: {_pot_pdf}  |  Sonuç: {_sonuc_pdf}", ST_SMALL))
+            story.append(HRFlowable(width=W, thickness=1, color=colors.HexColor("#e2e8f0"), spaceAfter=8, spaceBefore=4))
+            _met = [["Beklenen Ciro","Gerçekleşen","Potansiyel","Sonuç"],[_bek_pdf,_ger_pdf,_pot_pdf,_sonuc_pdf]]
+            _mt = Table(_met, colWidths=[W/4]*4)
+            _mt.setStyle(TableStyle([
+                ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#f8fafc")),
+                ("FONTNAME",(0,0),(-1,0),"Helvetica"),("FONTSIZE",(0,0),(-1,0),8),
+                ("TEXTCOLOR",(0,0),(-1,0),colors.HexColor("#64748b")),
+                ("FONTNAME",(0,1),(-1,1),"Helvetica-Bold"),("FONTSIZE",(0,1),(-1,1),11),
+                ("ALIGN",(0,0),(-1,-1),"CENTER"),("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+                ("PADDING",(0,0),(-1,-1),7),("GRID",(0,0),(-1,-1),0.5,colors.HexColor("#e2e8f0")),
+            ]))
+            story.append(_mt); story.append(Spacer(1,8))
+            def _bolum(baslik, satirlar):
+                story.append(_p(baslik, ST_SECTION)); story.append(Spacer(1,3))
+                tdata = [[_p(k,ST_KEY),_p(v,ST_VAL)] for k,v in satirlar]
+                t = Table(tdata, colWidths=[3.5*cm, W-3.5*cm])
+                t.setStyle(TableStyle([("VALIGN",(0,0),(-1,-1),"TOP"),("LINEBELOW",(0,0),(-1,-1),0.3,colors.HexColor("#f1f5f9")),("LEFTPADDING",(0,0),(-1,-1),4),("TOPPADDING",(0,0),(-1,-1),5),("BOTTOMPADDING",(0,0),(-1,-1),5)]))
+                story.append(t); story.append(Spacer(1,6))
+            _bolum("1 — ANALİZ AMACI",[("Görüşme amacı",_pills(_ar_d.get("amac",""))),("Müşteri durumu",_clean(_ar_d.get("mdurum","")))])
+            _bolge_raw2 = {}
+            try:
+                _br2 = _ar_d.get("bolge","")
+                if _br2: _bolge_raw2 = _pj.loads(_br2) if isinstance(_br2,str) else _br2
+            except: pass
+            _urun_pdf = _bolge_raw2.get("urun","") if isinstance(_bolge_raw2,dict) else ""
+            _bolum("2 — KAYNAK & MÜŞTERİ",[("Firma",_clean(_ar_d.get("firma",""))),("Yetkili",_clean(_ar_d.get("yetkili",""))),("İletişim",_clean(_ar_d.get("iletisim",""))),("Sektör",_clean(_ar_d.get("sektor",""))),("Kaynak",_clean(_ar_d.get("kaynak",""))),("Gönderi türü",_urun_pdf or _pills(_ar_d.get("urun","")))])
+            story.append(_p("3 — ÜRÜN, HACİM & CİRO", ST_SECTION)); story.append(Spacer(1,3))
+            _bolge_rows2 = []
+            if isinstance(_bolge_raw2, dict):
+                _bolge_rows2 = _bolge_raw2.get("satirlar",[])
+                if not _bolge_rows2:
+                    for _g in _bolge_raw2.get("gruplar",[]): _bolge_rows2 += _g.get("satirlar",[])
+            elif isinstance(_bolge_raw2, list): _bolge_rows2 = _bolge_raw2
+            if _bolge_rows2:
+                _tbl_data = [["Güzergah","Tip","Adet","Rakip Fiyatı (TL)","Bizim Fiyatımız (TL)","Fark","Periyot"]]
+                for _br in _bolge_rows2:
+                    _rak = str(_br.get("rakip_fiyat","") or _br.get("fiyat","") or "—")
+                    _biz = str(_br.get("bizim_fiyat","") or _br.get("bizim","") or _br.get("ciro","") or "—")
+                    _fark_pdf = "—"
+                    try:
+                        _rv2=float(_rak.replace(",",".").replace("₺","")); _bv2=float(_biz.replace(",",".").replace("₺",""))
+                        if _rv2>0 and _bv2>0:
+                            _fd=_rv2-_bv2; _fp=(_fd/_rv2)*100
+                            _fark_pdf=f"{'▼' if _fd>0 else '▲'} {abs(_fd):,.0f} (%{abs(_fp):.0f})"
+                    except: pass
+                    _il_str = str(_br.get("il","") or ", ".join((_br.get("cikis",[]) or [])+["→"]+(_br.get("varis",[]) or [])) or "—")
+                    _tbl_data.append([_il_str,str(_br.get("urun","") or ", ".join(_br.get("tur",[]) or []) or "—"),str(_br.get("adet","") or "—"),_rak,_biz,_fark_pdf,str(_br.get("siklik","") or "—")])
+                _bt = Table(_tbl_data, colWidths=[W*0.28,W*0.07,W*0.07,W*0.14,W*0.14,W*0.16,W*0.14])
+                _bt.setStyle(TableStyle([("BACKGROUND",(0,0),(-1,0),colors.HexColor("#f8fafc")),("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),("FONTSIZE",(0,0),(-1,-1),8),("GRID",(0,0),(-1,-1),0.3,colors.HexColor("#e2e8f0")),("PADDING",(0,0),(-1,-1),5),("VALIGN",(0,0),(-1,-1),"MIDDLE")]))
+                story.append(_bt)
+            else: story.append(_p("— veri girilmedi", ST_VAL))
+            story.append(Spacer(1,8))
+            _bolum("4 — BEKLENTİ & SONUÇ",[("Beklenti",_pills(_ar_d.get("beklenti",""))),("Engel",_pills(_ar_d.get("engel",""))),("Sonuç",_clean(_ar_d.get("sonuc",""))),("Sonraki adım",_pills(_ar_d.get("sonraki_adim",""))),("Takip",fmt_tarih(_ar_d.get("takip_tar","")))])
+            _bolum("5 — NOT & ÖZET",[("Görüşme notu",_clean(_ar_d.get("not_alan",""))),("Olusturan",_clean(_ar_d.get("olusturan","")))])
+            doc.build(story); buf.seek(0); return buf.read()
+        except Exception as _pe:
+            return None
+
     # ── TAB 1: LİSTE ──────────────────────────────────────────────────────────
     with _an_tab1:
         # Detay sayfası açıksa onu göster
@@ -4528,214 +4638,7 @@ elif aktif == "analiz":
 
             _pic_map = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}
         # ── PDF ÜRETICI FONKSİYONU ───────────────────────────────────────────
-        def _analiz_pdf(_ar):
-            try:
-                from reportlab.lib.pagesizes import A4
-                from reportlab.lib.units import cm
-                from reportlab.lib.styles import ParagraphStyle
-                from reportlab.lib import colors
-                from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
-                from reportlab.lib.enums import TA_LEFT, TA_CENTER
-                import io, json as _pj
-                buf = io.BytesIO()
-                doc = SimpleDocTemplate(buf, pagesize=A4,
-                    leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
-                story = []
-                W = A4[0] - 4*cm
-
-                def _s(name, **kw):
-                    base = {"fontName":"Helvetica","fontSize":10,"leading":14,"textColor":colors.HexColor("#1e293b")}
-                    base.update(kw); return ParagraphStyle(name, **base)
-
-                def _p(txt, style): return Paragraph(str(txt or "").replace("&","&amp;").replace("<","&lt;"), style)
-                def _clean(v): return "—" if str(v or "").strip() in ["","nan","None","—"] else str(v)
-                def _pills(txt): return " · ".join([x.strip() for x in str(txt or "").split(",") if x.strip()]) or "—"
-
-                ST_TITLE  = _s("t", fontSize=18, fontName="Helvetica-Bold", leading=22, textColor=colors.HexColor("#0f172a"))
-                ST_SECTION= _s("sec", fontSize=11, fontName="Helvetica-Bold", textColor=colors.HexColor("#1d4ed8"), leading=16)
-                ST_KEY    = _s("key", fontSize=9,  textColor=colors.HexColor("#64748b"), leading=12)
-                ST_VAL    = _s("val", fontSize=10, textColor=colors.HexColor("#1e293b"), leading=14)
-                ST_NOTE   = _s("note",fontSize=10, textColor=colors.HexColor("#374151"), leading=16)
-                ST_SMALL  = _s("sm",  fontSize=8,  textColor=colors.HexColor("#94a3b8"), leading=11)
-
-                _firma_pdf   = _clean(_ar.get("firma",""))
-                _tarih_pdf   = fmt_tarih(_ar.get("tarih",""))
-                _pot_pdf     = _clean(_ar.get("potansiyel",""))
-                _sonuc_pdf   = _clean(_ar.get("sonuc",""))
-                _bek_pdf     = f"{float(_ar.get('bek_ciro',0) or 0):,.0f} TL"
-                _ger_pdf     = f"{float(_ar.get('ger_ciro',0) or 0):,.0f} TL"
-
-                # Başlık
-                story.append(_p(f"{_firma_pdf}", ST_TITLE))
-                story.append(Spacer(1, 4))
-                story.append(_p(f"Analiz Tarihi: {_tarih_pdf}  |  Potansiyel: {_pot_pdf}  |  Sonuç: {_sonuc_pdf}", ST_SMALL))
-                story.append(HRFlowable(width=W, thickness=1, color=colors.HexColor("#e2e8f0"), spaceAfter=10, spaceBefore=6))
-
-                # Metrikler
-                _met_data = [["Beklenen Ciro","Gerçekleşen","Potansiyel","Sonuç"],
-                             [_bek_pdf, _ger_pdf, _pot_pdf, _sonuc_pdf]]
-                _met_tbl = Table(_met_data, colWidths=[W/4]*4)
-                _met_tbl.setStyle(TableStyle([
-                    ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#f8fafc")),
-                    ("FONTNAME",(0,0),(-1,0),"Helvetica"),
-                    ("FONTSIZE",(0,0),(-1,0),8),
-                    ("TEXTCOLOR",(0,0),(-1,0),colors.HexColor("#64748b")),
-                    ("FONTNAME",(0,1),(-1,1),"Helvetica-Bold"),
-                    ("FONTSIZE",(0,1),(-1,1),11),
-                    ("TEXTCOLOR",(0,1),(-1,1),colors.HexColor("#0f172a")),
-                    ("ALIGN",(0,0),(-1,-1),"CENTER"),
-                    ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-                    ("PADDING",(0,0),(-1,-1),8),
-                    ("GRID",(0,0),(-1,-1),0.5,colors.HexColor("#e2e8f0")),
-                    ("ROUNDEDCORNERS",[4,4,4,4]),
-                ]))
-                story.append(_met_tbl)
-                story.append(Spacer(1, 10))
-
-                def _bolum(baslik, satirlar):
-                    story.append(_p(baslik, ST_SECTION))
-                    story.append(Spacer(1,3))
-                    tdata = [[_p(k, ST_KEY), _p(v, ST_VAL)] for k,v in satirlar]
-                    t = Table(tdata, colWidths=[3.5*cm, W-3.5*cm])
-                    t.setStyle(TableStyle([
-                        ("VALIGN",(0,0),(-1,-1),"TOP"),
-                        ("LINEBELOW",(0,0),(-1,-1),0.3,colors.HexColor("#f1f5f9")),
-                        ("LEFTPADDING",(0,0),(-1,-1),4),
-                        ("RIGHTPADDING",(0,0),(-1,-1),4),
-                        ("TOPPADDING",(0,0),(-1,-1),5),
-                        ("BOTTOMPADDING",(0,0),(-1,-1),5),
-                    ]))
-                    story.append(t)
-                    story.append(Spacer(1,8))
-
-                # 1. Analiz amacı
-                _bolge_raw2 = {}
-                try:
-                    _br2 = _ar.get("bolge","")
-                    if _br2: _bolge_raw2 = _pj.loads(_br2) if isinstance(_br2,str) else _br2
-                except: pass
-                _urun_pdf = _bolge_raw2.get("urun","") if isinstance(_bolge_raw2,dict) else ""
-
-                _bolum("1 — ANALİZ AMACI",[
-                    ("Görüşme amacı", _pills(_ar.get("amac",""))),
-                    ("Müşteri durumu", _clean(_ar.get("mdurum",""))),
-                ])
-
-                # 2. Kaynak & müşteri
-                _bolum("2 — KAYNAK & MÜŞTERİ",[
-                    ("Firma", _clean(_ar.get("firma",""))),
-                    ("Yetkili", _clean(_ar.get("yetkili",""))),
-                    ("İletişim", _clean(_ar.get("iletisim",""))),
-                    ("Sektör", _clean(_ar.get("sektor",""))),
-                    ("Kaynak", _clean(_ar.get("kaynak",""))),
-                    ("Gönderi türü", _urun_pdf or _pills(_ar.get("urun",""))),
-                ])
-
-                # 3. Bölge tablosu
-                story.append(_p("3 — ÜRÜN, HACİM & CİRO", ST_SECTION))
-                story.append(Spacer(1,3))
-                _bolge_rows2 = []
-                if isinstance(_bolge_raw2, dict):
-                    _bolge_rows2 = _bolge_raw2.get("satirlar",[])
-                elif isinstance(_bolge_raw2, list):
-                    _bolge_rows2 = _bolge_raw2
-                if _bolge_rows2:
-                    _tbl_data = [["Güzergah & Desi","Tip","Adet","Rakip Fiyatı (TL)","Bizim Fiyatımız (TL)","Fark","Periyot"]]
-                    for _br in _bolge_rows2:
-                        _rak = str(_br.get("rakip_fiyat","") or "—")
-                        _biz = str(_br.get("bizim_fiyat","") or _br.get("ciro","") or "—")
-                        _fark_pdf = "—"
-                        try:
-                            _rv2 = float(_rak.replace(",",".").replace("₺","").strip())
-                            _bv2 = float(_biz.replace(",",".").replace("₺","").strip())
-                            if _rv2 > 0 and _bv2 > 0:
-                                _fd = _rv2 - _bv2
-                                _fp = (_fd/_rv2)*100
-                                _fark_pdf = f"{'▼' if _fd>0 else '▲'} {abs(_fd):,.0f} (%{abs(_fp):.0f})"
-                        except: pass
-                        _tbl_data.append([
-                            str(_br.get("il","") or "—"),
-                            str(_br.get("urun","") or "—"),
-                            str(_br.get("adet","") or "—"),
-                            _rak, _biz, _fark_pdf,
-                            str(_br.get("siklik","") or "—"),
-                        ])
-                    _bt = Table(_tbl_data, colWidths=[W*0.3,W*0.07,W*0.07,W*0.14,W*0.14,W*0.14,W*0.14])
-                    _bt.setStyle(TableStyle([
-                        ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#f8fafc")),
-                        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-                        ("FONTSIZE",(0,0),(-1,-1),9),
-                        ("TEXTCOLOR",(0,0),(-1,0),colors.HexColor("#64748b")),
-                        ("TEXTCOLOR",(0,1),(-1,-1),colors.HexColor("#1e293b")),
-                        ("GRID",(0,0),(-1,-1),0.3,colors.HexColor("#e2e8f0")),
-                        ("PADDING",(0,0),(-1,-1),6),
-                        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
-                    ]))
-                    story.append(_bt)
-                else:
-                    story.append(_p("— veri girilmedi", ST_VAL))
-                story.append(Spacer(1,8))
-
-                # 4. Beklenti & sonuç
-                _bolum("4 — BEKLENTİ & SONUÇ",[
-                    ("Beklenti", _pills(_ar.get("beklenti",""))),
-                    ("Engel",    _pills(_ar.get("engel",""))),
-                    ("Sonuç",    _clean(_ar.get("sonuc",""))),
-                    ("Sonraki adım", _pills(_ar.get("sonraki_adim",""))),
-                ])
-
-                # 5. Rakip
-                _rakip_pdf = []
-                try:
-                    _rp = _ar.get("rakip","")
-                    if _rp: _rakip_pdf = _pj.loads(_rp) if isinstance(_rp,str) else _rp
-                except: pass
-                story.append(_p("5 — RAKİP", ST_SECTION))
-                story.append(Spacer(1,3))
-                if _rakip_pdf:
-                    _rt = Table([["Rakip Firma","₺/Desi","Güç","Sebep"]] +
-                        [[str(r.get("firma","—")),str(r.get("fiyat","—")),str(r.get("durum","—")),str(r.get("sebep","—"))] for r in _rakip_pdf],
-                        colWidths=[W*0.3,W*0.15,W*0.15,W*0.4])
-                    _rt.setStyle(TableStyle([
-                        ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#f8fafc")),
-                        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
-                        ("FONTSIZE",(0,0),(-1,-1),9),
-                        ("GRID",(0,0),(-1,-1),0.3,colors.HexColor("#e2e8f0")),
-                        ("PADDING",(0,0),(-1,-1),6),
-                    ]))
-                    story.append(_rt)
-                else:
-                    story.append(_p("— henüz girilmedi", ST_VAL))
-                story.append(Spacer(1,8))
-
-                # 6. Not & özet
-                _bolum("6 — NOT & ÖZET",[
-                    ("Görüşme notu", _clean(_ar.get("not_alan",""))),
-                    ("Takip tarihi", fmt_tarih(_ar.get("takip_tar",""))),
-                    ("Olusturan",    _clean(_ar.get("olusturan",""))),
-                ])
-
-                doc.build(story)
-                buf.seek(0)
-                return buf.read()
-            except Exception as _pe:
-                return None
-
         # ── KART GÖRÜNÜMÜ ─────────────────────────────────────────────────────
-        def _pill_html2(txt, renk="gray"):
-            _renkler = {"blue":"#e6f1fb;color:#185fa5","green":"#eaf3de;color:#3b6d11",
-                        "red":"#fcebeb;color:#a32d2d","amber":"#faeeda;color:#854f0b",
-                        "gray":"#f1f5f9;color:#64748b"}
-            _stl = _renkler.get(renk, _renkler["gray"])
-            pills = [x.strip() for x in str(txt or "").split(",") if x.strip() and x.strip() not in ["nan","None"]]
-            if not pills: return "<span style='color:#94a3b8;font-style:italic'>— henüz girilmedi</span>"
-            return "".join([f"<span style='display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;background:{_stl.split(';')[0].replace('background:','')};color:{_stl.split('color:')[1]};margin:2px'>{p}</span>" for p in pills])
-
-        def _val_html(v):
-            s = str(v or "").strip()
-            if s in ["","nan","None","—"]: return "<span style='color:#94a3b8;font-style:italic'>— henüz girilmedi</span>"
-            return f"<span style='color:var(--color-text-primary,#1e293b)'>{s}</span>"
-
         _pot_renk = {"çok yüksek":"#22c55e","yüksek":"#22c55e","orta":"#f59e0b","düşük":"#ef4444","çok düşük":"#ef4444"}
 
         for _ai, (_, _ar) in enumerate(_dff.iterrows()):
