@@ -4498,7 +4498,7 @@ elif aktif == "analiz":
             else:
                 st.error("Analiz bulunamadı")
                 if st.button("← Geri"): st.session_state.pop("an_detay_firma",None); st.rerun()
-            return
+            st.stop()
 
         _df_tum = _an_liste()
 
