@@ -4982,26 +4982,97 @@ elif aktif == "analiz":
         if _step == 2:
             st.markdown("#### 📦 Ürün, Hacim & Ciro")
             _btn_an("an_t_urun",["koli","palet","parsiyel","TIR/komple","soğuk zincir","ADR/tehlikeli","ambar kargo","dış nakliye"],label="Gönderi türü")
-            st.caption("İl bazlı hacim & ciro")
-            _bolge_rows = st.session_state.get("an_bolge_rows",[{"il":"","urun":"koli","adet":"","ciro":"","siklik":"haftalık","rakip_fiyat":"","bizim_fiyat":""}])
-            _urun_opts_t=["koli","palet","dorse","ambar","AVM"]; _sikl_opts_t=["haftalık","günlük","aylık","düzensiz"]
-            # Kolon başlıkları
-            _hc = st.columns([2,1,1,1,1,1,0.3])
-            for _hi,_hl in enumerate(["İl / Güzergah","Ürün","Adet","Periyot","🟡 Rakip ₺","🟢 Bizim ₺",""]):
-                _hc[_hi].markdown(f"<div style='font-size:10px;color:{'#854f0b' if _hi==4 else '#15803d' if _hi==5 else '#64748b'};font-weight:500;padding-bottom:2px'>{_hl}</div>", unsafe_allow_html=True)
-            for _bi in range(len(_bolge_rows)):
-                _br=_bolge_rows[_bi]; _bc=st.columns([2,1,1,1,1,1,0.3])
-                _bolge_rows[_bi]["il"]          = _bc[0].text_input("",value=_br.get("il",""),key=f"bil_{_bi}",placeholder="İl / Güzergah",label_visibility="collapsed")
-                _bolge_rows[_bi]["urun"]        = _bc[1].selectbox("",_urun_opts_t,index=_urun_opts_t.index(_br.get("urun","koli")) if _br.get("urun","koli") in _urun_opts_t else 0,key=f"bur_{_bi}",label_visibility="collapsed")
-                _bolge_rows[_bi]["adet"]        = _bc[2].text_input("",value=_br.get("adet",""),key=f"bad_{_bi}",placeholder="adet/ay",label_visibility="collapsed")
-                _bolge_rows[_bi]["siklik"]      = _bc[3].selectbox("",_sikl_opts_t,index=_sikl_opts_t.index(_br.get("siklik","haftalık")) if _br.get("siklik","haftalık") in _sikl_opts_t else 0,key=f"bsk_{_bi}",label_visibility="collapsed")
-                _bolge_rows[_bi]["rakip_fiyat"] = _bc[4].text_input("",value=_br.get("rakip_fiyat",""),key=f"brak_{_bi}",placeholder="Rakip ₺",label_visibility="collapsed")
-                _bolge_rows[_bi]["bizim_fiyat"] = _bc[5].text_input("",value=_br.get("bizim_fiyat",""),key=f"bbiz_{_bi}",placeholder="Bizim ₺",label_visibility="collapsed")
-                if _bc[6].button("✕",key=f"bdel_{_bi}") and len(_bolge_rows)>1:
-                    _bolge_rows.pop(_bi); st.session_state["an_bolge_rows"]=_bolge_rows; st.rerun()
-            st.session_state["an_bolge_rows"]=_bolge_rows
-            if st.button("+ Satır ekle",key="bolge_ekle"):
-                st.session_state["an_bolge_rows"].append({"il":"","urun":"koli","adet":"","ciro":"","siklik":"haftalık","rakip_fiyat":"","bizim_fiyat":""}); st.rerun()
+
+            # ── GRUP SİSTEMİ ─────────────────────────────────────────────────
+            if "an_grp" not in st.session_state:
+                _mevcut_bolge = st.session_state.get("an_bolge_rows",[])
+                if _mevcut_bolge and isinstance(_mevcut_bolge[0], dict) and "cikis" in _mevcut_bolge[0]:
+                    st.session_state["an_grp"] = [{"satirlar": _mevcut_bolge}]
+                else:
+                    st.session_state["an_grp"] = [{"satirlar":[
+                        {"cikis":[],"varis":[],"tur":["Koli"],"bas":0,"bit":5,"kg":0,"fiyat":0,"bizim":0}
+                    ]}]
+
+            _an_grp = st.session_state["an_grp"]
+
+            if st.button("➕ Yeni Grup Ekle", key="an_grp_ekle"):
+                _an_grp.append({"satirlar":[
+                    {"cikis":[],"varis":[],"tur":["Koli"],"bas":0,"bit":5,"kg":0,"fiyat":0,"bizim":0}
+                ]})
+                st.rerun()
+
+            _AN_ILLER = sorted(["İstanbul","Ankara","İzmir","Bursa","Kocaeli","Tekirdağ","Sakarya",
+                "Gebze","Dilovası","Manisa","Balıkesir","Çanakkale","Edirne","Kırklareli",
+                "Eskişehir","Konya","Antalya","Mersin","Adana","Gaziantep","Kayseri",
+                "Samsun","Trabzon","Erzurum","Diyarbakır","Şanlıurfa","Malatya",
+                "Denizli","Muğla","Aydın","Uşak","Afyon"])
+            _AN_TUR = ["Koli","Palet","Dorse","Parsiyel","TIR/Komple","Ambar","ADR"]
+
+            _CW_AN = [1.8, 1.8, 1.8, 0.9, 0.9, 0.7, 1.2, 1.2, 0.4]
+
+            for _gi, _g in enumerate(_an_grp):
+                st.markdown(f"---\n**Grup {_gi+1}**")
+
+                _bh = st.columns(_CW_AN)
+                for _txt,_col in zip(["Çıkış İlleri","Varış İlleri","Tür","Baş Desi","Bit Desi","KG","Rakip Fiyatı ₺","Bizim Fiyatımız ₺",""],_bh):
+                    if _txt == "Rakip Fiyatı ₺":
+                        _col.markdown("<small style='color:#854f0b;font-weight:500'>🟡 Rakip Fiyatı ₺</small>", unsafe_allow_html=True)
+                    elif _txt == "Bizim Fiyatımız ₺":
+                        _col.markdown("<small style='color:#15803d;font-weight:500'>🟢 Bizim Fiyatımız ₺</small>", unsafe_allow_html=True)
+                    else:
+                        _col.caption(f"**{_txt}**")
+
+                _an_satirlar = _g.get("satirlar",[])
+                _new_an_satirlar = []
+
+                for _si, _s in enumerate(_an_satirlar):
+                    _rc = st.columns(_CW_AN)
+
+                    _cd = _s.get("cikis","")
+                    _cd_list = _cd if isinstance(_cd, list) else ([_cd] if _cd and _cd in _AN_ILLER else [])
+                    _cikis = _rc[0].multiselect("", _AN_ILLER, default=_cd_list, key=f"an_c_{_gi}_{_si}", label_visibility="collapsed")
+
+                    _vd = _s.get("varis","")
+                    _vd_list = _vd if isinstance(_vd, list) else ([_vd] if _vd and _vd in _AN_ILLER else [])
+                    _varis = _rc[1].multiselect("", _AN_ILLER, default=_vd_list, key=f"an_v_{_gi}_{_si}", label_visibility="collapsed")
+
+                    _td = _s.get("tur",[]) or []
+                    _tl = _AN_TUR.copy()
+                    for _tx in _td:
+                        if _tx and _tx not in _tl: _tl.append(_tx)
+                    _td2 = [x for x in _td if x] or ([_tl[0]] if _tl else [])
+                    _tur = _rc[2].multiselect("", _tl, default=_td2, key=f"an_tur_{_gi}_{_si}", label_visibility="collapsed")
+
+                    _bas = _rc[3].number_input("", min_value=0.0, step=1.0, value=float(_s.get("bas",0) or 0), key=f"an_bas_{_gi}_{_si}", label_visibility="collapsed", format="%.0f")
+                    _bit = _rc[4].number_input("", min_value=0.0, step=1.0, value=float(_s.get("bit",0) or 0), key=f"an_bit_{_gi}_{_si}", label_visibility="collapsed", format="%.0f")
+                    _kg  = _rc[5].number_input("", min_value=0.0, step=1.0, value=float(_s.get("kg",0) or 0), key=f"an_kg_{_gi}_{_si}", label_visibility="collapsed", format="%.0f")
+                    _fiy = _rc[6].number_input("", min_value=0.0, step=1.0, value=float(_s.get("fiyat",0) or 0), key=f"an_fiy_{_gi}_{_si}", label_visibility="collapsed", format="%.0f")
+                    _biz = _rc[7].number_input("", min_value=0.0, step=1.0, value=float(_s.get("bizim",0) or 0), key=f"an_biz_{_gi}_{_si}", label_visibility="collapsed", format="%.0f")
+
+                    _sil = _rc[8].button("➖", key=f"an_ssil_{_gi}_{_si}")
+                    if not _sil or len(_an_satirlar) <= 1:
+                        _new_an_satirlar.append({
+                            "cikis":_cikis,"varis":_varis,"tur":_tur,
+                            "bas":_bas,"bit":_bit,"kg":_kg,"fiyat":_fiy,"bizim":_biz
+                        })
+                    else:
+                        _an_satirlar.pop(_si)
+                        _g["satirlar"] = _an_satirlar
+                        st.rerun()
+
+                _g["satirlar"] = _new_an_satirlar
+
+                _ga1, _ga2 = st.columns([1.2, 1.5])
+                if _ga1.button("➕ Satır Ekle", key=f"an_sekle_{_gi}", use_container_width=True):
+                    _g["satirlar"].append({"cikis":[],"varis":[],"tur":["Koli"],"bas":0,"bit":0,"kg":0,"fiyat":0,"bizim":0})
+                    st.rerun()
+                if _ga2.button("🗑️ Grubu Sil", key=f"an_gsil_{_gi}", use_container_width=True) and len(_an_grp) > 1:
+                    _an_grp.pop(_gi); st.rerun()
+
+            st.session_state["an_grp"] = _an_grp
+            # Bolge rows'u da güncelle (kaydet için)
+            st.session_state["an_bolge_rows"] = [s for g in _an_grp for s in g.get("satirlar",[])]
+
             _btn_an("an_t_fiyattur",["spot","anlaşmalı","ihale","paket fiyat","yıllık kontrat"],label="Fiyat teklif türü")
             _btn_an("an_t_odeme",["nakit","çek","havale","vadeli","kredi kartı"],label="Ödeme türü")
 
@@ -5096,6 +5167,7 @@ elif aktif == "analiz":
             st.session_state.pop("an_kaydet_trigger",None)
             # urun, kargo, fiyattur, odeme, yetkili_ek → bolge JSON'una dahil et
             _bolge_data = {
+                "gruplar":   st.session_state.get("an_grp",[]),
                 "satirlar":  st.session_state.get("an_bolge_rows",[]),
                 "urun":      _gs2("an_t_urun"),
                 "kargo":     _gs2("an_t_kargo"),
