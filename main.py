@@ -4651,6 +4651,13 @@ elif aktif == "analiz":
                     _rakip_rows_html += f"<tr><td style='padding:7px 16px;font-size:12px;border-bottom:0.5px solid #f1f5f9'>{_rr.get('firma','—')}</td><td style='padding:7px 16px;font-size:12px;border-bottom:0.5px solid #f1f5f9;text-align:right'>{_rr.get('fiyat','—')}</td><td style='padding:7px 16px;border-bottom:0.5px solid #f1f5f9'>{_pill_html2(_rr.get('durum',''),_rg)}</td><td style='padding:7px 16px;font-size:12px;border-bottom:0.5px solid #f1f5f9;color:#64748b'>{_rr.get('sebep','—')}</td></tr>"
             except: pass
 
+            _ar_sonraki_txt = _pills(_ar.get("sonraki_adim",""))
+            _ar_takip_txt   = fmt_tarih(_ar.get("takip_tar",""))
+            if _ar.get("sonraki_adim","") or _ar.get("takip_tar",""):
+                _sonraki_blok = f"<div style='display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#64748b;border-bottom:0.5px solid #f1f5f9'>📅 Sonraki adım: <strong style='color:#0f172a'>{_ar_sonraki_txt}</strong> → <strong style='color:#0f172a'>{_ar_takip_txt}</strong></div>"
+            else:
+                _sonraki_blok = ""
+
             _kart_html = f"""
 <div style='background:white;border:0.5px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px;font-family:-apple-system,sans-serif'>
 
@@ -4707,8 +4714,8 @@ elif aktif == "analiz":
 
   <div style='border-top:0.5px solid #e2e8f0'>
     <div style='padding:9px 18px;background:#f8fafc;font-size:11px;font-weight:500;color:#64748b;border-bottom:0.5px solid #e2e8f0'>⑥ NOT & ÖZET</div>
-    <div style='padding:12px 18px;font-size:13px;color:#374151;line-height:1.6;border-bottom:0.5px solid #f1f5f9'>{_val_html(_ar.get("not_alan",""))}</div>
-    {f"<div style='display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#64748b;border-bottom:0.5px solid #f1f5f9'>📅 Sonraki adım: <strong style=\"color:#0f172a\">{_pills(_ar.get('sonraki_adim',''))}</strong> → <strong style=\"color:#0f172a\">{fmt_tarih(_ar.get('takip_tar',''))}</strong></div>" if _ar.get("sonraki_adim","") or _ar.get("takip_tar","") else ""}
+    {f"<div style='padding:12px 18px;font-size:13px;color:#374151;line-height:1.6;border-bottom:0.5px solid #f1f5f9'>{_val_html(_ar.get('not_alan',''))}</div>"}
+    {_sonraki_blok}
   </div>
 
 </div>"""
