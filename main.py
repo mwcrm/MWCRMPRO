@@ -4648,43 +4648,63 @@ elif aktif == "analiz":
             _ar_tarih   = fmt_tarih(_ar.get("tarih",""))
             _dot_renk   = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(_ar_pot,"⚪")
 
-            _lc1, _lc2 = st.columns([8,1])
-            if _lc1.button(
-                f"{_dot_renk}  {_ar_firma}   ·   {_ar_tarih}   ·   {_ar_pot}   ·   {_ar_sonuc}",
-                key=f"an_ac_{_ai}", use_container_width=True
-            ):
+            _lc1, _lc2 = st.columns([9, 1])
+            _lc1.markdown(
+                f"<div onclick=\"\" style='background:white;border:0.5px solid #e2e8f0;border-radius:8px;"
+                f"padding:9px 16px;cursor:pointer;font-size:13px;color:#1e293b;display:flex;align-items:center;gap:8px'>"
+                f"<span>{_dot_renk}</span>"
+                f"<span style='font-weight:500'>{_ar_firma}</span>"
+                f"<span style='color:#94a3b8;font-size:11px'>· {_ar_tarih} · {_ar_pot} · {_ar_sonuc}</span>"
+                f"</div>", unsafe_allow_html=True
+            )
+            if _lc1.button("↗ Aç", key=f"an_ac_{_ai}", use_container_width=True,
+                           help=f"{_ar_firma} analizini aç"):
                 st.session_state["an_detay_firma"] = _ar_firma
                 st.rerun()
-            if _lc2.button("🗑", key=f"an_sil2_{_ai}", use_container_width=True):
-                if _an_sil(_ar_firma): st.rerun()
+            with _lc2:
+                _sil_key = f"an_sil_onay_{_ai}"
+                if st.session_state.get(_sil_key):
+                    st.warning("Emin misin?")
+                    _c1, _c2 = st.columns(2)
+                    if _c1.button("✓ Evet", key=f"an_sil_evet_{_ai}", use_container_width=True):
+                        if _an_sil(_ar_firma):
+                            st.session_state.pop(_sil_key, None)
+                            st.rerun()
+                    if _c2.button("✗ Hayır", key=f"an_sil_hayir_{_ai}", use_container_width=True):
+                        st.session_state.pop(_sil_key, None)
+                        st.rerun()
+                else:
+                    if st.button("🗑 Sil", key=f"an_sil2_{_ai}", use_container_width=True):
+                        st.session_state[_sil_key] = True
+                        st.rerun()
 
         st.divider()
 
     # ── TAB 2: FORM ───────────────────────────────────────────────────────────
     with _an_tab2:
         st.markdown("### ✏️ Analiz Formu")
-    _df_cari = get_cari_listesi()
-    _col1, _col2 = st.columns([3,1])
-    _opts = ["-- Seçin --"] + [f"[{int(r['id'])}] {r['firma']}" for _,r in _df_cari.iterrows()]
-    _sec = _col1.selectbox("Müşteri seç", _opts, key="an_cari_sec")
-    _yaz = _col2.text_input("veya firma adı", key="an_firma_yaz", placeholder="Manuel...",
+        _df_cari = get_cari_listesi()
+        _col1, _col2 = st.columns([3,1])
+        _opts = ["-- Seçin --"] + [f"[{int(r['id'])}] {r['firma']}" for _,r in _df_cari.iterrows()]
+        _sec = _col1.selectbox("Müşteri seç", _opts, key="an_cari_sec")
+        _yaz = _col2.text_input("veya firma adı", key="an_firma_yaz", placeholder="Manuel...",
         value=st.session_state.pop("an_duzenle_firma",""))
 
-    _firma = ""
-    _cari_row = None
-    if _sec != "-- Seçin --" and "[" in _sec:
-        _cid = int(_sec.split("]")[0].replace("[","").strip())
-        _cr = _df_cari[_df_cari["id"]==_cid]
-        if not _cr.empty:
-            _cari_row = _cr.iloc[0]
-            _firma = str(_cari_row.get("firma",""))
-    elif _yaz.strip():
-        _firma = _yaz.strip()
+        _firma = ""
+        _cari_row = None
+        if _sec != "-- Seçin --" and "[" in _sec:
+            _cid = int(_sec.split("]")[0].replace("[","").strip())
+            _cr = _df_cari[_df_cari["id"]==_cid]
+            if not _cr.empty:
+                _cari_row = _cr.iloc[0]
+                _firma = str(_cari_row.get("firma",""))
+        elif _yaz.strip():
+            _firma = _yaz.strip()
 
-    if not _firma:
-        st.warning("⚠️ Müşteri seçin veya firma adı yazın.")
-    else:
-        _mv_data = _an_getir(_firma)
+        if not _firma:
+            st.warning("⚠️ Müşteri seçin veya firma adı yazın.")
+        else:
+            _mv_data = _an_getir(_firma)
         _duzenle = _mv_data is not None
         _ik = f"an_init_{_firma}"
 
@@ -5072,7 +5092,7 @@ elif aktif == "analiz":
             else:
                 st.error(f"❌ Kayıt hatası: {_err}")
 
-    # DB FONKSIYONLARI
+        # DB FONKSIYONLARI
 
 elif aktif == "detay_cari":
     sayfa_log("detay_cari")
