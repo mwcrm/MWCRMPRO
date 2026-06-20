@@ -4408,65 +4408,344 @@ elif aktif == "analiz":
         st.caption(f"{len(_dff)} analiz")
 
         _pic_map = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}
+        # ── PDF ÜRETICI FONKSİYONU ───────────────────────────────────────────
+        def _analiz_pdf(_ar):
+            try:
+                from reportlab.lib.pagesizes import A4
+                from reportlab.lib.units import cm
+                from reportlab.lib.styles import ParagraphStyle
+                from reportlab.lib import colors
+                from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, HRFlowable
+                from reportlab.lib.enums import TA_LEFT, TA_CENTER
+                import io, json as _pj
+                buf = io.BytesIO()
+                doc = SimpleDocTemplate(buf, pagesize=A4,
+                    leftMargin=2*cm, rightMargin=2*cm, topMargin=2*cm, bottomMargin=2*cm)
+                story = []
+                W = A4[0] - 4*cm
+
+                def _s(name, **kw):
+                    base = {"fontName":"Helvetica","fontSize":10,"leading":14,"textColor":colors.HexColor("#1e293b")}
+                    base.update(kw); return ParagraphStyle(name, **base)
+
+                def _p(txt, style): return Paragraph(str(txt or "").replace("&","&amp;").replace("<","&lt;"), style)
+                def _clean(v): return "—" if str(v or "").strip() in ["","nan","None","—"] else str(v)
+                def _pills(txt): return " · ".join([x.strip() for x in str(txt or "").split(",") if x.strip()]) or "—"
+
+                ST_TITLE  = _s("t", fontSize=18, fontName="Helvetica-Bold", leading=22, textColor=colors.HexColor("#0f172a"))
+                ST_SECTION= _s("sec", fontSize=11, fontName="Helvetica-Bold", textColor=colors.HexColor("#1d4ed8"), leading=16)
+                ST_KEY    = _s("key", fontSize=9,  textColor=colors.HexColor("#64748b"), leading=12)
+                ST_VAL    = _s("val", fontSize=10, textColor=colors.HexColor("#1e293b"), leading=14)
+                ST_NOTE   = _s("note",fontSize=10, textColor=colors.HexColor("#374151"), leading=16)
+                ST_SMALL  = _s("sm",  fontSize=8,  textColor=colors.HexColor("#94a3b8"), leading=11)
+
+                _firma_pdf   = _clean(_ar.get("firma",""))
+                _tarih_pdf   = fmt_tarih(_ar.get("tarih",""))
+                _pot_pdf     = _clean(_ar.get("potansiyel",""))
+                _sonuc_pdf   = _clean(_ar.get("sonuc",""))
+                _bek_pdf     = f"{float(_ar.get('bek_ciro',0) or 0):,.0f} TL"
+                _ger_pdf     = f"{float(_ar.get('ger_ciro',0) or 0):,.0f} TL"
+
+                # Başlık
+                story.append(_p(f"{_firma_pdf}", ST_TITLE))
+                story.append(Spacer(1, 4))
+                story.append(_p(f"Analiz Tarihi: {_tarih_pdf}  |  Potansiyel: {_pot_pdf}  |  Sonuç: {_sonuc_pdf}", ST_SMALL))
+                story.append(HRFlowable(width=W, thickness=1, color=colors.HexColor("#e2e8f0"), spaceAfter=10, spaceBefore=6))
+
+                # Metrikler
+                _met_data = [["Beklenen Ciro","Gerçekleşen","Potansiyel","Sonuç"],
+                             [_bek_pdf, _ger_pdf, _pot_pdf, _sonuc_pdf]]
+                _met_tbl = Table(_met_data, colWidths=[W/4]*4)
+                _met_tbl.setStyle(TableStyle([
+                    ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#f8fafc")),
+                    ("FONTNAME",(0,0),(-1,0),"Helvetica"),
+                    ("FONTSIZE",(0,0),(-1,0),8),
+                    ("TEXTCOLOR",(0,0),(-1,0),colors.HexColor("#64748b")),
+                    ("FONTNAME",(0,1),(-1,1),"Helvetica-Bold"),
+                    ("FONTSIZE",(0,1),(-1,1),11),
+                    ("TEXTCOLOR",(0,1),(-1,1),colors.HexColor("#0f172a")),
+                    ("ALIGN",(0,0),(-1,-1),"CENTER"),
+                    ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+                    ("PADDING",(0,0),(-1,-1),8),
+                    ("GRID",(0,0),(-1,-1),0.5,colors.HexColor("#e2e8f0")),
+                    ("ROUNDEDCORNERS",[4,4,4,4]),
+                ]))
+                story.append(_met_tbl)
+                story.append(Spacer(1, 10))
+
+                def _bolum(baslik, satirlar):
+                    story.append(_p(baslik, ST_SECTION))
+                    story.append(Spacer(1,3))
+                    tdata = [[_p(k, ST_KEY), _p(v, ST_VAL)] for k,v in satirlar]
+                    t = Table(tdata, colWidths=[3.5*cm, W-3.5*cm])
+                    t.setStyle(TableStyle([
+                        ("VALIGN",(0,0),(-1,-1),"TOP"),
+                        ("LINEBELOW",(0,0),(-1,-1),0.3,colors.HexColor("#f1f5f9")),
+                        ("LEFTPADDING",(0,0),(-1,-1),4),
+                        ("RIGHTPADDING",(0,0),(-1,-1),4),
+                        ("TOPPADDING",(0,0),(-1,-1),5),
+                        ("BOTTOMPADDING",(0,0),(-1,-1),5),
+                    ]))
+                    story.append(t)
+                    story.append(Spacer(1,8))
+
+                # 1. Analiz amacı
+                _bolge_raw2 = {}
+                try:
+                    _br2 = _ar.get("bolge","")
+                    if _br2: _bolge_raw2 = _pj.loads(_br2) if isinstance(_br2,str) else _br2
+                except: pass
+                _urun_pdf = _bolge_raw2.get("urun","") if isinstance(_bolge_raw2,dict) else ""
+
+                _bolum("1 — ANALİZ AMACI",[
+                    ("Görüşme amacı", _pills(_ar.get("amac",""))),
+                    ("Müşteri durumu", _clean(_ar.get("mdurum",""))),
+                ])
+
+                # 2. Kaynak & müşteri
+                _bolum("2 — KAYNAK & MÜŞTERİ",[
+                    ("Firma", _clean(_ar.get("firma",""))),
+                    ("Yetkili", _clean(_ar.get("yetkili",""))),
+                    ("İletişim", _clean(_ar.get("iletisim",""))),
+                    ("Sektör", _clean(_ar.get("sektor",""))),
+                    ("Kaynak", _clean(_ar.get("kaynak",""))),
+                    ("Gönderi türü", _urun_pdf or _pills(_ar.get("urun",""))),
+                ])
+
+                # 3. Bölge tablosu
+                story.append(_p("3 — ÜRÜN, HACİM & CİRO", ST_SECTION))
+                story.append(Spacer(1,3))
+                _bolge_rows2 = []
+                if isinstance(_bolge_raw2, dict):
+                    _bolge_rows2 = _bolge_raw2.get("satirlar",[])
+                elif isinstance(_bolge_raw2, list):
+                    _bolge_rows2 = _bolge_raw2
+                if _bolge_rows2:
+                    _tbl_data = [["Güzergah & Desi","Tip","Adet","Fiyat (TL)","Periyot"]]
+                    for _br in _bolge_rows2:
+                        _tbl_data.append([
+                            str(_br.get("il","") or "—"),
+                            str(_br.get("urun","") or "—"),
+                            str(_br.get("adet","") or "—"),
+                            str(_br.get("ciro","") or "—"),
+                            str(_br.get("siklik","") or "—"),
+                        ])
+                    _bt = Table(_tbl_data, colWidths=[W*0.45,W*0.1,W*0.1,W*0.15,W*0.2])
+                    _bt.setStyle(TableStyle([
+                        ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#f8fafc")),
+                        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
+                        ("FONTSIZE",(0,0),(-1,-1),9),
+                        ("TEXTCOLOR",(0,0),(-1,0),colors.HexColor("#64748b")),
+                        ("TEXTCOLOR",(0,1),(-1,-1),colors.HexColor("#1e293b")),
+                        ("GRID",(0,0),(-1,-1),0.3,colors.HexColor("#e2e8f0")),
+                        ("PADDING",(0,0),(-1,-1),6),
+                        ("VALIGN",(0,0),(-1,-1),"MIDDLE"),
+                    ]))
+                    story.append(_bt)
+                else:
+                    story.append(_p("— veri girilmedi", ST_VAL))
+                story.append(Spacer(1,8))
+
+                # 4. Beklenti & sonuç
+                _bolum("4 — BEKLENTİ & SONUÇ",[
+                    ("Beklenti", _pills(_ar.get("beklenti",""))),
+                    ("Engel",    _pills(_ar.get("engel",""))),
+                    ("Sonuç",    _clean(_ar.get("sonuc",""))),
+                    ("Sonraki adım", _pills(_ar.get("sonraki_adim",""))),
+                ])
+
+                # 5. Rakip
+                _rakip_pdf = []
+                try:
+                    _rp = _ar.get("rakip","")
+                    if _rp: _rakip_pdf = _pj.loads(_rp) if isinstance(_rp,str) else _rp
+                except: pass
+                story.append(_p("5 — RAKİP", ST_SECTION))
+                story.append(Spacer(1,3))
+                if _rakip_pdf:
+                    _rt = Table([["Rakip Firma","₺/Desi","Güç","Sebep"]] +
+                        [[str(r.get("firma","—")),str(r.get("fiyat","—")),str(r.get("durum","—")),str(r.get("sebep","—"))] for r in _rakip_pdf],
+                        colWidths=[W*0.3,W*0.15,W*0.15,W*0.4])
+                    _rt.setStyle(TableStyle([
+                        ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#f8fafc")),
+                        ("FONTNAME",(0,0),(-1,0),"Helvetica-Bold"),
+                        ("FONTSIZE",(0,0),(-1,-1),9),
+                        ("GRID",(0,0),(-1,-1),0.3,colors.HexColor("#e2e8f0")),
+                        ("PADDING",(0,0),(-1,-1),6),
+                    ]))
+                    story.append(_rt)
+                else:
+                    story.append(_p("— henüz girilmedi", ST_VAL))
+                story.append(Spacer(1,8))
+
+                # 6. Not & özet
+                _bolum("6 — NOT & ÖZET",[
+                    ("Görüşme notu", _clean(_ar.get("not_alan",""))),
+                    ("Takip tarihi", fmt_tarih(_ar.get("takip_tar",""))),
+                    ("Olusturan",    _clean(_ar.get("olusturan",""))),
+                ])
+
+                doc.build(story)
+                buf.seek(0)
+                return buf.read()
+            except Exception as _pe:
+                return None
+
+        # ── KART GÖRÜNÜMÜ ─────────────────────────────────────────────────────
+        def _pill_html2(txt, renk="gray"):
+            _renkler = {"blue":"#e6f1fb;color:#185fa5","green":"#eaf3de;color:#3b6d11",
+                        "red":"#fcebeb;color:#a32d2d","amber":"#faeeda;color:#854f0b",
+                        "gray":"#f1f5f9;color:#64748b"}
+            _stl = _renkler.get(renk, _renkler["gray"])
+            pills = [x.strip() for x in str(txt or "").split(",") if x.strip() and x.strip() not in ["nan","None"]]
+            if not pills: return "<span style='color:#94a3b8;font-style:italic'>— henüz girilmedi</span>"
+            return "".join([f"<span style='display:inline-block;padding:2px 10px;border-radius:20px;font-size:12px;background:{_stl.split(';')[0].replace('background:','')};color:{_stl.split('color:')[1]};margin:2px'>{p}</span>" for p in pills])
+
+        def _val_html(v):
+            s = str(v or "").strip()
+            if s in ["","nan","None","—"]: return "<span style='color:#94a3b8;font-style:italic'>— henüz girilmedi</span>"
+            return f"<span style='color:var(--color-text-primary,#1e293b)'>{s}</span>"
+
+        _pot_renk = {"çok yüksek":"#22c55e","yüksek":"#22c55e","orta":"#f59e0b","düşük":"#ef4444","çok düşük":"#ef4444"}
+
         for _ai, (_, _ar) in enumerate(_dff.iterrows()):
-            _pic = _pic_map.get(str(_ar.get("potansiyel","")),"-")
-            with st.expander(f"{_pic} **{_ar.get('firma','?')}** · {fmt_tarih(_ar.get('tarih',''))} · {_ar.get('sonuc','')} · {_ar.get('potansiyel','')}"):
-                _c1,_c2,_c3,_c4 = st.columns(4)
-                _c1.metric("Potansiyel", _ar.get("potansiyel","—"))
-                _c2.metric("Beklenen Ciro", f"{float(_ar.get('bek_ciro',0) or 0):,.0f} ₺")
-                _c3.metric("Gerçekleşen", f"{float(_ar.get('ger_ciro',0) or 0):,.0f} ₺")
-                _c4.metric("Sonuç", _ar.get("sonuc","—"))
-                _ar_firma    = str(_ar.get("firma","") or "—")
-                _ar_yetkili  = str(_ar.get("yetkili","") or "—")
-                _ar_iletisim = str(_ar.get("iletisim","") or "—")
-                _ar_sektor   = str(_ar.get("sektor","") or "—")
-                _ar_kaynak   = str(_ar.get("kaynak","") or "—")
-                _ar_beklenti = str(_ar.get("beklenti","") or "—")
-                _ar_engel    = str(_ar.get("engel","") or "—")
-                _ar_not      = str(_ar.get("not_alan","") or "—")
-                _ar_sonraki  = str(_ar.get("sonraki_adim","") or "—")
-                # nan temizle
-                for _v in ["nan","None",""]:
-                    _ar_yetkili  = "—" if _ar_yetkili  == _v else _ar_yetkili
-                    _ar_iletisim = "—" if _ar_iletisim == _v else _ar_iletisim
-                    _ar_sektor   = "—" if _ar_sektor   == _v else _ar_sektor
-                    _ar_kaynak   = "—" if _ar_kaynak   == _v else _ar_kaynak
-                    _ar_beklenti = "—" if _ar_beklenti == _v else _ar_beklenti
-                    _ar_engel    = "—" if _ar_engel    == _v else _ar_engel
-                    _ar_not      = "—" if _ar_not      == _v else _ar_not
-                    _ar_sonraki  = "—" if _ar_sonraki  == _v else _ar_sonraki
+            _ar_firma   = str(_ar.get("firma","") or "?")
+            _ar_pot     = str(_ar.get("potansiyel","") or "")
+            _ar_sonuc   = str(_ar.get("sonuc","") or "")
+            _ar_tarih   = fmt_tarih(_ar.get("tarih",""))
+            _dot_clr    = _pot_renk.get(_ar_pot,"#94a3b8")
+            _bek_v      = float(_ar.get("bek_ciro",0) or 0)
+            _ger_v      = float(_ar.get("ger_ciro",0) or 0)
 
-                st.markdown(f"""| | |
-|---|---|
-| **Firma / Yetkili** | {_ar_firma} · {_ar_yetkili} · {_ar_iletisim} |
-| **Sektör / Kaynak** | {_ar_sektor} · {_ar_kaynak} |
-| **Beklenti / Engel** | {_ar_beklenti} · {_ar_engel} |
-| **Not** | {_ar_not} |
-| **Sonraki Adım** | {_ar_sonraki} · {fmt_tarih(_ar.get("takip_tar",""))} |""")
+            # Bölge JSON parse
+            try:
+                _br_raw = _ar.get("bolge","")
+                _br_obj = __import__("json").loads(_br_raw) if isinstance(_br_raw,str) and _br_raw else _br_raw
+            except: _br_obj = {}
+            _br_rows = _br_obj.get("satirlar",[]) if isinstance(_br_obj,dict) else (_br_obj if isinstance(_br_obj,list) else [])
+            _urun_v  = _br_obj.get("urun","") if isinstance(_br_obj,dict) else ""
 
-                _b1,_b2,_b3,_b4,_b5 = st.columns(5)
-                if _b1.button("✏️ Düzenle", key=f"duz_{_ai}", use_container_width=True):
-                    st.session_state["an_duzenle_firma"] = str(_ar.get("firma",""))
-                    _ik2 = f"an_init_{_ar.get('firma','')}"
-                    for _kk in [_ik2,"an_fiyat_rows","an_bolge_rows","an_avm_rows","an_rakip_rows"]:
-                        if _kk in st.session_state: del st.session_state[_kk]
-                    for _pk in list(st.session_state.keys()):
-                        if _pk.endswith("_custom"): del st.session_state[_pk]
-                    st.rerun()
-                _tel2 = str(_ar.get("iletisim","") or "").replace(" ","").replace("-","")
-                if _tel2 and "@" not in _tel2:
-                    if _tel2.startswith("0"): _tel2 = "90"+_tel2[1:]
-                    _b2.markdown(f"<a href='https://wa.me/{_tel2}' target='_blank'><button style='width:100%%;padding:5px;font-size:11px;background:#25d366;color:white;border:none;border-radius:5px;cursor:pointer;'>💬 WA</button></a>", unsafe_allow_html=True)
-                if _b3.button("📄 Spot Teklif", key=f"tek_{_ai}", use_container_width=True):
-                    st.session_state["aktif_tab"] = "teklif"
-                    st.session_state["teklif_musteri_onsel"] = str(_ar.get("firma",""))
-                    st.rerun()
-                if _b4.button("⭐ Özel Teklif", key=f"oztk_{_ai}", use_container_width=True):
-                    st.session_state["aktif_tab"] = "ozel_teklif"
-                    st.session_state["teklif_musteri_onsel"] = str(_ar.get("firma",""))
-                    st.rerun()
-                if _b5.button("🗑 Sil", key=f"sil_{_ai}", use_container_width=True):
-                    if _an_sil(str(_ar.get("firma",""))): st.success("Silindi!"); st.rerun()
+            # Bölge tablosu HTML
+            _tbl_rows_html = ""
+            for _brow in _br_rows:
+                _brow_il   = str(_brow.get("il","") or "—")
+                _brow_urun = str(_brow.get("urun","") or "—")
+                _brow_adet = str(_brow.get("adet","") or "—")
+                _brow_ciro = str(_brow.get("ciro","") or "—")
+                _brow_sik  = str(_brow.get("siklik","") or "—")
+                _pu = "green" if _brow_urun=="palet" else "amber" if _brow_urun in ["dorse","TIR/komple"] else "blue"
+                _tbl_rows_html += f"""<tr>
+                  <td style='padding:8px 16px;border-bottom:0.5px solid #f1f5f9;font-size:12px;color:#1e293b'>{_brow_il}</td>
+                  <td style='padding:8px 16px;border-bottom:0.5px solid #f1f5f9'>{_pill_html2(_brow_urun,_pu)}</td>
+                  <td style='padding:8px 16px;border-bottom:0.5px solid #f1f5f9;font-size:12px;color:#1e293b;text-align:center'>{_brow_adet}</td>
+                  <td style='padding:8px 16px;border-bottom:0.5px solid #f1f5f9;font-size:12px;color:#1e293b;text-align:right'>{_brow_ciro}</td>
+                  <td style='padding:8px 16px;border-bottom:0.5px solid #f1f5f9;font-size:12px;color:#64748b'>{_brow_sik}</td>
+                </tr>"""
+
+            _rakip_rows_html = ""
+            try:
+                _rp_raw = _ar.get("rakip","")
+                _rp_lst = __import__("json").loads(_rp_raw) if isinstance(_rp_raw,str) and _rp_raw else []
+                for _rr in _rp_lst:
+                    _rg = "red" if _rr.get("durum","")=="güçlü" else "amber" if _rr.get("durum","")=="orta" else "green"
+                    _rakip_rows_html += f"<tr><td style='padding:7px 16px;font-size:12px;border-bottom:0.5px solid #f1f5f9'>{_rr.get('firma','—')}</td><td style='padding:7px 16px;font-size:12px;border-bottom:0.5px solid #f1f5f9;text-align:right'>{_rr.get('fiyat','—')}</td><td style='padding:7px 16px;border-bottom:0.5px solid #f1f5f9'>{_pill_html2(_rr.get('durum',''),_rg)}</td><td style='padding:7px 16px;font-size:12px;border-bottom:0.5px solid #f1f5f9;color:#64748b'>{_rr.get('sebep','—')}</td></tr>"
+            except: pass
+
+            _kart_html = f"""
+<div style='background:white;border:0.5px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:14px;font-family:-apple-system,sans-serif'>
+
+  <div style='display:flex;align-items:center;justify-content:space-between;padding:14px 18px;gap:12px;flex-wrap:wrap'>
+    <div style='display:flex;align-items:center;gap:10px'>
+      <span style='width:10px;height:10px;border-radius:50%;background:{_dot_clr};display:inline-block;flex-shrink:0'></span>
+      <span style='font-size:15px;font-weight:500;color:#0f172a'>{_ar_firma}</span>
+      <span style='font-size:12px;color:#94a3b8'>{_ar_tarih}</span>
+    </div>
+    <div style='display:flex;gap:6px;flex-wrap:wrap'>
+      <span style='font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500;background:#eaf3de;color:#3b6d11'>{_ar_pot} potansiyel</span>
+      <span style='font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500;background:#e6f1fb;color:#185fa5'>{_ar_sonuc}</span>
+    </div>
+  </div>
+
+  <div style='display:grid;grid-template-columns:repeat(4,1fr);border-top:0.5px solid #e2e8f0'>
+    <div style='padding:12px 16px;border-right:0.5px solid #e2e8f0'><div style='font-size:11px;color:#64748b;margin-bottom:4px'>Potansiyel</div><div style='font-size:17px;font-weight:500;color:#0f172a'>{_ar_pot.title() if _ar_pot else "—"}</div></div>
+    <div style='padding:12px 16px;border-right:0.5px solid #e2e8f0'><div style='font-size:11px;color:#64748b;margin-bottom:4px'>Beklenen ciro</div><div style='font-size:17px;font-weight:500;color:#0f172a'>{_bek_v:,.0f} ₺</div></div>
+    <div style='padding:12px 16px;border-right:0.5px solid #e2e8f0'><div style='font-size:11px;color:#64748b;margin-bottom:4px'>Gerçekleşen</div><div style='font-size:17px;font-weight:500;color:#0f172a'>{_ger_v:,.0f} ₺</div></div>
+    <div style='padding:12px 16px'><div style='font-size:11px;color:#64748b;margin-bottom:4px'>Sonuç</div><div style='font-size:14px;font-weight:500;color:#0f172a'>{_ar_sonuc.title() if _ar_sonuc else "—"}</div></div>
+  </div>
+
+  <div style='border-top:0.5px solid #e2e8f0'>
+    <div style='padding:9px 18px;background:#f8fafc;font-size:11px;font-weight:500;color:#64748b;border-bottom:0.5px solid #e2e8f0'>① ANALİZ AMACI</div>
+    <div style='display:flex;padding:9px 18px;border-bottom:0.5px solid #f1f5f9'><div style='width:140px;flex-shrink:0;font-size:12px;color:#64748b'>Analiz amacı</div><div style='flex:1'>{_pill_html2(_ar.get("amac",""),"blue")}</div></div>
+    <div style='display:flex;padding:9px 18px'><div style='width:140px;flex-shrink:0;font-size:12px;color:#64748b'>Müşteri durumu</div><div style='flex:1'>{_pill_html2(_ar.get("mdurum",""),"gray")}</div></div>
+  </div>
+
+  <div style='border-top:0.5px solid #e2e8f0'>
+    <div style='padding:9px 18px;background:#f8fafc;font-size:11px;font-weight:500;color:#64748b;border-bottom:0.5px solid #e2e8f0'>② KAYNAK & MÜŞTERİ</div>
+    <div style='display:flex;padding:9px 18px;border-bottom:0.5px solid #f1f5f9'><div style='width:140px;flex-shrink:0;font-size:12px;color:#64748b'>Firma</div><div style='flex:1;font-size:13px;color:#1e293b'>{_ar_firma}</div></div>
+    <div style='display:flex;padding:9px 18px;border-bottom:0.5px solid #f1f5f9'><div style='width:140px;flex-shrink:0;font-size:12px;color:#64748b'>Yetkili</div><div style='flex:1;font-size:13px'>{_val_html(_ar.get("yetkili",""))}</div></div>
+    <div style='display:flex;padding:9px 18px;border-bottom:0.5px solid #f1f5f9'><div style='width:140px;flex-shrink:0;font-size:12px;color:#64748b'>Sektör</div><div style='flex:1;font-size:13px'>{_val_html(_ar.get("sektor",""))}</div></div>
+    <div style='display:flex;padding:9px 18px;border-bottom:0.5px solid #f1f5f9'><div style='width:140px;flex-shrink:0;font-size:12px;color:#64748b'>Kaynak</div><div style='flex:1'>{_pill_html2(_ar.get("kaynak",""),"gray")}</div></div>
+    <div style='display:flex;padding:9px 18px'><div style='width:140px;flex-shrink:0;font-size:12px;color:#64748b'>Gönderi türü</div><div style='flex:1'>{_pill_html2(_urun_v or _ar.get("urun",""),"green")}</div></div>
+  </div>
+
+  <div style='border-top:0.5px solid #e2e8f0'>
+    <div style='padding:9px 18px;background:#f8fafc;font-size:11px;font-weight:500;color:#64748b;border-bottom:0.5px solid #e2e8f0'>③ ÜRÜN, HACİM & CİRO</div>
+    {'<table style="width:100%;border-collapse:collapse"><thead><tr><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;text-align:left;border-bottom:0.5px solid #e2e8f0">Güzergah & Desi</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;text-align:left;border-bottom:0.5px solid #e2e8f0">Tip</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;text-align:center;border-bottom:0.5px solid #e2e8f0">Adet</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;text-align:right;border-bottom:0.5px solid #e2e8f0">Fiyat (₺)</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;border-bottom:0.5px solid #e2e8f0">Periyot</th></tr></thead><tbody>' + _tbl_rows_html + '</tbody></table>' if _tbl_rows_html else '<div style="padding:12px 18px;font-size:12px;color:#94a3b8;font-style:italic">— henüz girilmedi</div>'}
+  </div>
+
+  <div style='border-top:0.5px solid #e2e8f0'>
+    <div style='padding:9px 18px;background:#f8fafc;font-size:11px;font-weight:500;color:#64748b;border-bottom:0.5px solid #e2e8f0'>④ BEKLENTİ & SONUÇ</div>
+    <div style='display:flex;padding:9px 18px;border-bottom:0.5px solid #f1f5f9'><div style='width:140px;flex-shrink:0;font-size:12px;color:#64748b'>Beklenti</div><div style='flex:1'>{_pill_html2(_ar.get("beklenti",""),"blue")}</div></div>
+    <div style='display:flex;padding:9px 18px;border-bottom:0.5px solid #f1f5f9'><div style='width:140px;flex-shrink:0;font-size:12px;color:#64748b'>Engel</div><div style='flex:1'>{_pill_html2(_ar.get("engel",""),"red")}</div></div>
+    <div style='display:flex;padding:9px 18px'><div style='width:140px;flex-shrink:0;font-size:12px;color:#64748b'>Sonuç</div><div style='flex:1'>{_pill_html2(_ar.get("sonuc",""),"blue")}</div></div>
+  </div>
+
+  <div style='border-top:0.5px solid #e2e8f0'>
+    <div style='padding:9px 18px;background:#f8fafc;font-size:11px;font-weight:500;color:#64748b;border-bottom:0.5px solid #e2e8f0'>⑤ RAKİP</div>
+    {'<table style="width:100%;border-collapse:collapse"><thead><tr><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;border-bottom:0.5px solid #e2e8f0">Mevcut Taşıyıcı</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;border-bottom:0.5px solid #e2e8f0;text-align:right">Fiyat</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;border-bottom:0.5px solid #e2e8f0">Güç</th><th style="padding:7px 16px;background:#f8fafc;font-size:11px;color:#64748b;font-weight:500;border-bottom:0.5px solid #e2e8f0">Sebep</th></tr></thead><tbody>' + _rakip_rows_html + '</tbody></table>' if _rakip_rows_html else '<div style="padding:12px 18px;font-size:12px;color:#94a3b8;font-style:italic">— henüz girilmedi</div>'}
+  </div>
+
+  <div style='border-top:0.5px solid #e2e8f0'>
+    <div style='padding:9px 18px;background:#f8fafc;font-size:11px;font-weight:500;color:#64748b;border-bottom:0.5px solid #e2e8f0'>⑥ NOT & ÖZET</div>
+    <div style='padding:12px 18px;font-size:13px;color:#374151;line-height:1.6;border-bottom:0.5px solid #f1f5f9'>{_val_html(_ar.get("not_alan",""))}</div>
+    {f"<div style='display:flex;align-items:center;gap:8px;padding:10px 18px;font-size:13px;color:#64748b;border-bottom:0.5px solid #f1f5f9'>📅 Sonraki adım: <strong style=\"color:#0f172a\">{_pills(_ar.get('sonraki_adim',''))}</strong> → <strong style=\"color:#0f172a\">{fmt_tarih(_ar.get('takip_tar',''))}</strong></div>" if _ar.get("sonraki_adim","") or _ar.get("takip_tar","") else ""}
+  </div>
+
+</div>"""
+
+            st.markdown(_kart_html, unsafe_allow_html=True)
+
+            # Aksiyon butonları
+            _kb1,_kb2,_kb3,_kb4,_kb5,_kb6 = st.columns(6)
+            if _kb1.button("✏️ Düzenle", key=f"duz_{_ai}", use_container_width=True):
+                st.session_state["an_duzenle_firma"] = _ar_firma
+                _ik2 = f"an_init_{_ar_firma}"
+                for _kk in [_ik2,"an_fiyat_rows","an_bolge_rows","an_avm_rows","an_rakip_rows"]:
+                    if _kk in st.session_state: del st.session_state[_kk]
+                for _pk in list(st.session_state.keys()):
+                    if _pk.endswith("_custom"): del st.session_state[_pk]
+                st.rerun()
+            _tel2 = str(_ar.get("iletisim","") or "").replace(" ","").replace("-","")
+            if _tel2 and "@" not in _tel2:
+                if _tel2.startswith("0"): _tel2 = "90"+_tel2[1:]
+                _kb2.markdown(f"<a href='https://wa.me/{_tel2}' target='_blank'><button style='width:100%;padding:6px;font-size:11px;background:#25d366;color:white;border:none;border-radius:6px;cursor:pointer'>💬 WA</button></a>", unsafe_allow_html=True)
+            if _kb3.button("📄 Spot", key=f"tek_{_ai}", use_container_width=True):
+                st.session_state["aktif_tab"] = "teklif"
+                st.session_state["teklif_musteri_onsel"] = _ar_firma
+                st.rerun()
+            if _kb4.button("⭐ Özel", key=f"oztk_{_ai}", use_container_width=True):
+                st.session_state["aktif_tab"] = "ozel_teklif"
+                st.session_state["teklif_musteri_onsel"] = _ar_firma
+                st.rerun()
+            # PDF indir
+            _pdf_bytes = _analiz_pdf(_ar)
+            if _pdf_bytes:
+                _kb5.download_button("⬇️ PDF", data=_pdf_bytes,
+                    file_name=f"analiz_{_ar_firma[:20].replace(' ','_')}.pdf",
+                    mime="application/pdf", key=f"pdf_{_ai}", use_container_width=True)
+            if _kb6.button("🗑 Sil", key=f"sil_{_ai}", use_container_width=True):
+                if _an_sil(_ar_firma): st.success("Silindi!"); st.rerun()
+            st.markdown("---")
 
         st.divider()
         _sc1,_sc2,_sc3,_sc4,_sc5 = st.columns(5)
