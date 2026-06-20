@@ -2032,7 +2032,8 @@ elif aktif == "liste":
         "id":            st.column_config.NumberColumn("ID", disabled=True),
         "tarih":         None, "olusturan": None, "silindi": None,
         "beklenen_ciro": None, "gerceklesen_ciro": None,
-        "adres":         None, "aciklama":   None,
+        "aciklama":      None,
+        "adres":         st.column_config.TextColumn("Adres", width="large"),
         "firma":         st.column_config.TextColumn("Firma"),
         "yetkili":       st.column_config.TextColumn("Yetkili"),
         "gsm":           st.column_config.TextColumn("GSM"),
@@ -2046,7 +2047,7 @@ elif aktif == "liste":
         "aciklama":      st.column_config.TextColumn("Açıklama — yaz kaydet → arşivlenir", width="large"),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width="small"),
     }
-    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi","aciklama","📨 Notlar"]
+    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","aciklama","📨 Notlar"]
 
     # ── DATA EDITOR ─────────────────────────────────────────────────────────────
     df_edit = df_f.copy()
