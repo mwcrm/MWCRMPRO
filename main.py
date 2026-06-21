@@ -6104,7 +6104,7 @@ elif aktif == "randevu":
     bugun_str = datetime.now().strftime("%Y-%m-%d")
 
     # ── iki sekme ─────────────────────────────────────────────────────────────
-    r_tab1, r_tab2, r_tab3, r_tab4 = st.tabs(["📋 Liste & Düzenle", "➕ Yeni Randevu", "📂 Aşama Sayfaları", "⚙️ Yönetim"])
+    r_tab1, r_tab2, r_tab3, r_tab4, r_tab_rut = st.tabs(["📋 Liste & Düzenle", "➕ Yeni Randevu", "📂 Aşama Sayfaları", "⚙️ Yönetim", "🗺️ Rut Haritası"])
 
     with r_tab1:
         # Filtreler
@@ -6976,8 +6976,216 @@ elif aktif == "randevu":
 
             st.divider()
 
+    with r_tab_rut:
+        st.markdown("### 🗺️ Günlük Rut Haritası")
+        import streamlit.components.v1 as _rut_comp
+        import json as _rj
 
+        _rc1, _rc2 = st.columns([1,1])
+        _rut_tarih = _rc1.date_input("Tarih", value=datetime.now().date(), key="rut_tarih")
+        _rut_tem_list = ["Tüm Temsilciler"]
+        if not df_rand_all.empty and "temsilci" in df_rand_all.columns:
+            _rut_tem_list += sorted(df_rand_all["temsilci"].dropna().unique().tolist())
+        _rut_tem = _rc2.selectbox("Temsilci", _rut_tem_list, key="rut_tem")
 
+        # Seçili tarihin randevularını filtrele — gelecek ve bugün
+        _rut_df = df_rand_all.copy()
+        if "randevu_tarihi" in _rut_df.columns:
+            _rut_df = _rut_df[_rut_df["randevu_tarihi"].astype(str).str[:10] == str(_rut_tarih)]
+        if _rut_tem != "Tüm Temsilciler" and "temsilci" in _rut_df.columns:
+            _rut_df = _rut_df[_rut_df["temsilci"] == _rut_tem]
+        if "randevu_saati" in _rut_df.columns:
+            _rut_df = _rut_df.sort_values("randevu_saati")
+
+        # İlçe koordinatları
+        _RUT_ILCE = {
+            "tuzla":[40.821,29.310],"pendik":[40.876,29.256],"kartal":[40.889,29.183],
+            "maltepe":[40.933,29.150],"ataşehir":[40.982,29.120],"kadıköy":[40.990,29.030],
+            "üsküdar":[41.022,29.025],"beykoz":[41.118,29.097],"ümraniye":[41.015,29.124],
+            "çekmeköy":[41.034,29.172],"sancaktepe":[41.000,29.231],"sultanbeyli":[40.963,29.262],
+            "gebze":[40.800,29.432],"izmit":[40.764,29.917],"darıca":[40.760,29.570],
+            "dilovası":[40.753,29.528],"körfez":[40.745,29.787],"kocaeli":[40.765,29.940],
+            "fatih":[41.013,28.940],"beyoğlu":[41.031,28.975],"şişli":[41.058,28.985],
+            "beşiktaş":[41.042,29.009],"sarıyer":[41.166,29.053],"bakırköy":[40.979,28.875],
+            "bağcılar":[41.042,28.855],"bahçelievler":[41.000,28.858],"zeytinburnu":[40.999,28.900],
+            "küçükçekmece":[41.003,28.778],"avcılar":[40.979,28.720],"esenyurt":[41.033,28.668],
+            "beylikdüzü":[40.981,28.642],"büyükçekmece":[41.019,28.583],"silivri":[41.072,28.243],
+            "başakşehir":[41.090,28.800],"eyüpsultan":[41.073,28.935],"gaziosmanpaşa":[41.065,28.906],
+            "sultangazi":[41.105,28.872],"arnavutköy":[41.182,28.735],"çatalca":[41.143,28.459],
+            "nilüfer":[40.213,28.963],"osmangazi":[40.196,29.057],"yıldırım":[40.189,29.100],
+            "çerkezköy":[41.289,27.988],"çorlu":[41.160,27.801],"lüleburgaz":[41.404,27.351],
+        }
+        _RUT_IL = {
+            "istanbul":[41.050,28.900],"kocaeli":[40.765,29.940],"bursa":[40.183,29.067],
+            "ankara":[39.920,32.854],"izmir":[38.423,27.143],"tekirdağ":[40.978,27.515],
+            "sakarya":[40.769,30.394],"gebze":[40.800,29.432],
+        }
+
+        def _tr_low(s):
+            return (s.replace("İ","i").replace("I","ı").replace("Ş","ş").replace("Ğ","ğ")
+                     .replace("Ü","ü").replace("Ö","ö").replace("Ç","ç").lower().strip())
+
+        # Pin listesi oluştur
+        _rut_pins = []
+        import random as _rnd, hashlib as _rh
+        for _idx, (_, _rr) in enumerate(_rut_df.iterrows()):
+            _firma = str(_rr.get("musteri_adi","") or "?")
+            _saat  = str(_rr.get("randevu_saati","") or "")[:5]
+            _bolge = str(_rr.get("bolge","") or "")
+            _gorev = str(_rr.get("gorev","") or "Ziyaret")
+            _sonuc = str(_rr.get("sonuc","") or "")
+            _tem   = str(_rr.get("temsilci","") or "")
+            _aciklama = str(_rr.get("aciklama","") or "")
+
+            # Bölgeden il/ilçe çıkar
+            _bolge_lower = _tr_low(_bolge)
+            _lat, _lng = None, None
+            for _k,_v in _RUT_ILCE.items():
+                if _k in _bolge_lower:
+                    _lat,_lng = _v; break
+            if _lat is None:
+                for _k,_v in _RUT_IL.items():
+                    if _k in _bolge_lower:
+                        _lat,_lng = _v; break
+            if _lat is None:
+                _lat,_lng = 41.050,28.900  # default İstanbul
+
+            _rnd.seed(int(_rh.md5(_firma.encode()).hexdigest()[:8],16))
+            _lat += _rnd.uniform(-0.005,0.005)
+            _lng += _rnd.uniform(-0.005,0.005)
+
+            _rut_pins.append({
+                "idx":_idx+1,"lat":round(_lat,5),"lng":round(_lng,5),
+                "firma":_firma.replace("'","&#39;"),
+                "saat":_saat,"bolge":_bolge.replace("'","&#39;"),
+                "gorev":_gorev,"sonuc":_sonuc,"tem":_tem,
+                "aciklama":_aciklama.replace("'","&#39;")[:80]
+            })
+
+        _pins_json = _rj.dumps(_rut_pins, ensure_ascii=False)
+        _tarih_str = _rut_tarih.strftime("%d %B %Y")
+
+        if not _rut_pins:
+            st.info(f"📅 {_tarih_str} tarihinde randevu bulunamadı.")
+        else:
+            st.caption(f"📅 {_tarih_str} · {len(_rut_pins)} randevu")
+
+            _rut_html = """<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,sans-serif;}
+body{display:grid;grid-template-columns:1fr 280px;height:520px;overflow:hidden;}
+#map{height:520px;}
+#sidebar{height:520px;overflow-y:auto;border-left:0.5px solid #e2e8f0;display:flex;flex-direction:column;}
+.s-hdr{padding:9px 12px;background:#f8fafc;border-bottom:0.5px solid #e2e8f0;font-size:11px;font-weight:600;color:#64748b;flex-shrink:0;}
+.s-list{flex:1;overflow-y:auto;}
+.s-item{display:flex;align-items:flex-start;gap:8px;padding:9px 12px;border-bottom:0.5px solid #f1f5f9;cursor:pointer;transition:.1s;}
+.s-item:hover{background:#fef2f2;}
+.s-item.act{background:#fef2f2;border-left:3px solid #dc2626;}
+.s-num{width:24px;height:24px;border-radius:50%;background:#dc2626;color:white;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;}
+.s-inf{flex:1;min-width:0;}
+.s-saat{font-size:12px;font-weight:700;color:#dc2626;}
+.s-firma{font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.s-bolge{font-size:10px;color:#64748b;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.s-foot{padding:8px;border-top:0.5px solid #e2e8f0;display:flex;gap:5px;flex-shrink:0;}
+.btn{flex:1;padding:7px;border:none;border-radius:7px;font-size:11px;font-weight:500;cursor:pointer;}
+.btn-m{background:#1d4ed8;color:white;}
+.btn-w{background:#25d366;color:white;}
+.pp{font-family:-apple-system,sans-serif;}
+.pp-hdr{background:#dc2626;color:white;padding:8px 12px;margin:-8px -12px 8px;border-radius:3px 3px 0 0;font-weight:600;font-size:13px;}
+.pp table{font-size:11px;width:100%;border-collapse:collapse;}
+.pp td{padding:3px 4px;} .pp td:first-child{color:#94a3b8;width:65px;}
+.pp td:last-child{font-weight:500;}
+</style></head>
+<body>
+<div id="map"></div>
+<div id="sidebar">
+  <div class="s-hdr">📋 """ + _tarih_str + """ · """ + str(len(_rut_pins)) + """ randevu</div>
+  <div class="s-list" id="slist"></div>
+  <div class="s-foot">
+    <button class="btn btn-m" onclick="mapsAc()">🗺️ Navigasyon</button>
+    <button class="btn btn-w" onclick="waGonder()">💬 WA</button>
+  </div>
+</div>
+<script>
+var pins = """ + _pins_json + """;
+var map = L.map('map').setView([40.9,29.1],11);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:18}).addTo(map);
+var markers=[], latlngs=[], rutLine=null, arrowMarkers=[];
+
+// Liste oluştur
+var html='';
+pins.forEach(function(p,i){
+  html+='<div class="s-item" id="si'+i+'" onclick="secPin('+i+')">'
+    +'<div class="s-num">'+p.idx+'</div>'
+    +'<div class="s-inf">'
+    +'<div class="s-saat">'+p.saat+'</div>'
+    +'<div class="s-firma">'+p.firma+'</div>'
+    +'<div class="s-bolge">📍 '+p.bolge+'</div>'
+    +'</div></div>';
+});
+document.getElementById('slist').innerHTML=html;
+
+// Pinler ve rut
+pins.forEach(function(p,i){
+  latlngs.push([p.lat,p.lng]);
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="34" height="44" viewBox="0 0 34 44">'
+    +'<path d="M17 0C7.6 0 0 7.6 0 17c0 12.7 17 27 17 27s17-14.3 17-27C34 7.6 26.4 0 17 0z" fill="#dc2626" stroke="white" stroke-width="2"/>'
+    +'<circle cx="17" cy="17" r="10" fill="white"/>'
+    +'<text x="17" y="22" text-anchor="middle" fill="#dc2626" font-size="12" font-weight="700">'+p.idx+'</text>'
+    +'</svg>';
+  var ic=L.divIcon({html:svg,className:'',iconSize:[34,44],iconAnchor:[17,44],popupAnchor:[0,-46]});
+  var pop='<div class="pp"><div class="pp-hdr">'+p.idx+'. Durak · '+p.saat+'</div>'
+    +'<table><tr><td>Firma</td><td>'+p.firma+'</td></tr>'
+    +'<tr><td>Bölge</td><td>'+p.bolge+'</td></tr>'
+    +'<tr><td>Görev</td><td>'+p.gorev+'</td></tr>'
+    +'<tr><td>Temsilci</td><td>'+p.tem+'</td></tr>'
+    +(p.aciklama?'<tr><td>Not</td><td>'+p.aciklama+'</td></tr>':'')
+    +'</table></div>';
+  var m=L.marker([p.lat,p.lng],{icon:ic}).bindPopup(pop,{maxWidth:260}).addTo(map);
+  m.on('click',function(){secPin(i);});
+  markers.push(m);
+});
+
+// Rut çizgisi
+rutLine=L.polyline(latlngs,{color:'#dc2626',weight:3,dashArray:'8,5',opacity:0.8}).addTo(map);
+
+// Oklar
+for(var i=0;i<latlngs.length-1;i++){
+  var f=latlngs[i],t=latlngs[i+1];
+  var ml=(f[0]+t[0])/2, mn=(f[1]+t[1])/2;
+  var ang=Math.atan2(t[1]-f[1],t[0]-f[0])*180/Math.PI;
+  var asvg='<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" style="transform:rotate('+ang+'deg)">'
+    +'<polygon points="0,4 0,14 18,9" fill="#dc2626" opacity="0.85"/></svg>';
+  L.marker([ml,mn],{icon:L.divIcon({html:asvg,className:'',iconSize:[18,18],iconAnchor:[9,9]}),interactive:false}).addTo(map);
+}
+
+if(latlngs.length>0) map.fitBounds(L.latLngBounds(latlngs),{padding:[40,40]});
+
+function secPin(i){
+  document.querySelectorAll('.s-item').forEach(function(el,j){el.classList.toggle('act',j===i);});
+  map.setView([pins[i].lat,pins[i].lng],14);
+  markers[i].openPopup();
+}
+
+function mapsAc(){
+  if(pins.length===0) return;
+  var o=pins[0].lat+','+pins[0].lng;
+  var d=pins[pins.length-1].lat+','+pins[pins.length-1].lng;
+  var wp=pins.slice(1,-1).map(function(p){return p.lat+','+p.lng;}).join('|');
+  window.open('https://www.google.com/maps/dir/?api=1&origin='+o+'&destination='+d+(wp?'&waypoints='+wp:'')+'&travelmode=driving','_blank');
+}
+
+function waGonder(){
+  var msg='🗺️ *Rut Planı — """ + _tarih_str + """*\\n\\n';
+  pins.forEach(function(p){msg+=p.idx+'. '+p.saat+' — *'+p.firma+'*\\n📍 '+p.bolge+'\\n\\n';});
+  window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+}
+</script></body></html>"""
+
+            _rut_comp.html(_rut_html, height=525, scrolling=False)
 
 elif aktif == "admin_rapor":
     sayfa_log("admin_rapor")
