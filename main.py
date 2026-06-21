@@ -2045,9 +2045,10 @@ elif aktif == "liste":
         "temsilci":      st.column_config.TextColumn("Temsilci"),
         "islem_asamasi": st.column_config.SelectboxColumn("Aşama", options=tum_asama_opts),
         "aciklama":      st.column_config.TextColumn("Açıklama — yaz kaydet → arşivlenir", width="large"),
+        "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width="large"),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width="small"),
     }
-    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","aciklama","📨 Notlar"]
+    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","📅 Son Randevu","aciklama","📨 Notlar"]
 
     # ── DATA EDITOR ─────────────────────────────────────────────────────────────
     df_edit = df_f.copy()
@@ -2055,6 +2056,23 @@ elif aktif == "liste":
     if "aciklama" not in df_edit.columns:
         df_edit["aciklama"] = ""
     df_edit["aciklama"] = df_edit["aciklama"].fillna("").astype(str).replace("nan","")
+
+    # Son randevu bilgisini ekle (tarih + saat + bölge)
+    try:
+        _df_rand_join = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC, randevu_saati DESC")
+        if not _df_rand_join.empty and "musteri_adi" in _df_rand_join.columns:
+            _son_rand = {}
+            for _, _rj in _df_rand_join.iterrows():
+                _mn = str(_rj.get("musteri_adi","") or "").strip()
+                if _mn and _mn not in _son_rand:
+                    _dt = fmt_tarih(str(_rj.get("randevu_tarihi","") or ""))
+                    _st = str(_rj.get("randevu_saati","") or "")[:5]
+                    _bl = str(_rj.get("bolge","") or "")
+                    _sc = str(_rj.get("sonuc","") or "")
+                    _son_rand[_mn] = f"📅 {_dt} {_st}" + (f" · {_bl}" if _bl else "") + (f" [{_sc}]" if _sc else "")
+            df_edit["📅 Son Randevu"] = df_edit["firma"].apply(lambda x: _son_rand.get(str(x),""))
+    except:
+        df_edit["📅 Son Randevu"] = ""
 
     # Her firma için not sayısı + içerik (hover için)
     _not_detay = {}  # {cari_id: [{tarih, olusturan, aciklama}, ...]}
