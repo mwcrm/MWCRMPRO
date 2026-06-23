@@ -1721,15 +1721,17 @@ elif aktif == "liste":
         ara_txt = _frow1[0].text_input("", placeholder="🔍 Firma, yetkili, il, gsm...", key="ara_liste", label_visibility="collapsed")
 
         # Asama multiselect
+        _asama_def = [x for x in st.session_state.get("_cl_fil_asama_multi", []) if x in tum_asama_opts]
         _asama_sec = _frow1[1].multiselect(
             "Aşama", tum_asama_opts,
-            default=st.session_state.get("_cl_fil_asama_multi", []),
+            default=_asama_def,
             key="_cl_fil_asama_multi", placeholder="Aşama seç..."
         )
         # Durum multiselect
+        _durum_def = [x for x in st.session_state.get("_cl_fil_durum_multi", []) if x in tum_durum_opts]
         _durum_sec = _frow1[2].multiselect(
             "Durum", tum_durum_opts,
-            default=st.session_state.get("_cl_fil_durum_multi", []),
+            default=_durum_def,
             key="_cl_fil_durum_multi", placeholder="Durum seç..."
         )
         # Segment
@@ -1739,9 +1741,10 @@ elif aktif == "liste":
         )
         # İl multiselect
         _il_opts = sorted(df["il"].dropna().astype(str).unique().tolist()) if "il" in df.columns else []
+        _il_def = [x for x in st.session_state.get("_cl_fil_il_multi", []) if x in _il_opts]
         _il_sec = _frow1[4].multiselect(
             "İl", _il_opts,
-            default=st.session_state.get("_cl_fil_il_multi", []),
+            default=_il_def,
             key="_cl_fil_il_multi", placeholder="İl seç..."
         )
         # İlçe multiselect — seçili ile göre dinamik filtrele
@@ -1757,9 +1760,10 @@ elif aktif == "liste":
         )
         # Temsilci multiselect
         _tem_opts = sorted(df["temsilci"].dropna().astype(str).unique().tolist()) if "temsilci" in df.columns else []
+        _tem_def = [x for x in st.session_state.get("_cl_fil_temsilci_multi", []) if x in _tem_opts]
         _tem_sec = _frow1[6].multiselect(
             "Temsilci", _tem_opts,
-            default=st.session_state.get("_cl_fil_temsilci_multi", []),
+            default=_tem_def,
             key="_cl_fil_temsilci_multi", placeholder="Temsilci seç..."
         )
 
