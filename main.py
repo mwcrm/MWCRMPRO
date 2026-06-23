@@ -886,7 +886,7 @@ def fmt_tarih(v):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "detay_cari", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "detay_cari", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -902,6 +902,7 @@ _TAB_ETIKETLER = {
     "mesajlar": "💬 Mesajlar",
     "admin_rapor": "📊 Rapor Tasarla",
     "harita": "🗺️ Müşteri Haritası",
+    "patron": "👑 Yönetim Paneli",
 }
 
 def get_menu_tercihi(kullanici):
@@ -6357,14 +6358,13 @@ elif aktif == "randevu":
                             musteri_adi = rand_musteri.split("] ")[1].split(" (")[0]
                         except: pass
 
-                    # Mükerrer kontrolü
+                    # Mükerrer kontrolü — sadece uyar, engelleme
                     if musteri_id > 0:
                         _df_muk = db_read("randevular", filters={"musteri_id":musteri_id})
                         if not _df_muk.empty and "sonuc" in _df_muk.columns:
                             _aktif = _df_muk[~_df_muk["sonuc"].isin(["Bitti","İptal","Gidilmedi"])]
                             if not _aktif.empty:
-                                st.error(f"⚠️ Bu müşterinin aktif randevusu var! ({_aktif.iloc[0].get('randevu_tarihi','')} — {_aktif.iloc[0].get('gorev','')})")
-                                st.stop()
+                                st.warning(f"⚠️ Bu müşterinin aktif randevusu var: {_aktif.iloc[0].get('randevu_tarihi','')} — {_aktif.iloc[0].get('gorev','')}")
 
                     kullanici_log_kaydet("RANDEVU_EKLE","randevu",f"Müşteri: {musteri_adi}")
                     db_insert("randevular",{
@@ -7551,6 +7551,266 @@ elif aktif == "admin_rapor":
                             st.rerun()
 
 
+
+elif aktif == "patron":
+    sayfa_log("patron")
+    import streamlit.components.v1 as _pc
+    import json as _pj
+    from datetime import datetime as _pdt, timedelta as _ptd
+
+    # Veri çek
+    _p_cari  = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+    _p_rand  = db_read("randevular",   extra_sql="ORDER BY randevu_tarihi DESC")
+    _p_tek   = db_read("teklifler",    order_col="tarih")
+    _p_an    = db_read("musteri_analiz")
+
+    # Periyot seçimi
+    _bugun = _pdt.now().date()
+    _p1,_p2,_p3,_p4,_p5 = st.columns(5)
+    _periyot = st.session_state.get("patron_periyot","hafta")
+    if _p1.button("📅 Bugün",    key="pp1", use_container_width=True, type="primary" if _periyot=="bugun" else "secondary"):
+        st.session_state["patron_periyot"]="bugun"; st.rerun()
+    if _p2.button("📅 Bu Hafta", key="pp2", use_container_width=True, type="primary" if _periyot=="hafta" else "secondary"):
+        st.session_state["patron_periyot"]="hafta"; st.rerun()
+    if _p3.button("📅 Bu Ay",    key="pp3", use_container_width=True, type="primary" if _periyot=="ay" else "secondary"):
+        st.session_state["patron_periyot"]="ay"; st.rerun()
+    if _p4.button("📅 Bu Yıl",   key="pp4", use_container_width=True, type="primary" if _periyot=="yil" else "secondary"):
+        st.session_state["patron_periyot"]="yil"; st.rerun()
+    if _p5.button("📅 Tümü",     key="pp5", use_container_width=True, type="primary" if _periyot=="tum" else "secondary"):
+        st.session_state["patron_periyot"]="tum"; st.rerun()
+
+    # Tarih aralığı
+    if _periyot == "bugun":
+        _bas = str(_bugun); _bit = str(_bugun)
+    elif _periyot == "hafta":
+        _bas = str(_bugun - _ptd(days=_bugun.weekday())); _bit = str(_bugun)
+    elif _periyot == "ay":
+        _bas = str(_bugun.replace(day=1)); _bit = str(_bugun)
+    elif _periyot == "yil":
+        _bas = str(_bugun.replace(month=1,day=1)); _bit = str(_bugun)
+    else:
+        _bas = "2000-01-01"; _bit = str(_bugun)
+
+    # Randevu filtre
+    def _rand_filtre(df, bas, bit):
+        if df.empty or "randevu_tarihi" not in df.columns: return df
+        return df[(df["randevu_tarihi"].astype(str)>=bas)&(df["randevu_tarihi"].astype(str)<=bit)]
+
+    _p_rand_p = _rand_filtre(_p_rand, _bas, _bit)
+
+    # KPI hesapla
+    _toplam_musteri = len(_p_cari) if not _p_cari.empty else 0
+    _portfoy        = len(_p_cari[_p_cari["durum"]=="Aktif"]) if not _p_cari.empty and "durum" in _p_cari.columns else 0
+    _hedef          = len(_p_cari[_p_cari["durum"]=="Hedef"]) if not _p_cari.empty and "durum" in _p_cari.columns else 0
+    _toplam_rand    = len(_p_rand_p)
+    _toplam_an      = len(_p_an) if not _p_an.empty else 0
+    try:
+        _bek_ciro = float(_p_cari["beklenen_ciro"].apply(pd.to_numeric,errors="coerce").sum()) if not _p_cari.empty and "beklenen_ciro" in _p_cari.columns else 0
+    except: _bek_ciro = 0
+
+    # Temas tipleri (randevular tablosundan gorev bazlı)
+    def _gorev_say(gorev):
+        if _p_rand_p.empty or "gorev" not in _p_rand_p.columns: return 0
+        return len(_p_rand_p[_p_rand_p["gorev"]==gorev])
+
+    _say_ziyaret = _gorev_say("Ziyaret")
+    _say_arama   = _gorev_say("Arama")
+    _say_email   = _gorev_say("E-mail")
+    _say_wa      = _gorev_say("Whatsapp Mesaj")
+    _say_bitti   = len(_p_rand_p[_p_rand_p["sonuc"]=="Bitti"]) if not _p_rand_p.empty and "sonuc" in _p_rand_p.columns else 0
+    _say_teklif  = len(_p_tek[(_p_tek.get("tarih","") if not _p_tek.empty else pd.Series(dtype=str))>=_bas]) if not _p_tek.empty and "tarih" in _p_tek.columns else 0
+    _say_analiz  = _toplam_an
+
+    # Segment dağılımı
+    def _seg_say(seg):
+        if _p_cari.empty or "segment" not in _p_cari.columns: return 0
+        return len(_p_cari[_p_cari["segment"]==seg])
+
+    # Temsilci aktivitesi
+    _tem_data = {}
+    if not _p_rand_p.empty and "temsilci" in _p_rand_p.columns:
+        for _tem, _grp in _p_rand_p.groupby("temsilci"):
+            if str(_tem).strip():
+                _tem_data[str(_tem)] = {
+                    "toplam":  len(_grp),
+                    "ziyaret": len(_grp[_grp["gorev"]=="Ziyaret"]) if "gorev" in _grp.columns else 0,
+                    "arama":   len(_grp[_grp["gorev"]=="Arama"])   if "gorev" in _grp.columns else 0,
+                    "email":   len(_grp[_grp["gorev"]=="E-mail"])  if "gorev" in _grp.columns else 0,
+                    "wa":      len(_grp[_grp["gorev"]=="Whatsapp Mesaj"]) if "gorev" in _grp.columns else 0,
+                    "bitti":   len(_grp[_grp["sonuc"]=="Bitti"])   if "sonuc" in _grp.columns else 0,
+                }
+    _tem_json = _pj.dumps(_tem_data, ensure_ascii=False)
+
+    # Segment json
+    _seg_json = _pj.dumps({
+        "👑 A+": _seg_say("👑 A+"),
+        "⭐ A":  _seg_say("⭐ A"),
+        "🔵 B":  _seg_say("🔵 B"),
+        "⚪ C":  _seg_say("⚪ C"),
+        "Hedef": _hedef,
+        "Pasif": len(_p_cari[_p_cari["durum"]=="Pasif"]) if not _p_cari.empty and "durum" in _p_cari.columns else 0,
+    }, ensure_ascii=False)
+
+    # Uyarılar
+    _uyarilar = []
+    if not _p_rand.empty and "randevu_tarihi" in _p_rand.columns and "sonuc" in _p_rand.columns:
+        _acik_eski = _p_rand[(_p_rand["randevu_tarihi"].astype(str)<str(_bugun))&(~_p_rand["sonuc"].isin(["Bitti","İptal","Gidilmedi",""]))]
+        if len(_acik_eski)>0: _uyarilar.append({"tip":"r","mesaj":f"🔴 {len(_acik_eski)} randevu sonuçlandırılmamış (geçmiş tarih)"})
+    if not _p_cari.empty and "durum" in _p_cari.columns:
+        _htemas = _hedef
+        if _htemas>0: _uyarilar.append({"tip":"y","mesaj":f"🟡 {_htemas} hedef müşteride aktif takip gerekiyor"})
+    if _say_bitti>0: _uyarilar.append({"tip":"g","mesaj":f"✅ Bu dönem {_say_bitti} randevu başarıyla tamamlandı"})
+    if _say_analiz>0: _uyarilar.append({"tip":"b","mesaj":f"ℹ️ Toplam {_say_analiz} müşteri analizi yapılmış"})
+    _uyari_json = _pj.dumps(_uyarilar, ensure_ascii=False)
+
+    _patron_html = f"""<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+*{{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,sans-serif;}}
+body{{background:#0f172a;padding:14px;color:white;}}
+.kpi-grid{{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:12px;}}
+.kpi{{background:#1e293b;border-radius:10px;padding:13px 14px;border:0.5px solid #334155;}}
+.kpi-l{{font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:5px;}}
+.kpi-v{{font-size:24px;font-weight:700;}}
+.kpi-s{{font-size:10px;margin-top:3px;}}
+.up{{color:#22c55e;}} .dn{{color:#ef4444;}} .neu{{color:#94a3b8;}}
+
+.temas-grid{{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;margin-bottom:12px;}}
+.tk{{background:#1e293b;border-radius:10px;padding:11px 8px;border:0.5px solid #334155;text-align:center;}}
+.tk-ik{{font-size:20px;margin-bottom:4px;}}
+.tk-s{{font-size:20px;font-weight:700;margin-bottom:2px;}}
+.tk-l{{font-size:10px;color:#64748b;}}
+
+.mid{{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:8px;margin-bottom:12px;}}
+.kart{{background:#1e293b;border-radius:10px;padding:13px;border:0.5px solid #334155;}}
+.kart-t{{font-size:10px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.4px;margin-bottom:10px;}}
+
+.bar-row{{display:flex;align-items:center;gap:7px;margin-bottom:6px;}}
+.bar-l{{font-size:11px;color:#94a3b8;width:90px;flex-shrink:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}}
+.bar-w{{flex:1;background:#0f172a;border-radius:3px;height:7px;}}
+.bar-f{{height:7px;border-radius:3px;background:linear-gradient(90deg,#38bdf8,#818cf8);}}
+.bar-n{{font-size:11px;color:white;width:28px;text-align:right;flex-shrink:0;}}
+
+.tem-row{{display:flex;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:0.5px solid #0f172a;}}
+.tem-row:last-child{{border-bottom:none;}}
+.tem-av{{width:28px;height:28px;border-radius:50%;background:linear-gradient(135deg,#38bdf8,#818cf8);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}}
+.tem-inf{{flex:1;}}
+.tem-n{{font-size:12px;font-weight:500;}}
+.tem-d{{font-size:10px;color:#64748b;margin-top:2px;}}
+.tem-b{{width:100%;background:#0f172a;border-radius:3px;height:4px;margin-top:4px;}}
+.tem-bf{{height:4px;border-radius:3px;background:#38bdf8;}}
+
+.bot{{display:grid;grid-template-columns:1fr 1fr;gap:8px;}}
+.al{{display:flex;align-items:center;gap:7px;padding:7px 10px;border-radius:7px;margin-bottom:5px;font-size:11px;}}
+.ar{{background:#450a0a;border:0.5px solid #7f1d1d;color:#fca5a5;}}
+.ay{{background:#422006;border:0.5px solid #78350f;color:#fcd34d;}}
+.ag{{background:#052e16;border:0.5px solid #14532d;color:#86efac;}}
+.ab{{background:#0c1a4a;border:0.5px solid #1e3a8a;color:#93c5fd;}}
+</style></head>
+<body>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="kpi-l">Toplam Müşteri</div><div class="kpi-v">{_toplam_musteri}</div><div class="kpi-s neu">kayıtlı cari</div></div>
+  <div class="kpi"><div class="kpi-l">Aktif Portföy</div><div class="kpi-v" style="color:#38bdf8">{_portfoy}</div><div class="kpi-s up">aktif müşteri</div></div>
+  <div class="kpi"><div class="kpi-l">Toplam Randevu</div><div class="kpi-v" style="color:#a78bfa">{_toplam_rand}</div><div class="kpi-s neu">bu dönem</div></div>
+  <div class="kpi"><div class="kpi-l">Analiz Yapılan</div><div class="kpi-v" style="color:#34d399">{_say_analiz}</div><div class="kpi-s neu">müşteri analizi</div></div>
+  <div class="kpi"><div class="kpi-l">Beklenen Ciro</div><div class="kpi-v" style="font-size:18px;color:#fbbf24">{_bek_ciro:,.0f} ₺</div><div class="kpi-s neu">toplam portföy</div></div>
+</div>
+
+<div class="temas-grid">
+  <div class="tk"><div class="tk-ik">🏢</div><div class="tk-s" style="color:#38bdf8">{_say_ziyaret}</div><div class="tk-l">Ziyaret</div></div>
+  <div class="tk"><div class="tk-ik">📞</div><div class="tk-s" style="color:#a78bfa">{_say_arama}</div><div class="tk-l">Arama</div></div>
+  <div class="tk"><div class="tk-ik">✉️</div><div class="tk-s" style="color:#34d399">{_say_email}</div><div class="tk-l">E-Mail</div></div>
+  <div class="tk"><div class="tk-ik">💬</div><div class="tk-s" style="color:#fbbf24">{_say_wa}</div><div class="tk-l">WhatsApp</div></div>
+  <div class="tk"><div class="tk-ik">📋</div><div class="tk-s" style="color:#f87171">{_say_analiz}</div><div class="tk-l">Not/Analiz</div></div>
+  <div class="tk"><div class="tk-ik">📄</div><div class="tk-s" style="color:#fb923c">{_say_teklif}</div><div class="tk-l">Teklif</div></div>
+  <div class="tk"><div class="tk-ik">✅</div><div class="tk-s" style="color:#4ade80">{_say_bitti}</div><div class="tk-l">Tamamlandı</div></div>
+</div>
+
+<div class="mid">
+  <div class="kart">
+    <div class="kart-t">👤 Temsilci Aktivitesi</div>
+    <div id="tem-list"></div>
+  </div>
+  <div class="kart">
+    <div class="kart-t">📊 Müşteri Segmentleri</div>
+    <div id="seg-list"></div>
+  </div>
+  <div class="kart">
+    <div class="kart-t">⚡ Uyarılar & Aksiyonlar</div>
+    <div id="uyari-list"></div>
+  </div>
+</div>
+
+<div class="bot">
+  <div class="kart">
+    <div class="kart-t">📅 Dönem Temas Özeti</div>
+    <div class="bar-row"><div class="bar-l">🏢 Ziyaret</div><div class="bar-w"><div class="bar-f" id="bz"></div></div><div class="bar-n">{_say_ziyaret}</div></div>
+    <div class="bar-row"><div class="bar-l">📞 Arama</div><div class="bar-w"><div class="bar-f" id="ba" style="background:linear-gradient(90deg,#a78bfa,#7c3aed)"></div></div><div class="bar-n">{_say_arama}</div></div>
+    <div class="bar-row"><div class="bar-l">💬 WhatsApp</div><div class="bar-w"><div class="bar-f" id="bw" style="background:linear-gradient(90deg,#4ade80,#16a34a)"></div></div><div class="bar-n">{_say_wa}</div></div>
+    <div class="bar-row"><div class="bar-l">✉️ E-Mail</div><div class="bar-w"><div class="bar-f" id="be" style="background:linear-gradient(90deg,#fbbf24,#d97706)"></div></div><div class="bar-n">{_say_email}</div></div>
+    <div class="bar-row"><div class="bar-l">✅ Tamamlandı</div><div class="bar-w"><div class="bar-f" id="bb" style="background:linear-gradient(90deg,#4ade80,#15803d)"></div></div><div class="bar-n">{_say_bitti}</div></div>
+  </div>
+  <div class="kart">
+    <div class="kart-t">🎯 Müşteri Durumu</div>
+    <div class="bar-row"><div class="bar-l">✅ Aktif</div><div class="bar-w"><div class="bar-f" style="width:{min(100,int(_portfoy/max(_toplam_musteri,1)*100))}%"></div></div><div class="bar-n">{_portfoy}</div></div>
+    <div class="bar-row"><div class="bar-l">🎯 Hedef</div><div class="bar-w"><div class="bar-f" style="width:{min(100,int(_hedef/max(_toplam_musteri,1)*100))}%;background:linear-gradient(90deg,#f87171,#dc2626)"></div></div><div class="bar-n">{_hedef}</div></div>
+    <div class="bar-row"><div class="bar-l">😴 Pasif</div><div class="bar-w"><div class="bar-f" style="width:{min(100,int((len(_p_cari[_p_cari['durum']=='Pasif']) if not _p_cari.empty and 'durum' in _p_cari.columns else 0)/max(_toplam_musteri,1)*100))}%;background:#334155"></div></div><div class="bar-n">{len(_p_cari[_p_cari['durum']=='Pasif']) if not _p_cari.empty and 'durum' in _p_cari.columns else 0}</div></div>
+  </div>
+</div>
+
+<script>
+var temData = {_tem_json};
+var segData = {_seg_json};
+var uyarilar = {_uyari_json};
+var maxTem = Math.max(...Object.values(temData).map(function(t){{return t.toplam;}}),1);
+var maxSeg = Math.max(...Object.values(segData),1);
+
+// Temsilci listesi
+var temHtml='';
+Object.entries(temData).sort(function(a,b){{return b[1].toplam-a[1].toplam;}}).forEach(function(e){{
+  var t=e[1]; var pct=Math.round(t.toplam/maxTem*100);
+  temHtml+='<div class="tem-row">'
+    +'<div class="tem-av">'+e[0][0].toUpperCase()+'</div>'
+    +'<div class="tem-inf">'
+    +'<div class="tem-n">'+e[0]+'</div>'
+    +'<div class="tem-d">'+t.toplam+' randevu · '+t.ziyaret+' ziyaret · '+t.arama+' arama · '+t.wa+' WA · '+t.email+' email</div>'
+    +'<div class="tem-b"><div class="tem-bf" style="width:'+pct+'%"></div></div>'
+    +'</div>'
+    +'<div style="text-align:right;font-size:11px;flex-shrink:0"><div style="color:#22c55e;font-weight:600">'+t.bitti+'</div><div style="color:#64748b">bitti</div></div>'
+    +'</div>';
+}});
+if(!temHtml) temHtml='<div style="color:#64748b;font-size:12px">Bu dönem randevu yok</div>';
+document.getElementById('tem-list').innerHTML=temHtml;
+
+// Segment listesi
+var segHtml='';
+Object.entries(segData).forEach(function(e){{
+  if(!e[1]) return;
+  var pct=Math.round(e[1]/maxSeg*100);
+  segHtml+='<div class="bar-row"><div class="bar-l">'+e[0]+'</div><div class="bar-w"><div class="bar-f" style="width:'+pct+'%"></div></div><div class="bar-n">'+e[1]+'</div></div>';
+}});
+if(!segHtml) segHtml='<div style="color:#64748b;font-size:12px">Veri yok</div>';
+document.getElementById('seg-list').innerHTML=segHtml;
+
+// Uyarılar
+var uyHtml='';
+var tipMap={{r:'ar',y:'ay',g:'ag',b:'ab'}};
+uyarilar.forEach(function(u){{uyHtml+='<div class="al '+tipMap[u.tip]+'">'+u.mesaj+'</div>';}});
+if(!uyHtml) uyHtml='<div class="al ag">✅ Her şey yolunda!</div>';
+document.getElementById('uyari-list').innerHTML=uyHtml;
+
+// Bar widths — temas özeti
+var maxT=Math.max({_say_ziyaret},{_say_arama},{_say_wa},{_say_email},{_say_bitti},1);
+document.getElementById('bz').style.width=Math.round({_say_ziyaret}/maxT*100)+'%';
+document.getElementById('ba').style.width=Math.round({_say_arama}/maxT*100)+'%';
+document.getElementById('bw').style.width=Math.round({_say_wa}/maxT*100)+'%';
+document.getElementById('be').style.width=Math.round({_say_email}/maxT*100)+'%';
+document.getElementById('bb').style.width=Math.round({_say_bitti}/maxT*100)+'%';
+</script>
+</body></html>"""
+
+    _pc.html(_patron_html, height=820, scrolling=True)
 
 elif aktif == "harita":
     sayfa_log("harita")
