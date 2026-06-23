@@ -7602,17 +7602,22 @@ elif aktif == "patron":
 
     _p_rand_p = _rand_filtre(_p_rand, _bas, _bit)
 
-    # KPI hesapla
+    # KPI hesapla — silindi olmayanlar
     _toplam_musteri = len(_p_cari) if not _p_cari.empty else 0
-    _portfoy        = len(_p_cari[_p_cari["durum"]=="Aktif"]) if not _p_cari.empty and "durum" in _p_cari.columns else 0
-    _hedef          = len(_p_cari[_p_cari["durum"]=="Hedef"]) if not _p_cari.empty and "durum" in _p_cari.columns else 0
-    _toplam_rand    = len(_p_rand_p)
-    _toplam_an      = len(_p_an) if not _p_an.empty else 0
+    # Portföy: durum Aktif VEYA islem_asamasi dolu olanlar
+    if not _p_cari.empty and "durum" in _p_cari.columns:
+        _portfoy = len(_p_cari[~_p_cari["durum"].isin(["Hedef","Pasif",""])])
+    else:
+        _portfoy = 0
+    _hedef = len(_p_cari[_p_cari["durum"]=="Hedef"]) if not _p_cari.empty and "durum" in _p_cari.columns else 0
+    _pasif = len(_p_cari[_p_cari["durum"]=="Pasif"]) if not _p_cari.empty and "durum" in _p_cari.columns else 0
+    _toplam_rand = len(_p_rand_p)
+    _toplam_an   = len(_p_an) if not _p_an.empty else 0
     try:
-        _bek_ciro = float(_p_cari["beklenen_ciro"].apply(pd.to_numeric,errors="coerce").sum()) if not _p_cari.empty and "beklenen_ciro" in _p_cari.columns else 0
+        _bek_ciro = pd.to_numeric(_p_cari["beklenen_ciro"], errors="coerce").fillna(0).sum() if not _p_cari.empty and "beklenen_ciro" in _p_cari.columns else 0
     except: _bek_ciro = 0
 
-    # Temas tipleri (randevular tablosundan gorev bazlı)
+    # Temas tipleri — dönem filtreli randevular
     def _gorev_say(gorev):
         if _p_rand_p.empty or "gorev" not in _p_rand_p.columns: return 0
         return len(_p_rand_p[_p_rand_p["gorev"]==gorev])
@@ -7622,20 +7627,28 @@ elif aktif == "patron":
     _say_email   = _gorev_say("E-mail")
     _say_wa      = _gorev_say("Whatsapp Mesaj")
     _say_bitti   = len(_p_rand_p[_p_rand_p["sonuc"]=="Bitti"]) if not _p_rand_p.empty and "sonuc" in _p_rand_p.columns else 0
-    _say_teklif  = len(_p_tek[(_p_tek.get("tarih","") if not _p_tek.empty else pd.Series(dtype=str))>=_bas]) if not _p_tek.empty and "tarih" in _p_tek.columns else 0
-    _say_analiz  = _toplam_an
+    # Teklif — dönem filtreli
+    try:
+        if not _p_tek.empty and "tarih" in _p_tek.columns:
+            _say_teklif = len(_p_tek[_p_tek["tarih"].astype(str)>=_bas])
+        else:
+            _say_teklif = 0
+    except: _say_teklif = 0
+    _say_analiz = _toplam_an
 
     # Segment dağılımı
     def _seg_say(seg):
         if _p_cari.empty or "segment" not in _p_cari.columns: return 0
         return len(_p_cari[_p_cari["segment"]==seg])
 
-    # Temsilci aktivitesi
+    # Temsilci aktivitesi — büyük/küçük harf normalize et
     _tem_data = {}
     if not _p_rand_p.empty and "temsilci" in _p_rand_p.columns:
+        _p_rand_p = _p_rand_p.copy()
+        _p_rand_p["temsilci"] = _p_rand_p["temsilci"].astype(str).str.strip().str.title()
         for _tem, _grp in _p_rand_p.groupby("temsilci"):
-            if str(_tem).strip():
-                _tem_data[str(_tem)] = {
+            if _tem and _tem not in ["","Nan","None"]:
+                _tem_data[_tem] = {
                     "toplam":  len(_grp),
                     "ziyaret": len(_grp[_grp["gorev"]=="Ziyaret"]) if "gorev" in _grp.columns else 0,
                     "arama":   len(_grp[_grp["gorev"]=="Arama"])   if "gorev" in _grp.columns else 0,
@@ -7651,20 +7664,30 @@ elif aktif == "patron":
         "⭐ A":  _seg_say("⭐ A"),
         "🔵 B":  _seg_say("🔵 B"),
         "⚪ C":  _seg_say("⚪ C"),
-        "Hedef": _hedef,
-        "Pasif": len(_p_cari[_p_cari["durum"]=="Pasif"]) if not _p_cari.empty and "durum" in _p_cari.columns else 0,
+        "🎯 Hedef": _hedef,
+        "😴 Pasif": _pasif,
     }, ensure_ascii=False)
 
-    # Uyarılar
+    # Uyarılar — gerçek verilerden
     _uyarilar = []
     if not _p_rand.empty and "randevu_tarihi" in _p_rand.columns and "sonuc" in _p_rand.columns:
-        _acik_eski = _p_rand[(_p_rand["randevu_tarihi"].astype(str)<str(_bugun))&(~_p_rand["sonuc"].isin(["Bitti","İptal","Gidilmedi",""]))]
-        if len(_acik_eski)>0: _uyarilar.append({"tip":"r","mesaj":f"🔴 {len(_acik_eski)} randevu sonuçlandırılmamış (geçmiş tarih)"})
-    if not _p_cari.empty and "durum" in _p_cari.columns:
-        _htemas = _hedef
-        if _htemas>0: _uyarilar.append({"tip":"y","mesaj":f"🟡 {_htemas} hedef müşteride aktif takip gerekiyor"})
-    if _say_bitti>0: _uyarilar.append({"tip":"g","mesaj":f"✅ Bu dönem {_say_bitti} randevu başarıyla tamamlandı"})
-    if _say_analiz>0: _uyarilar.append({"tip":"b","mesaj":f"ℹ️ Toplam {_say_analiz} müşteri analizi yapılmış"})
+        _acik_eski = _p_rand[
+            (_p_rand["randevu_tarihi"].astype(str) < str(_bugun)) &
+            (~_p_rand["sonuc"].isin(["Bitti","İptal","Gidilmedi"])) &
+            (_p_rand["sonuc"].astype(str).str.strip() != "")
+        ]
+        if len(_acik_eski) > 0:
+            _uyarilar.append({"tip":"r","mesaj":f"🔴 {len(_acik_eski)} randevu sonuçlandırılmamış (geçmiş tarih)"})
+    if _hedef > 0:
+        _uyarilar.append({"tip":"y","mesaj":f"🟡 {_hedef} hedef müşteride aktif takip gerekiyor"})
+    if _pasif > 0:
+        _uyarilar.append({"tip":"y","mesaj":f"🟡 {_pasif} pasif müşteri var — reaktivasyon fırsatı"})
+    if _say_bitti > 0:
+        _uyarilar.append({"tip":"g","mesaj":f"✅ Bu dönem {_say_bitti} randevu başarıyla tamamlandı"})
+    if _say_analiz > 0:
+        _uyarilar.append({"tip":"b","mesaj":f"ℹ️ Toplam {_say_analiz} müşteri analizi yapılmış"})
+    if not _uyarilar:
+        _uyarilar.append({"tip":"g","mesaj":"✅ Her şey yolunda!"})
     _uyari_json = _pj.dumps(_uyarilar, ensure_ascii=False)
 
     _patron_html = f"""<!DOCTYPE html>
@@ -7759,7 +7782,7 @@ body{{background:#0f172a;padding:14px;color:white;}}
     <div class="kart-t">🎯 Müşteri Durumu</div>
     <div class="bar-row"><div class="bar-l">✅ Aktif</div><div class="bar-w"><div class="bar-f" style="width:{min(100,int(_portfoy/max(_toplam_musteri,1)*100))}%"></div></div><div class="bar-n">{_portfoy}</div></div>
     <div class="bar-row"><div class="bar-l">🎯 Hedef</div><div class="bar-w"><div class="bar-f" style="width:{min(100,int(_hedef/max(_toplam_musteri,1)*100))}%;background:linear-gradient(90deg,#f87171,#dc2626)"></div></div><div class="bar-n">{_hedef}</div></div>
-    <div class="bar-row"><div class="bar-l">😴 Pasif</div><div class="bar-w"><div class="bar-f" style="width:{min(100,int((len(_p_cari[_p_cari['durum']=='Pasif']) if not _p_cari.empty and 'durum' in _p_cari.columns else 0)/max(_toplam_musteri,1)*100))}%;background:#334155"></div></div><div class="bar-n">{len(_p_cari[_p_cari['durum']=='Pasif']) if not _p_cari.empty and 'durum' in _p_cari.columns else 0}</div></div>
+    <div class="bar-row"><div class="bar-l">😴 Pasif</div><div class="bar-w"><div class="bar-f" style="width:{min(100,int(_pasif/max(_toplam_musteri,1)*100))}%;background:#334155"></div></div><div class="bar-n">{_pasif}</div></div>
   </div>
 </div>
 
