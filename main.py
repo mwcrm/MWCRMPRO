@@ -1702,63 +1702,54 @@ elif aktif == "liste":
         _sira = [x for x in _sira if x in _adlar]
         st.session_state[sira_key] = _sira
 
-        # Gizli hafızası
-        _gizli = st.session_state.get(gizli_key, set())
-        if not isinstance(_gizli, set): _gizli = set(_gizli)
+        # Gizli hafızası — list olarak sakla (set serialize edilemiyor)
+        _gizli_list = st.session_state.get(gizli_key, [])
+        if not isinstance(_gizli_list, list): _gizli_list = list(_gizli_list)
+        _gizli = set(_gizli_list)
 
         # Düzenleme modu
         _mode = st.session_state.get(f"_{sira_key}_mode", False)
 
-        # Başlık satırı
-        _hc = st.columns([0.5, 0.5, 8])
-        if _hc[0].button("⚙️", key=f"{sira_key}_toggle", help="Düzenle", use_container_width=True):
-            st.session_state[f"_{sira_key}_mode"] = not _mode; st.rerun()
-        _hc[1].markdown(f"<div style='font-size:11px;color:#94a3b8;padding-top:6px'>{satir_label}</div>", unsafe_allow_html=True)
-
         if _mode:
-            # Düzenleme modu — her buton için kontroller
-            st.caption("← → taşı · 👁 gizle/göster")
+            # Düzenleme modu — başında ✓ sonra her buton
+            st.caption("← → taşı · 🙈 gizle · ✓ bitir")
             _tum = _sira.copy()
-            _edit_cols = st.columns(len(_tum))
+            _edit_cols = st.columns([0.4] + [1]*len(_tum))
+            # İlk kolona ✓ butonu
+            if _edit_cols[0].button("✓", key=f"{sira_key}_bitti", use_container_width=True):
+                st.session_state[f"_{sira_key}_mode"] = False; st.rerun()
             for i, _ad in enumerate(_tum):
                 _sayi = _veri_dict.get(_ad, 0)
                 _em = emoji_map.get(_ad, "🔹")
                 _gizli_mi = _ad in _gizli
-                with _edit_cols[i]:
+                with _edit_cols[i+1]:
                     _r1, _r2, _r3 = st.columns(3)
-                    # Sol
                     if _r1.button("←", key=f"{sira_key}_sol_{i}", use_container_width=True):
                         if i > 0:
                             _sira[i], _sira[i-1] = _sira[i-1], _sira[i]
                             st.session_state[sira_key] = _sira; st.rerun()
-                    # Sağ
                     if _r2.button("→", key=f"{sira_key}_sag_{i}", use_container_width=True):
                         if i < len(_tum)-1:
                             _sira[i], _sira[i+1] = _sira[i+1], _sira[i]
                             st.session_state[sira_key] = _sira; st.rerun()
-                    # Gizle/Göster
                     if _r3.button("🙈" if not _gizli_mi else "👁", key=f"{sira_key}_giz_{i}", use_container_width=True):
                         if _gizli_mi: _gizli.discard(_ad)
                         else: _gizli.add(_ad)
-                        st.session_state[gizli_key] = _gizli; st.rerun()
-                    # Buton önizleme
-                    st.button(
-                        f"{_em} {_ad}\n{_sayi}",
-                        key=f"{sira_key}_prev_{i}",
-                        use_container_width=True,
-                        disabled=True,
-                        type="secondary" if not _gizli_mi else "secondary",
-                    )
+                        st.session_state[gizli_key] = list(_gizli); st.rerun()
+                    st.button(f"{_em} {_ad}\n{_sayi}", key=f"{sira_key}_prev_{i}",
+                              use_container_width=True, disabled=True)
                     if _gizli_mi:
                         st.markdown("<div style='text-align:center;font-size:10px;color:#94a3b8'>gizli</div>", unsafe_allow_html=True)
         else:
-            # Normal mod — sadece görünen butonlar
+            # Normal mod — sadece görünen butonlar + başında ⚙️
             _gorunen = [(_ad, _veri_dict.get(_ad, 0)) for _ad in _sira if _ad not in _gizli]
             if _gorunen:
-                _btn_cols = st.columns(len(_gorunen))
+                _btn_cols = st.columns([0.4] + [1]*len(_gorunen))
+                if _btn_cols[0].button("⚙️", key=f"{sira_key}_toggle2", use_container_width=True):
+                    st.session_state[f"_{sira_key}_mode"] = True; st.rerun()
                 for i, (_ad, _sayi) in enumerate(_gorunen):
                     _em = emoji_map.get(_ad, "🔹")
-                    if _btn_cols[i].button(f"{_em} {_ad}\n{_sayi}", key=f"{sira_key}_btn_{i}", use_container_width=True):
+                    if _btn_cols[i+1].button(f"{_em} {_ad}\n{_sayi}", key=f"{sira_key}_btn_{i}", use_container_width=True):
                         if fil_key == "durum":
                             st.session_state["_cl_fil_durum_multi"] = [] if _ad == "Toplam" else [_ad]
                         else:
