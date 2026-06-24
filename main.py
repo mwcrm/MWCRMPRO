@@ -2698,11 +2698,11 @@ elif aktif == "kullanici":
     )
 
     if st.session_state.get("rol") == "admin":
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir"])
     elif _surum_yetkisi:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir"])
     else:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir"])
         kul_tab5 = None
 
     with kul_tab1:
@@ -3365,7 +3365,75 @@ function updateBot(v){{
             except Exception as _kgue:
                 st.error(f"Hata: {_kgue}")
 
-    # ── ⚙️ TANIMLAR TABÜ — AŞAMA & DURUM YÖNETİMİ ───────────────────────────
+    # ── 🔄 TOPLU DEĞİŞTİR ────────────────────────────────────────────────────
+    with kul_tab_toplu:
+        st.markdown("### 🔄 Toplu Aşama / Durum Değiştir")
+        st.caption("Seçili aşama veya durumu toplu olarak değiştirin")
+
+        _sb_toplu = get_sb_client()
+        _df_toplu = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+
+        if not _df_toplu.empty:
+            _tc1, _tc2, _tc3 = st.columns(3)
+
+            # Filtrele
+            _t_tem_opts = ["Tümü"] + sorted(_df_toplu["temsilci"].dropna().astype(str).unique().tolist()) if "temsilci" in _df_toplu.columns else ["Tümü"]
+            _t_tem = _tc1.selectbox("Temsilci filtrele", _t_tem_opts, key="toplu_tem")
+            if _t_tem != "Tümü":
+                _df_toplu = _df_toplu[_df_toplu["temsilci"] == _t_tem]
+
+            _t_asama_opts = ["Tümü"] + tum_asama_opts
+            _t_asama_fil = _tc2.selectbox("Mevcut Aşama filtrele", _t_asama_opts, key="toplu_asama_fil")
+            if _t_asama_fil != "Tümü":
+                _df_toplu = _df_toplu[_df_toplu["islem_asamasi"] == _t_asama_fil]
+
+            _t_durum_opts = ["Tümü"] + tum_durum_opts
+            _t_durum_fil = _tc3.selectbox("Mevcut Durum filtrele", _t_durum_opts, key="toplu_durum_fil")
+            if _t_durum_fil != "Tümü":
+                _df_toplu = _df_toplu[_df_toplu["durum"] == _t_durum_fil]
+
+            st.caption(f"**{len(_df_toplu)} müşteri** seçili")
+
+            st.divider()
+            st.markdown("#### Ne Değiştirilsin?")
+            _tc4, _tc5 = st.columns(2)
+
+            _degistir_ne = _tc4.radio("Değiştirilecek alan:", ["Aşama", "Durum"], horizontal=True, key="toplu_ne")
+
+            if _degistir_ne == "Aşama":
+                _yeni_deger = _tc5.selectbox("Yeni Aşama:", tum_asama_opts, key="toplu_yeni_asama")
+                _alan = "islem_asamasi"
+            else:
+                _yeni_deger = _tc5.selectbox("Yeni Durum:", tum_durum_opts, key="toplu_yeni_durum")
+                _alan = "durum"
+
+            # Önizleme
+            with st.expander(f"👁 Etkilenecek {len(_df_toplu)} müşteriyi gör", expanded=False):
+                st.dataframe(_df_toplu[["id","firma","durum","islem_asamasi","temsilci"]].head(50),
+                           use_container_width=True, hide_index=True)
+
+            _onay = st.checkbox(f"✅ **{len(_df_toplu)} müşterinin {_degistir_ne} değerini '{_yeni_deger}' yapmayı onaylıyorum**", key="toplu_onay")
+
+            if st.button("🔄 Toplu Değiştir", type="primary", key="toplu_kaydet", disabled=not _onay):
+                _basarili = 0
+                _hatali = 0
+                for _, _tr in _df_toplu.iterrows():
+                    try:
+                        if _sb_toplu:
+                            _sb_toplu.table("cari_kartlar").update({_alan: _yeni_deger}).eq("id", int(_tr["id"])).execute()
+                        _basarili += 1
+                    except:
+                        _hatali += 1
+                try: db_read.clear()
+                except: pass
+                st.session_state.pop("toplu_onay", None)
+                if _basarili:
+                    st.success(f"✅ {_basarili} müşteri güncellendi!" + (f" ⚠️ {_hatali} hata" if _hatali else ""))
+                    st.rerun()
+                else:
+                    st.error("Güncelleme başarısız!")
+        else:
+            st.info("Müşteri verisi bulunamadı.")
     with kul_tab_tanim:
         st.markdown("### ⚙️ Aşama & Durum Tanımları")
         _sb_tan = get_sb_client()
