@@ -1652,17 +1652,8 @@ elif aktif == "liste":
     # ── ASAMA & DURUM LİSTELERİ — sistem_tanimlar tablosundan ──────────────────
     tum_asama_opts = _tanimlar_yukle("asama")
     tum_durum_opts = _tanimlar_yukle("durum")
-
-    # df'de olan ama tabloda olmayan aşama/durumları da ekle
-    if not df.empty:
-        if "islem_asamasi" in df.columns:
-            for _da in df["islem_asamasi"].dropna().unique():
-                if str(_da).strip() and str(_da) not in ["nan",""] and _da not in tum_asama_opts:
-                    tum_asama_opts.append(str(_da))
-        if "durum" in df.columns:
-            for _dd in df["durum"].dropna().unique():
-                if str(_dd).strip() and str(_dd) not in ["nan",""] and _dd not in tum_durum_opts:
-                    tum_durum_opts.append(str(_dd))
+    # NOT: df'de olan ama tanımlardan silinmiş durum/aşamalar eklenmez
+    # Sadece tanımlar tablosundakiler gösterilir
 
     # ── ÜST METRİKLER — TÜM DURUM VE AŞAMALAR ──────────────────────────────
     # Durum emoji haritası
@@ -1695,14 +1686,42 @@ elif aktif == "liste":
         _veri_dict = {ad: sayi for ad, sayi in veri_listesi}
         _adlar = [ad for ad, _ in veri_listesi]
 
-        # Sıra hafızası
-        _sira = st.session_state.get(sira_key, _adlar.copy())
+        def _tercih_yukle(anahtar, varsayilan):
+            """DB'den tercih yükle"""
+            try:
+                _sb = get_sb_client()
+                if _sb:
+                    _r = _sb.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar",anahtar).execute()
+                    if _r.data:
+                        import json as _tj
+                        return _tj.loads(_r.data[0]["deger"])
+            except: pass
+            return varsayilan
+
+        def _tercih_kaydet(anahtar, deger):
+            """DB'ye tercih kaydet"""
+            try:
+                _sb = get_sb_client()
+                if _sb:
+                    import json as _tj
+                    _sb.table("kullanici_tercih").upsert({
+                        "kullanici":"__liste_ui__","anahtar":anahtar,
+                        "deger":_tj.dumps(deger, ensure_ascii=False)
+                    }, on_conflict="kullanici,anahtar").execute()
+            except: pass
+
+        # Sıra — session_state'te yoksa DB'den yükle
+        if sira_key not in st.session_state:
+            st.session_state[sira_key] = _tercih_yukle(sira_key, _adlar.copy())
+        _sira = st.session_state[sira_key]
         for _a in _adlar:
             if _a not in _sira: _sira.append(_a)
         _sira = [x for x in _sira if x in _adlar]
         st.session_state[sira_key] = _sira
 
-        # Gizli hafızası — list olarak sakla (set serialize edilemiyor)
+        # Gizli — session_state'te yoksa DB'den yükle
+        if gizli_key not in st.session_state:
+            st.session_state[gizli_key] = _tercih_yukle(gizli_key, [])
         _gizli_list = st.session_state.get(gizli_key, [])
         if not isinstance(_gizli_list, list): _gizli_list = list(_gizli_list)
         _gizli = set(_gizli_list)
@@ -1727,15 +1746,18 @@ elif aktif == "liste":
                     if _r1.button("←", key=f"{sira_key}_sol_{i}", use_container_width=True):
                         if i > 0:
                             _sira[i], _sira[i-1] = _sira[i-1], _sira[i]
-                            st.session_state[sira_key] = _sira; st.rerun()
+                            st.session_state[sira_key] = _sira
+                            _tercih_kaydet(sira_key, _sira); st.rerun()
                     if _r2.button("→", key=f"{sira_key}_sag_{i}", use_container_width=True):
                         if i < len(_tum)-1:
                             _sira[i], _sira[i+1] = _sira[i+1], _sira[i]
-                            st.session_state[sira_key] = _sira; st.rerun()
+                            st.session_state[sira_key] = _sira
+                            _tercih_kaydet(sira_key, _sira); st.rerun()
                     if _r3.button("🙈" if not _gizli_mi else "👁", key=f"{sira_key}_giz_{i}", use_container_width=True):
                         if _gizli_mi: _gizli.discard(_ad)
                         else: _gizli.add(_ad)
-                        st.session_state[gizli_key] = list(_gizli); st.rerun()
+                        st.session_state[gizli_key] = list(_gizli)
+                        _tercih_kaydet(gizli_key, list(_gizli)); st.rerun()
                     st.button(f"{_em} {_ad}\n{_sayi}", key=f"{sira_key}_prev_{i}",
                               use_container_width=True, disabled=True)
                     if _gizli_mi:
