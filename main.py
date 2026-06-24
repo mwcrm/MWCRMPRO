@@ -2248,7 +2248,8 @@ elif aktif == "liste":
         "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
         "id":            st.column_config.NumberColumn("ID", disabled=True, width=_w("id")),
         "tarih":         None, "olusturan": None, "silindi": None,
-        "beklenen_ciro": None, "gerceklesen_ciro": None,
+        "beklenen_ciro":    st.column_config.NumberColumn("Hedef ₺",  format="%.0f ₺", width="small"),
+        "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%.0f ₺", width="small"),
         "firma":         st.column_config.TextColumn("Firma",     width=_w("firma")),
         "yetkili":       st.column_config.TextColumn("Yetkili",   width=_w("yetkili")),
         "gsm":           st.column_config.TextColumn("GSM",       width=_w("gsm")),
@@ -2264,7 +2265,7 @@ elif aktif == "liste":
         "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
     }
-    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","📅 Son Randevu","aciklama","📨 Notlar"]
+    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro","📅 Son Randevu","aciklama","📨 Notlar"]
 
     # ── DATA EDITOR ─────────────────────────────────────────────────────────────
     df_edit = df_f.copy()
