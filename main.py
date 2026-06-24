@@ -2639,11 +2639,11 @@ elif aktif == "kullanici":
     )
 
     if st.session_state.get("rol") == "admin":
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları"])
     elif _surum_yetkisi:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları"])
     else:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5_ekran, kul_tab_tanim = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🎨 Ekran Ayarları","⚙️ Tanımlar"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları"])
         kul_tab5 = None
 
     with kul_tab1:
@@ -3257,9 +3257,8 @@ function updateBot(v){{
 4. Sorun çıkarsa **🔄 Geri Al** → önceki sürüme dön
                 """)
 
-    # ── ⚙️ TANIMLAR TABÜ — AŞAMA & DURUM YÖNETİMİ ───────────────────────────
-    with kul_tab_tanim:
-        # Kolon Genişlik Ayarları
+    # ── 📐 KOLON AYARLARI ─────────────────────────────────────────────────────
+    with kul_tab_kolon:
         st.markdown("### 📐 Cari Liste Kolon Genişlikleri")
         st.caption("Slider ile ayarlayın → Kaydet → Cari listede her zaman bu genişlikte açılır")
         _KOL_VARS_UI = {
@@ -3273,7 +3272,6 @@ function updateBot(v){{
             "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"Aşama",
             "aciklama":"Açıklama","📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID"
         }
-        # Mevcut değerleri yükle
         try:
             _sb_kg_ui = get_sb_client()
             _kg_ui_mevcut = _KOL_VARS_UI.copy()
@@ -3287,13 +3285,13 @@ function updateBot(v){{
         _yeni_kg_ui = {}
         _ui_cols = st.columns(len(_KOL_VARS_UI))
         for _i, _k in enumerate(_KOL_VARS_UI.keys()):
-            _yeni_kg_ui[_k] = _ui_cols[_i].number_input(
+            _yeni_kg_ui[_k] = _ui_cols[_i].slider(
                 _KG_UI_ETIKET.get(_k,_k),
-                min_value=40, max_value=500,
+                min_value=40, max_value=400,
                 value=int(_kg_ui_mevcut.get(_k, _KOL_VARS_UI.get(_k,100))),
                 step=10, key=f"ui_kg_{_k}"
             )
-        if st.button("💾 Kolon Genişliklerini Kaydet", type="primary", key="ui_kg_kaydet"):
+        if st.button("💾 Kaydet", type="primary", key="ui_kg_kaydet"):
             try:
                 _sb_kg_s = get_sb_client()
                 if _sb_kg_s:
@@ -3304,11 +3302,12 @@ function updateBot(v){{
                     }, on_conflict="kullanici,anahtar").execute()
                 st.session_state["_kol_genislik"] = _yeni_kg_ui
                 st.session_state.pop("_kol_genislik_init", None)
-                st.success("✅ Kaydedildi! Cari listeye geçince yeni genişlikler aktif olur.")
+                st.success("✅ Kaydedildi!")
             except Exception as _kgue:
                 st.error(f"Hata: {_kgue}")
 
-        st.divider()
+    # ── ⚙️ TANIMLAR TABÜ — AŞAMA & DURUM YÖNETİMİ ───────────────────────────
+    with kul_tab_tanim:
         st.markdown("### ⚙️ Aşama & Durum Tanımları")
         _sb_tan = get_sb_client()
 
