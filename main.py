@@ -2309,9 +2309,9 @@ elif aktif == "liste":
                         "metin": str(_nr.get("aciklama","") or ""),
                     })
                 df_edit["📨 Notlar"] = df_edit["id"].apply(lambda x: f"📨 {_not_sayac.get(str(int(x)),0)}" if _not_sayac.get(str(int(x)),0) > 0 else "")
-                _notlu_idler = set(str(k) for k in _not_sayac.keys() if _not_sayac.get(k,0) > 0)
-                df_edit["_notlu"] = df_edit["id"].apply(lambda x: 0 if str(int(x)) in _notlu_idler else 1)
-                df_edit = df_edit.sort_values("_notlu").drop(columns=["_notlu"]).reset_index(drop=True)
+                # Not sayısına göre sırala — çok notlu üstte, notsuzlar altta
+                df_edit["_not_sayi"] = df_edit["id"].apply(lambda x: _not_sayac.get(str(int(x)),0))
+                df_edit = df_edit.sort_values("_not_sayi", ascending=False).drop(columns=["_not_sayi"]).reset_index(drop=True)
             else:
                 df_edit["📨 Notlar"] = ""
         except:
