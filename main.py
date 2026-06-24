@@ -6278,7 +6278,6 @@ elif aktif == "randevu":
                         if not _rid: continue
                         _guncelle = {}
                         if "Tarih" in _degis:
-                            # GG.AA.YYYY → YYYY-MM-DD (DB formatı)
                             _t = str(_degis["Tarih"]).strip()
                             if len(_t) == 10 and _t[2] == "." and _t[5] == ".":
                                 _guncelle["randevu_tarihi"] = f"{_t[6:]}-{_t[3:5]}-{_t[:2]}"
@@ -6306,6 +6305,41 @@ elif aktif == "randevu":
                     st.rerun()
                 else:
                     st.info("Değişiklik yok.")
+
+            # ── SİLME KISMI ──────────────────────────────────────────────────
+            with st.expander("🗑 Randevu Sil", expanded=False):
+                st.caption("Silmek istediğiniz randevunun ID'sini seçin:")
+                _sil_id_opts = [f"ID:{r.get('id','')} · {fmt_tarih(r.get('randevu_tarihi',''))} · {r.get('musteri_adi','')} · {r.get('bolge','')}" for _,r in df_rand.iterrows()]
+                _sil_id_map  = {f"ID:{r.get('id','')} · {fmt_tarih(r.get('randevu_tarihi',''))} · {r.get('musteri_adi','')} · {r.get('bolge','')}": int(r.get("id",0)) for _,r in df_rand.iterrows()}
+                if _sil_id_opts:
+                    _sil_sec = st.selectbox("Randevu seç:", _sil_id_opts, key="rand_sil_sec")
+                    _sc1, _sc2 = st.columns(2)
+                    if _sc1.button("🗑 Sil", key="rand_sil_btn", use_container_width=True, type="primary"):
+                        st.session_state["rand_sil_onay"] = True
+                    if st.session_state.get("rand_sil_onay"):
+                        st.warning(f"⚠️ **{_sil_sec}** silinecek. Emin misin?")
+                        _oc1, _oc2 = st.columns(2)
+                        if _oc1.button("✅ Evet, Sil", key="rand_sil_evet", use_container_width=True):
+                            _sil_rid = _sil_id_map.get(_sil_sec, 0)
+                            if _sil_rid:
+                                try:
+                                    _sb_sil = get_sb_client()
+                                    if _sb_sil:
+                                        _sb_sil.table("randevular").delete().eq("id", _sil_rid).execute()
+                                    else:
+                                        db_exec(f"DELETE FROM randevular WHERE id={_sil_rid}")
+                                    st.session_state.pop("rand_sil_onay", None)
+                                    try: db_read.clear()
+                                    except: pass
+                                    st.success("✅ Randevu silindi!")
+                                    st.rerun()
+                                except Exception as _se:
+                                    st.error(f"Hata: {_se}")
+                        if _oc2.button("❌ Hayır", key="rand_sil_hayir", use_container_width=True):
+                            st.session_state.pop("rand_sil_onay", None)
+                            st.rerun()
+                else:
+                    st.info("Silinecek randevu yok.")
 
             # Excel
             _buf_r = _rio.BytesIO(); df_rand.to_excel(_buf_r,index=False); _buf_r.seek(0)
