@@ -3404,13 +3404,15 @@ function updateBot(v){{
             _degistir_ne = _tc4.radio("Değiştirilecek alan:", ["Aşama", "Durum"], horizontal=True, key="toplu_ne")
 
             if _degistir_ne == "Aşama":
-                _yeni_deger = _tc5.selectbox("Yeni Aşama:", ["— Seçiniz —"] + _t_asama_l, key="toplu_yeni_asama")
+                _yeni_deger = _tc5.selectbox("Yeni Aşama:", ["— Boş (Temizle) —"] + _t_asama_l, key="toplu_yeni_asama")
                 _alan = "islem_asamasi"
+                _yeni_deger_db = "" if _yeni_deger == "— Boş (Temizle) —" else _yeni_deger
             else:
-                _yeni_deger = _tc5.selectbox("Yeni Durum:", ["— Seçiniz —"] + _t_durum_l, key="toplu_yeni_durum")
+                _yeni_deger = _tc5.selectbox("Yeni Durum:", ["— Boş (Temizle) —"] + _t_durum_l, key="toplu_yeni_durum")
                 _alan = "durum"
+                _yeni_deger_db = "" if _yeni_deger == "— Boş (Temizle) —" else _yeni_deger
 
-            _secim_gecerli = _yeni_deger and _yeni_deger != "— Seçiniz —"
+            _secim_gecerli = True  # Boş da geçerli seçim
 
             # Önizleme
             with st.expander(f"👁 Etkilenecek {len(_df_toplu)} müşteriyi gör", expanded=False):
@@ -3425,7 +3427,7 @@ function updateBot(v){{
                 for _, _tr in _df_toplu.iterrows():
                     try:
                         if _sb_toplu:
-                            _sb_toplu.table("cari_kartlar").update({_alan: _yeni_deger}).eq("id", int(_tr["id"])).execute()
+                            _sb_toplu.table("cari_kartlar").update({_alan: _yeni_deger_db}).eq("id", int(_tr["id"])).execute()
                         _basarili += 1
                     except:
                         _hatali += 1
