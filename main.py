@@ -1164,6 +1164,10 @@ div[data-testid="stVerticalBlock"] > div:empty { display: none !important; }
 div[data-testid="stVerticalBlock"] { gap: 0.3rem !important; }
 hr { margin: 0.3rem 0 !important; }
 div[data-testid="stHorizontalBlock"] { gap: 0.3rem !important; }
+/* Ana içerik scroll bar kaldır */
+html, body, [data-testid="stAppViewContainer"] { overflow: hidden !important; }
+[data-testid="stMain"] { overflow-y: auto !important; }
+::-webkit-scrollbar { width: 0px !important; background: transparent !important; }
 button[data-testid="collapsedControl"] { display: none !important; }
 section[data-testid="stSidebar"] .stButton>button {
     text-align: left !important;
