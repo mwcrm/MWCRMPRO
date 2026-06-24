@@ -2190,26 +2190,86 @@ elif aktif == "liste":
     _tum_durumlar = ["Aktif","Hedef","Pasif"] + [d for d in _ekstra_d if d not in ["Aktif","Hedef","Pasif"]]
 
     # ── KOLON AYARLARI ──────────────────────────────────────────────────────────
+    # ── KOLON GENİŞLİKLERİ — DB'den oku ─────────────────────────────────────
+    _KOL_VARSAYILAN = {
+        "firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
+        "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
+        "islem_asamasi":90,"📅 Son Randevu":180,"📨 Notlar":60,"id":50
+    }
+    if "_kol_genislik_init" not in st.session_state:
+        try:
+            _sb_kg = get_sb_client()
+            if _sb_kg:
+                import json as _kgj
+                _r_kg = _sb_kg.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kol_genislik").execute()
+                if _r_kg.data:
+                    st.session_state["_kol_genislik"] = _kgj.loads(_r_kg.data[0]["deger"])
+                else:
+                    st.session_state["_kol_genislik"] = _KOL_VARSAYILAN.copy()
+        except:
+            st.session_state["_kol_genislik"] = _KOL_VARSAYILAN.copy()
+        st.session_state["_kol_genislik_init"] = True
+
+    _KG = st.session_state.get("_kol_genislik", _KOL_VARSAYILAN.copy())
+
+    # Kolon ayarları paneli
+    with st.expander("⚙️ Kolon Genişlik Ayarları", expanded=False):
+        st.caption("Kaydır → Kaydet → Her yenilemede bu genişlikte açılır")
+        _kg_cols = list(_KOL_VARSAYILAN.keys())
+        _kg_etiket = {"firma":"Firma","yetkili":"Yetkili","gsm":"GSM","sabit":"S.Tel",
+                      "email":"Email","adres":"Adres","il":"İl","ilce":"İlçe",
+                      "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"Aşama",
+                      "📅 Son Randevu":"Son Randevu","📨 Notlar":"Notlar","id":"ID"}
+        _yeni_kg = {}
+        _slider_cols = st.columns(4)
+        for _i, _k in enumerate(_kg_cols):
+            _yeni_kg[_k] = _slider_cols[_i % 4].slider(
+                _kg_etiket.get(_k, _k),
+                min_value=40, max_value=400,
+                value=int(_KG.get(_k, _KOL_VARSAYILAN.get(_k, 100))),
+                step=10, key=f"kg_{_k}"
+            )
+        if st.button("💾 Kolon Ayarlarını Kaydet", type="primary", key="kg_kaydet", use_container_width=True):
+            try:
+                _sb_kgs = get_sb_client()
+                if _sb_kgs:
+                    import json as _kgsj
+                    _sb_kgs.table("kullanici_tercih").upsert({
+                        "kullanici":"__liste_ui__","anahtar":"_kol_genislik",
+                        "deger":_kgsj.dumps(_yeni_kg, ensure_ascii=False)
+                    }, on_conflict="kullanici,anahtar").execute()
+                st.session_state["_kol_genislik"] = _yeni_kg
+                st.session_state.pop("_kol_genislik_init", None)
+                st.success("✅ Kaydedildi!"); st.rerun()
+            except Exception as _kge:
+                st.error(f"Hata: {_kge}")
+
+    def _w(k):
+        """Kolon genişliğini pixel olarak döndür"""
+        px = int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100)))
+        if px <= 80:   return "small"
+        elif px <= 150: return "medium"
+        else:           return "large"
+
     col_config = {
         "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
-        "id":            st.column_config.NumberColumn("ID", disabled=True),
+        "id":            st.column_config.NumberColumn("ID", disabled=True, width=_w("id")),
         "tarih":         None, "olusturan": None, "silindi": None,
         "beklenen_ciro": None, "gerceklesen_ciro": None,
-        "aciklama":      None,
-        "adres":         st.column_config.TextColumn("Adres", width="large"),
-        "firma":         st.column_config.TextColumn("Firma"),
-        "yetkili":       st.column_config.TextColumn("Yetkili"),
-        "gsm":           st.column_config.TextColumn("GSM"),
-        "sabit":         st.column_config.TextColumn("S. Tel"),
-        "email":         st.column_config.TextColumn("Email"),
-        "il":            st.column_config.TextColumn("İl"),
-        "ilce":          st.column_config.TextColumn("İlçe"),
-        "durum":         st.column_config.SelectboxColumn("Durum", options=tum_durum_opts),
-        "temsilci":      st.column_config.TextColumn("Temsilci"),
-        "islem_asamasi": st.column_config.SelectboxColumn("Aşama", options=tum_asama_opts),
-        "aciklama":      st.column_config.TextColumn("Açıklama — yaz kaydet → arşivlenir", width="large"),
-        "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width="large"),
-        "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width="small"),
+        "firma":         st.column_config.TextColumn("Firma",     width=_w("firma")),
+        "yetkili":       st.column_config.TextColumn("Yetkili",   width=_w("yetkili")),
+        "gsm":           st.column_config.TextColumn("GSM",       width=_w("gsm")),
+        "sabit":         st.column_config.TextColumn("S. Tel",    width=_w("sabit")),
+        "email":         st.column_config.TextColumn("Email",     width=_w("email")),
+        "adres":         st.column_config.TextColumn("Adres",     width=_w("adres")),
+        "il":            st.column_config.TextColumn("İl",        width=_w("il")),
+        "ilce":          st.column_config.TextColumn("İlçe",      width=_w("ilce")),
+        "durum":         st.column_config.SelectboxColumn("Durum", options=tum_durum_opts, width=_w("durum")),
+        "temsilci":      st.column_config.TextColumn("Temsilci",  width=_w("temsilci")),
+        "islem_asamasi": st.column_config.SelectboxColumn("Aşama", options=tum_asama_opts, width=_w("islem_asamasi")),
+        "aciklama":      st.column_config.TextColumn("Açıklama",  width="large"),
+        "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
+        "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
     }
     col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","📅 Son Randevu","aciklama","📨 Notlar"]
 
