@@ -2195,7 +2195,7 @@ elif aktif == "liste":
     _KOL_VARSAYILAN = {
         "firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
         "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
-        "islem_asamasi":90,"📅 Son Randevu":180,"📨 Notlar":60,"id":50
+        "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50
     }
     if "_kol_genislik_init" not in st.session_state:
         try:
@@ -2213,41 +2213,9 @@ elif aktif == "liste":
 
     _KG = st.session_state.get("_kol_genislik", _KOL_VARSAYILAN.copy())
 
-    # Kolon ayarları paneli
-    # Kolon ayarları — tek satır, expander içinde
-    with st.expander("⚙️ Kolon Genişlikleri", expanded=False):
-        _kg_cols = list(_KOL_VARSAYILAN.keys())
-        _kg_etiket = {"firma":"Firma","yetkili":"Yetkili","gsm":"GSM","sabit":"S.Tel",
-                      "email":"Email","adres":"Adres","il":"İl","ilce":"İlçe",
-                      "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"Aşama",
-                      "📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID"}
-        _yeni_kg = {}
-        _slider_cols = st.columns(len(_kg_cols))
-        for _i, _k in enumerate(_kg_cols):
-            _yeni_kg[_k] = _slider_cols[_i].slider(
-                _kg_etiket.get(_k,_k), min_value=40, max_value=400,
-                value=int(_KG.get(_k,_KOL_VARSAYILAN.get(_k,100))),
-                step=10, key=f"kg_{_k}"
-            )
-        if st.button("💾 Kaydet", type="primary", key="kg_kaydet"):
-            try:
-                _sb_kgs = get_sb_client()
-                if _sb_kgs:
-                    import json as _kgsj
-                    _sb_kgs.table("kullanici_tercih").upsert({
-                        "kullanici":"__liste_ui__","anahtar":"_kol_genislik",
-                        "deger":_kgsj.dumps(_yeni_kg, ensure_ascii=False)
-                    }, on_conflict="kullanici,anahtar").execute()
-                st.session_state["_kol_genislik"] = _yeni_kg
-                st.session_state.pop("_kol_genislik_init",None)
-                st.success("✅ Kaydedildi!"); st.rerun()
-            except Exception as _kge:
-                st.error(f"Hata: {_kge}")
-
     def _w(k):
-        """Kolon genişliğini pixel olarak döndür"""
         px = int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100)))
-        if px <= 80:   return "small"
+        if px <= 80:    return "small"
         elif px <= 150: return "medium"
         else:           return "large"
 
@@ -3291,6 +3259,56 @@ function updateBot(v){{
 
     # ── ⚙️ TANIMLAR TABÜ — AŞAMA & DURUM YÖNETİMİ ───────────────────────────
     with kul_tab_tanim:
+        # Kolon Genişlik Ayarları
+        st.markdown("### 📐 Cari Liste Kolon Genişlikleri")
+        st.caption("Slider ile ayarlayın → Kaydet → Cari listede her zaman bu genişlikte açılır")
+        _KOL_VARS_UI = {
+            "firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
+            "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
+            "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50
+        }
+        _KG_UI_ETIKET = {
+            "firma":"Firma","yetkili":"Yetkili","gsm":"GSM","sabit":"S.Tel",
+            "email":"Email","adres":"Adres","il":"İl","ilce":"İlçe",
+            "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"Aşama",
+            "aciklama":"Açıklama","📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID"
+        }
+        # Mevcut değerleri yükle
+        try:
+            _sb_kg_ui = get_sb_client()
+            _kg_ui_mevcut = _KOL_VARS_UI.copy()
+            if _sb_kg_ui:
+                import json as _kguj
+                _r_kgu = _sb_kg_ui.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kol_genislik").execute()
+                if _r_kgu.data:
+                    _kg_ui_mevcut = _kguj.loads(_r_kgu.data[0]["deger"])
+        except: _kg_ui_mevcut = _KOL_VARS_UI.copy()
+
+        _yeni_kg_ui = {}
+        _ui_slider_cols = st.columns(len(_KOL_VARS_UI))
+        for _i, _k in enumerate(_KOL_VARS_UI.keys()):
+            _yeni_kg_ui[_k] = _ui_slider_cols[_i].slider(
+                _KG_UI_ETIKET.get(_k,_k),
+                min_value=40, max_value=400,
+                value=int(_kg_ui_mevcut.get(_k, _KOL_VARS_UI.get(_k,100))),
+                step=10, key=f"ui_kg_{_k}"
+            )
+        if st.button("💾 Kolon Genişliklerini Kaydet", type="primary", key="ui_kg_kaydet"):
+            try:
+                _sb_kg_s = get_sb_client()
+                if _sb_kg_s:
+                    import json as _kgsj2
+                    _sb_kg_s.table("kullanici_tercih").upsert({
+                        "kullanici":"__liste_ui__","anahtar":"_kol_genislik",
+                        "deger":_kgsj2.dumps(_yeni_kg_ui, ensure_ascii=False)
+                    }, on_conflict="kullanici,anahtar").execute()
+                st.session_state["_kol_genislik"] = _yeni_kg_ui
+                st.session_state.pop("_kol_genislik_init", None)
+                st.success("✅ Kaydedildi! Cari listeye geçince yeni genişlikler aktif olur.")
+            except Exception as _kgue:
+                st.error(f"Hata: {_kgue}")
+
+        st.divider()
         st.markdown("### ⚙️ Aşama & Durum Tanımları")
         _sb_tan = get_sb_client()
 
