@@ -2190,11 +2190,8 @@ elif aktif == "liste":
         if _not_detay.get(str(_sel_id)):
             if st.session_state.get("_cl_not_panel_id") != _sel_id:
                 st.session_state["_cl_not_panel_id"] = _sel_id
-                st.rerun()
     elif secili_sayi == 0 and st.session_state.get("_cl_not_panel_id"):
-        # Seçim kalkarsa paneli kapat
         st.session_state.pop("_cl_not_panel_id", None)
-        st.rerun()
 
 
     # ── BUTONLAR ──────────────────────────────────────────────────────────────
@@ -5357,12 +5354,10 @@ elif aktif == "detay_cari":
         _dc_sel_notlar = _dc_notlar_tum.get(_dc_sel_id, [])
         if _dc_sel_notlar and st.session_state.get("_dc_not_panel_id") != _dc_sel_id:
             st.session_state["_dc_not_panel_id"] = _dc_sel_id
-            st.rerun()
         elif not _dc_sel_notlar:
             st.session_state.pop("_dc_not_panel_id", None)
     elif len(_dc_secili) == 0 and st.session_state.get("_dc_not_panel_id"):
         st.session_state.pop("_dc_not_panel_id", None)
-        st.rerun()
 
     if _dc_not_panel_id and _dc_not_col:
         with _dc_not_col:
