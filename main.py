@@ -3285,11 +3285,11 @@ function updateBot(v){{
         except: _kg_ui_mevcut = _KOL_VARS_UI.copy()
 
         _yeni_kg_ui = {}
-        _ui_slider_cols = st.columns(len(_KOL_VARS_UI))
+        _ui_cols = st.columns(len(_KOL_VARS_UI))
         for _i, _k in enumerate(_KOL_VARS_UI.keys()):
-            _yeni_kg_ui[_k] = _ui_slider_cols[_i].slider(
+            _yeni_kg_ui[_k] = _ui_cols[_i].number_input(
                 _KG_UI_ETIKET.get(_k,_k),
-                min_value=40, max_value=400,
+                min_value=40, max_value=500,
                 value=int(_kg_ui_mevcut.get(_k, _KOL_VARS_UI.get(_k,100))),
                 step=10, key=f"ui_kg_{_k}"
             )
