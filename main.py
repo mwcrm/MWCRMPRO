@@ -874,15 +874,96 @@ def fmt_tarih(v):
     s = str(v).strip()
     if not s or s in ["nan","None",""]: return ""
     try:
-        # 2026-06-22 veya 2026-06-22T... → 22.06.2026
         if len(s) >= 10 and s[4] == "-":
             return f"{s[8:10]}.{s[5:7]}.{s[:4]}"
-        # Zaten 22.06.2026 formatındaysa
         if len(s) >= 10 and s[2] == "." and s[5] == ".":
             return s[:10]
     except:
         pass
     return s[:10]
+
+def not_paneli(cari_id, firma_adi="", key_prefix="np"):
+    """Her yerde kullanılan ortak not paneli — oku, yaz, sil"""
+    try:
+        _sb = get_sb_client()
+        # Notları çek
+        _notlar = []
+        if _sb:
+            _r = _sb.table("cari_aciklamalar").select("*").eq("cari_id", int(cari_id)).execute()
+            _notlar = _r.data or []
+        else:
+            import sqlite3 as _sq3
+            _cn = _sq3.connect("mw_crm.db", check_same_thread=False)
+            _rows = _cn.execute("SELECT * FROM cari_aciklamalar WHERE cari_id=? ORDER BY tarih DESC", (int(cari_id),)).fetchall()
+            _cols = [d[0] for d in _cn.execute("PRAGMA table_info(cari_aciklamalar)").fetchall()]
+            _notlar = [dict(zip(_cols, r)) for r in _rows]
+
+        # Sırala — en yeni üstte
+        try:
+            _notlar = sorted(_notlar, key=lambda x: str(x.get("tarih","") or ""), reverse=True)
+        except: pass
+
+        if firma_adi:
+            st.markdown(f"<div style='font-size:15px;font-weight:700;color:#1e40af;margin-bottom:4px'>📋 {firma_adi}</div>", unsafe_allow_html=True)
+        st.caption(f"{len(_notlar)} not")
+
+        # Notları göster
+        for _nn in _notlar:
+            _nid  = _nn.get("id","")
+            _txt  = str(_nn.get("aciklama","") or _nn.get("metin","") or "")
+            _kim  = str(_nn.get("olusturan","") or _nn.get("kim","") or "")
+            _tar  = fmt_tarih(str(_nn.get("tarih","") or ""))
+
+            with st.container():
+                st.markdown(
+                    f"<div style='border-left:4px solid #3b82f6;padding:10px 14px;margin-bottom:8px;"
+                    f"border-radius:0 8px 8px 0;background:#eff6ff;'>"
+                    f"<div style='font-size:11px;color:#94a3b8;margin-bottom:5px'>📅 {_tar} &nbsp;·&nbsp; 👤 {_kim}</div>"
+                    f"<div style='color:#1e293b;font-size:14px;line-height:1.7;white-space:pre-wrap'>{_txt.replace('<','&lt;').replace('>','&gt;')}</div>"
+                    f"</div>",
+                    unsafe_allow_html=True
+                )
+                if st.button("🗑 Sil", key=f"{key_prefix}_sil_{_nid}_{cari_id}", use_container_width=False):
+                    try:
+                        if _sb:
+                            _sb.table("cari_aciklamalar").delete().eq("id", int(_nid)).execute()
+                        try: db_read.clear()
+                        except: pass
+                        st.rerun()
+                    except Exception as _se:
+                        st.error(f"Sil hatası: {_se}")
+
+        # Yeni not yaz
+        st.markdown("<div style='margin-top:10px'></div>", unsafe_allow_html=True)
+        _yeni = st.text_area(
+            "✏️ Yeni not yaz:", key=f"{key_prefix}_yeni_{cari_id}",
+            placeholder="Buraya yazın...",
+            height=90
+        )
+        if st.button("💾 Kaydet", key=f"{key_prefix}_kaydet_{cari_id}", use_container_width=True, type="primary"):
+            if _yeni and _yeni.strip():
+                try:
+                    _yazar = st.session_state.get("kullanici_ad", st.session_state.get("kullanici",""))
+                    _veri = {
+                        "cari_id":  int(cari_id),
+                        "cari_adi": str(firma_adi),
+                        "aciklama": _yeni.strip(),
+                        "olusturan": _yazar,
+                        "tarih": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "tip": "not"
+                    }
+                    if _sb:
+                        _sb.table("cari_aciklamalar").insert(_veri).execute()
+                    try: db_read.clear()
+                    except: pass
+                    st.success("✅ Not kaydedildi!")
+                    st.rerun()
+                except Exception as _ne:
+                    st.error(f"Kayıt hatası: {_ne}")
+                else:
+                    st.warning("Not boş olamaz!")
+    except Exception as _np_err:
+        st.error(f"Not paneli hatası: {_np_err}")
 
 
 
@@ -2053,49 +2134,9 @@ elif aktif == "liste":
             st.markdown("---")
             st.markdown(f"#### 📝 Açıklamalar")
 
-            # Supabase'den çek
-            _df_ac = pd.DataFrame()
-            if sb_liste:
-                try:
-                    _r = sb_liste.table("cari_aciklamalar").select("*").eq("cari_id", kart_id).order("tarih", desc=True).execute()
-                    _df_ac = pd.DataFrame(_r.data) if _r.data else pd.DataFrame()
-                except:
-                    _df_ac = pd.DataFrame()
-
-            # YENİ AÇIKLAMA FORMU
-            with st.form(f"acform_{kart_id}", clear_on_submit=True):
-                _yaz = st.text_area("Yeni Açıklama:", height=80, placeholder="Açıklamanızı yazın...")
-                if st.form_submit_button("💾 Kaydet", type="primary", use_container_width=True):
-                    if _yaz and _yaz.strip():
-                        try:
-                            sb_liste.table("cari_aciklamalar").insert({
-                                "cari_id": kart_id,
-                                "cari_adi": str(kart_row.get("firma","")),
-                                "aciklama": _yaz.strip(),
-                                "olusturan": st.session_state.get("kullanici","")
-                            }).execute()
-                            st.success("✅ Kaydedildi!")
-                            st.rerun()
-                        except Exception as _ex:
-                            st.error(f"Hata: {_ex}")
-                    else:
-                        st.warning("Boş olamaz!")
-
-            # ESKİ AÇIKLAMALAR
-            if not _df_ac.empty:
-                st.markdown(f"**{len(_df_ac)} kayıt — tıkla aç:**")
-                for _, _row in _df_ac.iterrows():
-                    _rid   = _row.get("id", 0)
-                    _tarih = fmt_tarih(_row.get("tarih",""))
-                    _kim   = str(_row.get("olusturan",""))
-                    _txt   = str(_row.get("aciklama",""))
-                    with st.expander(f"📅 {_tarih}  👤 {_kim}  · {_txt[:50]}{'...' if len(_txt)>50 else ''}"):
-                        st.write(_txt)
-                        if st.button("🗑️ Sil", key=f"sil_{_rid}_{kart_id}"):
-                            try:
-                                sb_liste.table("cari_aciklamalar").delete().eq("id", int(_rid)).execute()
-                                st.rerun()
-                            except: pass
+            # Notlar — ortak panel
+            st.markdown("---")
+            not_paneli(kart_id, str(kart_row.get("firma","")), key_prefix=f"ck_{kart_id}")
 
         except Exception as e:
             st.error(f"Kart hatası: {e}")
@@ -2237,69 +2278,10 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
 
     if _not_panel_id and _not_col:
         with _not_col:
-            _panel_notlar = _not_detay.get(str(_not_panel_id), [])
-            _panel_firma = ""
             _panel_rows = df_edit[df_edit["id"] == int(_not_panel_id)]
-            if not _panel_rows.empty:
-                _panel_firma = str(_panel_rows.iloc[0].get("firma",""))
-
-            # Başlık
-            st.markdown(
-                f"<div style='font-size:14px;font-weight:700;color:#1e40af;padding:8px 0 4px'>"
-                f"📋 {_panel_firma}</div>"
-                f"<div style='font-size:12px;color:#64748b;margin-bottom:8px'>{len(_panel_notlar)} not</div>",
-                unsafe_allow_html=True
-            )
-
-            # Notları büyük oku
-            for _nn in reversed(_panel_notlar):
-                _nt = str(_nn.get("metin","")).replace("<","&lt;").replace(">","&gt;")
-                _tr = str(_nn.get("tarih",""))
-                _km = str(_nn.get("kim",""))
-                _nid = str(_nn.get("id",""))
-                st.markdown(
-                    f"<div style='border-left:4px solid #3b82f6;padding:10px 14px;margin-bottom:8px;"
-                    f"border-radius:0 8px 8px 0;background:#f0f7ff;'>"
-                    f"<div style='font-size:11px;color:#94a3b8;margin-bottom:6px'>📅 {_tr} &nbsp;·&nbsp; 👤 {_km}</div>"
-                    f"<div style='color:#1e293b;font-size:14px;line-height:1.6;white-space:pre-wrap'>{_nt}</div>"
-                    f"</div>",
-                    unsafe_allow_html=True
-                )
-
-            # Yeni not yaz
-            st.markdown("<div style='font-size:12px;font-weight:600;color:#374151;margin-top:8px'>✏️ Yeni Not</div>", unsafe_allow_html=True)
-            _yeni_not_txt = st.text_area(
-                "", key=f"yeni_not_panel_{_not_panel_id}",
-                placeholder="Buraya yaz...",
-                height=100,
-                label_visibility="collapsed"
-            )
-            if st.button("💾 Kaydet", key=f"not_panel_kaydet_{_not_panel_id}", use_container_width=True, type="primary"):
-                if _yeni_not_txt.strip():
-                    try:
-                        _sb_np = get_sb_client()
-                        _yazar = st.session_state.get("kullanici_ad", st.session_state.get("kullanici",""))
-                        _not_veri = {
-                            "cari_id": int(_not_panel_id),
-                            "metin": _yeni_not_txt.strip(),
-                            "kim": _yazar,
-                            "tarih": datetime.now().strftime("%d.%m.%Y %H:%M"),
-                            "tip": "not"
-                        }
-                        if _sb_np:
-                            _sb_np.table("cari_aciklamalar").insert(_not_veri).execute()
-                        else:
-                            db_insert("cari_aciklamalar", _not_veri)
-                        try: db_read.clear()
-                        except: pass
-                        st.success("✅ Not kaydedildi!")
-                        st.rerun()
-                    except Exception as _ne:
-                        st.error(f"Hata: {_ne}")
-                else:
-                    st.warning("Not boş olamaz!")
-
-            if st.button("✕ Kapat", key="not_panel_kapat", use_container_width=True):
+            _panel_firma = str(_panel_rows.iloc[0].get("firma","")) if not _panel_rows.empty else ""
+            not_paneli(int(_not_panel_id), _panel_firma, key_prefix="cl")
+            if st.button("✕ Kapat", key="cl_not_kapat", use_container_width=True):
                 st.session_state.pop("_cl_not_panel_id", None)
 
     # Kolon sırası değiştiyse session_state'e kaydet
@@ -5508,27 +5490,11 @@ elif aktif == "detay_cari":
 
     if _dc_not_panel_id and _dc_not_col:
         with _dc_not_col:
-            _dc_pnotlar = _dc_notlar_tum.get(int(_dc_not_panel_id), [])
-            _dc_pfirma = ""
             _dc_prows = _df_tablo[_df_tablo["ID"] == int(_dc_not_panel_id)]
-            if not _dc_prows.empty:
-                _dc_pfirma = str(_dc_prows.iloc[0].get("Firma",""))
-            st.markdown(
-                f"<div style='border:1.5px solid #3b82f6;border-radius:10px;padding:12px 14px;background:white'>"
-                f"<div style='font-size:12px;font-weight:600;color:#1e40af;margin-bottom:8px'>📋 {_dc_pfirma[:22]}<br>"
-                f"<span style='font-weight:400;color:#64748b'>{len(_dc_pnotlar)} not</span></div>"
-                + "".join([
-                    f"<div style='border-left:3px solid #3b82f6;padding:7px 10px;margin:5px 0;"
-                    f"border-radius:0 6px 6px 0;background:#f8fafc'>"
-                    f"<div style='font-size:11px;color:#94a3b8;margin-bottom:2px'>📅 {fmt_tarih(_dn.get('tarih',''))} · 👤 {_dn.get('olusturan','')}</div>"
-                    f"<div style='color:#1e293b;font-size:12px'>{str(_dn.get('aciklama','')).replace('<','&lt;').replace('>','&gt;')}</div>"
-                    f"</div>"
-                    for _dn in _dc_pnotlar
-                ])
-                + "<div style='font-size:11px;color:#94a3b8;margin-top:8px'>Satırı tekrar seç → kapanır</div>"
-                + "</div>",
-                unsafe_allow_html=True
-            )
+            _dc_pfirma = str(_dc_prows.iloc[0].get("Firma","")) if not _dc_prows.empty else ""
+            not_paneli(int(_dc_not_panel_id), _dc_pfirma, key_prefix="dc")
+            if st.button("✕ Kapat", key="dc_not_kapat", use_container_width=True):
+                st.session_state.pop("_dc_not_panel_id", None)
 
     _bk1, _bk2 = st.columns(2)
 
