@@ -3499,10 +3499,10 @@ function updateBot(v){{
                     elif _tan_ekle("durum", _yeni_durum.strip()):
                         st.success(f"✅ '{_yeni_durum}' eklendi!"); st.rerun()
             st.caption(f"{len(_durum_listesi)} durum")
-            for _d in _durum_listesi:
+            for _di, _d in enumerate(_durum_listesi):
                 _dc1, _dc2 = st.columns([4,1])
                 _dc1.markdown(f"🔹 **{_d}**")
-                if _dc2.button("🗑", key=f"dsil2_{_d}", use_container_width=True, help="Sil"):
+                if _dc2.button("🗑", key=f"dsil2_{_di}_{_d[:8]}", use_container_width=True, help="Sil"):
                     if _tan_sil("durum", _d):
                         st.success(f"'{_d}' silindi!"); st.rerun()
 
@@ -7327,7 +7327,7 @@ elif aktif == "randevu":
                         _lc1, _lc2 = st.columns([4,1])
                         _lc1.caption(f"🔹 **{_d}** — {_adet} firma")
                         if _d not in _varsayilan:
-                            if _lc2.button("🗑️", key=f"dsil_{_d}", help="Sil (önce veri silinmeli)"):
+                            if _lc2.button("🗑️", key=f"dsil_v_{_d[:10]}", help="Sil (önce veri silinmeli)"):
                                 st.warning(f"'{_d}' durumunda {_adet} firma var, önce firmalar başka duruma taşınmalı!")
                         else:
                             _lc2.caption("—")
@@ -7335,7 +7335,7 @@ elif aktif == "randevu":
                     elif _d in _ekstra_durumlar:
                         _lc1, _lc2 = st.columns([4,1])
                         _lc1.caption(f"⬜ {_d} — 0 firma")
-                        if _lc2.button("🗑️", key=f"dsil_{_d}"):
+                        if _lc2.button("🗑️", key=f"dsil_e_{_d[:10]}"):
                             _ekstra_durumlar.remove(_d)
                             _durum_kaydet(_ekstra_durumlar)
                             st.rerun()
