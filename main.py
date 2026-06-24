@@ -2278,11 +2278,8 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
     # Sağda not paneli açık mı?
     _not_panel_id = st.session_state.get("_cl_not_panel_id")
 
-    if _not_panel_id:
-        _tbl_col, _not_col = st.columns([3, 1])
-    else:
-        _tbl_col = st.container()
-        _not_col = None
+    _tbl_col = st.container()
+    _not_col = None
 
     with _tbl_col:
         edited_df = st.data_editor(
@@ -2294,13 +2291,7 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
             key="cari_editor"
         )
 
-    if _not_panel_id and _not_col:
-        with _not_col:
-            _panel_rows = df_edit[df_edit["id"] == int(_not_panel_id)]
-            _panel_firma = str(_panel_rows.iloc[0].get("firma","")) if not _panel_rows.empty else ""
-            not_paneli(int(_not_panel_id), _panel_firma, key_prefix="cl")
-            if st.button("✕ Kapat", key="cl_not_kapat", use_container_width=True):
-                st.session_state.pop("_cl_not_panel_id", None)
+    # (not paneli artık tablonun altında expander olarak açılıyor)
 
     # Kolon sırası değiştiyse session_state'e kaydet
     try:
@@ -2331,14 +2322,13 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
     secili_sayi = len(secili_df)
     secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
 
-    # Tek satır seçilince — notu varsa sağ paneli aç
+    # ── NOT PANELİ — tablonun altında, rerun YOK ──────────────────────────────
     if secili_sayi == 1:
         _sel_id = int(secili_idler[0])
-        if _not_detay.get(str(_sel_id)):
-            if st.session_state.get("_cl_not_panel_id") != _sel_id:
-                st.session_state["_cl_not_panel_id"] = _sel_id
-    elif secili_sayi == 0 and st.session_state.get("_cl_not_panel_id"):
-        st.session_state.pop("_cl_not_panel_id", None)
+        _sel_rows = df_edit[df_edit["id"] == _sel_id]
+        _sel_firma = str(_sel_rows.iloc[0].get("firma","")) if not _sel_rows.empty else ""
+        with st.expander(f"📋 {_sel_firma} — Notlar", expanded=True):
+            not_paneli(_sel_id, _sel_firma, key_prefix="cl")
 
 
     # ── BUTONLAR ──────────────────────────────────────────────────────────────
