@@ -2264,8 +2264,9 @@ elif aktif == "liste":
         "aciklama":      st.column_config.TextColumn("Açıklama",  width=_w("aciklama")),
         "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
+        "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=True, width="small"),
     }
-    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro","📅 Son Randevu","aciklama","📨 Notlar"]
+    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro","✅ Analiz","📅 Son Randevu","aciklama","📨 Notlar"]
 
     # ── DATA EDITOR ─────────────────────────────────────────────────────────────
     df_edit = df_f.copy()
@@ -2291,7 +2292,16 @@ elif aktif == "liste":
     except:
         df_edit["📅 Son Randevu"] = ""
 
-    # Her firma için not sayısı + içerik
+    # Analiz yapılmış firmaları işaretle
+    try:
+        _df_analiz_join = db_read("musteri_analiz")
+        if not _df_analiz_join.empty and "firma" in _df_analiz_join.columns:
+            _analiz_firmalar = set(_df_analiz_join["firma"].dropna().astype(str).str.strip().tolist())
+            df_edit["✅ Analiz"] = df_edit["firma"].apply(lambda x: "✅" if str(x).strip() in _analiz_firmalar else "")
+        else:
+            df_edit["✅ Analiz"] = ""
+    except:
+        df_edit["✅ Analiz"] = ""
     _not_detay = {}
     _not_sayac = {}
     if sb_liste:
