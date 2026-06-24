@@ -1141,7 +1141,19 @@ if st.session_state.get("rol") != "admin":
 with st.sidebar:
     st.markdown("""
 <style>
-section[data-testid="stSidebar"] { padding-top: 0.5rem !important; transform: translateX(0px) !important; }
+section[data-testid="stSidebar"] { 
+    padding-top: 0.5rem !important; 
+    transform: translateX(0px) !important;
+    overflow-y: hidden !important;
+    height: 100vh !important;
+}
+section[data-testid="stSidebar"] > div:first-child {
+    overflow-y: hidden !important;
+    height: 100% !important;
+}
+section[data-testid="stSidebar"] > div > div {
+    overflow-y: hidden !important;
+}
 button[data-testid="collapsedControl"] { display: none !important; }
 section[data-testid="stSidebar"] .stButton>button {
     text-align: left !important;
