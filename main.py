@@ -2006,25 +2006,21 @@ elif aktif == "liste":
     df_f = df_f.reset_index(drop=True)
 
     # Müşteri seçici + aktif filtre özeti
-    _fc_row = st.columns([3,1,0.6])
+    if st.session_state.get("kart_sec_reset"):
+        st.session_state.pop("kart_sec_reset", None)
+        st.session_state.pop("kart_sec", None)
     kart_opts = ["-- Müşteri Seçin --"] + [
         f"[{int(r['id'])}] {r['_seg_goster']+' ' if r['_seg_goster'] else ''}{r['firma']} | {r.get('il','')} | {r.get('islem_asamasi','')}"
         for _, r in df_f.iterrows()
     ]
-    if st.session_state.get("kart_sec_reset"):
-        st.session_state.pop("kart_sec_reset", None)
-        st.session_state.pop("kart_sec", None)
-    secili_kart = _fc_row[0].selectbox("", kart_opts, key="kart_sec", label_visibility="collapsed")
+    # Müşteri seçiciyi filtre satırına taşı — yeni satır
+    _ms1, _ms2, _ms3 = st.columns([5, 1, 1])
+    secili_kart = _ms1.selectbox("", kart_opts, key="kart_sec", label_visibility="collapsed")
     if secili_kart != "-- Müşteri Seçin --":
-        if _fc_row[1].button("❌ Temizle", key="kart_sec_temizle", use_container_width=True):
-            st.session_state["kart_sec_reset"] = True
-            st.rerun()
-    _aktif_fil_sayisi = sum([
-        bool(ara_txt), bool(_asama_sec), bool(_durum_sec),
-        filtre_seg != "Tümü", bool(_il_sec), bool(_ilce_sec), bool(_tem_sec)
-    ])
-    _fil_badge = f" 🔵 {_aktif_fil_sayisi} filtre aktif" if _aktif_fil_sayisi else ""
-    _fc_row[2].markdown(f"<small style='color:gray'>{len(df_f)} kayıt{_fil_badge}</small>", unsafe_allow_html=True)
+        if _ms2.button("❌ Temizle", key="kart_sec_temizle", use_container_width=True):
+            st.session_state["kart_sec_reset"] = True; st.rerun()
+    _aktif_fil_sayisi = sum([bool(ara_txt),bool(_asama_sec),bool(_durum_sec),filtre_seg!="Tümü",bool(_il_sec),bool(_ilce_sec),bool(_tem_sec)])
+    _ms3.markdown(f"<div style='padding-top:8px;font-size:12px;color:#64748b'>{len(df_f)} kayıt{f' · 🔵 {_aktif_fil_sayisi} filtre' if _aktif_fil_sayisi else ''}</div>", unsafe_allow_html=True)
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
         try:
             kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
@@ -2213,23 +2209,22 @@ elif aktif == "liste":
     _KG = st.session_state.get("_kol_genislik", _KOL_VARSAYILAN.copy())
 
     # Kolon ayarları paneli
-    with st.expander("⚙️ Kolon Genişlik Ayarları", expanded=False):
-        st.caption("Kaydır → Kaydet → Her yenilemede bu genişlikte açılır")
+    # Kolon ayarları — tek satır, expander içinde
+    with st.expander("⚙️ Kolon Genişlikleri", expanded=False):
         _kg_cols = list(_KOL_VARSAYILAN.keys())
         _kg_etiket = {"firma":"Firma","yetkili":"Yetkili","gsm":"GSM","sabit":"S.Tel",
                       "email":"Email","adres":"Adres","il":"İl","ilce":"İlçe",
                       "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"Aşama",
-                      "📅 Son Randevu":"Son Randevu","📨 Notlar":"Notlar","id":"ID"}
+                      "📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID"}
         _yeni_kg = {}
-        _slider_cols = st.columns(4)
+        _slider_cols = st.columns(len(_kg_cols))
         for _i, _k in enumerate(_kg_cols):
-            _yeni_kg[_k] = _slider_cols[_i % 4].slider(
-                _kg_etiket.get(_k, _k),
-                min_value=40, max_value=400,
-                value=int(_KG.get(_k, _KOL_VARSAYILAN.get(_k, 100))),
+            _yeni_kg[_k] = _slider_cols[_i].slider(
+                _kg_etiket.get(_k,_k), min_value=40, max_value=400,
+                value=int(_KG.get(_k,_KOL_VARSAYILAN.get(_k,100))),
                 step=10, key=f"kg_{_k}"
             )
-        if st.button("💾 Kolon Ayarlarını Kaydet", type="primary", key="kg_kaydet", use_container_width=True):
+        if st.button("💾 Kaydet", type="primary", key="kg_kaydet"):
             try:
                 _sb_kgs = get_sb_client()
                 if _sb_kgs:
@@ -2239,7 +2234,7 @@ elif aktif == "liste":
                         "deger":_kgsj.dumps(_yeni_kg, ensure_ascii=False)
                     }, on_conflict="kullanici,anahtar").execute()
                 st.session_state["_kol_genislik"] = _yeni_kg
-                st.session_state.pop("_kol_genislik_init", None)
+                st.session_state.pop("_kol_genislik_init",None)
                 st.success("✅ Kaydedildi!"); st.rerun()
             except Exception as _kge:
                 st.error(f"Hata: {_kge}")
