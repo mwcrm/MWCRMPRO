@@ -2006,7 +2006,7 @@ elif aktif == "liste":
         _tem_def  = [x for x in st.session_state.get("_cl_fil_temsilci_multi",[]) if x in _tem_opts]
         _tem_sec  = _fc[7].multiselect("t", _tem_opts, default=_tem_def, key="_cl_fil_temsilci_multi", placeholder="Temsilci...", label_visibility="collapsed")
 
-        siralama_kol = _fc[8].selectbox("sr", ["Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z"], key="siralama_kol", label_visibility="collapsed")
+        siralama_kol = _fc[8].selectbox("sr", ["Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z","Hedef ₺↓","Hedef ₺↑","Gerçek ₺↓","Gerçek ₺↑"], key="siralama_kol", label_visibility="collapsed")
 
         # Eski sistemle uyumluluk
         kart_opts = ["-- Müşteri Seçin --"] + [
@@ -2048,6 +2048,18 @@ elif aktif == "liste":
     elif siralama_kol == "Firma Z-A":    df_f = df_f.sort_values("firma", ascending=False)
     elif siralama_kol == "İl A-Z" and "il" in df_f.columns:       df_f = df_f.sort_values("il", ascending=True)
     elif siralama_kol == "Temsilci A-Z" and "temsilci" in df_f.columns: df_f = df_f.sort_values("temsilci", ascending=True)
+    elif siralama_kol == "Hedef ₺↓" and "beklenen_ciro" in df_f.columns:
+        df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["beklenen_ciro"], errors="coerce").fillna(0)
+        df_f = df_f.sort_values("_s", ascending=False).drop(columns=["_s"])
+    elif siralama_kol == "Hedef ₺↑" and "beklenen_ciro" in df_f.columns:
+        df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["beklenen_ciro"], errors="coerce").fillna(0)
+        df_f = df_f.sort_values("_s", ascending=True).drop(columns=["_s"])
+    elif siralama_kol == "Gerçek ₺↓" and "gerceklesen_ciro" in df_f.columns:
+        df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["gerceklesen_ciro"], errors="coerce").fillna(0)
+        df_f = df_f.sort_values("_s", ascending=False).drop(columns=["_s"])
+    elif siralama_kol == "Gerçek ₺↑" and "gerceklesen_ciro" in df_f.columns:
+        df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["gerceklesen_ciro"], errors="coerce").fillna(0)
+        df_f = df_f.sort_values("_s", ascending=True).drop(columns=["_s"])
     df_f = df_f.reset_index(drop=True)
 
     _aktif_fil_sayisi = sum([bool(ara_txt),bool(_asama_sec),bool(_durum_sec),filtre_seg!="Tümü",bool(_il_sec),bool(_ilce_sec),bool(_tem_sec)])
@@ -2292,15 +2304,19 @@ elif aktif == "liste":
     except:
         df_edit["📅 Son Randevu"] = ""
 
-    # Ciro kolonlarını Türkçe formatla göster
+    # Ciro kolonlarını Türkçe formatla göster — sıralama için sayısal kopyasını sakla
     def _tr_para(v):
         try:
             n = float(v or 0)
             if n == 0: return ""
             return f"{n:,.0f}".replace(",",".")+" ₺"
         except: return ""
-    df_edit["beklenen_ciro"]    = df_edit["beklenen_ciro"].apply(_tr_para) if "beklenen_ciro" in df_edit.columns else ""
-    df_edit["gerceklesen_ciro"] = df_edit["gerceklesen_ciro"].apply(_tr_para) if "gerceklesen_ciro" in df_edit.columns else ""
+    if "beklenen_ciro" in df_edit.columns:
+        df_edit["_bek_sayi"] = pd.to_numeric(df_edit["beklenen_ciro"], errors="coerce").fillna(0)
+        df_edit["beklenen_ciro"] = df_edit["beklenen_ciro"].apply(_tr_para)
+    if "gerceklesen_ciro" in df_edit.columns:
+        df_edit["_ger_sayi"] = pd.to_numeric(df_edit["gerceklesen_ciro"], errors="coerce").fillna(0)
+        df_edit["gerceklesen_ciro"] = df_edit["gerceklesen_ciro"].apply(_tr_para)
     try:
         _df_analiz_join = db_read("musteri_analiz")
         if not _df_analiz_join.empty and "firma" in _df_analiz_join.columns:
