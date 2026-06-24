@@ -3404,20 +3404,22 @@ function updateBot(v){{
             _degistir_ne = _tc4.radio("Değiştirilecek alan:", ["Aşama", "Durum"], horizontal=True, key="toplu_ne")
 
             if _degistir_ne == "Aşama":
-                _yeni_deger = _tc5.selectbox("Yeni Aşama:", _t_asama_l, key="toplu_yeni_asama")
+                _yeni_deger = _tc5.selectbox("Yeni Aşama:", ["— Seçiniz —"] + _t_asama_l, key="toplu_yeni_asama")
                 _alan = "islem_asamasi"
             else:
-                _yeni_deger = _tc5.selectbox("Yeni Durum:", _t_durum_l, key="toplu_yeni_durum")
+                _yeni_deger = _tc5.selectbox("Yeni Durum:", ["— Seçiniz —"] + _t_durum_l, key="toplu_yeni_durum")
                 _alan = "durum"
+
+            _secim_gecerli = _yeni_deger and _yeni_deger != "— Seçiniz —"
 
             # Önizleme
             with st.expander(f"👁 Etkilenecek {len(_df_toplu)} müşteriyi gör", expanded=False):
                 st.dataframe(_df_toplu[["id","firma","durum","islem_asamasi","temsilci"]].head(50),
                            use_container_width=True, hide_index=True)
 
-            _onay = st.checkbox(f"✅ **{len(_df_toplu)} müşterinin {_degistir_ne} değerini '{_yeni_deger}' yapmayı onaylıyorum**", key="toplu_onay")
+            _onay = st.checkbox(f"✅ **{len(_df_toplu)} müşterinin {_degistir_ne} değerini '{_yeni_deger}' yapmayı onaylıyorum**", key="toplu_onay", disabled=not _secim_gecerli)
 
-            if st.button("🔄 Toplu Değiştir", type="primary", key="toplu_kaydet", disabled=not _onay):
+            if st.button("🔄 Toplu Değiştir", type="primary", key="toplu_kaydet", disabled=not (_onay and _secim_gecerli)):
                 _basarili = 0
                 _hatali = 0
                 for _, _tr in _df_toplu.iterrows():
