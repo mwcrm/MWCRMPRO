@@ -1945,8 +1945,12 @@ elif aktif == "liste":
     with st.expander("🔍 Filtreler & Arama", expanded=st.session_state.get("_cl_fil_acik", True)):
         st.session_state["_cl_fil_acik"] = True  # expander açık kalsın
         # ── TEK SATIR FİLTRE ───────────────────────────────────────────────────
-        _fc = st.columns([2.5, 1.2, 1.2, 0.8, 1, 1, 1, 1, 0.6])
-        ara_txt = _fc[0].text_input("", placeholder="🔍 Firma, yetkili, il, gsm...", key="ara_liste", label_visibility="collapsed")
+        if st.session_state.get("kart_sec_reset"):
+            st.session_state.pop("kart_sec_reset", None)
+            st.session_state.pop("kart_sec", None)
+
+        _fc = st.columns([1.5, 1.2, 1.2, 1.2, 0.7, 0.8, 0.8, 0.9, 0.8, 0.5])
+        ara_txt = _fc[0].text_input("", placeholder="🔍 Firma, yetkili, il...", key="ara_liste", label_visibility="collapsed")
 
         _asama_def = [x for x in st.session_state.get("_cl_fil_asama_multi",[]) if x in tum_asama_opts]
         _asama_sec = _fc[1].multiselect("Aşama", tum_asama_opts, default=_asama_def, key="_cl_fil_asama_multi", placeholder="Aşama...")
@@ -1954,7 +1958,7 @@ elif aktif == "liste":
         _durum_def = [x for x in st.session_state.get("_cl_fil_durum_multi",[]) if x in tum_durum_opts]
         _durum_sec = _fc[2].multiselect("Durum", tum_durum_opts, default=_durum_def, key="_cl_fil_durum_multi", placeholder="Durum...")
 
-        filtre_seg = _fc[3].selectbox("Seg.", ["Tümü","👑 A+","⭐ A","🔵 B","⚪ C"], key="fil_seg", label_visibility="visible")
+        filtre_seg = _fc[3].selectbox("Seg.", ["Tümü","👑 A+","⭐ A","🔵 B","⚪ C"], key="fil_seg")
 
         _il_opts = sorted(df["il"].dropna().astype(str).unique().tolist()) if "il" in df.columns else []
         _il_def  = [x for x in st.session_state.get("_cl_fil_il_multi",[]) if x in _il_opts]
@@ -1968,12 +1972,30 @@ elif aktif == "liste":
         _tem_def  = [x for x in st.session_state.get("_cl_fil_temsilci_multi",[]) if x in _tem_opts]
         _tem_sec  = _fc[6].multiselect("Temsilci", _tem_opts, default=_tem_def, key="_cl_fil_temsilci_multi", placeholder="Temsilci...")
 
-        siralama_kol = _fc[7].selectbox("Sırala", ["Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z"], key="siralama_kol", label_visibility="visible")
+        siralama_kol = _fc[7].selectbox("Sırala", ["Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z"], key="siralama_kol")
 
-        if _fc[8].button("🗑", key="cl_fil_temizle", use_container_width=True, help="Filtreleri temizle"):
-            for _fk in ["_cl_fil_asama_multi","_cl_fil_durum_multi","_cl_fil_il_multi","_cl_fil_ilce_multi","_cl_fil_temsilci_multi","fil_seg","ara_liste"]:
+        # Müşteri seçin — aynı satırda
+        kart_opts_inline = ["-- Seç --"] + [
+            f"[{int(r['id'])}] {r['firma']}"
+            for _, r in df.iterrows()
+        ]
+        secili_kart_inline = _fc[8].selectbox("Müşteri", kart_opts_inline, key="kart_sec_inline", label_visibility="visible")
+        if secili_kart_inline != "-- Seç --":
+            # kart_sec ile senkronize et
+            _esl = [o for o in (["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['_seg_goster']+' ' if r['_seg_goster'] else ''}{r['firma']} | {r.get('il','')} | {r.get('islem_asamasi','')}" for _,r in df.iterrows()]) if secili_kart_inline.split("]")[0]+"" in o]
+            if _esl: st.session_state["kart_sec"] = _esl[0]
+
+        if _fc[9].button("🗑", key="cl_fil_temizle", use_container_width=True, help="Filtreleri temizle"):
+            for _fk in ["_cl_fil_asama_multi","_cl_fil_durum_multi","_cl_fil_il_multi","_cl_fil_ilce_multi","_cl_fil_temsilci_multi","fil_seg","ara_liste","kart_sec_inline"]:
                 st.session_state.pop(_fk, None)
             st.rerun()
+
+        # Eski kart_sec sistemi için uyumluluk
+        kart_opts = ["-- Müşteri Seçin --"] + [
+            f"[{int(r['id'])}] {r['_seg_goster']+' ' if r['_seg_goster'] else ''}{r['firma']} | {r.get('il','')} | {r.get('islem_asamasi','')}"
+            for _, r in df_f.iterrows()
+        ]
+        secili_kart = st.session_state.get("kart_sec", "-- Müşteri Seçin --")
 
     # Filtre uygula
     df_f = df.copy()
@@ -2005,22 +2027,7 @@ elif aktif == "liste":
     elif siralama_kol == "Temsilci A-Z" and "temsilci" in df_f.columns: df_f = df_f.sort_values("temsilci", ascending=True)
     df_f = df_f.reset_index(drop=True)
 
-    # Müşteri seçici + aktif filtre özeti
-    if st.session_state.get("kart_sec_reset"):
-        st.session_state.pop("kart_sec_reset", None)
-        st.session_state.pop("kart_sec", None)
-    kart_opts = ["-- Müşteri Seçin --"] + [
-        f"[{int(r['id'])}] {r['_seg_goster']+' ' if r['_seg_goster'] else ''}{r['firma']} | {r.get('il','')} | {r.get('islem_asamasi','')}"
-        for _, r in df_f.iterrows()
-    ]
-    # Müşteri seçiciyi filtre satırına taşı — yeni satır
-    _ms1, _ms2, _ms3 = st.columns([5, 1, 1])
-    secili_kart = _ms1.selectbox("", kart_opts, key="kart_sec", label_visibility="collapsed")
-    if secili_kart != "-- Müşteri Seçin --":
-        if _ms2.button("❌ Temizle", key="kart_sec_temizle", use_container_width=True):
-            st.session_state["kart_sec_reset"] = True; st.rerun()
     _aktif_fil_sayisi = sum([bool(ara_txt),bool(_asama_sec),bool(_durum_sec),filtre_seg!="Tümü",bool(_il_sec),bool(_ilce_sec),bool(_tem_sec)])
-    _ms3.markdown(f"<div style='padding-top:8px;font-size:12px;color:#64748b'>{len(df_f)} kayıt{f' · 🔵 {_aktif_fil_sayisi} filtre' if _aktif_fil_sayisi else ''}</div>", unsafe_allow_html=True)
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
         try:
             kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
