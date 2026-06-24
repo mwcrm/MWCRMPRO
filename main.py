@@ -2252,7 +2252,7 @@ elif aktif == "liste":
         "durum":         st.column_config.SelectboxColumn("Durum", options=tum_durum_opts, width=_w("durum")),
         "temsilci":      st.column_config.TextColumn("Temsilci",  width=_w("temsilci")),
         "islem_asamasi": st.column_config.SelectboxColumn("Aşama", options=tum_asama_opts, width=_w("islem_asamasi")),
-        "aciklama":      st.column_config.TextColumn("Açıklama",  width="large"),
+        "aciklama":      st.column_config.TextColumn("Açıklama",  width=_w("aciklama")),
         "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
     }
