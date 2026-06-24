@@ -2260,8 +2260,8 @@ elif aktif == "liste":
         "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
         "id":            st.column_config.NumberColumn("ID", disabled=True, width=_w("id")),
         "tarih":         None, "olusturan": None, "silindi": None,
-        "beklenen_ciro":    st.column_config.TextColumn("Hedef ₺",  width="small"),
-        "gerceklesen_ciro": st.column_config.TextColumn("Gerçek ₺", width="small"),
+        "beklenen_ciro":    st.column_config.NumberColumn("Hedef ₺",  format="%,.0f ₺", width="small"),
+        "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width="small"),
         "firma":         st.column_config.TextColumn("Firma",     width=_w("firma")),
         "yetkili":       st.column_config.TextColumn("Yetkili",   width=_w("yetkili")),
         "gsm":           st.column_config.TextColumn("GSM",       width=_w("gsm")),
@@ -2304,19 +2304,11 @@ elif aktif == "liste":
     except:
         df_edit["📅 Son Randevu"] = ""
 
-    # Ciro kolonlarını Türkçe formatla göster — sıralama için sayısal kopyasını sakla
-    def _tr_para(v):
-        try:
-            n = float(v or 0)
-            if n == 0: return ""
-            return f"{n:,.0f}".replace(",",".")+" ₺"
-        except: return ""
+    # Ciro kolonlarını sayısal tut — başlığa tıklayınca doğru sıralar
     if "beklenen_ciro" in df_edit.columns:
-        df_edit["_bek_sayi"] = pd.to_numeric(df_edit["beklenen_ciro"], errors="coerce").fillna(0)
-        df_edit["beklenen_ciro"] = df_edit["beklenen_ciro"].apply(_tr_para)
+        df_edit["beklenen_ciro"] = pd.to_numeric(df_edit["beklenen_ciro"], errors="coerce").fillna(0)
     if "gerceklesen_ciro" in df_edit.columns:
-        df_edit["_ger_sayi"] = pd.to_numeric(df_edit["gerceklesen_ciro"], errors="coerce").fillna(0)
-        df_edit["gerceklesen_ciro"] = df_edit["gerceklesen_ciro"].apply(_tr_para)
+        df_edit["gerceklesen_ciro"] = pd.to_numeric(df_edit["gerceklesen_ciro"], errors="coerce").fillna(0)
     try:
         _df_analiz_join = db_read("musteri_analiz")
         if not _df_analiz_join.empty and "firma" in _df_analiz_join.columns:
@@ -2502,13 +2494,15 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                         guncelle = {}
                         for k, v in degisiklikler.items():
                             if k == "Seç": continue
-                            # Türkçe format → sayıya çevir
-                            if k in ("beklenen_ciro", "gerceklesen_ciro", "Hedef ₺", "Gerçek ₺"):
-                                _db_key = "beklenen_ciro" if k in ("beklenen_ciro","Hedef ₺") else "gerceklesen_ciro"
-                                try:
-                                    _num = str(v or "").replace(".","").replace("₺","").replace(" ","").strip()
-                                    guncelle[_db_key] = float(_num) if _num else 0
-                                except: guncelle[_db_key] = 0
+                            if k in ("beklenen_ciro", "gerceklesen_ciro"):
+                                try: guncelle[k] = float(v or 0)
+                                except: guncelle[k] = 0
+                            elif k in ("Hedef ₺",):
+                                try: guncelle["beklenen_ciro"] = float(str(v or "").replace(".","").replace("₺","").replace(",",".").strip() or 0)
+                                except: guncelle["beklenen_ciro"] = 0
+                            elif k in ("Gerçek ₺",):
+                                try: guncelle["gerceklesen_ciro"] = float(str(v or "").replace(".","").replace("₺","").replace(",",".").strip() or 0)
+                                except: guncelle["gerceklesen_ciro"] = 0
                             else:
                                 guncelle[k] = str(v) if v is not None else ""
                         if not guncelle: continue
