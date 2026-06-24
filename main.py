@@ -6226,11 +6226,45 @@ elif aktif == "randevu":
             _gorev_opts = ["Ziyaret","Arama","Değerlendirme","Kazanıldı","Kaybedildi","Devam Ediyor","Whatsapp Mesaj","E-mail","Yeni Tarihe Ertele"]
             _saat_opts  = [f"{h:02d}:{m:02d}" for h in range(9,21) for m in (0,15,30,45)]
 
+            # Müşteri adres/il/ilçe bilgilerini cari listeden çek
+            _adres_map = {}
+            try:
+                _df_cari_adres = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+                if not _df_cari_adres.empty:
+                    for _, _ca in _df_cari_adres.iterrows():
+                        _adres_map[str(_ca.get("firma",""))] = {
+                            "il":    str(_ca.get("il","")    or ""),
+                            "ilce":  str(_ca.get("ilce","")  or ""),
+                            "adres": str(_ca.get("adres","") or ""),
+                        }
+            except: pass
+
+            # Sıralama hafızası
+            if "rand_sort_col" not in st.session_state:
+                st.session_state["rand_sort_col"] = "Tarih"
+                st.session_state["rand_sort_asc"] = True
+            _rs1,_rs2,_rs3 = st.columns([2,1,1])
+            _sort_col = _rs1.selectbox("Sırala:", ["Tarih","Saat","Müşteri","İl","Bölge","Görev","Sonuç","Temsilci"],
+                index=["Tarih","Saat","Müşteri","İl","Bölge","Görev","Sonuç","Temsilci"].index(st.session_state.get("rand_sort_col","Tarih")),
+                key="rand_sort_sel")
+            _sort_asc = _rs2.checkbox("Artan", value=st.session_state.get("rand_sort_asc",True), key="rand_sort_asc_cb")
+            _row_h = _rs3.selectbox("Satır yüksekliği:", ["Küçük","Orta","Büyük"],
+                index=["Küçük","Orta","Büyük"].index(st.session_state.get("rand_row_h","Orta")),
+                key="rand_row_h_sel")
+            # Hafızaya kaydet
+            st.session_state["rand_sort_col"] = _sort_col
+            st.session_state["rand_sort_asc"] = _sort_asc
+            st.session_state["rand_row_h"]    = _row_h
+            _row_h_px = {"Küçük":35,"Orta":57,"Büyük":100}[_row_h]
+
             _df_goster = pd.DataFrame([{
                 "ID":       int(r.get("id",0) or 0),
                 "Tarih":    fmt_tarih(r.get("randevu_tarihi","")),
                 "Saat":     str(r.get("randevu_saati","") or "09:00")[:5],
                 "Müşteri":  str(r.get("musteri_adi","") or ""),
+                "İl":       _adres_map.get(str(r.get("musteri_adi","")),{}).get("il",""),
+                "İlçe":     _adres_map.get(str(r.get("musteri_adi","")),{}).get("ilce",""),
+                "Adres":    _adres_map.get(str(r.get("musteri_adi","")),{}).get("adres",""),
                 "Bölge":    str(r.get("bolge","") or ""),
                 "Görev":    str(r.get("gorev","") or ""),
                 "Sonuç":    str(r.get("sonuc","") or "—"),
@@ -6241,19 +6275,29 @@ elif aktif == "randevu":
                 "Fark ₺":   float(_ciro_map.get(str(r.get("musteri_adi","")),{"gercek":0})["gercek"]) - float(_ciro_map.get(str(r.get("musteri_adi","")),{"hedef":0})["hedef"]),
             } for _,r in df_rand.iterrows()])
 
+            # Sıralama uygula — hafızadan
+            if _sort_col in _df_goster.columns:
+                _df_goster = _df_goster.sort_values(_sort_col, ascending=_sort_asc).reset_index(drop=True)
+                # id listesini de aynı sırayla yenile
+                _rand_id_list = list(_df_goster["ID"])
+
             # id→index map (kaydetmek için)
-            _rand_id_list = [int(r.get("id",0)) for _,r in df_rand.iterrows()]
+            _rand_id_list = list(_df_goster["ID"])
 
             _edited_rand = st.data_editor(
                 _df_goster,
                 use_container_width=True,
                 hide_index=True,
                 num_rows="fixed",
+                row_height=_row_h_px,
                 column_config={
                     "ID":       st.column_config.NumberColumn("ID", width="small", disabled=True),
                     "Tarih":    st.column_config.TextColumn("Tarih", width="small", help="GG.AA.YYYY"),
                     "Saat":     st.column_config.SelectboxColumn("Saat", options=_saat_opts, width="small"),
                     "Müşteri":  st.column_config.TextColumn("Müşteri", width="large"),
+                    "İl":       st.column_config.TextColumn("İl", width="small", disabled=True),
+                    "İlçe":     st.column_config.TextColumn("İlçe", width="small", disabled=True),
+                    "Adres":    st.column_config.TextColumn("Adres", width="large", disabled=True),
                     "Bölge":    st.column_config.TextColumn("Bölge"),
                     "Görev":    st.column_config.SelectboxColumn("Görev", options=_gorev_opts, width="medium"),
                     "Sonuç":    st.column_config.SelectboxColumn("Sonuç", options=_sonuc_opts, width="small"),
