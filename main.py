@@ -1681,7 +1681,7 @@ elif aktif == "liste":
 
     # Durum butonu sırası — hafızada tut
     # ── DURUM & AŞAMA BUTONLARI ───────────────────────────────────────────────
-    def _rapor_satir(veri_listesi, sira_key, gizli_key, fil_key, emoji_map, satir_label):
+    def _rapor_satir(veri_listesi, sira_key, gizli_key, fil_key, emoji_map, satir_label, d_adlar=None):
         """Genel buton satırı: sıralama + gizle/göster"""
         _veri_dict = {ad: sayi for ad, sayi in veri_listesi}
         _adlar = [ad for ad, _ in veri_listesi]
@@ -1774,21 +1774,31 @@ elif aktif == "liste":
                     if _btn_cols[i+1].button(f"{_em} {_ad}\n{_sayi}", key=f"{sira_key}_btn_{i}", use_container_width=True):
                         if fil_key == "durum":
                             st.session_state["_cl_fil_durum_multi"] = [] if _ad == "Toplam" else [_ad]
-                        else:
+                        elif fil_key == "asama":
                             st.session_state["_cl_fil_asama_multi"] = [_ad]
+                        else:  # tek — durum+asama birleşik
+                            if _ad == "Toplam":
+                                st.session_state["_cl_fil_durum_multi"] = []
+                                st.session_state["_cl_fil_asama_multi"] = []
+                            elif d_adlar and _ad in d_adlar:
+                                st.session_state["_cl_fil_durum_multi"] = [_ad]
+                                st.session_state["_cl_fil_asama_multi"] = []
+                            else:
+                                st.session_state["_cl_fil_asama_multi"] = [_ad]
+                                st.session_state["_cl_fil_durum_multi"] = []
                         st.rerun()
 
-    # Durum satırı
+    # ── TEK SATIR: Durum + Aşama birleşik ───────────────────────────────────
     _d_veri = [("Toplam", len(df))]
     for _dn in tum_durum_opts:
         _dc = len(df[df["durum"]==_dn]) if "durum" in df.columns else 0
         _d_veri.append((_dn, _dc))
-    _rapor_satir(_d_veri, "_dur_sirasi", "_dur_gizli", "durum", _DURUM_EMOJI, "Durum")
+    _a_veri = [(a, len(df[df["islem_asamasi"]==a]) if "islem_asamasi" in df.columns else 0) for a in tum_asama_opts] if tum_asama_opts else []
+    _tum_veri = _d_veri + _a_veri
+    _tum_emoji = {**_DURUM_EMOJI, **_ASAMA_EMOJI}
+    _d_adlar = {x[0] for x in _d_veri}
 
-    # Aşama satırı
-    if tum_asama_opts:
-        _a_veri = [(a, len(df[df["islem_asamasi"]==a]) if "islem_asamasi" in df.columns else 0) for a in tum_asama_opts]
-        _rapor_satir(_a_veri, "_asm_sirasi", "_asm_gizli", "asama", _ASAMA_EMOJI, "Aşama")
+    _rapor_satir(_tum_veri, "_tek_sirasi", "_tek_gizlisi", "tek", _tum_emoji, "", d_adlar=_d_adlar)
 
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
     with st.expander("🔍 Filtreler & Arama", expanded=st.session_state.get("_cl_fil_acik", True)):
