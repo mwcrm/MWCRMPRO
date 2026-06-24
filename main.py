@@ -2248,8 +2248,8 @@ elif aktif == "liste":
         "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
         "id":            st.column_config.NumberColumn("ID", disabled=True, width=_w("id")),
         "tarih":         None, "olusturan": None, "silindi": None,
-        "beklenen_ciro":    st.column_config.NumberColumn("Hedef ₺",  format="%.0f ₺", width="small"),
-        "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%.0f ₺", width="small"),
+        "beklenen_ciro":    st.column_config.TextColumn("Hedef ₺",  width="small", disabled=True),
+        "gerceklesen_ciro": st.column_config.TextColumn("Gerçek ₺", width="small", disabled=True),
         "firma":         st.column_config.TextColumn("Firma",     width=_w("firma")),
         "yetkili":       st.column_config.TextColumn("Yetkili",   width=_w("yetkili")),
         "gsm":           st.column_config.TextColumn("GSM",       width=_w("gsm")),
@@ -2292,7 +2292,15 @@ elif aktif == "liste":
     except:
         df_edit["📅 Son Randevu"] = ""
 
-    # Analiz yapılmış firmaları işaretle
+    # Ciro kolonlarını Türkçe formatla göster
+    def _tr_para(v):
+        try:
+            n = float(v or 0)
+            if n == 0: return ""
+            return f"{n:,.0f}".replace(",",".")+" ₺"
+        except: return ""
+    df_edit["beklenen_ciro"]    = df_edit["beklenen_ciro"].apply(_tr_para) if "beklenen_ciro" in df_edit.columns else ""
+    df_edit["gerceklesen_ciro"] = df_edit["gerceklesen_ciro"].apply(_tr_para) if "gerceklesen_ciro" in df_edit.columns else ""
     try:
         _df_analiz_join = db_read("musteri_analiz")
         if not _df_analiz_join.empty and "firma" in _df_analiz_join.columns:
