@@ -1992,7 +1992,7 @@ elif aktif == "liste":
 
         # Eski kart_sec sistemi için uyumluluk
         kart_opts = ["-- Müşteri Seçin --"] + [
-            f"[{int(r['id'])}] {r['_seg_goster']+' ' if r['_seg_goster'] else ''}{r['firma']} | {r.get('il','')} | {r.get('islem_asamasi','')}"
+            f"[{int(r['id'])}] {r.get('firma','')} | {r.get('il','')} | {r.get('islem_asamasi','')}"
             for _, r in df.iterrows()
         ]
         secili_kart = st.session_state.get("kart_sec", "-- Müşteri Seçin --")
