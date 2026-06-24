@@ -1154,6 +1154,11 @@ section[data-testid="stSidebar"] > div:first-child {
 section[data-testid="stSidebar"] > div > div {
     overflow-y: hidden !important;
 }
+/* Gereksiz boşlukları kaldır */
+div[data-testid="stVerticalBlock"] > div:empty { display: none !important; }
+div[data-testid="stVerticalBlock"] { gap: 0.3rem !important; }
+hr { margin: 0.3rem 0 !important; }
+div[data-testid="stHorizontalBlock"] { gap: 0.3rem !important; }
 button[data-testid="collapsedControl"] { display: none !important; }
 section[data-testid="stSidebar"] .stButton>button {
     text-align: left !important;
