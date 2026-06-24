@@ -2097,6 +2097,10 @@ elif aktif == "liste":
                         "metin": str(_nr.get("aciklama","") or ""),
                     })
                 df_edit["📨 Notlar"] = df_edit["id"].apply(lambda x: f"📨 {_not_sayac.get(str(int(x)),0)}" if _not_sayac.get(str(int(x)),0) > 0 else "")
+                # Notlu olanları en üste al
+                _notlu_idler = set(str(k) for k in _not_sayac.keys() if _not_sayac.get(k,0) > 0)
+                df_edit["_notlu"] = df_edit["id"].apply(lambda x: 0 if str(int(x)) in _notlu_idler else 1)
+                df_edit = df_edit.sort_values("_notlu").drop(columns=["_notlu"]).reset_index(drop=True)
             else:
                 df_edit["📨 Notlar"] = ""
         except:
@@ -2111,6 +2115,20 @@ elif aktif == "liste":
     # ── TÜMÜ GÖSTER — tablo sol, not paneli sağ ──────────────────────────────
     _kayitli_sira = st.session_state.get("_cl_kolon_sira", [])
     _aktif_col_order = _kayitli_sira if _kayitli_sira else col_order
+
+    # Notlu satırları sarı yap — kaç tane notlu var
+    _notlu_kac = len(df_edit[df_edit["📨 Notlar"] != ""]) if "📨 Notlar" in df_edit.columns else 0
+    if _notlu_kac > 0:
+        # data_editor'da ilk N satır notlu — CSS ile sarı yap
+        st.markdown(f"""<style>
+/* İlk {_notlu_kac} veri satırı — notlu müşteriler sarı */
+div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}) td {{
+    background-color: #fefce8 !important;
+}}
+div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover td {{
+    background-color: #fef9c3 !important;
+}}
+</style>""", unsafe_allow_html=True)
 
     # Sağda not paneli açık mı?
     _not_panel_id = st.session_state.get("_cl_not_panel_id")
