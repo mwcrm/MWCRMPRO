@@ -3382,12 +3382,15 @@ function updateBot(v){{
             if _t_tem != "Tümü":
                 _df_toplu = _df_toplu[_df_toplu["temsilci"] == _t_tem]
 
-            _t_asama_opts = ["Tümü"] + tum_asama_opts
+            _t_asama_l = _tanimlar_yukle("asama")
+            _t_durum_l  = _tanimlar_yukle("durum")
+
+            _t_asama_opts = ["Tümü"] + _t_asama_l
             _t_asama_fil = _tc2.selectbox("Mevcut Aşama filtrele", _t_asama_opts, key="toplu_asama_fil")
             if _t_asama_fil != "Tümü":
                 _df_toplu = _df_toplu[_df_toplu["islem_asamasi"] == _t_asama_fil]
 
-            _t_durum_opts = ["Tümü"] + tum_durum_opts
+            _t_durum_opts = ["Tümü"] + _t_durum_l
             _t_durum_fil = _tc3.selectbox("Mevcut Durum filtrele", _t_durum_opts, key="toplu_durum_fil")
             if _t_durum_fil != "Tümü":
                 _df_toplu = _df_toplu[_df_toplu["durum"] == _t_durum_fil]
@@ -3401,10 +3404,10 @@ function updateBot(v){{
             _degistir_ne = _tc4.radio("Değiştirilecek alan:", ["Aşama", "Durum"], horizontal=True, key="toplu_ne")
 
             if _degistir_ne == "Aşama":
-                _yeni_deger = _tc5.selectbox("Yeni Aşama:", tum_asama_opts, key="toplu_yeni_asama")
+                _yeni_deger = _tc5.selectbox("Yeni Aşama:", _t_asama_l, key="toplu_yeni_asama")
                 _alan = "islem_asamasi"
             else:
-                _yeni_deger = _tc5.selectbox("Yeni Durum:", tum_durum_opts, key="toplu_yeni_durum")
+                _yeni_deger = _tc5.selectbox("Yeni Durum:", _t_durum_l, key="toplu_yeni_durum")
                 _alan = "durum"
 
             # Önizleme
