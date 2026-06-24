@@ -2260,8 +2260,8 @@ elif aktif == "liste":
         "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
         "id":            st.column_config.NumberColumn("ID", disabled=True, width=_w("id")),
         "tarih":         None, "olusturan": None, "silindi": None,
-        "beklenen_ciro":    st.column_config.TextColumn("Hedef ₺",  width="small", disabled=True),
-        "gerceklesen_ciro": st.column_config.TextColumn("Gerçek ₺", width="small", disabled=True),
+        "beklenen_ciro":    st.column_config.TextColumn("Hedef ₺",  width="small"),
+        "gerceklesen_ciro": st.column_config.TextColumn("Gerçek ₺", width="small"),
         "firma":         st.column_config.TextColumn("Firma",     width=_w("firma")),
         "yetkili":       st.column_config.TextColumn("Yetkili",   width=_w("yetkili")),
         "gsm":           st.column_config.TextColumn("GSM",       width=_w("gsm")),
@@ -2499,8 +2499,18 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                         if idx >= len(_rows): continue
                         rid = int(float(str(_rows[idx].get("id",0))))
                         if not rid: continue
-                        guncelle = {k: str(v) if v is not None else ""
-                                   for k, v in degisiklikler.items() if k != "Seç"}
+                        guncelle = {}
+                        for k, v in degisiklikler.items():
+                            if k == "Seç": continue
+                            # Türkçe format → sayıya çevir
+                            if k in ("beklenen_ciro", "gerceklesen_ciro", "Hedef ₺", "Gerçek ₺"):
+                                _db_key = "beklenen_ciro" if k in ("beklenen_ciro","Hedef ₺") else "gerceklesen_ciro"
+                                try:
+                                    _num = str(v or "").replace(".","").replace("₺","").replace(" ","").strip()
+                                    guncelle[_db_key] = float(_num) if _num else 0
+                                except: guncelle[_db_key] = 0
+                            else:
+                                guncelle[k] = str(v) if v is not None else ""
                         if not guncelle: continue
                         if sb_liste:
                             sb_liste.table("cari_kartlar").update(guncelle).eq("id", rid).execute()
