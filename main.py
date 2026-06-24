@@ -1523,6 +1523,56 @@ if aktif == "yeni":
 # ── CARİ LİSTE ───────────────────────────────────────────────────────────────
 elif aktif == "liste":
     sayfa_log("liste")
+    # Kolon genişliklerini localStorage'a kaydet ve geri yükle
+    st.markdown("""<script>
+(function(){
+  const STORE_KEY = 'mwcrm_col_widths';
+  function saveWidths(){
+    try {
+      const headers = document.querySelectorAll('[data-testid="stDataEditor"] th');
+      if(!headers.length) return;
+      const widths = {};
+      headers.forEach(th => {
+        const label = th.innerText.trim();
+        if(label) widths[label] = th.offsetWidth;
+      });
+      localStorage.setItem(STORE_KEY, JSON.stringify(widths));
+    } catch(e){}
+  }
+  function restoreWidths(){
+    try {
+      const saved = localStorage.getItem(STORE_KEY);
+      if(!saved) return;
+      const widths = JSON.parse(saved);
+      const headers = document.querySelectorAll('[data-testid="stDataEditor"] th');
+      headers.forEach(th => {
+        const label = th.innerText.trim();
+        if(widths[label]){
+          th.style.width = widths[label]+'px';
+          th.style.minWidth = widths[label]+'px';
+          th.style.maxWidth = widths[label]+'px';
+        }
+      });
+    } catch(e){}
+  }
+  // Resize observer — genişlik değişince kaydet
+  const obs = new MutationObserver(() => {
+    restoreWidths();
+    setTimeout(saveWidths, 500);
+  });
+  function init(){
+    const editor = document.querySelector('[data-testid="stDataEditor"]');
+    if(editor){
+      restoreWidths();
+      obs.observe(editor, {childList:true, subtree:true, attributes:true});
+      editor.addEventListener('mouseup', () => setTimeout(saveWidths, 300));
+    } else {
+      setTimeout(init, 500);
+    }
+  }
+  setTimeout(init, 1000);
+})();
+</script>""", unsafe_allow_html=True)
     if st.session_state.get("kayit_mesaj"):
         st.success(st.session_state["kayit_mesaj"])
         st.session_state["kayit_mesaj"] = ""
