@@ -1689,94 +1689,93 @@ elif aktif == "liste":
     }
 
     # Durum butonu sırası — hafızada tut
+    # ── DURUM & AŞAMA BUTONLARI ───────────────────────────────────────────────
+    def _rapor_satir(veri_listesi, sira_key, gizli_key, fil_key, emoji_map, satir_label):
+        """Genel buton satırı: sıralama + gizle/göster"""
+        _veri_dict = {ad: sayi for ad, sayi in veri_listesi}
+        _adlar = [ad for ad, _ in veri_listesi]
+
+        # Sıra hafızası
+        _sira = st.session_state.get(sira_key, _adlar.copy())
+        for _a in _adlar:
+            if _a not in _sira: _sira.append(_a)
+        _sira = [x for x in _sira if x in _adlar]
+        st.session_state[sira_key] = _sira
+
+        # Gizli hafızası
+        _gizli = st.session_state.get(gizli_key, set())
+        if not isinstance(_gizli, set): _gizli = set(_gizli)
+
+        # Düzenleme modu
+        _mode = st.session_state.get(f"_{sira_key}_mode", False)
+
+        # Başlık satırı
+        _hc = st.columns([0.5, 0.5, 8])
+        if _hc[0].button("⚙️", key=f"{sira_key}_toggle", help="Düzenle", use_container_width=True):
+            st.session_state[f"_{sira_key}_mode"] = not _mode; st.rerun()
+        _hc[1].markdown(f"<div style='font-size:11px;color:#94a3b8;padding-top:6px'>{satir_label}</div>", unsafe_allow_html=True)
+
+        if _mode:
+            # Düzenleme modu — her buton için kontroller
+            st.caption("← → taşı · 👁 gizle/göster")
+            _tum = _sira.copy()
+            _edit_cols = st.columns(len(_tum))
+            for i, _ad in enumerate(_tum):
+                _sayi = _veri_dict.get(_ad, 0)
+                _em = emoji_map.get(_ad, "🔹")
+                _gizli_mi = _ad in _gizli
+                with _edit_cols[i]:
+                    _r1, _r2, _r3 = st.columns(3)
+                    # Sol
+                    if _r1.button("←", key=f"{sira_key}_sol_{i}", use_container_width=True):
+                        if i > 0:
+                            _sira[i], _sira[i-1] = _sira[i-1], _sira[i]
+                            st.session_state[sira_key] = _sira; st.rerun()
+                    # Sağ
+                    if _r2.button("→", key=f"{sira_key}_sag_{i}", use_container_width=True):
+                        if i < len(_tum)-1:
+                            _sira[i], _sira[i+1] = _sira[i+1], _sira[i]
+                            st.session_state[sira_key] = _sira; st.rerun()
+                    # Gizle/Göster
+                    if _r3.button("🙈" if not _gizli_mi else "👁", key=f"{sira_key}_giz_{i}", use_container_width=True):
+                        if _gizli_mi: _gizli.discard(_ad)
+                        else: _gizli.add(_ad)
+                        st.session_state[gizli_key] = _gizli; st.rerun()
+                    # Buton önizleme
+                    st.button(
+                        f"{_em} {_ad}\n{_sayi}",
+                        key=f"{sira_key}_prev_{i}",
+                        use_container_width=True,
+                        disabled=True,
+                        type="secondary" if not _gizli_mi else "secondary",
+                    )
+                    if _gizli_mi:
+                        st.markdown("<div style='text-align:center;font-size:10px;color:#94a3b8'>gizli</div>", unsafe_allow_html=True)
+        else:
+            # Normal mod — sadece görünen butonlar
+            _gorunen = [(_ad, _veri_dict.get(_ad, 0)) for _ad in _sira if _ad not in _gizli]
+            if _gorunen:
+                _btn_cols = st.columns(len(_gorunen))
+                for i, (_ad, _sayi) in enumerate(_gorunen):
+                    _em = emoji_map.get(_ad, "🔹")
+                    if _btn_cols[i].button(f"{_em} {_ad}\n{_sayi}", key=f"{sira_key}_btn_{i}", use_container_width=True):
+                        if fil_key == "durum":
+                            st.session_state["_cl_fil_durum_multi"] = [] if _ad == "Toplam" else [_ad]
+                        else:
+                            st.session_state["_cl_fil_asama_multi"] = [_ad]
+                        st.rerun()
+
+    # Durum satırı
     _d_veri = [("Toplam", len(df))]
     for _dn in tum_durum_opts:
         _dc = len(df[df["durum"]==_dn]) if "durum" in df.columns else 0
         _d_veri.append((_dn, _dc))
-
-    # Sıralama hafızası — sadece durum adları
-    _dur_sirasi = st.session_state.get("_dur_sirasi", [x[0] for x in _d_veri])
-    # Yeni eklenen durumları sona ekle
-    _mevcut_adlar = [x[0] for x in _d_veri]
-    for _ad in _mevcut_adlar:
-        if _ad not in _dur_sirasi: _dur_sirasi.append(_ad)
-    # Silinenleri çıkar
-    _dur_sirasi = [x for x in _dur_sirasi if x in _mevcut_adlar]
-    st.session_state["_dur_sirasi"] = _dur_sirasi
-    _d_veri_sirali = sorted(_d_veri, key=lambda x: _dur_sirasi.index(x[0]) if x[0] in _dur_sirasi else 99)
-
-    # Sıralama modu açık mı?
-    _dur_sort_mode = st.session_state.get("_dur_sort_mode", False)
-    _dsm_col = st.columns([1,10])
-    if _dsm_col[0].button("⇅" if not _dur_sort_mode else "✓", key="dur_sort_toggle",
-                          help="Buton sıralamasını aç/kapat", use_container_width=True):
-        st.session_state["_dur_sort_mode"] = not _dur_sort_mode
-        st.rerun()
-
-    if _dur_sort_mode:
-        # Sıralama modu: her butonun yanında ↑↓
-        st.caption("↑↓ ile sırala, ✓ ile bitir")
-        _sm_cols = st.columns(len(_d_veri_sirali))
-        for i, (_ad, _sayi) in enumerate(_d_veri_sirali):
-            _em = _DURUM_EMOJI.get(_ad, "🔹")
-            with _sm_cols[i].container():
-                _sc1, _sc2 = st.columns(2)
-                if _sc1.button("←", key=f"dur_sol_{i}", use_container_width=True) and i > 0:
-                    _dur_sirasi[i], _dur_sirasi[i-1] = _dur_sirasi[i-1], _dur_sirasi[i]
-                    st.session_state["_dur_sirasi"] = _dur_sirasi; st.rerun()
-                if _sc2.button("→", key=f"dur_sag_{i}", use_container_width=True) and i < len(_d_veri_sirali)-1:
-                    _dur_sirasi[i], _dur_sirasi[i+1] = _dur_sirasi[i+1], _dur_sirasi[i]
-                    st.session_state["_dur_sirasi"] = _dur_sirasi; st.rerun()
-                st.button(f"{_em} {_ad}\n{_sayi}", key=f"dur_btn_s_{i}", use_container_width=True, disabled=True)
-    else:
-        _d_cols = st.columns(len(_d_veri_sirali))
-        for i, (_ad, _sayi) in enumerate(_d_veri_sirali):
-            _em = _DURUM_EMOJI.get(_ad, "🔹")
-            if _d_cols[i].button(f"{_em} {_ad}\n{_sayi}", key=f"dur_btn_{i}", use_container_width=True):
-                if _ad == "Toplam":
-                    st.session_state["_cl_fil_durum_multi"] = []
-                else:
-                    st.session_state["_cl_fil_durum_multi"] = [_ad]
-                st.rerun()
+    _rapor_satir(_d_veri, "_dur_sirasi", "_dur_gizli", "durum", _DURUM_EMOJI, "Durum")
 
     # Aşama satırı
     if tum_asama_opts:
         _a_veri = [(a, len(df[df["islem_asamasi"]==a]) if "islem_asamasi" in df.columns else 0) for a in tum_asama_opts]
-
-        _asm_sirasi = st.session_state.get("_asm_sirasi", [x[0] for x in _a_veri])
-        for _ad in [x[0] for x in _a_veri]:
-            if _ad not in _asm_sirasi: _asm_sirasi.append(_ad)
-        _asm_sirasi = [x for x in _asm_sirasi if x in [y[0] for y in _a_veri]]
-        st.session_state["_asm_sirasi"] = _asm_sirasi
-        _a_veri_sirali = sorted(_a_veri, key=lambda x: _asm_sirasi.index(x[0]) if x[0] in _asm_sirasi else 99)
-
-        _asm_sort_mode = st.session_state.get("_asm_sort_mode", False)
-        _asm_col = st.columns([1,10])
-        if _asm_col[0].button("⇅" if not _asm_sort_mode else "✓", key="asm_sort_toggle",
-                              help="Aşama sıralamasını aç/kapat", use_container_width=True):
-            st.session_state["_asm_sort_mode"] = not _asm_sort_mode; st.rerun()
-
-        if _asm_sort_mode:
-            st.caption("↑↓ ile sırala, ✓ ile bitir")
-            _sm_cols2 = st.columns(len(_a_veri_sirali))
-            for i, (_an, _ac) in enumerate(_a_veri_sirali):
-                _em2 = _ASAMA_EMOJI.get(_an, "🔸")
-                with _sm_cols2[i].container():
-                    _sc1, _sc2 = st.columns(2)
-                    if _sc1.button("←", key=f"asm_sol_{i}", use_container_width=True) and i > 0:
-                        _asm_sirasi[i], _asm_sirasi[i-1] = _asm_sirasi[i-1], _asm_sirasi[i]
-                        st.session_state["_asm_sirasi"] = _asm_sirasi; st.rerun()
-                    if _sc2.button("→", key=f"asm_sag_{i}", use_container_width=True) and i < len(_a_veri_sirali)-1:
-                        _asm_sirasi[i], _asm_sirasi[i+1] = _asm_sirasi[i+1], _asm_sirasi[i]
-                        st.session_state["_asm_sirasi"] = _asm_sirasi; st.rerun()
-                    st.button(f"{_em2} {_an}\n{_ac}", key=f"asm_btn_s_{i}", use_container_width=True, disabled=True)
-        else:
-            _a_cols = st.columns(len(_a_veri_sirali))
-            for i, (_an, _ac) in enumerate(_a_veri_sirali):
-                _em2 = _ASAMA_EMOJI.get(_an, "🔸")
-                if _a_cols[i].button(f"{_em2} {_an}\n{_ac}", key=f"asm_btn_{i}", use_container_width=True):
-                    st.session_state["_cl_fil_asama_multi"] = [_an]
-                    st.rerun()
+        _rapor_satir(_a_veri, "_asm_sirasi", "_asm_gizli", "asama", _ASAMA_EMOJI, "Aşama")
 
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
     with st.expander("🔍 Filtreler & Arama", expanded=st.session_state.get("_cl_fil_acik", True)):
