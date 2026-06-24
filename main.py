@@ -882,21 +882,27 @@ def fmt_tarih(v):
         pass
     return s[:10]
 
-def not_paneli(cari_id, firma_adi="", key_prefix="np"):
-    """Her yerde kullanılan ortak not paneli — oku, yaz, sil"""
+@st.cache_data(ttl=30, show_spinner=False)
+def _notlar_yukle(cari_id):
+    """Notları cache'le — 30 saniye"""
     try:
         _sb = get_sb_client()
-        # Notları çek
-        _notlar = []
         if _sb:
             _r = _sb.table("cari_aciklamalar").select("*").eq("cari_id", int(cari_id)).execute()
-            _notlar = _r.data or []
+            return _r.data or []
         else:
             import sqlite3 as _sq3
             _cn = _sq3.connect("mw_crm.db", check_same_thread=False)
             _rows = _cn.execute("SELECT * FROM cari_aciklamalar WHERE cari_id=? ORDER BY tarih DESC", (int(cari_id),)).fetchall()
             _cols = [d[0] for d in _cn.execute("PRAGMA table_info(cari_aciklamalar)").fetchall()]
-            _notlar = [dict(zip(_cols, r)) for r in _rows]
+            return [dict(zip(_cols, r)) for r in _rows]
+    except: return []
+
+def not_paneli(cari_id, firma_adi="", key_prefix="np"):
+    """Her yerde kullanılan ortak not paneli — oku, yaz, sil"""
+    try:
+        _sb = get_sb_client()
+        _notlar = _notlar_yukle(cari_id)
 
         # Sırala — en yeni üstte
         try:
@@ -929,6 +935,8 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
                             _sb.table("cari_aciklamalar").delete().eq("id", int(_nid)).execute()
                         try: db_read.clear()
                         except: pass
+                        try: _notlar_yukle.clear()
+                        except: pass
                         st.rerun()
                     except Exception as _se:
                         st.error(f"Sil hatası: {_se}")
@@ -955,6 +963,8 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
                     if _sb:
                         _sb.table("cari_aciklamalar").insert(_veri).execute()
                     try: db_read.clear()
+                    except: pass
+                    try: _notlar_yukle.clear()
                     except: pass
                     st.success("✅ Not kaydedildi!")
                     st.rerun()
@@ -2206,25 +2216,33 @@ elif aktif == "liste":
     except:
         df_edit["📅 Son Randevu"] = ""
 
-    # Her firma için not sayısı + içerik (hover için)
-    _not_detay = {}  # {cari_id: [{tarih, olusturan, aciklama}, ...]}
+    # Her firma için not sayısı + içerik
+    _not_detay = {}
+    _not_sayac = {}
     if sb_liste:
         try:
-            _res_notlar = sb_liste.table("cari_aciklamalar").select("cari_id,tarih,olusturan,aciklama").execute()
-            if _res_notlar.data:
+            @st.cache_data(ttl=60, show_spinner=False)
+            def _tum_notlari_yukle():
+                _sb2 = get_sb_client()
+                if _sb2:
+                    _r2 = _sb2.table("cari_aciklamalar").select("id,cari_id,tarih,olusturan,aciklama").execute()
+                    return _r2.data or []
+                return []
+            _res_notlar_data = _tum_notlari_yukle()
+            if _res_notlar_data:
                 import collections
-                _not_sayac = collections.Counter([str(r["cari_id"]) for r in _res_notlar.data])
-                for _nr in _res_notlar.data:
+                _not_sayac = collections.Counter([str(r["cari_id"]) for r in _res_notlar_data])
+                for _nr in _res_notlar_data:
                     _ncid = str(_nr.get("cari_id",""))
                     if _ncid not in _not_detay:
                         _not_detay[_ncid] = []
                     _not_detay[_ncid].append({
+                        "id": _nr.get("id",""),
                         "tarih": fmt_tarih(_nr.get("tarih","")),
                         "kim": str(_nr.get("olusturan","") or ""),
                         "metin": str(_nr.get("aciklama","") or ""),
                     })
                 df_edit["📨 Notlar"] = df_edit["id"].apply(lambda x: f"📨 {_not_sayac.get(str(int(x)),0)}" if _not_sayac.get(str(int(x)),0) > 0 else "")
-                # Notlu olanları en üste al
                 _notlu_idler = set(str(k) for k in _not_sayac.keys() if _not_sayac.get(k,0) > 0)
                 df_edit["_notlu"] = df_edit["id"].apply(lambda x: 0 if str(int(x)) in _notlu_idler else 1)
                 df_edit = df_edit.sort_values("_notlu").drop(columns=["_notlu"]).reset_index(drop=True)
