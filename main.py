@@ -898,6 +898,11 @@ def _notlar_yukle(cari_id):
             return [dict(zip(_cols, r)) for r in _rows]
     except: return []
 
+@st.dialog("📋 Notlar", width="large")
+def not_dialog(cari_id, firma_adi=""):
+    """Ekran ortasında açılan not penceresi"""
+    not_paneli(cari_id, firma_adi, key_prefix="dlg")
+
 def not_paneli(cari_id, firma_adi="", key_prefix="np"):
     """Her yerde kullanılan ortak not paneli — oku, yaz, sil"""
     try:
@@ -2409,13 +2414,12 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
     secili_sayi = len(secili_df)
     secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
 
-    # ── NOT PANELİ — tablonun altında, rerun YOK ──────────────────────────────
+    # ── NOT DİALOG — satır seçince ekran ortasında açılır ────────────────────
     if secili_sayi == 1:
         _sel_id = int(secili_idler[0])
         _sel_rows = df_edit[df_edit["id"] == _sel_id]
         _sel_firma = str(_sel_rows.iloc[0].get("firma","")) if not _sel_rows.empty else ""
-        with st.expander(f"📋 {_sel_firma} — Notlar", expanded=True):
-            not_paneli(_sel_id, _sel_firma, key_prefix="cl")
+        not_dialog(_sel_id, _sel_firma)
 
 
     # ── BUTONLAR ──────────────────────────────────────────────────────────────
