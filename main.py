@@ -1688,31 +1688,95 @@ elif aktif == "liste":
         "Gereksizler":      "🗑️",
     }
 
-    # Durum satırı
+    # Durum butonu sırası — hafızada tut
     _d_veri = [("Toplam", len(df))]
     for _dn in tum_durum_opts:
         _dc = len(df[df["durum"]==_dn]) if "durum" in df.columns else 0
         _d_veri.append((_dn, _dc))
 
-    _d_cols = st.columns(len(_d_veri))
-    for i, (_ad, _sayi) in enumerate(_d_veri):
-        _em = _DURUM_EMOJI.get(_ad, "🔹")
-        if _d_cols[i].button(f"{_em} {_ad}\n{_sayi}", key=f"dur_btn_{i}", use_container_width=True):
-            if _ad == "Toplam":
-                st.session_state["_cl_fil_durum_multi"] = []
-            else:
-                st.session_state["_cl_fil_durum_multi"] = [_ad]
-            st.rerun()
+    # Sıralama hafızası — sadece durum adları
+    _dur_sirasi = st.session_state.get("_dur_sirasi", [x[0] for x in _d_veri])
+    # Yeni eklenen durumları sona ekle
+    _mevcut_adlar = [x[0] for x in _d_veri]
+    for _ad in _mevcut_adlar:
+        if _ad not in _dur_sirasi: _dur_sirasi.append(_ad)
+    # Silinenleri çıkar
+    _dur_sirasi = [x for x in _dur_sirasi if x in _mevcut_adlar]
+    st.session_state["_dur_sirasi"] = _dur_sirasi
+    _d_veri_sirali = sorted(_d_veri, key=lambda x: _dur_sirasi.index(x[0]) if x[0] in _dur_sirasi else 99)
+
+    # Sıralama modu açık mı?
+    _dur_sort_mode = st.session_state.get("_dur_sort_mode", False)
+    _dsm_col = st.columns([1,10])
+    if _dsm_col[0].button("⇅" if not _dur_sort_mode else "✓", key="dur_sort_toggle",
+                          help="Buton sıralamasını aç/kapat", use_container_width=True):
+        st.session_state["_dur_sort_mode"] = not _dur_sort_mode
+        st.rerun()
+
+    if _dur_sort_mode:
+        # Sıralama modu: her butonun yanında ↑↓
+        st.caption("↑↓ ile sırala, ✓ ile bitir")
+        _sm_cols = st.columns(len(_d_veri_sirali))
+        for i, (_ad, _sayi) in enumerate(_d_veri_sirali):
+            _em = _DURUM_EMOJI.get(_ad, "🔹")
+            with _sm_cols[i].container():
+                _sc1, _sc2 = st.columns(2)
+                if _sc1.button("←", key=f"dur_sol_{i}", use_container_width=True) and i > 0:
+                    _dur_sirasi[i], _dur_sirasi[i-1] = _dur_sirasi[i-1], _dur_sirasi[i]
+                    st.session_state["_dur_sirasi"] = _dur_sirasi; st.rerun()
+                if _sc2.button("→", key=f"dur_sag_{i}", use_container_width=True) and i < len(_d_veri_sirali)-1:
+                    _dur_sirasi[i], _dur_sirasi[i+1] = _dur_sirasi[i+1], _dur_sirasi[i]
+                    st.session_state["_dur_sirasi"] = _dur_sirasi; st.rerun()
+                st.button(f"{_em} {_ad}\n{_sayi}", key=f"dur_btn_s_{i}", use_container_width=True, disabled=True)
+    else:
+        _d_cols = st.columns(len(_d_veri_sirali))
+        for i, (_ad, _sayi) in enumerate(_d_veri_sirali):
+            _em = _DURUM_EMOJI.get(_ad, "🔹")
+            if _d_cols[i].button(f"{_em} {_ad}\n{_sayi}", key=f"dur_btn_{i}", use_container_width=True):
+                if _ad == "Toplam":
+                    st.session_state["_cl_fil_durum_multi"] = []
+                else:
+                    st.session_state["_cl_fil_durum_multi"] = [_ad]
+                st.rerun()
 
     # Aşama satırı
     if tum_asama_opts:
         _a_veri = [(a, len(df[df["islem_asamasi"]==a]) if "islem_asamasi" in df.columns else 0) for a in tum_asama_opts]
-        _a_cols = st.columns(len(_a_veri))
-        for i, (_an, _ac) in enumerate(_a_veri):
-            _em2 = _ASAMA_EMOJI.get(_an, "🔸")
-            if _a_cols[i].button(f"{_em2} {_an}\n{_ac}", key=f"asm_btn_{i}", use_container_width=True):
-                st.session_state["_cl_fil_asama_multi"] = [_an]
-                st.rerun()
+
+        _asm_sirasi = st.session_state.get("_asm_sirasi", [x[0] for x in _a_veri])
+        for _ad in [x[0] for x in _a_veri]:
+            if _ad not in _asm_sirasi: _asm_sirasi.append(_ad)
+        _asm_sirasi = [x for x in _asm_sirasi if x in [y[0] for y in _a_veri]]
+        st.session_state["_asm_sirasi"] = _asm_sirasi
+        _a_veri_sirali = sorted(_a_veri, key=lambda x: _asm_sirasi.index(x[0]) if x[0] in _asm_sirasi else 99)
+
+        _asm_sort_mode = st.session_state.get("_asm_sort_mode", False)
+        _asm_col = st.columns([1,10])
+        if _asm_col[0].button("⇅" if not _asm_sort_mode else "✓", key="asm_sort_toggle",
+                              help="Aşama sıralamasını aç/kapat", use_container_width=True):
+            st.session_state["_asm_sort_mode"] = not _asm_sort_mode; st.rerun()
+
+        if _asm_sort_mode:
+            st.caption("↑↓ ile sırala, ✓ ile bitir")
+            _sm_cols2 = st.columns(len(_a_veri_sirali))
+            for i, (_an, _ac) in enumerate(_a_veri_sirali):
+                _em2 = _ASAMA_EMOJI.get(_an, "🔸")
+                with _sm_cols2[i].container():
+                    _sc1, _sc2 = st.columns(2)
+                    if _sc1.button("←", key=f"asm_sol_{i}", use_container_width=True) and i > 0:
+                        _asm_sirasi[i], _asm_sirasi[i-1] = _asm_sirasi[i-1], _asm_sirasi[i]
+                        st.session_state["_asm_sirasi"] = _asm_sirasi; st.rerun()
+                    if _sc2.button("→", key=f"asm_sag_{i}", use_container_width=True) and i < len(_a_veri_sirali)-1:
+                        _asm_sirasi[i], _asm_sirasi[i+1] = _asm_sirasi[i+1], _asm_sirasi[i]
+                        st.session_state["_asm_sirasi"] = _asm_sirasi; st.rerun()
+                    st.button(f"{_em2} {_an}\n{_ac}", key=f"asm_btn_s_{i}", use_container_width=True, disabled=True)
+        else:
+            _a_cols = st.columns(len(_a_veri_sirali))
+            for i, (_an, _ac) in enumerate(_a_veri_sirali):
+                _em2 = _ASAMA_EMOJI.get(_an, "🔸")
+                if _a_cols[i].button(f"{_em2} {_an}\n{_ac}", key=f"asm_btn_{i}", use_container_width=True):
+                    st.session_state["_cl_fil_asama_multi"] = [_an]
+                    st.rerun()
 
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
     with st.expander("🔍 Filtreler & Arama", expanded=st.session_state.get("_cl_fil_acik", True)):
