@@ -1894,62 +1894,33 @@ elif aktif == "liste":
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
     with st.expander("🔍 Filtreler & Arama", expanded=st.session_state.get("_cl_fil_acik", True)):
         st.session_state["_cl_fil_acik"] = True  # expander açık kalsın
-        _frow1 = st.columns([2,1,1,1,1,1,1])
-        ara_txt = _frow1[0].text_input("", placeholder="🔍 Firma, yetkili, il, gsm...", key="ara_liste", label_visibility="collapsed")
+        # ── TEK SATIR FİLTRE ───────────────────────────────────────────────────
+        _fc = st.columns([2.5, 1.2, 1.2, 0.8, 1, 1, 1, 1, 0.6])
+        ara_txt = _fc[0].text_input("", placeholder="🔍 Firma, yetkili, il, gsm...", key="ara_liste", label_visibility="collapsed")
 
-        # Asama multiselect
-        _asama_def = [x for x in st.session_state.get("_cl_fil_asama_multi", []) if x in tum_asama_opts]
-        _asama_sec = _frow1[1].multiselect(
-            "Aşama", tum_asama_opts,
-            default=_asama_def,
-            key="_cl_fil_asama_multi", placeholder="Aşama seç..."
-        )
-        # Durum multiselect
-        _durum_def = [x for x in st.session_state.get("_cl_fil_durum_multi", []) if x in tum_durum_opts]
-        _durum_sec = _frow1[2].multiselect(
-            "Durum", tum_durum_opts,
-            default=_durum_def,
-            key="_cl_fil_durum_multi", placeholder="Durum seç..."
-        )
-        # Segment
-        filtre_seg = _frow1[3].selectbox(
-            "Segment", ["Tümü","👑 A+","⭐ A","🔵 B","⚪ C","Segmentsiz"],
-            key="fil_seg", label_visibility="visible"
-        )
-        # İl multiselect
+        _asama_def = [x for x in st.session_state.get("_cl_fil_asama_multi",[]) if x in tum_asama_opts]
+        _asama_sec = _fc[1].multiselect("Aşama", tum_asama_opts, default=_asama_def, key="_cl_fil_asama_multi", placeholder="Aşama...")
+
+        _durum_def = [x for x in st.session_state.get("_cl_fil_durum_multi",[]) if x in tum_durum_opts]
+        _durum_sec = _fc[2].multiselect("Durum", tum_durum_opts, default=_durum_def, key="_cl_fil_durum_multi", placeholder="Durum...")
+
+        filtre_seg = _fc[3].selectbox("Seg.", ["Tümü","👑 A+","⭐ A","🔵 B","⚪ C"], key="fil_seg", label_visibility="visible")
+
         _il_opts = sorted(df["il"].dropna().astype(str).unique().tolist()) if "il" in df.columns else []
-        _il_def = [x for x in st.session_state.get("_cl_fil_il_multi", []) if x in _il_opts]
-        _il_sec = _frow1[4].multiselect(
-            "İl", _il_opts,
-            default=_il_def,
-            key="_cl_fil_il_multi", placeholder="İl seç..."
-        )
-        # İlçe multiselect — seçili ile göre dinamik filtrele
-        if _il_sec:
-            _ilce_opts = sorted(df[df["il"].astype(str).isin(_il_sec)]["ilce"].dropna().astype(str).unique().tolist()) if "ilce" in df.columns else []
-        else:
-            _ilce_opts = sorted(df["ilce"].dropna().astype(str).unique().tolist()) if "ilce" in df.columns else []
-        _ilce_opts = [x for x in _ilce_opts if x and x not in ["nan","None",""]]
-        _ilce_sec = _frow1[5].multiselect(
-            "İlçe", _ilce_opts,
-            default=[x for x in st.session_state.get("_cl_fil_ilce_multi", []) if x in _ilce_opts],
-            key="_cl_fil_ilce_multi", placeholder="İlçe seç..."
-        )
-        # Temsilci multiselect
-        _tem_opts = sorted(df["temsilci"].dropna().astype(str).unique().tolist()) if "temsilci" in df.columns else []
-        _tem_def = [x for x in st.session_state.get("_cl_fil_temsilci_multi", []) if x in _tem_opts]
-        _tem_sec = _frow1[6].multiselect(
-            "Temsilci", _tem_opts,
-            default=_tem_def,
-            key="_cl_fil_temsilci_multi", placeholder="Temsilci seç..."
-        )
+        _il_def  = [x for x in st.session_state.get("_cl_fil_il_multi",[]) if x in _il_opts]
+        _il_sec  = _fc[4].multiselect("İl", _il_opts, default=_il_def, key="_cl_fil_il_multi", placeholder="İl...")
 
-        _frow2 = st.columns([2,1,1])
-        siralama_kol = _frow2[0].selectbox(
-            "Sıralama", ["Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z"],
-            key="siralama_kol", label_visibility="visible"
-        )
-        if _frow2[1].button("🗑️ Filtreleri Temizle", use_container_width=True, key="cl_fil_temizle"):
+        _ilce_opts = sorted((df[df["il"].astype(str).isin(_il_sec)] if _il_sec else df)["ilce"].dropna().astype(str).unique().tolist()) if "ilce" in df.columns else []
+        _ilce_opts = [x for x in _ilce_opts if x not in ["nan","None",""]]
+        _ilce_sec  = _fc[5].multiselect("İlçe", _ilce_opts, default=[x for x in st.session_state.get("_cl_fil_ilce_multi",[]) if x in _ilce_opts], key="_cl_fil_ilce_multi", placeholder="İlçe...")
+
+        _tem_opts = sorted(df["temsilci"].dropna().astype(str).unique().tolist()) if "temsilci" in df.columns else []
+        _tem_def  = [x for x in st.session_state.get("_cl_fil_temsilci_multi",[]) if x in _tem_opts]
+        _tem_sec  = _fc[6].multiselect("Temsilci", _tem_opts, default=_tem_def, key="_cl_fil_temsilci_multi", placeholder="Temsilci...")
+
+        siralama_kol = _fc[7].selectbox("Sırala", ["Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z"], key="siralama_kol", label_visibility="visible")
+
+        if _fc[8].button("🗑", key="cl_fil_temizle", use_container_width=True, help="Filtreleri temizle"):
             for _fk in ["_cl_fil_asama_multi","_cl_fil_durum_multi","_cl_fil_il_multi","_cl_fil_ilce_multi","_cl_fil_temsilci_multi","fil_seg","ara_liste"]:
                 st.session_state.pop(_fk, None)
             st.rerun()
@@ -2288,19 +2259,40 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
             num_rows="fixed",
             column_config=col_config,
             column_order=_aktif_col_order,
+            height=max(400, min(len(df_edit) * 35 + 80, 900)),
             key="cari_editor"
         )
 
     # (not paneli artık tablonun altında expander olarak açılıyor)
 
-    # Kolon sırası değiştiyse session_state'e kaydet
+    # Kolon sırası değiştiyse kaydet — hem session_state hem DB
     try:
         _editor_meta = st.session_state.get("cari_editor", {})
         _col_order_now = _editor_meta.get("column_order", [])
-        if _col_order_now:
+        if _col_order_now and _col_order_now != st.session_state.get("_cl_kolon_sira"):
             st.session_state["_cl_kolon_sira"] = _col_order_now
-    except:
-        pass
+            try:
+                _sb_ko = get_sb_client()
+                if _sb_ko:
+                    import json as _koj
+                    _sb_ko.table("kullanici_tercih").upsert({
+                        "kullanici":"__liste_ui__","anahtar":"_cl_kolon_sira",
+                        "deger":_koj.dumps(_col_order_now, ensure_ascii=False)
+                    }, on_conflict="kullanici,anahtar").execute()
+            except: pass
+    except: pass
+
+    # İlk yüklemede kolon sırasını DB'den al
+    if "_cl_kolon_sira_init" not in st.session_state:
+        try:
+            _sb_ki = get_sb_client()
+            if _sb_ki:
+                import json as _kij
+                _r_ko = _sb_ki.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_cl_kolon_sira").execute()
+                if _r_ko.data:
+                    st.session_state["_cl_kolon_sira"] = _kij.loads(_r_ko.data[0]["deger"])
+        except: pass
+        st.session_state["_cl_kolon_sira_init"] = True
 
     # Her render'da tüm tabloyu session_state'e kaydet
     try:
