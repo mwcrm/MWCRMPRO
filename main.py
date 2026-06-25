@@ -6657,6 +6657,10 @@ elif aktif == "randevu":
             # id→index map (kaydetmek için)
             _rand_id_list = list(_df_goster["ID"])
 
+            # Seç kolonu ekle
+            if "Seç" not in _df_goster.columns:
+                _df_goster.insert(0, "Seç", False)
+
             _edited_rand = st.data_editor(
                 _df_goster,
                 use_container_width=True,
@@ -6664,6 +6668,7 @@ elif aktif == "randevu":
                 num_rows="fixed",
                 row_height=_row_h_px,
                 column_config={
+                    "Seç":      st.column_config.CheckboxColumn("Seç", default=False, width="small"),
                     "ID":       st.column_config.NumberColumn("ID", width="small", disabled=True),
                     "Tarih":    st.column_config.TextColumn("Tarih", width="small", help="GG.AA.YYYY"),
                     "Saat":     st.column_config.SelectboxColumn("Saat", options=_saat_opts, width="small"),
@@ -6682,6 +6687,54 @@ elif aktif == "randevu":
                 },
                 key="rand_editor"
             )
+
+            # Seçili satırlar
+            _rand_secili_df = _edited_rand[_edited_rand["Seç"] == True] if "Seç" in _edited_rand.columns else pd.DataFrame()
+            _rand_secili_ids = [int(_rand_id_list[i]) for i in _rand_secili_df.index if i < len(_rand_id_list)]
+
+            # Seçilince aksiyon butonları
+            if len(_rand_secili_ids) > 0:
+                st.markdown(f"**{len(_rand_secili_ids)} randevu seçili**")
+                _ak1, _ak2, _ak3 = st.columns([1,1,4])
+
+                # Silme
+                if _ak1.button(f"🗑 Sil ({len(_rand_secili_ids)})", key="rand_sec_sil", use_container_width=True, type="primary"):
+                    st.session_state["rand_sil_onay_ids"] = _rand_secili_ids
+
+                if st.session_state.get("rand_sil_onay_ids"):
+                    _sil_ids = st.session_state["rand_sil_onay_ids"]
+                    st.warning(f"⚠️ {len(_sil_ids)} randevu silinecek. Emin misin?")
+                    _oc1, _oc2 = st.columns(2)
+                    if _oc1.button("✅ Evet, Sil", key="rand_sil_evet2", use_container_width=True):
+                        _sb_rsil = get_sb_client()
+                        for _rsil_id in _sil_ids:
+                            try:
+                                if _sb_rsil:
+                                    _sb_rsil.table("randevular").delete().eq("id", _rsil_id).execute()
+                            except: pass
+                        st.session_state.pop("rand_sil_onay_ids", None)
+                        try: db_read.clear()
+                        except: pass
+                        st.success(f"✅ {len(_sil_ids)} randevu silindi!")
+                        st.rerun()
+                    if _oc2.button("❌ Vazgeç", key="rand_sil_vazgec2", use_container_width=True):
+                        st.session_state.pop("rand_sil_onay_ids", None)
+                        st.rerun()
+
+                # Toplu sonuç değiştir
+                _yeni_sonuc = _ak2.selectbox("Sonuç değiştir:", ["—"] + _sonuc_opts, key="rand_toplu_sonuc")
+                if _yeni_sonuc != "—":
+                    if _ak3.button(f"✅ {len(_rand_secili_ids)} randevuya '{_yeni_sonuc}' yaz", key="rand_toplu_kaydet", use_container_width=True):
+                        _sb_rts = get_sb_client()
+                        for _rts_id in _rand_secili_ids:
+                            try:
+                                if _sb_rts:
+                                    _sb_rts.table("randevular").update({"sonuc": _yeni_sonuc}).eq("id", _rts_id).execute()
+                            except: pass
+                        try: db_read.clear()
+                        except: pass
+                        st.success(f"✅ {len(_rand_secili_ids)} randevu güncellendi!")
+                        st.rerun()
 
             # Kaydet butonu
             if st.button("💾 Değişiklikleri Kaydet", type="primary", use_container_width=True, key="rand_kaydet"):
