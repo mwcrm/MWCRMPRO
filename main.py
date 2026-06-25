@@ -814,6 +814,9 @@ st.markdown("""
 }
 /* Genel buton iyileştirme */
 .stButton>button { border-radius: 8px !important; }
+/* Data editor selectbox dropdown - tüm seçenekler görünsün */
+[data-baseweb="popover"] [data-baseweb="menu"] { max-height: 600px !important; overflow-y: auto !important; }
+[data-baseweb="select"] [data-baseweb="menu"] { max-height: 600px !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1991,27 +1994,8 @@ elif aktif == "liste":
         secili_kart_inline = _fc[0].selectbox("m", kart_opts_inline, key="kart_sec_inline", label_visibility="collapsed")
         ara_txt = _fc[1].text_input("a", placeholder="🔍 Firma, yetkili, il...", key="ara_liste", label_visibility="collapsed")
 
-        # Aşama — sabit açık buton listesi
-        if "cl_asama_sec" not in st.session_state:
-            st.session_state["cl_asama_sec"] = []
-        _asama_sec = st.session_state.get("cl_asama_sec", [])
-        with _fc[2].container():
-            for _ao in tum_asama_opts:
-                _secili = _ao in _asama_sec
-                if st.button(
-                    ("✓ " if _secili else "") + _ao,
-                    key=f"cl_asama_btn_{_ao}",
-                    use_container_width=True,
-                    type="primary" if _secili else "secondary"
-                ):
-                    if _secili:
-                        _asama_sec = [x for x in _asama_sec if x != _ao]
-                    else:
-                        _asama_sec = _asama_sec + [_ao]
-                    st.session_state["cl_asama_sec"] = _asama_sec
-                    st.session_state["_cl_fil_asama_multi"] = _asama_sec
-                    st.rerun()
-        _asama_def = _asama_sec
+        _asama_def = [x for x in st.session_state.get("_cl_fil_asama_multi",[]) if x in tum_asama_opts]
+        _asama_sec = _fc[2].multiselect("a", tum_asama_opts, default=_asama_def, key="_cl_fil_asama_multi", placeholder="Aşama...", label_visibility="collapsed")
 
         _durum_def = [x for x in st.session_state.get("_cl_fil_durum_multi",[]) if x in tum_durum_opts]
         _durum_sec = _fc[3].multiselect("d", tum_durum_opts, default=_durum_def, key="_cl_fil_durum_multi", placeholder="Durum...", label_visibility="collapsed")
