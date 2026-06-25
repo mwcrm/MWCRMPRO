@@ -543,15 +543,20 @@ def sayfa_log(sayfa):
 
 
 def _tanimlar_yukle(tip):
-    """sistem_tanimlar tablosundan aşama/durum listesi çek
-    + cari_kartlar'daki eksik değerleri otomatik ekle"""
+    """sistem_tanimlar tablosundan aşama/durum listesi çek"""
     _sb = get_sb_client()
     _liste = []
     try:
         if _sb:
             _r = _sb.table("sistem_tanimlar").select("deger").eq("tip", tip).order("sira").execute()
             if _r.data:
-                _liste = [d["deger"] for d in _r.data]
+                # Duplicate temizle — sırayı koru
+                _goruldu = set()
+                for d in _r.data:
+                    _v = str(d["deger"] or "").strip()
+                    if _v and _v not in _goruldu:
+                        _liste.append(_v)
+                        _goruldu.add(_v)
     except: pass
 
     # cari_kartlar'daki değerleri de ekle — eksik olanları sistem_tanimlar'a yaz
@@ -3498,6 +3503,19 @@ function updateBot(v){{
         with _ta2:
             st.markdown("**📊 Durum Yönetimi**")
             _durum_listesi = _tan_liste("durum")
+            # Duplicate temizle butonu
+            _durum_unique = list(dict.fromkeys(_durum_listesi))
+            if len(_durum_unique) < len(_durum_listesi):
+                st.warning(f"⚠️ {len(_durum_listesi) - len(_durum_unique)} tekrar var!")
+                if st.button("🧹 Tekrarları Temizle", key="durum_temizle", type="primary"):
+                    try:
+                        # Tüm durum kayıtlarını sil
+                        _sb_tan.table("sistem_tanimlar").delete().eq("tip","durum").execute()
+                        # Unique olanları yeniden ekle
+                        for _si, _dv in enumerate(_durum_unique):
+                            _sb_tan.table("sistem_tanimlar").insert({"tip":"durum","deger":_dv,"sira":_si+1}).execute()
+                        st.success("✅ Tekrarlar temizlendi!"); st.rerun()
+                    except Exception as _te: st.error(f"Hata: {_te}")
             _ed1, _ed2 = st.columns([3,1])
             _yeni_durum = _ed1.text_input("", placeholder="Yeni durum adı...", key="kul_yeni_durum", label_visibility="collapsed")
             if _ed2.button("➕ Ekle", key="kul_durum_ekle", use_container_width=True):
@@ -3506,7 +3524,7 @@ function updateBot(v){{
                         st.warning("Bu durum zaten var!")
                     elif _tan_ekle("durum", _yeni_durum.strip()):
                         st.success(f"✅ '{_yeni_durum}' eklendi!"); st.rerun()
-            st.caption(f"{len(_durum_listesi)} durum")
+            st.caption(f"{len(_durum_unique)} durum")
             for _di, _d in enumerate(_durum_listesi):
                 _dc1, _dc2 = st.columns([4,1])
                 _dc1.markdown(f"🔹 **{_d}**")
