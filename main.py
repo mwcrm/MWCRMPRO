@@ -7454,12 +7454,26 @@ elif aktif == "randevu":
         import streamlit.components.v1 as _rut_comp
         import json as _rj
 
-        _rc1, _rc2 = st.columns([1,1])
+        _rc1, _rc2, _rc3 = st.columns([1,1,2])
         _rut_tarih = _rc1.date_input("Tarih", value=datetime.now().date(), key="rut_tarih")
         _rut_tem_list = ["Tüm Temsilciler"]
         if not df_rand_all.empty and "temsilci" in df_rand_all.columns:
             _rut_tem_list += sorted(df_rand_all["temsilci"].dropna().unique().tolist())
         _rut_tem = _rc2.selectbox("Temsilci", _rut_tem_list, key="rut_tem")
+
+        # Başlangıç konumu
+        _bas_konum_tipi = _rc3.selectbox("🏁 Başlangıç Konumu",
+            ["— Seçiniz —", "📍 Mevcut Konumumu Kullan", "🏢 Ofis / Manuel Adres"],
+            key="rut_bas_tip")
+
+        _bas_lat, _bas_lng, _bas_adi = None, None, ""
+        if _bas_konum_tipi == "📍 Mevcut Konumumu Kullan":
+            st.info("📍 Harita açılınca sağ üstteki **📍 Konumumu Kullan** butonuna basın.")
+        elif _bas_konum_tipi == "🏢 Ofis / Manuel Adres":
+            _ba1, _ba2, _ba3 = st.columns(3)
+            _bas_adi  = _ba1.text_input("Başlangıç adı", value=st.session_state.get("rut_bas_adi","Ofis"), key="rut_bas_adi")
+            _bas_ilce = _ba2.text_input("İlçe", value=st.session_state.get("rut_bas_ilce",""), key="rut_bas_ilce")
+            _bas_il   = _ba3.text_input("İl", value=st.session_state.get("rut_bas_il","İstanbul"), key="rut_bas_il")
 
         # Seçili tarihin randevularını filtrele — gelecek ve bugün
         _rut_df = df_rand_all.copy()
@@ -7538,6 +7552,22 @@ elif aktif == "randevu":
         _pins_json = _rj.dumps(_rut_pins, ensure_ascii=False)
         _tarih_str = _rut_tarih.strftime("%d %B %Y")
 
+        # Başlangıç konumu — manuel adres ile koordinat bul
+        _bas_pin_json = "null"
+        if _bas_konum_tipi == "🏢 Ofis / Manuel Adres":
+            _bas_ilce_v = _tr_low(st.session_state.get("rut_bas_ilce",""))
+            _bas_il_v   = _tr_low(st.session_state.get("rut_bas_il","istanbul"))
+            _bas_lat_v, _bas_lng_v = None, None
+            if _bas_ilce_v and _bas_ilce_v in _RUT_ILCE:
+                _bas_lat_v, _bas_lng_v = _RUT_ILCE[_bas_ilce_v]
+            elif _bas_il_v and _bas_il_v in _RUT_IL:
+                _bas_lat_v, _bas_lng_v = _RUT_IL[_bas_il_v]
+            if _bas_lat_v:
+                _bas_pin_json = _rj.dumps({
+                    "lat": _bas_lat_v, "lng": _bas_lng_v,
+                    "adi": st.session_state.get("rut_bas_adi","Ofis")
+                }, ensure_ascii=False)
+
         if not _rut_pins:
             st.info(f"📅 {_tarih_str} tarihinde randevu bulunamadı.")
         else:
@@ -7584,9 +7614,39 @@ body{display:grid;grid-template-columns:1fr 280px;height:520px;overflow:hidden;}
 </div>
 <script>
 var pins = """ + _pins_json + """;
+var basPinData = """ + _bas_pin_json + """;
 var map = L.map('map').setView([40.9,29.1],11);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:18}).addTo(map);
-var markers=[], latlngs=[], rutLine=null, arrowMarkers=[];
+var markers=[], latlngs=[], rutLine=null, arrowMarkers=[], basMarker=null;
+
+// Konumumu Kullan butonu
+var locBtn = L.control({position:'topright'});
+locBtn.onAdd=function(){
+  var d=L.DomUtil.create('button','');
+  d.innerHTML='📍 Konumumu Kullan';
+  d.style.cssText='background:white;border:1px solid #ccc;border-radius:6px;padding:6px 12px;cursor:pointer;font-size:12px;font-weight:600;';
+  d.onclick=function(){
+    if(navigator.geolocation){
+      navigator.geolocation.getCurrentPosition(function(pos){
+        basPinEkle(pos.coords.latitude,pos.coords.longitude,'Ben');
+        map.setView([pos.coords.latitude,pos.coords.longitude],13);
+      },function(){alert('Konum alınamadı. Tarayıcı iznini kontrol edin.');});
+    }else{alert('Tarayıcınız konum desteklemiyor.');}
+  };
+  return d;
+};
+locBtn.addTo(map);
+
+function basPinEkle(lat,lng,adi){
+  if(basMarker) map.removeLayer(basMarker);
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="34" height="44" viewBox="0 0 34 44">'
+    +'<path d="M17 0C7.6 0 0 7.6 0 17c0 12.7 17 27 17 27s17-14.3 17-27C34 7.6 26.4 0 17 0z" fill="#16a34a" stroke="white" stroke-width="2"/>'
+    +'<circle cx="17" cy="17" r="10" fill="white"/>'
+    +'<text x="17" y="21" text-anchor="middle" fill="#16a34a" font-size="11" font-weight="700">🏁</text></svg>';
+  var ic=L.divIcon({html:svg,className:'',iconSize:[34,44],iconAnchor:[17,44],popupAnchor:[0,-46]});
+  basMarker=L.marker([lat,lng],{icon:ic}).bindPopup('<b>🏁 '+adi+'</b><br>Başlangıç').addTo(map);
+}
+if(basPinData){ basPinEkle(basPinData.lat,basPinData.lng,basPinData.adi); }
 
 // Liste oluştur
 var html='';
@@ -7645,10 +7705,10 @@ function secPin(i){
 
 function mapsAc(){
   if(pins.length===0) return;
-  var o=pins[0].lat+','+pins[0].lng;
+  var origin = basPinData ? basPinData.lat+','+basPinData.lng : (basMarker ? basMarker.getLatLng().lat+','+basMarker.getLatLng().lng : pins[0].lat+','+pins[0].lng);
   var d=pins[pins.length-1].lat+','+pins[pins.length-1].lng;
-  var wp=pins.slice(1,-1).map(function(p){return p.lat+','+p.lng;}).join('|');
-  window.open('https://www.google.com/maps/dir/?api=1&origin='+o+'&destination='+d+(wp?'&waypoints='+wp:'')+'&travelmode=driving','_blank');
+  var wp=pins.slice(basPinData||basMarker?0:1,-1).map(function(p){return p.lat+','+p.lng;}).join('|');
+  window.open('https://www.google.com/maps/dir/?api=1&origin='+origin+'&destination='+d+(wp?'&waypoints='+wp:'')+'&travelmode=driving','_blank');
 }
 
 function waGonder(){
