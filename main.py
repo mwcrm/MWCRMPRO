@@ -6690,7 +6690,11 @@ elif aktif == "randevu":
 
             # Seçili satırlar
             _rand_secili_df = _edited_rand[_edited_rand["Seç"] == True] if "Seç" in _edited_rand.columns else pd.DataFrame()
-            _rand_secili_ids = [int(_rand_id_list[i]) for i in _rand_secili_df.index if i < len(_rand_id_list)]
+            _rand_secili_ids = []
+            for _si in _rand_secili_df.index:
+                _pos = list(_df_goster.index).index(_si) if _si in list(_df_goster.index) else _si
+                if _pos < len(_rand_id_list):
+                    _rand_secili_ids.append(int(_rand_id_list[_pos]))
 
             # Seçilince aksiyon butonları
             if len(_rand_secili_ids) > 0:
