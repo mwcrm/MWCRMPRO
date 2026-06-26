@@ -5084,128 +5084,93 @@ section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseBu
                     _tel2 = "90" + _tel2[1:]
 
                 # ── HEADER ────────────────────────────────────────────────────
-                _hb1, _hb2 = st.columns([5,1])
-                with _hb1:
-                    if st.button("← Listeye Dön", key="an_detay_geri"):
-                        st.session_state.pop("an_detay_firma", None); st.rerun()
-                with _hb2:
-                    pass
+                if st.button("← Listeye Dön", key="an_detay_geri"):
+                    st.session_state.pop("an_detay_firma", None); st.rerun()
 
-                st.markdown(f"""
-<div style="background:white;border-radius:12px;border:0.5px solid #e2e8f0;overflow:hidden;margin-bottom:10px;">
-  <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
-    <div>
-      <div style="font-size:18px;font-weight:800;color:#0f172a;">{_detay_firma}</div>
-      <div style="font-size:11px;color:#64748b;margin-top:3px;">
-        📅 {fmt_tarih(_da.get("tarih",""))} &nbsp;·&nbsp; 
-        👤 {_v("olusturan")} &nbsp;·&nbsp; 
-        🏭 {_v("sektor")}
-      </div>
-    </div>
-  </div>
-  <!-- SİNYAL SATIRLARI -->
-  <div style="display:grid;grid-template-columns:repeat(6,1fr);">
-    <div style="padding:12px;text-align:center;border-right:1px solid #f1f5f9;">
-      <div style="font-size:22px;margin-bottom:4px;">{_s_sonuc}</div>
-      <div style="font-size:11px;font-weight:700;color:#0f172a;">{_v("sonuc").title()}</div>
-      <div style="font-size:10px;color:#64748b;">Sonuç</div>
-    </div>
-    <div style="padding:12px;text-align:center;border-right:1px solid #f1f5f9;">
-      <div style="font-size:22px;margin-bottom:4px;">{_s_pot}</div>
-      <div style="font-size:11px;font-weight:700;color:#0f172a;">{_v("potansiyel").title()}</div>
-      <div style="font-size:10px;color:#64748b;">Potansiyel</div>
-    </div>
-    <div style="padding:12px;text-align:center;border-right:1px solid #f1f5f9;">
-      <div style="font-size:22px;margin-bottom:4px;">{_s_ciro}</div>
-      <div style="font-size:11px;font-weight:700;color:#0f172a;">%{_doluluk}</div>
-      <div style="font-size:10px;color:#64748b;">Ciro Doluluk</div>
-    </div>
-    <div style="padding:12px;text-align:center;border-right:1px solid #f1f5f9;">
-      <div style="font-size:22px;margin-bottom:4px;">{'🟢' if _rak_fiyat != '—' else '⚪'}</div>
-      <div style="font-size:11px;font-weight:700;color:#0f172a;">{_rak_firma[:12]}</div>
-      <div style="font-size:10px;color:#64748b;">Rakip</div>
-    </div>
-    <div style="padding:12px;text-align:center;border-right:1px solid #f1f5f9;">
-      <div style="font-size:22px;margin-bottom:4px;">{'🔴' if _v("engel") != '—' else '🟢'}</div>
-      <div style="font-size:11px;font-weight:700;color:#0f172a;">{_v("engel")[:14]}</div>
-      <div style="font-size:10px;color:#64748b;">Engel</div>
-    </div>
-    <div style="padding:12px;text-align:center;">
-      <div style="font-size:22px;margin-bottom:4px;">⏰</div>
-      <div style="font-size:11px;font-weight:700;color:#dc2626;">{fmt_tarih(_v("takip_tar"))}</div>
-      <div style="font-size:10px;color:#64748b;">Takip</div>
-    </div>
-  </div>
-</div>""", unsafe_allow_html=True)
+                def _satir(lbl, val):
+                    return f"""<div style="padding:7px 0;border-bottom:0.5px solid #f1f5f9;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:12px;"><span style="color:#94a3b8;flex-shrink:0;">{lbl}</span><span style="font-weight:500;color:#0f172a;text-align:right;">{val}</span></div>"""
+                def _kt(ikon, baslik):
+                    return f"""<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;padding-bottom:6px;border-bottom:2px solid #f1f5f9;">{ikon} {baslik}</div>"""
 
-                # ── DETAY 3 SÜTUN ─────────────────────────────────────────────
+                st.markdown(f"""<div style="background:white;border-radius:12px;border:0.5px solid #e2e8f0;padding:16px 20px;margin-bottom:10px;">
+<div style="font-size:20px;font-weight:800;color:#0f172a;margin-bottom:6px;">{_detay_firma}</div>
+<div style="font-size:12px;color:#64748b;display:flex;gap:16px;flex-wrap:wrap;">
+<span>📅 {fmt_tarih(_da.get("tarih",""))}</span><span>👤 {_v("olusturan")}</span><span>🏭 {_v("sektor")}</span>
+</div></div>""", unsafe_allow_html=True)
+
+                st.markdown(f"""<div style="background:white;border-radius:12px;border:0.5px solid #e2e8f0;overflow:hidden;margin-bottom:10px;">
+<div style="display:grid;grid-template-columns:repeat(6,1fr);">
+<div style="padding:14px 8px;text-align:center;border-right:1px solid #f1f5f9;">
+<div style="font-size:28px;margin-bottom:6px;">{_s_sonuc}</div>
+<div style="font-size:12px;font-weight:700;color:#0f172a;">{_v("sonuc").title()}</div>
+<div style="font-size:10px;color:#94a3b8;margin-top:2px;">Sonuç</div></div>
+<div style="padding:14px 8px;text-align:center;border-right:1px solid #f1f5f9;">
+<div style="font-size:28px;margin-bottom:6px;">{_s_pot}</div>
+<div style="font-size:12px;font-weight:700;color:#0f172a;">{_v("potansiyel").title()}</div>
+<div style="font-size:10px;color:#94a3b8;margin-top:2px;">Potansiyel</div></div>
+<div style="padding:14px 8px;text-align:center;border-right:1px solid #f1f5f9;">
+<div style="font-size:28px;margin-bottom:6px;">{_s_ciro}</div>
+<div style="font-size:12px;font-weight:700;color:#0f172a;">%{_doluluk}</div>
+<div style="font-size:10px;color:#94a3b8;margin-top:2px;">Ciro Doluluk</div></div>
+<div style="padding:14px 8px;text-align:center;border-right:1px solid #f1f5f9;">
+<div style="font-size:28px;margin-bottom:6px;">{"🟠" if _rak_firma != "—" else "⚪"}</div>
+<div style="font-size:12px;font-weight:700;color:#0f172a;word-break:break-word;">{_rak_firma}</div>
+<div style="font-size:10px;color:#94a3b8;margin-top:2px;">Rakip</div></div>
+<div style="padding:14px 8px;text-align:center;border-right:1px solid #f1f5f9;">
+<div style="font-size:28px;margin-bottom:6px;">{"🔴" if _v("engel") != "—" else "🟢"}</div>
+<div style="font-size:12px;font-weight:700;color:#0f172a;">{_v("engel")}</div>
+<div style="font-size:10px;color:#94a3b8;margin-top:2px;">Engel</div></div>
+<div style="padding:14px 8px;text-align:center;">
+<div style="font-size:28px;margin-bottom:6px;">⏰</div>
+<div style="font-size:12px;font-weight:700;color:#dc2626;">{fmt_tarih(_v("takip_tar"))}</div>
+<div style="font-size:10px;color:#94a3b8;margin-top:2px;">Takip</div></div>
+</div></div>""", unsafe_allow_html=True)
+
                 _d1, _d2, _d3 = st.columns(3)
-
                 with _d1:
-                    st.markdown("""<div style="background:white;border-radius:10px;border:0.5px solid #e2e8f0;padding:14px;">
-<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #f1f5f9;padding-bottom:6px;margin-bottom:10px;">👤 Müşteri</div>""", unsafe_allow_html=True)
-                    for _lbl, _val in [
-                        ("Yetkili", _v("yetkili")),
-                        ("İletişim", _v("iletisim")),
-                        ("Sektör", _v("sektor")),
-                        ("Müşteri durumu", _pills("mdurum")),
-                        ("Görüşme amacı", _pills("amac")),
-                        ("Karar verici", _pills("karar")),
-                    ]:
-                        st.markdown(f"""<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid #f8fafc;font-size:12px;">
-<span style="color:#94a3b8;">{_lbl}</span>
-<span style="font-weight:500;color:#0f172a;text-align:right;max-width:160px;">{_val}</span></div>""", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
+                    st.markdown(f"""<div style="background:white;border-radius:10px;border:0.5px solid #e2e8f0;padding:14px;">
+{_kt("👤","Müşteri Bilgisi")}
+{_satir("Yetkili", _v("yetkili"))}
+{_satir("İletişim", _v("iletisim"))}
+{_satir("Sektör", _v("sektor"))}
+{_satir("Kaynak", _pills("kaynak"))}
+{_satir("Müşteri durumu", _pills("mdurum"))}
+{_satir("Görüşme amacı", _pills("amac"))}
+{_satir("Karar verici", _pills("karar"))}
+{_satir("Karar süresi", _pills("sure"))}
+</div>""", unsafe_allow_html=True)
 
                 with _d2:
-                    st.markdown("""<div style="background:white;border-radius:10px;border:0.5px solid #e2e8f0;padding:14px;">
-<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #f1f5f9;padding-bottom:6px;margin-bottom:10px;">⚔️ Rakip & Ciro</div>""", unsafe_allow_html=True)
-                    st.markdown(f"""
+                    st.markdown(f"""<div style="background:white;border-radius:10px;border:0.5px solid #e2e8f0;padding:14px;">
+{_kt("💰","Ciro & Rakip")}
 <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;text-align:center;">
-  <div style="background:#f0fdf4;border-radius:7px;padding:8px;">
-    <div style="font-size:15px;font-weight:700;color:#16a34a;">{_bek_v:,.0f}₺</div>
-    <div style="font-size:9px;color:#64748b;">Hedef/ay</div>
-  </div>
-  <div style="background:#fffbeb;border-radius:7px;padding:8px;">
-    <div style="font-size:15px;font-weight:700;color:#d97706;">{_ger_v:,.0f}₺</div>
-    <div style="font-size:9px;color:#64748b;">Gerçek</div>
-  </div>
-  <div style="background:#eff6ff;border-radius:7px;padding:8px;">
-    <div style="font-size:15px;font-weight:700;color:#2563eb;">%{_doluluk}</div>
-    <div style="font-size:9px;color:#64748b;">Doluluk</div>
-  </div>
+<div style="background:#f0fdf4;border-radius:7px;padding:10px 4px;"><div style="font-size:15px;font-weight:800;color:#16a34a;">{_bek_v:,.0f}₺</div><div style="font-size:9px;color:#64748b;">Hedef/ay</div></div>
+<div style="background:#fffbeb;border-radius:7px;padding:10px 4px;"><div style="font-size:15px;font-weight:800;color:#d97706;">{_ger_v:,.0f}₺</div><div style="font-size:9px;color:#64748b;">Gerçek</div></div>
+<div style="background:#eff6ff;border-radius:7px;padding:10px 4px;"><div style="font-size:15px;font-weight:800;color:#2563eb;">%{_doluluk}</div><div style="font-size:9px;color:#64748b;">Doluluk</div></div>
+</div>
+{_satir("Rakip firma", _rak_firma)}
+{_satir("Rakip fiyatı", _rak_fiyat)}
+{_satir("Beklenti", _pills("beklenti"))}
+{_satir("Engel", _pills("engel"))}
+{_satir("Fiyat beklentisi", _v("fiyat_bek"))}
+{_satir("Özel istek", _v("ozel_istek"))}
 </div>""", unsafe_allow_html=True)
-                    for _lbl, _val in [
-                        ("Rakip firma", _rak_firma),
-                        ("Rakip fiyatı", _rak_fiyat),
-                        ("Beklenti", _pills("beklenti")),
-                        ("Engel", _pills("engel")),
-                        ("Fiyat beklentisi", _v("fiyat_bek")),
-                        ("Özel istek", _v("ozel_istek")),
-                    ]:
-                        st.markdown(f"""<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid #f8fafc;font-size:12px;">
-<span style="color:#94a3b8;">{_lbl}</span>
-<span style="font-weight:500;color:#0f172a;text-align:right;max-width:160px;">{_val}</span></div>""", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
 
                 with _d3:
-                    st.markdown("""<div style="background:white;border-radius:10px;border:0.5px solid #e2e8f0;padding:14px;">
-<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #f1f5f9;padding-bottom:6px;margin-bottom:10px;">📝 Sonuç & Notlar</div>""", unsafe_allow_html=True)
-                    for _lbl, _val in [
-                        ("Sonuç", _v("sonuc")),
-                        ("Sonraki adım", _pills("sonraki_adim")),
-                        ("Takip tarihi", fmt_tarih(_v("takip_tar"))),
-                        ("Potansiyel", _v("potansiyel")),
-                    ]:
-                        st.markdown(f"""<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid #f8fafc;font-size:12px;">
-<span style="color:#94a3b8;">{_lbl}</span>
-<span style="font-weight:500;color:#0f172a;">{_val}</span></div>""", unsafe_allow_html=True)
                     _not_txt = _v("not_alan")
-                    st.markdown(f"""<div style="margin-top:8px;background:#f8fafc;border-left:3px solid #2563eb;padding:10px;border-radius:0 7px 7px 0;font-size:12px;color:#374151;line-height:1.6;">{_not_txt}</div>""", unsafe_allow_html=True)
-                    st.markdown("</div>", unsafe_allow_html=True)
+                    st.markdown(f"""<div style="background:white;border-radius:10px;border:0.5px solid #e2e8f0;padding:14px;">
+{_kt("✅","Sonuç & Notlar")}
+{_satir("Sonuç", _v("sonuc").title())}
+{_satir("Sonraki adım", _pills("sonraki_adim"))}
+{_satir("Takip tarihi", fmt_tarih(_v("takip_tar")))}
+{_satir("Potansiyel", _v("potansiyel").title())}
+<div style="margin-top:10px;">
+<div style="font-size:10px;color:#94a3b8;margin-bottom:6px;">📝 GÖRÜŞME NOTU</div>
+<div style="background:#f8fafc;border-left:3px solid #2563eb;padding:10px 12px;border-radius:0 8px 8px 0;font-size:13px;color:#374151;line-height:1.8;min-height:60px;">
+{"<span style='color:#94a3b8'>Henüz not girilmedi</span>" if _not_txt == "—" else _not_txt}
+</div></div></div>""", unsafe_allow_html=True)
 
-                # ── AKSİYON BUTONLARI ─────────────────────────────────────────
-                st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+                st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
                 _kb1,_kb2,_kb3,_kb4,_kb5,_kb6 = st.columns(6)
                 if _kb1.button("✏️ Düzenle", key="an_det_duz", use_container_width=True, type="primary"):
                     st.session_state["an_duzenle_firma"] = _detay_firma
