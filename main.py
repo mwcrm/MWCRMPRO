@@ -5054,90 +5054,170 @@ section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseBu
         if _detay_firma:
             _detay_ar = _an_getir(_detay_firma)
             if _detay_ar:
-                # Geri butonu
-                if st.button("← Listeye Dön", key="an_detay_geri"):
-                    st.session_state.pop("an_detay_firma", None); st.rerun()
-                st.markdown(f"## {_detay_firma}")
-
                 _da = _detay_ar
-                _pot_renk2 = {"çok yüksek":"#22c55e","yüksek":"#22c55e","orta":"#f59e0b","düşük":"#ef4444","çok düşük":"#ef4444"}
-                _dot_clr = _pot_renk2.get(str(_da.get("potansiyel","")), "#94a3b8")
                 _bek_v = float(_da.get("bek_ciro",0) or 0)
                 _ger_v = float(_da.get("ger_ciro",0) or 0)
+                _doluluk = int(_ger_v/_bek_v*100) if _bek_v > 0 else 0
 
-                _dc1,_dc2,_dc3,_dc4 = st.columns(4)
-                _dc1.metric("Potansiyel", str(_da.get("potansiyel","—")).title())
-                _dc2.metric("Beklenen Ciro", f"{_bek_v:,.0f} ₺")
-                _dc3.metric("Gerçekleşen", f"{_ger_v:,.0f} ₺")
-                _dc4.metric("Sonuç", str(_da.get("sonuc","—")).title())
-
-                def _val(_v):
-                    s = str(_v or "").strip()
-                    return "— henüz girilmedi" if s in ["","nan","None","—","--"] else s
-                def _pills_str(_v):
-                    return " · ".join([x.strip() for x in str(_v or "").split(",") if x.strip()]) or "— henüz girilmedi"
-
-                for _sec_name, _rows in [
-                    ("① Analiz Amacı", [("Görüşme amacı",_pills_str(_da.get("amac",""))),("Müşteri durumu",_val(_da.get("mdurum","")))]),
-                    ("② Kaynak & Müşteri", [("Firma",_val(_da.get("firma",""))),("Yetkili",_val(_da.get("yetkili",""))),("İletişim",_val(_da.get("iletisim",""))),("Sektör",_val(_da.get("sektor",""))),("Kaynak",_pills_str(_da.get("kaynak","")))]),
-                    ("④ Beklenti & Sonuç", [("Beklenti",_pills_str(_da.get("beklenti",""))),("Engel",_pills_str(_da.get("engel",""))),("Sonuç",_val(_da.get("sonuc",""))),("Sonraki adım",_pills_str(_da.get("sonraki_adim",""))),("Takip tarihi",fmt_tarih(_da.get("takip_tar","")))]),
-                    ("⑥ Not & Özet", [("Görüşme notu",_val(_da.get("not_alan",""))),("Olusturan",_val(_da.get("olusturan","")))]),
-                ]:
-                    st.markdown(f"**{_sec_name}**")
-                    for _k,_v in _rows:
-                        _r1,_r2 = st.columns([1,3])
-                        _r1.markdown(f"<small style='color:#94a3b8'>{_k}</small>", unsafe_allow_html=True)
-                        _r2.write(_v)
-                    st.divider()
-
-                # Ürün tablosu
-                st.markdown("**③ Ürün, Hacim & Ciro**")
+                # Rakip JSON parse
                 try:
-                    _br_raw = _da.get("bolge","")
-                    _br_obj = __import__("json").loads(_br_raw) if isinstance(_br_raw,str) and _br_raw else _br_raw
-                    _br_rows = (_br_obj.get("satirlar",[]) if isinstance(_br_obj,dict) else (_br_obj if isinstance(_br_obj,list) else []))
-                    # an_grp grupları da kontrol et
-                    if not _br_rows and isinstance(_br_obj,dict):
-                        for _g in _br_obj.get("gruplar",[]):
-                            _br_rows += _g.get("satirlar",[])
-                    if _br_rows:
-                        _tbl_data = []
-                        for _brow in _br_rows:
-                            _rak = str(_brow.get("rakip_fiyat","") or _brow.get("fiyat","") or "—")
-                            _biz = str(_brow.get("bizim_fiyat","") or _brow.get("bizim","") or _brow.get("ciro","") or "—")
-                            _fark_str = "—"
-                            try:
-                                _rv = float(_rak.replace(",",".").replace("₺",""))
-                                _bv = float(_biz.replace(",",".").replace("₺",""))
-                                if _rv>0 and _bv>0:
-                                    _fd = _rv-_bv; _fp = (_fd/_rv)*100
-                                    _fark_str = f"{'▼' if _fd>0 else '▲'} {abs(_fd):,.0f} ₺ (%{abs(_fp):.0f})"
-                            except: pass
-                            # İl ya da cikis/varis
-                            _il_str = str(_brow.get("il","") or ", ".join(_brow.get("cikis",[])+["→"]+_brow.get("varis",[])) or "—")
-                            _tur_str = str(_brow.get("urun","") or ", ".join(_brow.get("tur",[])) or "—")
-                            _tbl_data.append({"Güzergah":_il_str,"Tip":_tur_str,"Rakip ₺":_rak,"Bizim ₺":_biz,"Fark":_fark_str})
-                        st.dataframe(pd.DataFrame(_tbl_data), use_container_width=True, hide_index=True)
-                    else:
-                        st.caption("— henüz girilmedi")
-                except: st.caption("— veri okunamadı")
-                st.divider()
+                    _rakip_list = __import__("json").loads(_da.get("rakip","[]") or "[]")
+                    _rakip_list = _rakip_list if isinstance(_rakip_list, list) else []
+                except: _rakip_list = []
+                _ilk_rakip = _rakip_list[0] if _rakip_list else {}
+                _rak_firma = str(_ilk_rakip.get("firma","") or "—")
+                _rak_fiyat = str(_ilk_rakip.get("fiyat","") or "—")
 
-                # Aksiyon butonları
+                def _v(k): return str(_da.get(k,"") or "").strip() or "—"
+                def _pills(k): return " · ".join([x.strip() for x in str(_da.get(k,"") or "").split(",") if x.strip()]) or "—"
+
+                # Sinyal renkleri
+                _pot = _v("potansiyel").lower()
+                _sonuc = _v("sonuc").lower()
+                _s_pot = "🟢" if "yüksek" in _pot else ("🟡" if "orta" in _pot else "🔴")
+                _s_sonuc = "🟢" if _sonuc in ["teklif verildi","anlaşma yapıldı"] else ("🟡" if "takip" in _sonuc or "bekle" in _sonuc else "🔴")
+                _s_ciro = "🟢" if _doluluk>=80 else ("🟡" if _doluluk>=40 else "🔴")
+
+                # Telefon
+                _tel2 = str(_da.get("iletisim","") or "").replace(" ","").replace("-","")
+                if _tel2 and "@" not in _tel2 and _tel2.startswith("0"):
+                    _tel2 = "90" + _tel2[1:]
+
+                # ── HEADER ────────────────────────────────────────────────────
+                _hb1, _hb2 = st.columns([5,1])
+                with _hb1:
+                    if st.button("← Listeye Dön", key="an_detay_geri"):
+                        st.session_state.pop("an_detay_firma", None); st.rerun()
+                with _hb2:
+                    pass
+
+                st.markdown(f"""
+<div style="background:white;border-radius:12px;border:0.5px solid #e2e8f0;overflow:hidden;margin-bottom:10px;">
+  <div style="padding:14px 18px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:center;">
+    <div>
+      <div style="font-size:18px;font-weight:800;color:#0f172a;">{_detay_firma}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:3px;">
+        📅 {fmt_tarih(_da.get("tarih",""))} &nbsp;·&nbsp; 
+        👤 {_v("olusturan")} &nbsp;·&nbsp; 
+        🏭 {_v("sektor")}
+      </div>
+    </div>
+  </div>
+  <!-- SİNYAL SATIRLARI -->
+  <div style="display:grid;grid-template-columns:repeat(6,1fr);">
+    <div style="padding:12px;text-align:center;border-right:1px solid #f1f5f9;">
+      <div style="font-size:22px;margin-bottom:4px;">{_s_sonuc}</div>
+      <div style="font-size:11px;font-weight:700;color:#0f172a;">{_v("sonuc").title()}</div>
+      <div style="font-size:10px;color:#64748b;">Sonuç</div>
+    </div>
+    <div style="padding:12px;text-align:center;border-right:1px solid #f1f5f9;">
+      <div style="font-size:22px;margin-bottom:4px;">{_s_pot}</div>
+      <div style="font-size:11px;font-weight:700;color:#0f172a;">{_v("potansiyel").title()}</div>
+      <div style="font-size:10px;color:#64748b;">Potansiyel</div>
+    </div>
+    <div style="padding:12px;text-align:center;border-right:1px solid #f1f5f9;">
+      <div style="font-size:22px;margin-bottom:4px;">{_s_ciro}</div>
+      <div style="font-size:11px;font-weight:700;color:#0f172a;">%{_doluluk}</div>
+      <div style="font-size:10px;color:#64748b;">Ciro Doluluk</div>
+    </div>
+    <div style="padding:12px;text-align:center;border-right:1px solid #f1f5f9;">
+      <div style="font-size:22px;margin-bottom:4px;">{'🟢' if _rak_fiyat != '—' else '⚪'}</div>
+      <div style="font-size:11px;font-weight:700;color:#0f172a;">{_rak_firma[:12]}</div>
+      <div style="font-size:10px;color:#64748b;">Rakip</div>
+    </div>
+    <div style="padding:12px;text-align:center;border-right:1px solid #f1f5f9;">
+      <div style="font-size:22px;margin-bottom:4px;">{'🔴' if _v("engel") != '—' else '🟢'}</div>
+      <div style="font-size:11px;font-weight:700;color:#0f172a;">{_v("engel")[:14]}</div>
+      <div style="font-size:10px;color:#64748b;">Engel</div>
+    </div>
+    <div style="padding:12px;text-align:center;">
+      <div style="font-size:22px;margin-bottom:4px;">⏰</div>
+      <div style="font-size:11px;font-weight:700;color:#dc2626;">{fmt_tarih(_v("takip_tar"))}</div>
+      <div style="font-size:10px;color:#64748b;">Takip</div>
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
+
+                # ── DETAY 3 SÜTUN ─────────────────────────────────────────────
+                _d1, _d2, _d3 = st.columns(3)
+
+                with _d1:
+                    st.markdown("""<div style="background:white;border-radius:10px;border:0.5px solid #e2e8f0;padding:14px;">
+<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #f1f5f9;padding-bottom:6px;margin-bottom:10px;">👤 Müşteri</div>""", unsafe_allow_html=True)
+                    for _lbl, _val in [
+                        ("Yetkili", _v("yetkili")),
+                        ("İletişim", _v("iletisim")),
+                        ("Sektör", _v("sektor")),
+                        ("Müşteri durumu", _pills("mdurum")),
+                        ("Görüşme amacı", _pills("amac")),
+                        ("Karar verici", _pills("karar")),
+                    ]:
+                        st.markdown(f"""<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid #f8fafc;font-size:12px;">
+<span style="color:#94a3b8;">{_lbl}</span>
+<span style="font-weight:500;color:#0f172a;text-align:right;max-width:160px;">{_val}</span></div>""", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+                with _d2:
+                    st.markdown("""<div style="background:white;border-radius:10px;border:0.5px solid #e2e8f0;padding:14px;">
+<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #f1f5f9;padding-bottom:6px;margin-bottom:10px;">⚔️ Rakip & Ciro</div>""", unsafe_allow_html=True)
+                    st.markdown(f"""
+<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px;text-align:center;">
+  <div style="background:#f0fdf4;border-radius:7px;padding:8px;">
+    <div style="font-size:15px;font-weight:700;color:#16a34a;">{_bek_v:,.0f}₺</div>
+    <div style="font-size:9px;color:#64748b;">Hedef/ay</div>
+  </div>
+  <div style="background:#fffbeb;border-radius:7px;padding:8px;">
+    <div style="font-size:15px;font-weight:700;color:#d97706;">{_ger_v:,.0f}₺</div>
+    <div style="font-size:9px;color:#64748b;">Gerçek</div>
+  </div>
+  <div style="background:#eff6ff;border-radius:7px;padding:8px;">
+    <div style="font-size:15px;font-weight:700;color:#2563eb;">%{_doluluk}</div>
+    <div style="font-size:9px;color:#64748b;">Doluluk</div>
+  </div>
+</div>""", unsafe_allow_html=True)
+                    for _lbl, _val in [
+                        ("Rakip firma", _rak_firma),
+                        ("Rakip fiyatı", _rak_fiyat),
+                        ("Beklenti", _pills("beklenti")),
+                        ("Engel", _pills("engel")),
+                        ("Fiyat beklentisi", _v("fiyat_bek")),
+                        ("Özel istek", _v("ozel_istek")),
+                    ]:
+                        st.markdown(f"""<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid #f8fafc;font-size:12px;">
+<span style="color:#94a3b8;">{_lbl}</span>
+<span style="font-weight:500;color:#0f172a;text-align:right;max-width:160px;">{_val}</span></div>""", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+                with _d3:
+                    st.markdown("""<div style="background:white;border-radius:10px;border:0.5px solid #e2e8f0;padding:14px;">
+<div style="font-size:10px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid #f1f5f9;padding-bottom:6px;margin-bottom:10px;">📝 Sonuç & Notlar</div>""", unsafe_allow_html=True)
+                    for _lbl, _val in [
+                        ("Sonuç", _v("sonuc")),
+                        ("Sonraki adım", _pills("sonraki_adim")),
+                        ("Takip tarihi", fmt_tarih(_v("takip_tar"))),
+                        ("Potansiyel", _v("potansiyel")),
+                    ]:
+                        st.markdown(f"""<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:0.5px solid #f8fafc;font-size:12px;">
+<span style="color:#94a3b8;">{_lbl}</span>
+<span style="font-weight:500;color:#0f172a;">{_val}</span></div>""", unsafe_allow_html=True)
+                    _not_txt = _v("not_alan")
+                    st.markdown(f"""<div style="margin-top:8px;background:#f8fafc;border-left:3px solid #2563eb;padding:10px;border-radius:0 7px 7px 0;font-size:12px;color:#374151;line-height:1.6;">{_not_txt}</div>""", unsafe_allow_html=True)
+                    st.markdown("</div>", unsafe_allow_html=True)
+
+                # ── AKSİYON BUTONLARI ─────────────────────────────────────────
+                st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
                 _kb1,_kb2,_kb3,_kb4,_kb5,_kb6 = st.columns(6)
-                if _kb1.button("✏️ Düzenle", key="an_det_duz", use_container_width=True):
+                if _kb1.button("✏️ Düzenle", key="an_det_duz", use_container_width=True, type="primary"):
                     st.session_state["an_duzenle_firma"] = _detay_firma
                     st.session_state.pop("an_detay_firma", None)
                     for _kk in [f"an_init_{_detay_firma}","an_fiyat_rows","an_bolge_rows","an_rakip_rows","an_grp"]:
                         st.session_state.pop(_kk, None)
                     st.rerun()
-                _tel2 = str(_da.get("iletisim","") or "").replace(" ","").replace("-","")
                 if _tel2 and "@" not in _tel2:
-                    if _tel2.startswith("0"): _tel2 = "90"+_tel2[1:]
-                    _kb2.markdown(f"<a href='https://wa.me/{_tel2}' target='_blank'><button style='width:100%;padding:6px;font-size:11px;background:#25d366;color:white;border:none;border-radius:6px;cursor:pointer'>💬 WA</button></a>", unsafe_allow_html=True)
-                if _kb3.button("📄 Spot", key="an_det_spot", use_container_width=True):
+                    _kb2.markdown(f"<a href='https://wa.me/{_tel2}' target='_blank'><button style='width:100%;padding:8px;font-size:12px;background:#25d366;color:white;border:none;border-radius:7px;cursor:pointer;font-weight:500'>💬 WA</button></a>", unsafe_allow_html=True)
+                if _kb3.button("📄 Spot Teklif", key="an_det_spot", use_container_width=True):
                     st.session_state["aktif_tab"]="teklif"; st.session_state["teklif_musteri_onsel"]=_detay_firma; st.rerun()
-                if _kb4.button("⭐ Özel", key="an_det_ozel", use_container_width=True):
+                if _kb4.button("⭐ Özel Teklif", key="an_det_ozel", use_container_width=True):
                     st.session_state["aktif_tab"]="ozel_teklif"; st.session_state["teklif_musteri_onsel"]=_detay_firma; st.rerun()
                 _pdf_bytes = _analiz_pdf(pd.Series(_da))
                 if _pdf_bytes:
