@@ -2242,6 +2242,7 @@ elif aktif == "liste":
         "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
         "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50
     }
+    # Gizli kolonları DB'den yükle
     if "_kol_genislik_init" not in st.session_state:
         try:
             _sb_kg = get_sb_client()
@@ -2252,11 +2253,18 @@ elif aktif == "liste":
                     st.session_state["_kol_genislik"] = _kgj.loads(_r_kg.data[0]["deger"])
                 else:
                     st.session_state["_kol_genislik"] = _KOL_VARSAYILAN.copy()
+                _r_gizli_cl = _sb_kg.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kol_gizli").execute()
+                if _r_gizli_cl.data:
+                    st.session_state["_kol_gizli"] = _kgj.loads(_r_gizli_cl.data[0]["deger"])
+                else:
+                    st.session_state["_kol_gizli"] = []
         except:
             st.session_state["_kol_genislik"] = _KOL_VARSAYILAN.copy()
+            st.session_state["_kol_gizli"] = []
         st.session_state["_kol_genislik_init"] = True
 
     _KG = st.session_state.get("_kol_genislik", _KOL_VARSAYILAN.copy())
+    _GIZLI_KOLONLAR = set(st.session_state.get("_kol_gizli", []))
 
     def _w(k):
         px = int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100)))
@@ -2287,6 +2295,12 @@ elif aktif == "liste":
         "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=True, width="small"),
     }
     col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro","✅ Analiz","📅 Son Randevu","aciklama","📨 Notlar"]
+    # Gizli kolonları çıkar
+    _kol_gizli_map = {"firma":"firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email",
+                      "adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci",
+                      "islem_asamasi":"islem_asamasi","aciklama":"aciklama",
+                      "📅 Son Randevu":"📅 Son Randevu","📨 Notlar":"📨 Notlar","id":"id"}
+    col_order = [c for c in col_order if not any(c == _kol_gizli_map.get(g,g) for g in _GIZLI_KOLONLAR)]
 
     # ── DATA EDITOR ─────────────────────────────────────────────────────────────
     df_edit = df_f.copy()
@@ -3330,8 +3344,8 @@ function updateBot(v){{
 
     # ── 📐 KOLON AYARLARI ─────────────────────────────────────────────────────
     with kul_tab_kolon:
-        st.markdown("### 📐 Cari Liste Kolon Genişlikleri")
-        st.caption("Slider ile ayarlayın → Kaydet → Cari listede her zaman bu genişlikte açılır")
+        st.markdown("### 📐 Cari Liste Kolon Ayarları")
+        st.caption("Genişlik ayarlayın, gizlemek istediklerinizi kapatın → Kaydet")
         _KOL_VARS_UI = {
             "firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
             "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
@@ -3346,22 +3360,55 @@ function updateBot(v){{
         try:
             _sb_kg_ui = get_sb_client()
             _kg_ui_mevcut = _KOL_VARS_UI.copy()
+            _gizli_ui = []
             if _sb_kg_ui:
                 import json as _kguj
                 _r_kgu = _sb_kg_ui.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kol_genislik").execute()
                 if _r_kgu.data:
                     _kg_ui_mevcut = _kguj.loads(_r_kgu.data[0]["deger"])
-        except: _kg_ui_mevcut = _KOL_VARS_UI.copy()
+                _r_gizli = _sb_kg_ui.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kol_gizli").execute()
+                if _r_gizli.data:
+                    _gizli_ui = _kguj.loads(_r_gizli.data[0]["deger"])
+        except:
+            _kg_ui_mevcut = _KOL_VARS_UI.copy()
+            _gizli_ui = []
 
         _yeni_kg_ui = {}
+        _yeni_gizli_ui = []
         _ui_cols = st.columns(len(_KOL_VARS_UI))
         for _i, _k in enumerate(_KOL_VARS_UI.keys()):
-            _yeni_kg_ui[_k] = _ui_cols[_i].slider(
-                _KG_UI_ETIKET.get(_k,_k),
-                min_value=40, max_value=400,
-                value=int(_kg_ui_mevcut.get(_k, _KOL_VARS_UI.get(_k,100))),
-                step=10, key=f"ui_kg_{_k}"
-            )
+            _etiket = _KG_UI_ETIKET.get(_k, _k)
+            _gizli_mi = _k in _gizli_ui
+            with _ui_cols[_i]:
+                # Göz ikonu — tıklayınca gizle/göster
+                _goz = "🙈" if _gizli_mi else "👁"
+                if st.button(_goz, key=f"ui_giz_{_i}_{_k[:4]}", use_container_width=True,
+                             help="Gizle/Göster"):
+                    if _gizli_mi:
+                        _gizli_ui = [x for x in _gizli_ui if x != _k]
+                    else:
+                        _gizli_ui.append(_k)
+                    # Anında kaydet
+                    try:
+                        _sb_kg_ui.table("kullanici_tercih").upsert({
+                            "kullanici":"__liste_ui__","anahtar":"_kol_gizli",
+                            "deger":_kguj.dumps(_gizli_ui, ensure_ascii=False)
+                        }, on_conflict="kullanici,anahtar").execute()
+                        st.session_state["_kol_gizli"] = _gizli_ui
+                        st.session_state.pop("_kol_genislik_init", None)
+                    except: pass
+                    st.rerun()
+                # Slider — gizliyse devre dışı
+                _yeni_kg_ui[_k] = st.slider(
+                    f"{'~~' if _gizli_mi else ''}{_etiket}",
+                    min_value=40, max_value=400,
+                    value=int(_kg_ui_mevcut.get(_k, _KOL_VARS_UI.get(_k,100))),
+                    step=10, key=f"ui_kg_{_k}",
+                    disabled=_gizli_mi
+                )
+                if _gizli_mi:
+                    _yeni_gizli_ui.append(_k)
+
         if st.button("💾 Kaydet", type="primary", key="ui_kg_kaydet"):
             try:
                 _sb_kg_s = get_sb_client()
@@ -3371,7 +3418,12 @@ function updateBot(v){{
                         "kullanici":"__liste_ui__","anahtar":"_kol_genislik",
                         "deger":_kgsj2.dumps(_yeni_kg_ui, ensure_ascii=False)
                     }, on_conflict="kullanici,anahtar").execute()
+                    _sb_kg_s.table("kullanici_tercih").upsert({
+                        "kullanici":"__liste_ui__","anahtar":"_kol_gizli",
+                        "deger":_kgsj2.dumps(_gizli_ui, ensure_ascii=False)
+                    }, on_conflict="kullanici,anahtar").execute()
                 st.session_state["_kol_genislik"] = _yeni_kg_ui
+                st.session_state["_kol_gizli"] = _gizli_ui
                 st.session_state.pop("_kol_genislik_init", None)
                 st.success("✅ Kaydedildi!")
             except Exception as _kgue:
