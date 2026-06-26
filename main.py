@@ -5318,22 +5318,26 @@ section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseBu
             # ── SÜTUN 1: KİM? ─────────────────────────────────────────────────
             with _c1:
                 st.markdown("#### 👤 Kim?")
-                _an_yetkili   = st.text_input("Yetkili", value=_mv("yetkili",""), key="an_yetkili", placeholder="Adı soyadı...")
-                _an_iletisim  = st.text_input("İletişim", value=_mv("iletisim",""), key="an_iletisim", placeholder="Telefon / email...")
-                _an_sektor    = st.text_input("Sektör", value=_mv("sektor",""), key="an_sektor", placeholder="Sektör...")
+                # Cari listeden otomatik doldur — analiz kaydı yoksa cari bilgileri kullan
+                _oto_yetkili  = str(_cari_row.get("yetkili","") or "") if _cari_row is not None else ""
+                _oto_iletisim = str(_cari_row.get("gsm","") or _cari_row.get("email","") or "") if _cari_row is not None else ""
+                _oto_sektor   = str(_cari_row.get("segment","") or "") if _cari_row is not None else ""
+                _an_yetkili   = st.text_input("Yetkili", value=_mv("yetkili", _oto_yetkili), key="an_yetkili", placeholder="Adı soyadı...")
+                _an_iletisim  = st.text_input("İletişim", value=_mv("iletisim", _oto_iletisim), key="an_iletisim", placeholder="Telefon / email...")
+                _an_sektor    = st.text_input("Sektör", value=_mv("sektor", _oto_sektor), key="an_sektor", placeholder="Sektör...")
                 st.markdown("**Müşteri Durumu**")
-                _mdurum_opts  = ["yeni","mevcut","eski","rakip firmanın müşterisi"]
-                _mdurum_def   = _mvl("mdurum")
-                _mdurum_sec   = []
+                _mdurum_opts = ["yeni","mevcut","eski","rakip firmanın müşterisi"]
+                _mdurum_def  = _mvl("mdurum") if _duzenle else []
+                _mdurum_sec  = []
                 for _md in _mdurum_opts:
-                    _cur = _md in _mdurum_def or _md in st.session_state.get("an_t_mdurum",[])
+                    _cur = _md in _mdurum_def
                     if st.checkbox(_md, value=_cur, key=f"an_md_{_md}"):
                         _mdurum_sec.append(_md)
                 st.session_state["an_t_mdurum"] = _mdurum_sec
 
                 st.markdown("**Potansiyel**")
                 _pot_opts = ["çok düşük","düşük","orta","yüksek","çok yüksek"]
-                _pot_def  = (_mvl("potansiyel") or ["orta"])[0]
+                _pot_def  = (_mvl("potansiyel") or [""])[0] if _duzenle else ""
                 _pot_idx  = _pot_opts.index(_pot_def) if _pot_def in _pot_opts else 2
                 _pot_sel  = st.radio("", _pot_opts, index=_pot_idx, key="an_t_pot_r", horizontal=False, label_visibility="collapsed")
                 st.session_state["an_t_pot"] = [_pot_sel]
@@ -5345,22 +5349,20 @@ section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseBu
                 _amac_opts = ["yeni müşteri kazanım","zam görüşmesi","nezaket ziyareti",
                               "erken potansiyel","kayıp müşteri geri kazanım",
                               "mevcut müşteri analizi","rakip takibi","pazar araştırması"]
-                _amac_def  = _mvl("amac")
+                _amac_def  = _mvl("amac") if _duzenle else []
                 _amac_sec  = []
                 for _ao in _amac_opts:
-                    _cur = _ao in _amac_def or _ao in st.session_state.get("an_t_amac",[])
-                    if st.checkbox(_ao, value=_cur, key=f"an_amac_{_ao}"):
+                    if st.checkbox(_ao, value=_ao in _amac_def, key=f"an_amac_{_ao}"):
                         _amac_sec.append(_ao)
                 st.session_state["an_t_amac"] = _amac_sec
 
                 st.markdown("**Müşteri Beklentisi**")
                 _bek_opts = ["fiyat indirimi","daha iyi hizmet","hızlı teslimat",
                              "özel çözüm","daha iyi iletişim","teknik destek"]
-                _bek_def  = _mvl("beklenti")
+                _bek_def  = _mvl("beklenti") if _duzenle else []
                 _bek_sec  = []
                 for _bo in _bek_opts:
-                    _cur = _bo in _bek_def or _bo in st.session_state.get("an_t_beklenti",[])
-                    if st.checkbox(_bo, value=_cur, key=f"an_bek_{_bo}"):
+                    if st.checkbox(_bo, value=_bo in _bek_def, key=f"an_bek_{_bo}"):
                         _bek_sec.append(_bo)
                 st.session_state["an_t_beklenti"] = _bek_sec
 
@@ -5373,11 +5375,10 @@ section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseBu
                 st.markdown("**Engeller**")
                 _engel_opts = ["fiyat yüksek","marka bilinirliği","uzun sözleşme",
                                "mevcut tedarikçi memnun","teknik uyumsuzluk"]
-                _engel_def  = _mvl("engel")
+                _engel_def  = _mvl("engel") if _duzenle else []
                 _engel_sec  = []
                 for _eo in _engel_opts:
-                    _cur = _eo in _engel_def or _eo in st.session_state.get("an_t_engel",[])
-                    if st.checkbox(_eo, value=_cur, key=f"an_eng_{_eo}"):
+                    if st.checkbox(_eo, value=_eo in _engel_def, key=f"an_eng_{_eo}"):
                         _engel_sec.append(_eo)
                 st.session_state["an_t_engel"] = _engel_sec
 
@@ -5416,12 +5417,11 @@ section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseBu
 
                 _sonraki_opts = ["fiyat teklifi gönder","tekrar ara","randevu al",
                                  "numune gönder","sözleşme hazırla","demo yap"]
-                _sonraki_def  = _mvl("sonraki_adim")
+                _sonraki_def  = _mvl("sonraki_adim") if _duzenle else []
                 _sonraki_sec  = []
                 st.markdown("**Sonraki Adım**")
                 for _so in _sonraki_opts:
-                    _cur = _so in _sonraki_def or _so in st.session_state.get("an_t_sonraki",[])
-                    if st.checkbox(_so, value=_cur, key=f"an_son_{_so}"):
+                    if st.checkbox(_so, value=_so in _sonraki_def, key=f"an_son_{_so}"):
                         _sonraki_sec.append(_so)
                 st.session_state["an_t_sonraki"] = _sonraki_sec
 
