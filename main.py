@@ -3513,24 +3513,56 @@ function updateBot(v){{
             try:
                 if _sb_tan:
                     r = _sb_tan.table("sistem_tanimlar").select("deger").eq("tip",tip).order("sira").execute()
-                    return [d["deger"] for d in r.data] if r.data else []
+                    # Deduplicate — sırayı koru
+                    _goruldu = set()
+                    _liste = []
+                    for d in (r.data or []):
+                        v = str(d["deger"] or "").strip()
+                        if v and v not in _goruldu:
+                            _liste.append(v)
+                            _goruldu.add(v)
+                    return _liste
             except: return []
 
         def _tan_ekle(tip, deger):
             try:
                 if _sb_tan:
-                    mevcut = _sb_tan.table("sistem_tanimlar").select("sira").eq("tip",tip).order("sira",desc=True).limit(1).execute()
-                    sira = (mevcut.data[0]["sira"] + 1) if mevcut.data else 1
-                    _sb_tan.table("sistem_tanimlar").insert({"tip":tip,"deger":deger,"sira":sira}).execute()
+                    # Önce duplicate kontrolü
+                    mevcut_kayit = _sb_tan.table("sistem_tanimlar").select("id").eq("tip",tip).eq("deger",deger.strip()).execute()
+                    if mevcut_kayit.data:
+                        return False  # Zaten var
+                    mevcut_sira = _sb_tan.table("sistem_tanimlar").select("sira").eq("tip",tip).order("sira",desc=True).limit(1).execute()
+                    sira = (mevcut_sira.data[0]["sira"] + 1) if mevcut_sira.data else 1
+                    _sb_tan.table("sistem_tanimlar").insert({"tip":tip,"deger":deger.strip(),"sira":sira}).execute()
                     return True
             except: return False
 
         def _tan_sil(tip, deger):
             try:
                 if _sb_tan:
+                    # Aynı isimde TÜM kayıtları sil (duplicate temizler)
                     _sb_tan.table("sistem_tanimlar").delete().eq("tip",tip).eq("deger",deger).execute()
                     return True
             except: return False
+
+        def _tan_temizle(tip):
+            """Duplicate kayıtları temizle — her değerden sadece birini bırak"""
+            try:
+                if _sb_tan:
+                    r = _sb_tan.table("sistem_tanimlar").select("id,deger,sira").eq("tip",tip).order("sira").execute()
+                    if not r.data: return
+                    _goruldu = set()
+                    _silinecek = []
+                    for d in r.data:
+                        v = str(d["deger"] or "").strip()
+                        if v in _goruldu:
+                            _silinecek.append(d["id"])
+                        else:
+                            _goruldu.add(v)
+                    for _sid in _silinecek:
+                        _sb_tan.table("sistem_tanimlar").delete().eq("id",_sid).execute()
+                    return len(_silinecek)
+            except: return 0
 
         _ta1, _ta2 = st.columns(2)
 
@@ -3538,19 +3570,25 @@ function updateBot(v){{
         with _ta1:
             st.markdown("**🔄 Aşama Yönetimi**")
             _asama_listesi = _tan_liste("asama")
+            _asama_unique = list(dict.fromkeys(_asama_listesi))
+            if len(_asama_unique) < len(_asama_listesi):
+                st.warning(f"⚠️ {len(_asama_listesi) - len(_asama_unique)} tekrar var!")
+                if st.button("🧹 Tekrarları Temizle", key="asama_temizle", type="primary"):
+                    _silinen = _tan_temizle("asama")
+                    st.success(f"✅ {_silinen} tekrar silindi!"); st.rerun()
             _ea1, _ea2 = st.columns([3,1])
             _yeni_asama = _ea1.text_input("", placeholder="Yeni aşama adı...", key="kul_yeni_asama", label_visibility="collapsed")
             if _ea2.button("➕ Ekle", key="kul_asama_ekle", use_container_width=True):
                 if _yeni_asama.strip():
-                    if _yeni_asama.strip() in _asama_listesi:
+                    if _yeni_asama.strip() in _asama_unique:
                         st.warning("Bu aşama zaten var!")
                     elif _tan_ekle("asama", _yeni_asama.strip()):
                         st.success(f"✅ '{_yeni_asama}' eklendi!"); st.rerun()
-            st.caption(f"{len(_asama_listesi)} aşama")
-            for _a in _asama_listesi:
+            st.caption(f"{len(_asama_unique)} aşama")
+            for _ai, _a in enumerate(_asama_unique):
                 _ac1, _ac2 = st.columns([4,1])
                 _ac1.markdown(f"🔸 **{_a}**")
-                if _ac2.button("🗑", key=f"asil_{_a}", use_container_width=True, help="Sil"):
+                if _ac2.button("🗑", key=f"asil_{_ai}_{_a[:8]}", use_container_width=True, help="Sil"):
                     if _tan_sil("asama", _a):
                         st.success(f"'{_a}' silindi!"); st.rerun()
 
@@ -3563,14 +3601,8 @@ function updateBot(v){{
             if len(_durum_unique) < len(_durum_listesi):
                 st.warning(f"⚠️ {len(_durum_listesi) - len(_durum_unique)} tekrar var!")
                 if st.button("🧹 Tekrarları Temizle", key="durum_temizle", type="primary"):
-                    try:
-                        # Tüm durum kayıtlarını sil
-                        _sb_tan.table("sistem_tanimlar").delete().eq("tip","durum").execute()
-                        # Unique olanları yeniden ekle
-                        for _si, _dv in enumerate(_durum_unique):
-                            _sb_tan.table("sistem_tanimlar").insert({"tip":"durum","deger":_dv,"sira":_si+1}).execute()
-                        st.success("✅ Tekrarlar temizlendi!"); st.rerun()
-                    except Exception as _te: st.error(f"Hata: {_te}")
+                    _silinen = _tan_temizle("durum")
+                    st.success(f"✅ {_silinen} tekrar silindi!"); st.rerun()
             _ed1, _ed2 = st.columns([3,1])
             _yeni_durum = _ed1.text_input("", placeholder="Yeni durum adı...", key="kul_yeni_durum", label_visibility="collapsed")
             if _ed2.button("➕ Ekle", key="kul_durum_ekle", use_container_width=True):
