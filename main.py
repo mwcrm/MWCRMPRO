@@ -1988,12 +1988,12 @@ elif aktif == "liste":
         import json as _kbj
 
         # Veriyi hazırla
-        _kanban_asama_listesi = tum_asama_opts if tum_asama_opts else sorted(df_f["islem_asamasi"].dropna().unique().tolist())
+        _kanban_asama_listesi = tum_asama_opts if tum_asama_opts else sorted(df["islem_asamasi"].dropna().unique().tolist())
         _kanban_renk = ["#f59e0b","#2563eb","#16a34a","#7c3aed","#0891b2","#dc2626","#f97316","#0d9488","#6366f1","#84cc16","#ec4899","#14b8a6"]
 
         _kanban_kolonlar = []
         for _ki, _ka in enumerate(_kanban_asama_listesi):
-            _kdf = df_f[df_f["islem_asamasi"] == _ka] if "islem_asamasi" in df_f.columns else pd.DataFrame()
+            _kdf = df[df["islem_asamasi"] == _ka] if "islem_asamasi" in df.columns else pd.DataFrame()
             _kartlar = []
             for _, _kr in _kdf.iterrows():
                 _hedef = float(_kr.get("beklenen_ciro",0) or 0)
@@ -2080,7 +2080,7 @@ data.forEach(function(kol){
 
         import streamlit.components.v1 as _kbc
         _kbc.html(_kanban_html, height=600, scrolling=False)
-        st.caption(f"📋 Kanban — {len(df_f)} müşteri · {len(_kanban_asama_listesi)} aşama")
+        st.caption(f"📋 Kanban — {len(df)} müşteri · {len(_kanban_asama_listesi)} aşama")
         st.stop()
 
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
