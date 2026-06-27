@@ -2048,17 +2048,6 @@ elif aktif == "liste":
             st.session_state["_kb_gizli_init"] = True
             _kb_gizli = st.session_state.get("_kb_gizli_asama", [])
 
-        # URL params ile not dialog aç
-        try:
-            _qp = st.query_params
-            if "kb_not_id" in _qp:
-                _kb_qid = int(_qp["kb_not_id"])
-                st.query_params.clear()
-                _kb_row = _kb_df[_kb_df["id"]==_kb_qid]
-                _kb_qfirma = str(_kb_row.iloc[0]["firma"]) if not _kb_row.empty else ""
-                not_dialog(_kb_qid, _kb_qfirma)
-        except: pass
-
         _kanban_filtreli = [k for k in _kanban_kolonlar if k["asama"] not in _kb_gizli]
         _kanban_json = _kbj.dumps(_kanban_filtreli, ensure_ascii=False)
 
@@ -2103,7 +2092,7 @@ data.forEach(function(kol){
   if(!kol.kartlar.length) b+='<div class="bos">Boş</div>';
   kol.kartlar.forEach(function(k){
     var yer=[k.il,k.ilce].filter(Boolean).join('/');
-    b+='<div class="kart">';
+    b+='<div class="kart" onclick="kartSec('+k.id+')">';
     b+='<div class="firma">'+k.firma+'</div>';
     if(k.yetkili) b+='<div class="ytkl">👤 '+k.yetkili+'</div>';
     if(k.gsm) b+='<div class="gsm">📞 '+k.gsm+'</div>';
@@ -2112,15 +2101,14 @@ data.forEach(function(kol){
     b+='<div class="footer">';
     b+=k.hedef?'<span class="hedef">'+k.hedef+' ₺</span>':'<span></span>';
     var notLbl=k.not_sayi>0?'📋 '+k.not_sayi+' not':'📋 Not';
-    b+='<button class="nbtn" onclick="notAc(event,'+k.id+')">'+notLbl+'</button>';
+    b+='<span class="nbtn">'+notLbl+'</span>';
     b+='</div></div>';
   });
   b+='</div>';
   col.innerHTML=h+b;
   board.appendChild(col);
 });
-function notAc(e,id){
-  e.stopPropagation();
+function kartSec(id){
   var base=window.parent.location.href.split('?')[0];
   window.parent.location.href=base+'?kb_not_id='+id;
 }
