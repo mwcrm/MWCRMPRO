@@ -2053,14 +2053,14 @@ elif aktif == "liste":
 *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,sans-serif;}
 html,body{height:100%;overflow:hidden;}
 body{background:#f1f5f9;padding:6px;}
-.board{display:flex;gap:6px;height:580px;overflow-x:auto;overflow-y:hidden;align-items:flex-start;}
+.board{display:flex;gap:6px;height:calc(100vh - 16px);overflow-x:auto;overflow-y:hidden;}
 .board::-webkit-scrollbar{height:5px;}
 .board::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px;}
-.col{flex:0 0 200px;background:#f8fafc;border-radius:10px;border:0.5px solid #e2e8f0;display:flex;flex-direction:column;height:100%;overflow:hidden;}
+.col{flex:1 1 0;min-width:160px;background:#f8fafc;border-radius:10px;border:0.5px solid #e2e8f0;display:flex;flex-direction:column;height:100%;overflow:hidden;}
 .col-hdr{padding:9px 11px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
 .col-name{font-size:11px;font-weight:700;color:white;word-break:break-word;}
 .col-badge{background:rgba(255,255,255,.3);color:white;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;flex-shrink:0;margin-left:4px;}
-.col-body{padding:6px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;flex:1;height:0;}
+.col-body{padding:6px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;flex:1;min-height:0;}
 .col-body::-webkit-scrollbar{width:2px;}
 .col-body::-webkit-scrollbar-thumb{background:#e2e8f0;}
 .kart{background:white;border-radius:7px;padding:9px;border:0.5px solid #e2e8f0;}
@@ -2105,20 +2105,17 @@ data.forEach(function(kol){
 });
 function notAc(e,id){
   e.stopPropagation();
-  var u=new URL(window.parent.location.href);
-  u.searchParams.set('kb_not_id',id);
-  window.parent.location.href=u.toString();
+  window.parent.postMessage({type:'streamlit:setComponentValue',value:id},'*');
 }
 </script></body></html>""")
 
         import streamlit.components.v1 as _kbc
-        _kbc.html(_kanban_html, height=600, scrolling=False)
+        _kb_not_val = _kbc.html(_kanban_html, height=640, scrolling=False)
 
-        _qp_check = st.query_params
-        if "kb_not_id" in _qp_check:
+        # Not butonu — component value ile açılır
+        if _kb_not_val and isinstance(_kb_not_val, (int, float)):
             try:
-                _kb_qid = int(_qp_check["kb_not_id"])
-                st.query_params.clear()
+                _kb_qid = int(_kb_not_val)
                 _kb_row = _kb_df[_kb_df["id"] == _kb_qid]
                 if not _kb_row.empty:
                     not_dialog(_kb_qid, str(_kb_row.iloc[0]["firma"]))
