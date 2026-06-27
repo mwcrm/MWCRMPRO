@@ -1976,19 +1976,16 @@ elif aktif == "liste":
         st.session_state["_cl_view"] = "kanban"; st.rerun()
 
     if _cl_view == "kanban":
-        # ── QUERY PARAM KONTROL — karta tıklayınca alt panele seç ───────────
+        # ── KART TIKLAMASI — query param ile müşteri seç ─────────────────────
         try:
-            _qp_kb = st.query_params
-            if "kb_not_id" in _qp_kb:
-                _kb_qid2 = int(_qp_kb["kb_not_id"])
+            if "kb_not_id" in st.query_params:
+                _kb_qid2 = int(st.query_params["kb_not_id"])
                 st.query_params.clear()
-                _kb_df2 = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
-                _kb_row2 = _kb_df2[_kb_df2["id"] == _kb_qid2] if not _kb_df2.empty else pd.DataFrame()
+                _kb_row2 = df[df["id"] == _kb_qid2]
                 if not _kb_row2.empty:
                     _kb_firma2 = str(_kb_row2.iloc[0]["firma"])
                     st.session_state["kb_alt_sec"] = f"[{_kb_qid2}] {_kb_firma2}"
-                    st.session_state["_cl_view"] = "kanban"
-                    st.rerun()
+                st.rerun()
         except: pass
         # ── KANBAN GÖRÜNÜMÜ ───────────────────────────────────────────────────
         import streamlit.components.v1 as _kb_comp
