@@ -2006,6 +2006,7 @@ elif aktif == "liste":
                     "id": int(_kr.get("id",0) or 0),
                     "firma": str(_kr.get("firma","") or "")[:30],
                     "yetkili": str(_kr.get("yetkili","") or "")[:20],
+                    "gsm": str(_kr.get("gsm","") or ""),
                     "il": str(_kr.get("il","") or ""),
                     "ilce": str(_kr.get("ilce","") or ""),
                     "durum": str(_kr.get("durum","") or ""),
@@ -2018,9 +2019,35 @@ elif aktif == "liste":
                 "kartlar": _kartlar[:50]
             })
 
-        _kanban_json = _kbj.dumps(_kanban_kolonlar, ensure_ascii=False)
+        _kb_gizli = st.session_state.get("_kb_gizli_asama", [])
+        # DB'den yükle
+        if "_kb_gizli_init" not in st.session_state:
+            try:
+                _sb_kbi = get_sb_client()
+                if _sb_kbi:
+                    import json as _kbij
+                    _r_kbi = _sb_kbi.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kb_gizli_asama").execute()
+                    if _r_kbi.data:
+                        st.session_state["_kb_gizli_asama"] = _kbij.loads(_r_kbi.data[0]["deger"])
+            except: pass
+            st.session_state["_kb_gizli_init"] = True
+            _kb_gizli = st.session_state.get("_kb_gizli_asama", [])
 
-        _kanban_html = """<!DOCTYPE html>
+        # URL params ile not dialog aç
+        try:
+            _qp = st.query_params
+            if "kb_not_id" in _qp:
+                _kb_qid = int(_qp["kb_not_id"])
+                st.query_params.clear()
+                _kb_row = _kb_df[_kb_df["id"]==_kb_qid]
+                _kb_qfirma = str(_kb_row.iloc[0]["firma"]) if not _kb_row.empty else ""
+                not_dialog(_kb_qid, _kb_qfirma)
+        except: pass
+
+        _kanban_filtreli = [k for k in _kanban_kolonlar if k["asama"] not in _kb_gizli]
+        _kanban_json = _kbj.dumps(_kanban_filtreli, ensure_ascii=False)
+
+        _kanban_html = ("""<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,sans-serif;}
@@ -2033,52 +2060,57 @@ body{background:#f1f5f9;padding:8px;overflow-x:auto;}
 .col-body{padding:8px;display:flex;flex-direction:column;gap:5px;max-height:500px;overflow-y:auto;}
 .col-body::-webkit-scrollbar{width:3px;}
 .col-body::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:2px;}
-.kart{background:white;border-radius:8px;padding:10px;border:0.5px solid #e2e8f0;cursor:pointer;transition:.1s;}
+.kart{background:white;border-radius:8px;padding:10px;border:0.5px solid #e2e8f0;}
 .kart:hover{box-shadow:0 2px 8px rgba(0,0,0,.1);border-color:#93c5fd;}
 .firma{font-size:12px;font-weight:700;color:#0f172a;margin-bottom:3px;line-height:1.3;}
-.yetkili{font-size:10px;color:#94a3b8;margin-bottom:4px;}
-.yer{font-size:10px;color:#64748b;margin-bottom:4px;}
-.durum-chip{display:inline-block;padding:2px 7px;border-radius:20px;font-size:9px;background:#f1f5f9;color:#374151;margin-bottom:5px;}
-.footer{display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:0.5px solid #f1f5f9;font-size:11px;}
-.hedef{font-weight:700;color:#16a34a;}
-</style>
-</head>
-<body>
+.ytkl{font-size:10px;color:#64748b;margin-bottom:2px;}
+.gsm{font-size:10px;color:#2563eb;margin-bottom:3px;font-weight:500;}
+.yer{font-size:10px;color:#94a3b8;margin-bottom:4px;}
+.dchip{display:inline-block;padding:2px 7px;border-radius:20px;font-size:9px;background:#f1f5f9;color:#374151;margin-bottom:5px;}
+.footer{display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:0.5px solid #f1f5f9;}
+.hedef{font-size:11px;font-weight:700;color:#16a34a;}
+.nbtn{background:#eff6ff;color:#2563eb;border:none;border-radius:5px;padding:3px 8px;font-size:10px;cursor:pointer;font-weight:600;}
+</style></head><body>
 <div class="board" id="board"></div>
 <script>
-var data = """ + _kanban_json + """;
-var board = document.getElementById('board');
-if(!data || data.length===0){
-  board.innerHTML='<div style="padding:40px;color:#94a3b8;font-size:14px;">Aşama tanımlanmamış veya veri yok.</div>';
-}
+var data=""" + _kanban_json + """;
+var board=document.getElementById('board');
+if(!data||!data.length){board.innerHTML='<p style="padding:40px;color:#94a3b8">Veri yok</p>';}
 data.forEach(function(kol){
-  var col = document.createElement('div');
-  col.className = 'col';
-  var hdr = '<div class="col-hdr" style="background:'+kol.renk+'"><span class="col-name">'+kol.asama+'</span><span class="col-badge">'+kol.sayi+'</span></div>';
-  var body = '<div class="col-body">';
-  if(kol.kartlar.length===0){
-    body += '<div style="padding:12px;text-align:center;font-size:11px;color:#cbd5e1;">Boş</div>';
-  }
+  var col=document.createElement('div');col.className='col';
+  var h='<div class="col-hdr" style="background:'+kol.renk+'"><span class="col-name">'+kol.asama+'</span><span class="col-badge">'+kol.sayi+'</span></div>';
+  var b='<div class="col-body">';
+  if(!kol.kartlar.length) b+='<div style="padding:12px;text-align:center;font-size:11px;color:#cbd5e1">Boş</div>';
   kol.kartlar.forEach(function(k){
-    var yer = [k.il, k.ilce].filter(Boolean).join('/');
-    body += '<div class="kart">';
-    body += '<div class="firma">'+k.firma+'</div>';
-    if(k.yetkili) body += '<div class="yetkili">👤 '+k.yetkili+'</div>';
-    if(yer) body += '<div class="yer">📍 '+yer+'</div>';
-    if(k.durum) body += '<span class="durum-chip">'+k.durum+'</span>';
-    body += '<div class="footer">';
-    body += k.hedef ? '<span class="hedef">'+k.hedef+' ₺</span>' : '<span></span>';
-    body += '</div></div>';
+    var yer=[k.il,k.ilce].filter(Boolean).join('/');
+    b+='<div class="kart">';
+    b+='<div class="firma">'+k.firma+'</div>';
+    if(k.yetkili) b+='<div class="ytkl">👤 '+k.yetkili+'</div>';
+    if(k.gsm) b+='<div class="gsm">📞 '+k.gsm+'</div>';
+    if(yer) b+='<div class="yer">📍 '+yer+'</div>';
+    if(k.durum) b+='<span class="dchip">'+k.durum+'</span><br>';
+    b+='<div class="footer">';
+    b+=k.hedef?'<span class="hedef">'+k.hedef+' ₺</span>':'<span></span>';
+    b+='<button class="nbtn" onclick="notAc(event,'+k.id+')">📋 Not</button>';
+    b+='</div></div>';
   });
-  body += '</div>';
-  col.innerHTML = hdr + body;
+  b+='</div>';
+  col.innerHTML=h+b;
   board.appendChild(col);
 });
-</script>
-</body></html>"""
+function notAc(e,id){
+  e.stopPropagation();
+  try{
+    var u=new URL(window.parent.location.href);
+    u.searchParams.set('kb_not_id',id);
+    window.parent.location.href=u.toString();
+  }catch(ex){}
+}
+</script></body></html>""")
 
         import streamlit.components.v1 as _kbc
         _kbc.html(_kanban_html, height=620, scrolling=True)
+        st.caption(f"📋 Kanban — {len(_kb_df)} müşteri · {len(_kanban_asama_listesi)} aşama")
         st.caption(f"📋 Kanban — {len(_kb_df)} müşteri · {len(_kanban_asama_listesi)} aşama")
         st.stop()
 
@@ -3536,6 +3568,36 @@ function updateBot(v){{
                 st.success("✅ Kaydedildi!")
             except Exception as _kgue:
                 st.error(f"Hata: {_kgue}")
+
+        st.divider()
+        st.markdown("### 📋 Kanban Sütun Görünürlüğü")
+        st.caption("Kanban'da görünmesini istemediğiniz aşamaları kapatın")
+        _kb_gizli_ui = list(st.session_state.get("_kb_gizli_asama", []))
+        _all_asama = _tanimlar_yukle("asama")
+        if _all_asama:
+            _kb_cols = st.columns(4)
+            for _kbi, _kba in enumerate(_all_asama):
+                _kb_gorunsun = _kba not in _kb_gizli_ui
+                _kb_tog = _kb_cols[_kbi % 4].toggle(
+                    _kba, value=_kb_gorunsun, key=f"kb_giz_{_kbi}"
+                )
+                if not _kb_tog and _kba not in _kb_gizli_ui:
+                    _kb_gizli_ui.append(_kba)
+                elif _kb_tog and _kba in _kb_gizli_ui:
+                    _kb_gizli_ui.remove(_kba)
+            if st.button("💾 Kanban Ayarlarını Kaydet", key="kb_giz_kaydet", type="primary"):
+                st.session_state["_kb_gizli_asama"] = _kb_gizli_ui
+                try:
+                    _sb_kbg = get_sb_client()
+                    if _sb_kbg:
+                        import json as _kbgj
+                        _sb_kbg.table("kullanici_tercih").upsert({
+                            "kullanici":"__liste_ui__","anahtar":"_kb_gizli_asama",
+                            "deger":_kbgj.dumps(_kb_gizli_ui, ensure_ascii=False)
+                        }, on_conflict="kullanici,anahtar").execute()
+                    st.success("✅ Kaydedildi!")
+                except Exception as _kbge:
+                    st.error(f"Hata: {_kbge}")
 
     # ── 🔄 TOPLU DEĞİŞTİR ────────────────────────────────────────────────────
     with kul_tab_toplu:
