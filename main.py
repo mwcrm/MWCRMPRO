@@ -983,7 +983,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "detay_cari", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -993,7 +993,7 @@ _TAB_ETIKETLER = {
     "excel": "📥 Excel Aktar",
     "kisiler": "📞 Telefon Kişiler",
     "analiz": "🔍 Müşteri Analizi",
-    "detay_cari": "📊 Detay Cari Liste",
+    
     "randevu": "📅 Randevular",
     "kullanici": "👥 Kullanıcı Yönetimi",
     "mesajlar": "💬 Mesajlar",
@@ -1275,6 +1275,19 @@ button[data-testid="manage-app-button"] { display: none !important; }
         "mesajlar":    "#0891b2",
     }
 
+    # Gizli menü öğelerini yükle
+    if "_gizli_menu_list" not in st.session_state:
+        try:
+            _sb_gml = get_sb_client()
+            if _sb_gml:
+                import json as _gmlj
+                _r_gml = _sb_gml.table("kullanici_tercih").select("deger").eq("kullanici", st.session_state["kullanici"]).eq("anahtar","_gizli_menu").execute()
+                st.session_state["_gizli_menu_list"] = _gmlj.loads(_r_gml.data[0]["deger"]) if _r_gml.data else []
+        except: st.session_state["_gizli_menu_list"] = []
+
+    _gizli_menu_render = st.session_state.get("_gizli_menu_list", [])
+    _sb_liste = [t for t in _sb_liste if t not in _gizli_menu_render]
+
     for _tab_key in _sb_liste:
         _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
         _aktif_mi = st.session_state["aktif_tab"] == _tab_key
@@ -1301,26 +1314,46 @@ button[data-testid="manage-app-button"] { display: none !important; }
     if st.session_state.get("rol") == "admin":
         with st.expander("🎛️ Menü Sırası"):
             mevcut_sira_m = get_menu_tercihi(st.session_state["kullanici"])
+            _gizli_menu = st.session_state.get("_gizli_menu_list", [])
             _goster = []
             for _t in mevcut_sira_m:
                 if _t not in _goster:
                     _goster.append(_t)
             mevcut_sira_m = _goster
             for idx_m, tab_key in enumerate(mevcut_sira_m):
-                c1, c2, c3 = st.columns([4,1,1])
-                c1.caption(_TAB_ETIKETLER.get(tab_key, tab_key))
-                if idx_m > 0 and c2.button("▲", key=f"up_{tab_key}"):
+                c1, c2, c3, c4 = st.columns([3,1,1,1])
+                _gizli_mi_m = tab_key in _gizli_menu
+                c1.caption(("~~" if _gizli_mi_m else "") + _TAB_ETIKETLER.get(tab_key, tab_key))
+                if c2.button("🙈" if not _gizli_mi_m else "👁", key=f"giz_{tab_key}"):
+                    if _gizli_mi_m:
+                        _gizli_menu.remove(tab_key)
+                    else:
+                        _gizli_menu.append(tab_key)
+                    st.session_state["_gizli_menu_list"] = _gizli_menu
+                    try:
+                        _sb_gm = get_sb_client()
+                        if _sb_gm:
+                            import json as _gmj
+                            _sb_gm.table("kullanici_tercih").upsert({
+                                "kullanici": st.session_state["kullanici"],
+                                "anahtar": "_gizli_menu",
+                                "deger": _gmj.dumps(_gizli_menu)
+                            }, on_conflict="kullanici,anahtar").execute()
+                    except: pass
+                    st.rerun()
+                if idx_m > 0 and c3.button("▲", key=f"up_{tab_key}"):
                     yeni_s = mevcut_sira_m.copy()
                     yeni_s[idx_m], yeni_s[idx_m-1] = yeni_s[idx_m-1], yeni_s[idx_m]
                     save_menu_tercihi(st.session_state["kullanici"], yeni_s)
                     st.rerun()
-                if idx_m < len(mevcut_sira_m)-1 and c3.button("▼", key=f"dn_{tab_key}"):
+                if idx_m < len(mevcut_sira_m)-1 and c4.button("▼", key=f"dn_{tab_key}"):
                     yeni_s = mevcut_sira_m.copy()
                     yeni_s[idx_m], yeni_s[idx_m+1] = yeni_s[idx_m+1], yeni_s[idx_m]
                     save_menu_tercihi(st.session_state["kullanici"], yeni_s)
                     st.rerun()
             if st.button("↺ Sıfırla", use_container_width=True, key="menu_sifirla"):
                 save_menu_tercihi(st.session_state["kullanici"], _TAB_LISTESI_DEFAULT.copy() + ["kullanici","admin_rapor"])
+                st.session_state["_gizli_menu_list"] = []
                 st.rerun()
 
         with st.expander("📢 Duyuru"):
@@ -5696,307 +5729,6 @@ section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseBu
                     st.rerun()
                 else:
                     st.error(f"❌ Kayıt hatası: {_err}")
-
-elif aktif == "detay_cari":
-    sayfa_log("detay_cari")
-    import json as _dcj
-
-    st.markdown("## 📊 Detay Cari Liste — Çalışma Tablosu")
-    st.markdown("<small style='color:#64748b;'>Hücrelere tıklayıp direkt yazabilirsiniz. Çoklu değer için virgülle ayırın (örn: İstanbul, Ankara, Bursa).</small>", unsafe_allow_html=True)
-
-    def _dc_sb():
-        return get_sb_service() or get_sb_client()
-
-    @st.cache_data(ttl=60)
-    def _dc_getir_tum():
-        try:
-            sb = get_sb_service() or get_sb_client()
-            if sb:
-                r = sb.table("musteri_calisma_tablosu").select("*").execute()
-                return {row["cari_id"]: row for row in r.data} if r.data else {}
-        except Exception as e:
-            st.error(f"Veri çekme hatası: {e}")
-        return {}
-
-    @st.cache_data(ttl=60)
-    def _dc_notlar_getir_tum():
-        try:
-            sb = get_sb_service() or get_sb_client()
-            if sb:
-                r = sb.table("cari_aciklamalar").select("*").order("id", desc=True).execute()
-                if r.data:
-                    _gruplu = {}
-                    for row in r.data:
-                        cid = row.get("cari_id")
-                        _gruplu.setdefault(cid, []).append(row)
-                    return _gruplu
-        except: pass
-        return {}
-
-    def _dc_not_ekle(cari_id, firma, metin):
-        try:
-            sb = _dc_sb()
-            if sb:
-                sb.table("cari_aciklamalar").insert({
-                    "cari_id": cari_id, "cari_adi": firma, "aciklama": metin,
-                    "olusturan": st.session_state.get("kullanici","")
-                }).execute()
-                try: _dc_notlar_getir_tum.clear()
-                except: pass
-                return True
-        except Exception as e:
-            st.error(f"Not ekleme hatası: {e}")
-        return False
-
-    def _dc_kaydet_satir(cari_id, veri):
-        try:
-            sb = _dc_sb()
-            if sb:
-                ex = sb.table("musteri_calisma_tablosu").select("id").eq("cari_id", cari_id).execute()
-                if ex.data:
-                    sb.table("musteri_calisma_tablosu").update(veri).eq("cari_id", cari_id).execute()
-                else:
-                    veri["cari_id"] = cari_id
-                    sb.table("musteri_calisma_tablosu").insert(veri).execute()
-                try: _dc_getir_tum.clear()
-                except: pass
-                return True
-        except Exception as e:
-            st.error(f"Kayıt hatası ({veri.get('firma','?')}): {e}")
-            return False
-        return False
-
-    def _dc_satir_sil(cari_id):
-        try:
-            sb = _dc_sb()
-            if sb:
-                sb.table("musteri_calisma_tablosu").delete().eq("cari_id", cari_id).execute()
-                try: _dc_getir_tum.clear()
-                except: pass
-                return True
-        except Exception as e:
-            st.error(f"Silme hatası: {e}")
-        return False
-
-    # VERİ YÜKLE
-    _df_cari_dc = get_cari_listesi()
-    _dc_kayitlar = _dc_getir_tum()
-    _dc_notlar_tum = _dc_notlar_getir_tum()
-
-    if _df_cari_dc.empty:
-        st.info("Henüz cari kayıt yok.")
-        st.stop()
-
-    # SADECE musteri_calisma_tablosu'na kaydı olan müşteriler
-    _dc_kayitli_idler = set(_dc_kayitlar.keys())
-    _df_goster = _df_cari_dc[_df_cari_dc["id"].isin(_dc_kayitli_idler)].copy()
-
-    # YENİ MÜŞTERİ EKLE
-    with st.expander("➕ Cari Listeden Yeni Müşteri Ekle", expanded=_df_goster.empty):
-        _df_henuz_yok = _df_cari_dc[~_df_cari_dc["id"].isin(_dc_kayitli_idler)]
-        if _df_henuz_yok.empty:
-            st.caption("Tüm cari müşteriler zaten bu listede.")
-        else:
-            _yeni_opts_cok = [f"[{int(r['id'])}] {r['firma']}" for _,r in _df_henuz_yok.iterrows()]
-            _yeni_sec_cok = st.multiselect("Müşteri seç (birden fazla seçebilirsiniz)", _yeni_opts_cok, key="dc_yeni_musteri_sec_cok")
-
-            _ek1, _ek2 = st.columns(2)
-            if _ek1.button(f"Seçilenleri Ekle ({len(_yeni_sec_cok)})", key="dc_yeni_musteri_ekle_btn", disabled=len(_yeni_sec_cok)==0):
-                _eklenen_say = 0
-                for _ys in _yeni_sec_cok:
-                    _yeni_cid = int(_ys.split("]")[0].replace("[","").strip())
-                    _yeni_firma_adi = str(_df_henuz_yok[_df_henuz_yok["id"]==_yeni_cid].iloc[0]["firma"])
-                    if _dc_kaydet_satir(_yeni_cid, {"firma": _yeni_firma_adi, "guncelleyen": st.session_state.get("kullanici","")}):
-                        _eklenen_say += 1
-                st.success(f"✅ {_eklenen_say} müşteri eklendi!")
-                st.rerun()
-            if _ek2.button(f"🔁 Tüm Cari Listeyi Ekle ({len(_df_henuz_yok)})", key="dc_tum_ekle_btn"):
-                _eklenen_say2 = 0
-                for _, _hr in _df_henuz_yok.iterrows():
-                    if _dc_kaydet_satir(int(_hr["id"]), {"firma": str(_hr["firma"]), "guncelleyen": st.session_state.get("kullanici","")}):
-                        _eklenen_say2 += 1
-                st.success(f"✅ {_eklenen_say2} müşteri eklendi!")
-                st.rerun()
-
-    # MÜKERRER MÜŞTERİ TESPİTİ
-    if _df_goster.empty:
-        st.info("Henüz bu çalışma tablosunda müşteri yok. Yukarıdan ekleyin.")
-        st.stop()
-
-    _dc_ara = st.text_input("Firma ara", key="dc_ara", placeholder="firma adı ile filtrele...")
-    if _dc_ara:
-        _df_goster = _df_goster[_df_goster["firma"].str.contains(_dc_ara, case=False, na=False)]
-
-    st.caption(f"{len(_df_goster)} müşteri")
-
-    # TABLO VERİSİ — tek tablo, direkt düzenlenebilir + Sil kolonu
-    _tablo_satirlar = []
-    for _idx, (___, _cr) in enumerate(_df_goster.iterrows(), start=1):
-        _cid = int(_cr["id"])
-        _kayit = _dc_kayitlar.get(_cid, {})
-        _notlar_bu = _dc_notlar_tum.get(_cid, [])
-        _eski_notlar = " | ".join([f"{str(n.get('tarih',''))[:10]}: {n.get('aciklama','')}" for n in _notlar_bu]) if _notlar_bu else ""
-
-        _hedef_oto = str(int(_cr.get("beklenen_ciro",0))) if _cr.get("beklenen_ciro",0) else ""
-        _gercek_oto = str(int(_cr.get("gerceklesen_ciro",0))) if _cr.get("gerceklesen_ciro",0) else ""
-
-        _tablo_satirlar.append({
-            "Sil": False,
-            "Sıra": _idx,
-            "Kayıt Tarihi": fmt_tarih(_cr.get("tarih","")),
-            "ID": _cid,
-            "Firma": str(_cr.get("firma","")),
-            "Yetkili": str(_cr.get("yetkili","") or ""),
-            "GSM": str(_cr.get("gsm","") or ""),
-            "İl": str(_cr.get("il","") or ""),
-            "İlçe": str(_cr.get("ilce","") or ""),
-            "Çıkış İl": _kayit.get("cikis_il","") or "",
-            "Varış İl": _kayit.get("varis_il","") or "",
-            "Ciro": _kayit.get("ciro","") or "",
-            "Tür": _kayit.get("tur","") or "",
-            "Desi-Kg": _kayit.get("desi_kg","") or "",
-            "Fiyat": _kayit.get("fiyat","") or "",
-            "Durum": (_kayit.get("durum","") or "") if (_kayit.get("durum","") or "") not in ["","--"] else str(_cr.get("durum","") or ""),
-            "Aşama": (_kayit.get("asama","") or "") if (_kayit.get("asama","") or "") not in ["","--"] else str(_cr.get("islem_asamasi","") or ""),
-            "Segment": str(_cr.get("segment","") or ""),
-            "Hedef Ciro": _kayit.get("hedef_ciro","") or _hedef_oto,
-            "Gerçekleşen": _kayit.get("gerceklesen","") or _gercek_oto,
-            "fark": _kayit.get("fark","") or "",
-            "Başarı yuzdesi": _kayit.get("basari","") or "",
-            "Açıklama Yaz": "",
-            "Eski Açıklama Notu": _eski_notlar,
-            "Randevu İşlem Tarih": _kayit.get("randevu_tar","") or "",
-        })
-
-    _df_tablo = pd.DataFrame(_tablo_satirlar)
-
-    # ── DETAY CARİ NOT PANELİ ────────────────────────────────────────────────
-    _dc_not_panel_id = st.session_state.get("_dc_not_panel_id")
-
-    if _dc_not_panel_id:
-        _dc_tbl_col, _dc_not_col = st.columns([3, 1])
-    else:
-        _dc_tbl_col = st.container()
-        _dc_not_col = None
-
-    with _dc_tbl_col:
-        _edited = st.data_editor(
-            _df_tablo,
-            use_container_width=True,
-            hide_index=True,
-            num_rows="fixed",
-            height=min(700, 90 + len(_df_tablo)*40),
-            disabled=["Sıra","Kayıt Tarihi","ID","Firma","Yetkili","GSM","İl","İlçe","Segment","Eski Açıklama Notu"],
-            column_config={
-                "Sil": st.column_config.CheckboxColumn(width="small", help="İşaretleyip aşağıdaki 'Seçilenleri Sil' butonuna basın"),
-                "Sıra": st.column_config.NumberColumn(width="small"),
-                "Kayıt Tarihi": st.column_config.TextColumn(width="small"),
-                "ID": st.column_config.NumberColumn(width="small"),
-                "Çıkış İl": st.column_config.TextColumn(width="medium", help="virgülle ayırın"),
-                "Varış İl": st.column_config.TextColumn(width="medium", help="virgülle ayırın"),
-                "Ciro": st.column_config.TextColumn(width="medium", help="virgülle ayırın"),
-                "Tür": st.column_config.TextColumn(width="medium"),
-                "Desi-Kg": st.column_config.TextColumn(width="medium"),
-                "Fiyat": st.column_config.TextColumn(width="small"),
-                "Durum": st.column_config.TextColumn(width="small"),
-                "Aşama": st.column_config.TextColumn(width="small"),
-                "Hedef Ciro": st.column_config.TextColumn(width="small"),
-                "Gerçekleşen": st.column_config.TextColumn(width="small"),
-                "fark": st.column_config.TextColumn(width="small"),
-                "Başarı yuzdesi": st.column_config.TextColumn(width="small"),
-                "Açıklama Yaz": st.column_config.TextColumn(width="medium"),
-                "Eski Açıklama Notu": st.column_config.TextColumn(width="large"),
-                "Randevu İşlem Tarih": st.column_config.TextColumn(width="medium"),
-            },
-            key="dc_data_editor"
-        )
-
-    # Detay cari — seçili satır not paneli
-    _dc_secili = _edited[_edited.get("Sil", False) == True] if "Sil" in _edited.columns else pd.DataFrame()
-    # Tek satır seçili + notu var → paneli aç
-    if len(_dc_secili) == 1:
-        _dc_sel_id = int(_dc_secili.iloc[0]["ID"])
-        _dc_sel_notlar = _dc_notlar_tum.get(_dc_sel_id, [])
-        if _dc_sel_notlar and st.session_state.get("_dc_not_panel_id") != _dc_sel_id:
-            st.session_state["_dc_not_panel_id"] = _dc_sel_id
-        elif not _dc_sel_notlar:
-            st.session_state.pop("_dc_not_panel_id", None)
-    elif len(_dc_secili) == 0 and st.session_state.get("_dc_not_panel_id"):
-        st.session_state.pop("_dc_not_panel_id", None)
-
-    if _dc_not_panel_id and _dc_not_col:
-        with _dc_not_col:
-            _dc_prows = _df_tablo[_df_tablo["ID"] == int(_dc_not_panel_id)]
-            _dc_pfirma = str(_dc_prows.iloc[0].get("Firma","")) if not _dc_prows.empty else ""
-            not_paneli(int(_dc_not_panel_id), _dc_pfirma, key_prefix="dc")
-            if st.button("✕ Kapat", key="dc_not_kapat", use_container_width=True):
-                st.session_state.pop("_dc_not_panel_id", None)
-
-    _bk1, _bk2 = st.columns(2)
-
-    if _bk1.button("💾 Tüm Değişiklikleri Kaydet", type="primary", use_container_width=True, key="dc_kaydet_tum"):
-        _basarili = 0
-        _hatali = 0
-        for _i, _row in _edited.iterrows():
-            _cid_e = int(_row["ID"])
-            _eski_satir = _df_tablo.iloc[_i]
-
-            _degisti = any(str(_row[_c]) != str(_eski_satir[_c]) for _c in [
-                "Çıkış İl","Varış İl","Ciro","Tür","Desi-Kg","Fiyat","Durum","Aşama",
-                "Hedef Ciro","Gerçekleşen","fark","Başarı yuzdesi","Açıklama Yaz","Randevu İşlem Tarih"
-            ])
-            if not _degisti:
-                continue
-
-            _yeni_not = str(_row.get("Açıklama Yaz","") or "").strip()
-            if _yeni_not:
-                _dc_not_ekle(_cid_e, str(_row["Firma"]), _yeni_not)
-
-            _veri_kayit = {
-                "firma": str(_row["Firma"]),
-                "cikis_il": str(_row.get("Çıkış İl","") or ""),
-                "varis_il": str(_row.get("Varış İl","") or ""),
-                "ciro": str(_row.get("Ciro","") or ""),
-                "tur": str(_row.get("Tür","") or ""),
-                "desi_kg": str(_row.get("Desi-Kg","") or ""),
-                "fiyat": str(_row.get("Fiyat","") or ""),
-                "durum": str(_row.get("Durum","") or ""),
-                "asama": str(_row.get("Aşama","") or ""),
-                "hedef_ciro": str(_row.get("Hedef Ciro","") or ""),
-                "gerceklesen": str(_row.get("Gerçekleşen","") or ""),
-                "fark": str(_row.get("fark","") or ""),
-                "basari": str(_row.get("Başarı yuzdesi","") or ""),
-                "randevu_tar": str(_row.get("Randevu İşlem Tarih","") or ""),
-                "guncelleyen": st.session_state.get("kullanici",""),
-            }
-            if _dc_kaydet_satir(_cid_e, _veri_kayit):
-                _basarili += 1
-            else:
-                _hatali += 1
-
-        if _basarili:
-            st.success(f"✅ {_basarili} müşteri kaydedildi!")
-        if _hatali:
-            st.error(f"❌ {_hatali} müşteride hata oluştu.")
-        if _basarili or _hatali:
-            if "dc_data_editor" in st.session_state:
-                del st.session_state["dc_data_editor"]
-            st.rerun()
-        else:
-            st.info("Değişiklik bulunamadı.")
-
-    if _bk2.button("🗑 İşaretli Müşterileri Listeden Çıkar", use_container_width=True, key="dc_sil_btn"):
-        _silinecekler = _edited[_edited["Sil"] == True]
-        if _silinecekler.empty:
-            st.warning("Silmek için en az bir satırın 'Sil' kutusunu işaretleyin.")
-        else:
-            _silinen_sayisi = 0
-            for _, _srow in _silinecekler.iterrows():
-                if _dc_satir_sil(int(_srow["ID"])):
-                    _silinen_sayisi += 1
-            st.success(f"✅ {_silinen_sayisi} müşteri listeden çıkarıldı!")
-            st.rerun()
-
 
 elif aktif == "whatsapp":
     import requests as _wa_req
