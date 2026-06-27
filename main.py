@@ -1976,6 +1976,17 @@ elif aktif == "liste":
         st.session_state["_cl_view"] = "kanban"; st.rerun()
 
     if _cl_view == "kanban":
+        # ── QUERY PARAM KONTROL — not dialog ──────────────────────────────────
+        try:
+            _qp_kb = st.query_params
+            if "kb_not_id" in _qp_kb:
+                _kb_qid2 = int(_qp_kb["kb_not_id"])
+                st.query_params.clear()
+                _kb_df2 = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+                _kb_row2 = _kb_df2[_kb_df2["id"] == _kb_qid2] if not _kb_df2.empty else pd.DataFrame()
+                if not _kb_row2.empty:
+                    not_dialog(_kb_qid2, str(_kb_row2.iloc[0]["firma"]))
+        except: pass
         # ── KANBAN GÖRÜNÜMÜ ───────────────────────────────────────────────────
         import streamlit.components.v1 as _kb_comp
         import json as _kbj
@@ -2109,28 +2120,28 @@ data.forEach(function(kol){
 });
 function notAc(e,id){
   e.stopPropagation();
-  window.parent.postMessage({type:'streamlit:setComponentValue',value:id},'*');
+  var base=window.parent.location.href.split('?')[0];
+  window.parent.location.href=base+'?kb_not_id='+id;
 }
 </script></body></html>""")
 
         import streamlit.components.v1 as _kbc
-        _kb_not_val = _kbc.html(_kanban_html, height=640, scrolling=False)
+        _kbc.html(_kanban_html, height=640, scrolling=False)
 
-        # Not butonu — component value ile açılır
-        if _kb_not_val and isinstance(_kb_not_val, (int, float)):
-            try:
-                _kb_qid = int(_kb_not_val)
-                _kb_row = _kb_df[_kb_df["id"] == _kb_qid]
-                if not _kb_row.empty:
-                    not_dialog(_kb_qid, str(_kb_row.iloc[0]["firma"]))
-            except: pass
+        # Not butonu — component value ile açılır (artık query param ile çalışıyor)
+        _ = None  # placeholder
 
         # ── KANBAN ALT PANEL — müşteri seç, not yaz, aşama değiştir ──────────
         st.markdown("---")
         _kp1, _kp2, _kp3 = st.columns([2, 2, 2])
 
         _kb_opts = ["— Müşteri seçin —"] + [f"[{int(r['id'])}] {r.get('firma','')}" for _, r in _kb_df.sort_values("firma").iterrows()]
-        _kb_sec = _kp1.selectbox("📋 Müşteri seç (not/aşama)", _kb_opts, key="kb_alt_sec", label_visibility="collapsed")
+        _kb_sec_def = st.session_state.get("kb_alt_sec", "— Müşteri seçin —")
+        if _kb_sec_def not in _kb_opts:
+            _kb_sec_def = "— Müşteri seçin —"
+        _kb_sec = _kp1.selectbox("📋 Müşteri seç", _kb_opts,
+                                  index=_kb_opts.index(_kb_sec_def),
+                                  key="kb_alt_sec", label_visibility="collapsed")
 
         if _kb_sec != "— Müşteri seçin —":
             _kb_sel_id = int(_kb_sec.split("]")[0].replace("[","").strip())
