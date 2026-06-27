@@ -895,7 +895,7 @@ def _notlar_yukle(cari_id):
     try:
         _sb = get_sb_client()
         if _sb:
-            _r = _sb.table("cari_aciklamalar").select("*").eq("cari_id", int(cari_id)).order("id", desc=True).execute()
+            _r = _sb.table("cari_aciklamalar").select("*").eq("cari_id", int(cari_id)).execute()
             return _r.data or []
     except: pass
     return []
@@ -912,18 +912,18 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
     # Sırala — en yeni üstte
     try:
-        _notlar = sorted(_notlar, key=lambda x: str(x.get("created_at","") or x.get("tarih","") or x.get("id","")), reverse=True)
+        _notlar = sorted(_notlar, key=lambda x: str(x.get("created_at","") or x.get("tarih","") or x.get("id",0)), reverse=True)
     except: pass
 
     if firma_adi:
         st.markdown(f"<div style='font-size:15px;font-weight:700;color:#1e40af;margin-bottom:4px'>📋 {firma_adi}</div>", unsafe_allow_html=True)
-    st.caption(f"{len(_notlar)} not")
-
-    # Debug — ilk notun kolonlarını göster (geçici)
+    
+    # Tablo kolonlarını göster — hangi kolonlar var anlayalım
     if _notlar:
-        _ornek_kolon = list(_notlar[0].keys())
+        _kolon_adlari = list(_notlar[0].keys())
+        st.caption(f"{len(_notlar)} not · kolonlar: {', '.join(_kolon_adlari)}")
     else:
-        _ornek_kolon = []
+        st.caption("0 not")
 
     # Notları göster
     for _nn in _notlar:
@@ -2524,7 +2524,7 @@ function notAc(e,id){
             def _tum_notlari_yukle():
                 _sb2 = get_sb_client()
                 if _sb2:
-                    _r2 = _sb2.table("cari_aciklamalar").select("id,cari_id,created_at,olusturan,aciklama").execute()
+                    _r2 = _sb2.table("cari_aciklamalar").select("*").execute()
                     return _r2.data or []
                 return []
             _res_notlar_data = _tum_notlari_yukle()
@@ -2547,8 +2547,9 @@ function notAc(e,id){
                 df_edit = df_edit.sort_values("_not_sayi", ascending=False).drop(columns=["_not_sayi"]).reset_index(drop=True)
             else:
                 df_edit["📨 Notlar"] = ""
-        except:
+        except Exception as _not_err:
             df_edit["📨 Notlar"] = ""
+            st.warning(f"Not yükleme hatası: {_not_err}")
     else:
         df_edit["📨 Notlar"] = ""
 
@@ -5716,7 +5717,7 @@ elif aktif == "detay_cari":
         try:
             sb = get_sb_service() or get_sb_client()
             if sb:
-                r = sb.table("cari_aciklamalar").select("*").order("tarih", desc=True).execute()
+                r = sb.table("cari_aciklamalar").select("*").order("id", desc=True).execute()
                 if r.data:
                     _gruplu = {}
                     for row in r.data:
@@ -7640,7 +7641,7 @@ elif aktif == "randevu":
 
                 # Seçili firmanın notlarını çek
                 try:
-                    _rnotlar = sb_liste.table("cari_aciklamalar").select("*").eq("cari_id", _sec_cari_id).order("tarih", desc=True).execute()
+                    _rnotlar = sb_liste.table("cari_aciklamalar").select("*").eq("cari_id", _sec_cari_id).order("id", desc=True).execute()
                     _df_notlar = pd.DataFrame(_rnotlar.data) if _rnotlar.data else pd.DataFrame()
                 except:
                     _df_notlar = pd.DataFrame()
