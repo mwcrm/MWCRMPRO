@@ -1976,7 +1976,7 @@ elif aktif == "liste":
         st.session_state["_cl_view"] = "kanban"; st.rerun()
 
     if _cl_view == "kanban":
-        # ── QUERY PARAM KONTROL — not dialog ──────────────────────────────────
+        # ── QUERY PARAM KONTROL — not dialog veya müşteri seç ────────────────
         try:
             _qp_kb = st.query_params
             if "kb_not_id" in _qp_kb:
@@ -1985,7 +1985,11 @@ elif aktif == "liste":
                 _kb_df2 = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
                 _kb_row2 = _kb_df2[_kb_df2["id"] == _kb_qid2] if not _kb_df2.empty else pd.DataFrame()
                 if not _kb_row2.empty:
-                    not_dialog(_kb_qid2, str(_kb_row2.iloc[0]["firma"]))
+                    _kb_firma2 = str(_kb_row2.iloc[0]["firma"])
+                    # Alt panelde otomatik seç
+                    st.session_state["kb_alt_sec"] = f"[{_kb_qid2}] {_kb_firma2}"
+                    # Not dialog'u da aç
+                    not_dialog(_kb_qid2, _kb_firma2)
         except: pass
         # ── KANBAN GÖRÜNÜMÜ ───────────────────────────────────────────────────
         import streamlit.components.v1 as _kb_comp
