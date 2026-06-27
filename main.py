@@ -2051,36 +2051,41 @@ elif aktif == "liste":
 <html><head><meta charset="UTF-8">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,sans-serif;}
-body{background:#f1f5f9;padding:8px;overflow-x:auto;}
-.board{display:flex;gap:8px;min-width:max-content;padding-bottom:8px;}
-.col{width:220px;flex-shrink:0;background:#f8fafc;border-radius:10px;border:0.5px solid #e2e8f0;overflow:hidden;}
-.col-hdr{padding:10px 12px;display:flex;justify-content:space-between;align-items:center;}
+html,body{height:100%;overflow:hidden;}
+body{background:#f1f5f9;padding:6px;}
+.board{display:flex;gap:6px;height:calc(100vh-16px);overflow-x:auto;overflow-y:hidden;}
+.board::-webkit-scrollbar{height:5px;}
+.board::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px;}
+.col{flex:1;min-width:160px;max-width:240px;background:#f8fafc;border-radius:10px;border:0.5px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden;}
+.col-hdr{padding:9px 11px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
 .col-name{font-size:11px;font-weight:700;color:white;word-break:break-word;}
-.col-badge{background:rgba(255,255,255,.3);color:white;border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700;flex-shrink:0;margin-left:4px;}
-.col-body{padding:8px;display:flex;flex-direction:column;gap:5px;max-height:500px;overflow-y:auto;}
-.col-body::-webkit-scrollbar{width:3px;}
-.col-body::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:2px;}
-.kart{background:white;border-radius:8px;padding:10px;border:0.5px solid #e2e8f0;}
-.kart:hover{box-shadow:0 2px 8px rgba(0,0,0,.1);border-color:#93c5fd;}
-.firma{font-size:12px;font-weight:700;color:#0f172a;margin-bottom:3px;line-height:1.3;}
-.ytkl{font-size:10px;color:#64748b;margin-bottom:2px;}
-.gsm{font-size:10px;color:#2563eb;margin-bottom:3px;font-weight:500;}
-.yer{font-size:10px;color:#94a3b8;margin-bottom:4px;}
-.dchip{display:inline-block;padding:2px 7px;border-radius:20px;font-size:9px;background:#f1f5f9;color:#374151;margin-bottom:5px;}
-.footer{display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:0.5px solid #f1f5f9;}
-.hedef{font-size:11px;font-weight:700;color:#16a34a;}
-.nbtn{background:#eff6ff;color:#2563eb;border:none;border-radius:5px;padding:3px 8px;font-size:10px;cursor:pointer;font-weight:600;}
+.col-badge{background:rgba(255,255,255,.3);color:white;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;flex-shrink:0;margin-left:4px;}
+.col-body{padding:6px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;flex:1;}
+.col-body::-webkit-scrollbar{width:2px;}
+.col-body::-webkit-scrollbar-thumb{background:#e2e8f0;}
+.kart{background:white;border-radius:7px;padding:9px;border:0.5px solid #e2e8f0;}
+.kart:hover{border-color:#93c5fd;box-shadow:0 1px 6px rgba(0,0,0,.08);}
+.firma{font-size:11px;font-weight:700;color:#0f172a;margin-bottom:2px;line-height:1.3;}
+.ytkl{font-size:10px;color:#64748b;margin-bottom:1px;}
+.gsm{font-size:10px;color:#2563eb;margin-bottom:2px;font-weight:500;}
+.yer{font-size:9px;color:#94a3b8;margin-bottom:3px;}
+.dchip{display:inline-block;padding:1px 6px;border-radius:20px;font-size:9px;background:#f1f5f9;color:#374151;margin-bottom:3px;}
+.footer{display:flex;justify-content:space-between;align-items:center;padding-top:5px;border-top:0.5px solid #f1f5f9;}
+.hedef{font-size:10px;font-weight:700;color:#16a34a;}
+.nbtn{background:#eff6ff;color:#2563eb;border:none;border-radius:4px;padding:2px 7px;font-size:9px;cursor:pointer;font-weight:600;}
+.nbtn:hover{background:#dbeafe;}
+.bos{padding:12px;text-align:center;font-size:11px;color:#cbd5e1;}
 </style></head><body>
 <div class="board" id="board"></div>
 <script>
 var data=""" + _kanban_json + """;
 var board=document.getElementById('board');
-if(!data||!data.length){board.innerHTML='<p style="padding:40px;color:#94a3b8">Veri yok</p>';}
+if(!data||!data.length){board.innerHTML='<div class="bos">Veri yok</div>';}
 data.forEach(function(kol){
   var col=document.createElement('div');col.className='col';
   var h='<div class="col-hdr" style="background:'+kol.renk+'"><span class="col-name">'+kol.asama+'</span><span class="col-badge">'+kol.sayi+'</span></div>';
   var b='<div class="col-body">';
-  if(!kol.kartlar.length) b+='<div style="padding:12px;text-align:center;font-size:11px;color:#cbd5e1">Boş</div>';
+  if(!kol.kartlar.length) b+='<div class="bos">Boş</div>';
   kol.kartlar.forEach(function(k){
     var yer=[k.il,k.ilce].filter(Boolean).join('/');
     b+='<div class="kart">';
@@ -2100,18 +2105,26 @@ data.forEach(function(kol){
 });
 function notAc(e,id){
   e.stopPropagation();
-  try{
-    var u=new URL(window.parent.location.href);
-    u.searchParams.set('kb_not_id',id);
-    window.parent.location.href=u.toString();
-  }catch(ex){}
+  var u=new URL(window.parent.location.href);
+  u.searchParams.set('kb_not_id',id);
+  window.parent.location.href=u.toString();
 }
 </script></body></html>""")
 
         import streamlit.components.v1 as _kbc
-        _kbc.html(_kanban_html, height=620, scrolling=True)
-        st.caption(f"📋 Kanban — {len(_kb_df)} müşteri · {len(_kanban_asama_listesi)} aşama")
-        st.caption(f"📋 Kanban — {len(_kb_df)} müşteri · {len(_kanban_asama_listesi)} aşama")
+        _kbc.html(_kanban_html, height=600, scrolling=False)
+
+        _qp_check = st.query_params
+        if "kb_not_id" in _qp_check:
+            try:
+                _kb_qid = int(_qp_check["kb_not_id"])
+                st.query_params.clear()
+                _kb_row = _kb_df[_kb_df["id"] == _kb_qid]
+                if not _kb_row.empty:
+                    not_dialog(_kb_qid, str(_kb_row.iloc[0]["firma"]))
+            except: pass
+
+        st.caption(f"📋 Kanban — {len(_kb_df)} müşteri · {len(_kanban_filtreli)} sütun")
         st.stop()
 
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
