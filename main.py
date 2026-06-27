@@ -919,7 +919,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
         # Sırala — en yeni üstte
         try:
-            _notlar = sorted(_notlar, key=lambda x: str(x.get("tarih","") or ""), reverse=True)
+            _notlar = sorted(_notlar, key=lambda x: str(x.get("created_at","") or x.get("tarih","") or ""), reverse=True)
         except: pass
 
         if firma_adi:
@@ -931,7 +931,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
             _nid  = _nn.get("id","")
             _txt  = str(_nn.get("aciklama","") or _nn.get("metin","") or "")
             _kim  = str(_nn.get("olusturan","") or _nn.get("kim","") or "")
-            _tar  = fmt_tarih(str(_nn.get("tarih","") or ""))
+            _tar  = fmt_tarih(str(_nn.get("created_at","") or _nn.get("tarih","") or ""))
 
             with st.container():
                 st.markdown(
@@ -2529,7 +2529,7 @@ function notAc(e,id){
             def _tum_notlari_yukle():
                 _sb2 = get_sb_client()
                 if _sb2:
-                    _r2 = _sb2.table("cari_aciklamalar").select("id,cari_id,tarih,olusturan,aciklama").execute()
+                    _r2 = _sb2.table("cari_aciklamalar").select("id,cari_id,created_at,olusturan,aciklama").execute()
                     return _r2.data or []
                 return []
             _res_notlar_data = _tum_notlari_yukle()
@@ -2542,7 +2542,7 @@ function notAc(e,id){
                         _not_detay[_ncid] = []
                     _not_detay[_ncid].append({
                         "id": _nr.get("id",""),
-                        "tarih": fmt_tarih(_nr.get("tarih","")),
+                        "tarih": fmt_tarih(_nr.get("created_at","") or _nr.get("tarih","")),
                         "kim": str(_nr.get("olusturan","") or ""),
                         "metin": str(_nr.get("aciklama","") or ""),
                     })
