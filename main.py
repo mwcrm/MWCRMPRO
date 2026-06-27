@@ -892,19 +892,13 @@ def fmt_tarih(v):
 
 @st.cache_data(ttl=30, show_spinner=False)
 def _notlar_yukle(cari_id):
-    """Notları cache'le — 30 saniye"""
     try:
         _sb = get_sb_client()
         if _sb:
-            _r = _sb.table("cari_aciklamalar").select("*").eq("cari_id", int(cari_id)).execute()
+            _r = _sb.table("cari_aciklamalar").select("*").eq("cari_id", int(cari_id)).order("id", desc=True).execute()
             return _r.data or []
-        else:
-            import sqlite3 as _sq3
-            _cn = _sq3.connect("mw_crm.db", check_same_thread=False)
-            _rows = _cn.execute("SELECT * FROM cari_aciklamalar WHERE cari_id=? ORDER BY tarih DESC", (int(cari_id),)).fetchall()
-            _cols = [d[0] for d in _cn.execute("PRAGMA table_info(cari_aciklamalar)").fetchall()]
-            return [dict(zip(_cols, r)) for r in _rows]
-    except: return []
+    except: pass
+    return []
 
 @st.dialog("📋 Notlar", width="large")
 def not_dialog(cari_id, firma_adi=""):
@@ -913,78 +907,79 @@ def not_dialog(cari_id, firma_adi=""):
 
 def not_paneli(cari_id, firma_adi="", key_prefix="np"):
     """Her yerde kullanılan ortak not paneli — oku, yaz, sil"""
+    _sb = get_sb_client()
+    _notlar = _notlar_yukle(cari_id)
+
+    # Sırala — en yeni üstte
     try:
-        _sb = get_sb_client()
-        _notlar = _notlar_yukle(cari_id)
+        _notlar = sorted(_notlar, key=lambda x: str(x.get("created_at","") or x.get("tarih","") or x.get("id","")), reverse=True)
+    except: pass
 
-        # Sırala — en yeni üstte
-        try:
-            _notlar = sorted(_notlar, key=lambda x: str(x.get("created_at","") or x.get("tarih","") or ""), reverse=True)
-        except: pass
+    if firma_adi:
+        st.markdown(f"<div style='font-size:15px;font-weight:700;color:#1e40af;margin-bottom:4px'>📋 {firma_adi}</div>", unsafe_allow_html=True)
+    st.caption(f"{len(_notlar)} not")
 
-        if firma_adi:
-            st.markdown(f"<div style='font-size:15px;font-weight:700;color:#1e40af;margin-bottom:4px'>📋 {firma_adi}</div>", unsafe_allow_html=True)
-        st.caption(f"{len(_notlar)} not")
+    # Debug — ilk notun kolonlarını göster (geçici)
+    if _notlar:
+        _ornek_kolon = list(_notlar[0].keys())
+    else:
+        _ornek_kolon = []
 
-        # Notları göster
-        for _nn in _notlar:
-            _nid  = _nn.get("id","")
-            _txt  = str(_nn.get("aciklama","") or _nn.get("metin","") or "")
-            _kim  = str(_nn.get("olusturan","") or _nn.get("kim","") or "")
-            _tar  = fmt_tarih(str(_nn.get("created_at","") or _nn.get("tarih","") or ""))
+    # Notları göster
+    for _nn in _notlar:
+        _nid = _nn.get("id","")
+        # Metin kolonu — birden fazla adı olabilir
+        _txt = str(_nn.get("aciklama","") or _nn.get("metin","") or _nn.get("not","") or _nn.get("icerik","") or "")
+        _kim = str(_nn.get("olusturan","") or _nn.get("kim","") or _nn.get("kullanici","") or "")
+        _tar = fmt_tarih(str(_nn.get("created_at","") or _nn.get("tarih","") or ""))
 
-            with st.container():
-                st.markdown(
-                    f"<div style='border-left:4px solid #3b82f6;padding:10px 14px;margin-bottom:8px;"
-                    f"border-radius:0 8px 8px 0;background:#eff6ff;'>"
-                    f"<div style='font-size:11px;color:#94a3b8;margin-bottom:5px'>📅 {_tar} &nbsp;·&nbsp; 👤 {_kim}</div>"
-                    f"<div style='color:#1e293b;font-size:14px;line-height:1.7;white-space:pre-wrap'>{_txt.replace('<','&lt;').replace('>','&gt;')}</div>"
-                    f"</div>",
-                    unsafe_allow_html=True
-                )
-                if st.button("🗑 Sil", key=f"{key_prefix}_sil_{_nid}_{cari_id}", use_container_width=False):
-                    try:
-                        if _sb:
-                            _sb.table("cari_aciklamalar").delete().eq("id", int(_nid)).execute()
-                        try: db_read.clear()
-                        except: pass
-                        try: _notlar_yukle.clear()
-                        except: pass
-                        st.rerun()
-                    except Exception as _se:
-                        st.error(f"Sil hatası: {_se}")
+        if not _txt: continue
 
-        # Yeni not yaz
-        st.markdown("<div style='margin-top:10px'></div>", unsafe_allow_html=True)
-        _yeni = st.text_area(
-            "✏️ Yeni not yaz:", key=f"{key_prefix}_yeni_{cari_id}",
-            placeholder="Buraya yazın...",
-            height=90
+        st.markdown(
+            f"<div style='border-left:4px solid #3b82f6;padding:10px 14px;margin-bottom:8px;"
+            f"border-radius:0 8px 8px 0;background:#eff6ff;'>"
+            f"<div style='font-size:11px;color:#94a3b8;margin-bottom:5px'>📅 {_tar} &nbsp;·&nbsp; 👤 {_kim}</div>"
+            f"<div style='color:#1e293b;font-size:14px;line-height:1.7;white-space:pre-wrap'>{_txt.replace('<','&lt;').replace('>','&gt;')}</div>"
+            f"</div>",
+            unsafe_allow_html=True
         )
-        if st.button("💾 Kaydet", key=f"{key_prefix}_kaydet_{cari_id}", use_container_width=True, type="primary"):
-            if _yeni and _yeni.strip():
+        if st.button("🗑 Sil", key=f"{key_prefix}_sil_{_nid}_{cari_id}"):
+            try:
+                if _sb: _sb.table("cari_aciklamalar").delete().eq("id", int(_nid)).execute()
+                try: _notlar_yukle.clear()
+                except: pass
+                st.rerun()
+            except Exception as _se:
+                st.error(f"Sil hatası: {_se}")
+
+    # Yeni not yaz
+    st.markdown("<div style='margin-top:10px'></div>", unsafe_allow_html=True)
+    _yeni = st.text_area("✏️ Yeni not:", key=f"{key_prefix}_yeni_{cari_id}", placeholder="Buraya yazın...", height=90)
+
+    if st.button("💾 Kaydet", key=f"{key_prefix}_kaydet_{cari_id}", use_container_width=True, type="primary"):
+        if _yeni and _yeni.strip():
+            try:
+                _yazar = st.session_state.get("kullanici_ad", st.session_state.get("kullanici",""))
+                # Önce minimal insert dene, hata verirse kolon adlarını göster
+                _veri = {"cari_id": int(cari_id), "aciklama": _yeni.strip(), "olusturan": _yazar}
                 try:
-                    _yazar = st.session_state.get("kullanici_ad", st.session_state.get("kullanici",""))
-                    _veri = {
-                        "cari_id":  int(cari_id),
-                        "cari_adi": str(firma_adi),
-                        "aciklama": _yeni.strip(),
-                        "olusturan": _yazar,
-                    }
-                    if _sb:
-                        _sb.table("cari_aciklamalar").insert(_veri).execute()
-                    try: db_read.clear()
-                    except: pass
-                    try: _notlar_yukle.clear()
-                    except: pass
-                    st.success("✅ Not kaydedildi!")
-                    st.rerun()
-                except Exception as _ne:
-                    st.error(f"Kayıt hatası: {_ne}")
-                else:
-                    st.warning("Not boş olamaz!")
-    except Exception as _np_err:
-        st.error(f"Not paneli hatası: {_np_err}")
+                    _veri["cari_adi"] = str(firma_adi)
+                    if _sb: _sb.table("cari_aciklamalar").insert(_veri).execute()
+                except Exception as _e1:
+                    # cari_adi yoksa onsuz dene
+                    _veri2 = {"cari_id": int(cari_id), "aciklama": _yeni.strip(), "olusturan": _yazar}
+                    if _sb: _sb.table("cari_aciklamalar").insert(_veri2).execute()
+                try: _notlar_yukle.clear()
+                except: pass
+                try: db_read.clear()
+                except: pass
+                st.success("✅ Not kaydedildi!")
+                st.rerun()
+            except Exception as _ne:
+                st.error(f"Kayıt hatası: {_ne}")
+                st.info(f"Tablo kolonları: {_ornek_kolon}")
+        else:
+            st.warning("Not boş olamaz!")
 
 
 
