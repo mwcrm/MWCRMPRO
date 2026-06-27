@@ -1987,33 +1987,35 @@ elif aktif == "liste":
         import streamlit.components.v1 as _kb_comp
         import json as _kbj
 
-        # Veriyi hazırla
-        _kanban_asama_listesi = tum_asama_opts if tum_asama_opts else sorted(df["islem_asamasi"].dropna().unique().tolist())
+        # Veriyi hazırla — silindi olmayanlar
+        _kb_df = df.copy() if not df.empty else pd.DataFrame()
+        if not _kb_df.empty and "silindi" in _kb_df.columns:
+            _kb_df = _kb_df[_kb_df["silindi"].astype(str).isin(["0","False","","nan","None"]) | _kb_df["silindi"].isna()]
+
+        _kanban_asama_listesi = tum_asama_opts if tum_asama_opts else (sorted(_kb_df["islem_asamasi"].dropna().unique().tolist()) if "islem_asamasi" in _kb_df.columns else [])
         _kanban_renk = ["#f59e0b","#2563eb","#16a34a","#7c3aed","#0891b2","#dc2626","#f97316","#0d9488","#6366f1","#84cc16","#ec4899","#14b8a6"]
 
         _kanban_kolonlar = []
         for _ki, _ka in enumerate(_kanban_asama_listesi):
-            _kdf = df[df["islem_asamasi"] == _ka] if "islem_asamasi" in df.columns else pd.DataFrame()
+            _kdf = _kb_df[_kb_df["islem_asamasi"] == _ka] if "islem_asamasi" in _kb_df.columns else pd.DataFrame()
             _kartlar = []
             for _, _kr in _kdf.iterrows():
-                _hedef = float(_kr.get("beklenen_ciro",0) or 0)
+                try: _hedef = float(_kr.get("beklenen_ciro",0) or 0)
+                except: _hedef = 0
                 _kartlar.append({
-                    "id": int(_kr.get("id",0)),
-                    "firma": str(_kr.get("firma",""))[:30],
-                    "yetkili": str(_kr.get("yetkili","") or "—")[:20],
+                    "id": int(_kr.get("id",0) or 0),
+                    "firma": str(_kr.get("firma","") or "")[:30],
+                    "yetkili": str(_kr.get("yetkili","") or "")[:20],
                     "il": str(_kr.get("il","") or ""),
                     "ilce": str(_kr.get("ilce","") or ""),
                     "durum": str(_kr.get("durum","") or ""),
                     "hedef": f"{_hedef:,.0f}".replace(",",".") if _hedef > 0 else "",
-                    "not_sayi": str(_kr.get("📨 Notlar","") or "").replace("📨 ",""),
-                    "randevu": str(_kr.get("📅 Son Randevu","") or "")[:10],
-                    "analiz": bool(_kr.get("✅ Analiz","")),
                 })
             _kanban_kolonlar.append({
                 "asama": _ka,
                 "renk": _kanban_renk[_ki % len(_kanban_renk)],
                 "sayi": len(_kartlar),
-                "kartlar": _kartlar[:30]  # max 30 per column
+                "kartlar": _kartlar[:50]
             })
 
         _kanban_json = _kbj.dumps(_kanban_kolonlar, ensure_ascii=False)
@@ -2023,25 +2025,22 @@ elif aktif == "liste":
 <style>
 *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,sans-serif;}
 body{background:#f1f5f9;padding:8px;overflow-x:auto;}
-.board{display:flex;gap:8px;min-width:max-content;align-items:flex-start;}
+.board{display:flex;gap:8px;min-width:max-content;padding-bottom:8px;}
 .col{width:220px;flex-shrink:0;background:#f8fafc;border-radius:10px;border:0.5px solid #e2e8f0;overflow:hidden;}
-.col-hdr{padding:10px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0;}
-.col-name{font-size:11px;font-weight:700;color:white;}
-.col-badge{background:rgba(255,255,255,.25);color:white;border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700;}
-.col-body{padding:8px;display:flex;flex-direction:column;gap:5px;max-height:520px;overflow-y:auto;}
+.col-hdr{padding:10px 12px;display:flex;justify-content:space-between;align-items:center;}
+.col-name{font-size:11px;font-weight:700;color:white;word-break:break-word;}
+.col-badge{background:rgba(255,255,255,.3);color:white;border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700;flex-shrink:0;margin-left:4px;}
+.col-body{padding:8px;display:flex;flex-direction:column;gap:5px;max-height:500px;overflow-y:auto;}
 .col-body::-webkit-scrollbar{width:3px;}
 .col-body::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:2px;}
 .kart{background:white;border-radius:8px;padding:10px;border:0.5px solid #e2e8f0;cursor:pointer;transition:.1s;}
-.kart:hover{box-shadow:0 2px 8px rgba(0,0,0,.08);transform:translateY(-1px);}
-.kart-firma{font-size:12px;font-weight:700;color:#0f172a;margin-bottom:3px;line-height:1.3;}
-.kart-yetkili{font-size:10px;color:#94a3b8;margin-bottom:5px;}
-.kart-yer{font-size:10px;color:#64748b;margin-bottom:5px;}
-.kart-footer{display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:0.5px solid #f1f5f9;font-size:10px;}
-.chip{display:inline-block;padding:2px 6px;border-radius:20px;font-size:9px;}
+.kart:hover{box-shadow:0 2px 8px rgba(0,0,0,.1);border-color:#93c5fd;}
+.firma{font-size:12px;font-weight:700;color:#0f172a;margin-bottom:3px;line-height:1.3;}
+.yetkili{font-size:10px;color:#94a3b8;margin-bottom:4px;}
+.yer{font-size:10px;color:#64748b;margin-bottom:4px;}
+.durum-chip{display:inline-block;padding:2px 7px;border-radius:20px;font-size:9px;background:#f1f5f9;color:#374151;margin-bottom:5px;}
+.footer{display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:0.5px solid #f1f5f9;font-size:11px;}
 .hedef{font-weight:700;color:#16a34a;}
-.not-badge{color:#2563eb;font-weight:600;}
-.randevu{color:#dc2626;font-weight:600;}
-.analiz{color:#16a34a;}
 </style>
 </head>
 <body>
@@ -2049,26 +2048,26 @@ body{background:#f1f5f9;padding:8px;overflow-x:auto;}
 <script>
 var data = """ + _kanban_json + """;
 var board = document.getElementById('board');
+if(!data || data.length===0){
+  board.innerHTML='<div style="padding:40px;color:#94a3b8;font-size:14px;">Aşama tanımlanmamış veya veri yok.</div>';
+}
 data.forEach(function(kol){
   var col = document.createElement('div');
   col.className = 'col';
   var hdr = '<div class="col-hdr" style="background:'+kol.renk+'"><span class="col-name">'+kol.asama+'</span><span class="col-badge">'+kol.sayi+'</span></div>';
   var body = '<div class="col-body">';
+  if(kol.kartlar.length===0){
+    body += '<div style="padding:12px;text-align:center;font-size:11px;color:#cbd5e1;">Boş</div>';
+  }
   kol.kartlar.forEach(function(k){
-    var yer = k.il + (k.ilce ? '/'+k.ilce : '');
-    body += '<div class="kart" onclick="window.parent.postMessage({type:\\'kartsec\\',id:'+k.id+',firma:\\''+k.firma.replace(/\\'/g,\\"\\")+'\\'},\\'*\\')">';
-    body += '<div class="kart-firma">'+k.firma+'</div>';
-    if(k.yetkili && k.yetkili!='—') body += '<div class="kart-yetkili">👤 '+k.yetkili+'</div>';
-    if(yer) body += '<div class="kart-yer">📍 '+yer+'</div>';
-    if(k.durum) body += '<span class="chip" style="background:#f1f5f9;color:#374151;margin-bottom:4px;">'+k.durum+'</span>';
-    body += '<div class="kart-footer">';
-    if(k.hedef) body += '<span class="hedef">'+k.hedef+' ₺</span>';
-    else body += '<span></span>';
-    var sag = '';
-    if(k.analiz) sag += '<span class="analiz">✅</span> ';
-    if(k.not_sayi) sag += '<span class="not-badge">📋'+k.not_sayi+'</span> ';
-    if(k.randevu && k.randevu.length>5) sag += '<span class="randevu">'+k.randevu.substring(0,5)+'</span>';
-    body += '<span>'+sag+'</span>';
+    var yer = [k.il, k.ilce].filter(Boolean).join('/');
+    body += '<div class="kart">';
+    body += '<div class="firma">'+k.firma+'</div>';
+    if(k.yetkili) body += '<div class="yetkili">👤 '+k.yetkili+'</div>';
+    if(yer) body += '<div class="yer">📍 '+yer+'</div>';
+    if(k.durum) body += '<span class="durum-chip">'+k.durum+'</span>';
+    body += '<div class="footer">';
+    body += k.hedef ? '<span class="hedef">'+k.hedef+' ₺</span>' : '<span></span>';
     body += '</div></div>';
   });
   body += '</div>';
@@ -2079,8 +2078,8 @@ data.forEach(function(kol){
 </body></html>"""
 
         import streamlit.components.v1 as _kbc
-        _kbc.html(_kanban_html, height=600, scrolling=False)
-        st.caption(f"📋 Kanban — {len(df)} müşteri · {len(_kanban_asama_listesi)} aşama")
+        _kbc.html(_kanban_html, height=620, scrolling=True)
+        st.caption(f"📋 Kanban — {len(_kb_df)} müşteri · {len(_kanban_asama_listesi)} aşama")
         st.stop()
 
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
