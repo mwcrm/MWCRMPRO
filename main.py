@@ -1987,6 +1987,8 @@ elif aktif == "liste":
                 if not _kb_row2.empty:
                     _kb_firma2 = str(_kb_row2.iloc[0]["firma"])
                     st.session_state["kb_alt_sec"] = f"[{_kb_qid2}] {_kb_firma2}"
+                    st.session_state["_cl_view"] = "kanban"
+                    st.rerun()
         except: pass
         # ── KANBAN GÖRÜNÜMÜ ───────────────────────────────────────────────────
         import streamlit.components.v1 as _kb_comp
