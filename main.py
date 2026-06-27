@@ -1988,6 +1988,14 @@ elif aktif == "liste":
         _kanban_asama_listesi = tum_asama_opts if tum_asama_opts else (sorted(_kb_df["islem_asamasi"].dropna().unique().tolist()) if "islem_asamasi" in _kb_df.columns else [])
         _kanban_renk = ["#f59e0b","#2563eb","#16a34a","#7c3aed","#0891b2","#dc2626","#f97316","#0d9488","#6366f1","#84cc16","#ec4899","#14b8a6"]
 
+        # Not sayılarını al
+        try:
+            _sb_kbn = get_sb_client()
+            _kb_not_data = _sb_kbn.table("cari_aciklamalar").select("cari_id").execute().data or [] if _sb_kbn else []
+            import collections as _kbc2
+            _kb_not_sayac = _kbc2.Counter([str(r["cari_id"]) for r in _kb_not_data])
+        except: _kb_not_sayac = {}
+
         _kanban_kolonlar = []
         for _ki, _ka in enumerate(_kanban_asama_listesi):
             _kdf = _kb_df[_kb_df["islem_asamasi"] == _ka] if "islem_asamasi" in _kb_df.columns else pd.DataFrame()
@@ -1995,8 +2003,9 @@ elif aktif == "liste":
             for _, _kr in _kdf.iterrows():
                 try: _hedef = float(_kr.get("beklenen_ciro",0) or 0)
                 except: _hedef = 0
+                _kid = int(_kr.get("id",0) or 0)
                 _kartlar.append({
-                    "id": int(_kr.get("id",0) or 0),
+                    "id": _kid,
                     "firma": str(_kr.get("firma","") or "")[:30],
                     "yetkili": str(_kr.get("yetkili","") or "")[:20],
                     "gsm": str(_kr.get("gsm","") or ""),
@@ -2004,6 +2013,7 @@ elif aktif == "liste":
                     "ilce": str(_kr.get("ilce","") or ""),
                     "durum": str(_kr.get("durum","") or ""),
                     "hedef": f"{_hedef:,.0f}".replace(",",".") if _hedef > 0 else "",
+                    "not_sayi": int(_kb_not_sayac.get(str(_kid), 0)),
                 })
             _kanban_kolonlar.append({
                 "asama": _ka,
@@ -2089,7 +2099,8 @@ data.forEach(function(kol){
     if(k.durum) b+='<span class="dchip">'+k.durum+'</span><br>';
     b+='<div class="footer">';
     b+=k.hedef?'<span class="hedef">'+k.hedef+' ₺</span>':'<span></span>';
-    b+='<button class="nbtn" onclick="notAc(event,'+k.id+')">📋 Not</button>';
+    var notLbl=k.not_sayi>0?'📋 '+k.not_sayi+' not':'📋 Not';
+    b+='<button class="nbtn" onclick="notAc(event,'+k.id+')">'+notLbl+'</button>';
     b+='</div></div>';
   });
   b+='</div>';
