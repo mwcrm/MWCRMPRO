@@ -2148,6 +2148,7 @@ function kartSec(id){
                         _sb_kba.table("cari_kartlar").update({"islem_asamasi": _kb_yeni_asama}).eq("id", _kb_sel_id).execute()
                     try: db_read.clear()
                     except: pass
+                    st.toast(f"✅ {_kb_sel_firma} → {_kb_yeni_asama}", icon="✅")
                     st.rerun()
                 except Exception as _kbae:
                     st.error(f"Hata: {_kbae}")
