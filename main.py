@@ -2053,14 +2053,14 @@ elif aktif == "liste":
 *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,sans-serif;}
 html,body{height:100%;overflow:hidden;}
 body{background:#f1f5f9;padding:6px;}
-.board{display:flex;gap:6px;height:calc(100vh-16px);overflow-x:auto;overflow-y:hidden;}
+.board{display:flex;gap:6px;height:580px;overflow-x:auto;overflow-y:hidden;align-items:flex-start;}
 .board::-webkit-scrollbar{height:5px;}
 .board::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px;}
-.col{flex:1;min-width:160px;max-width:240px;background:#f8fafc;border-radius:10px;border:0.5px solid #e2e8f0;display:flex;flex-direction:column;overflow:hidden;}
+.col{flex:0 0 200px;background:#f8fafc;border-radius:10px;border:0.5px solid #e2e8f0;display:flex;flex-direction:column;height:100%;overflow:hidden;}
 .col-hdr{padding:9px 11px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;}
 .col-name{font-size:11px;font-weight:700;color:white;word-break:break-word;}
 .col-badge{background:rgba(255,255,255,.3);color:white;border-radius:20px;padding:1px 7px;font-size:10px;font-weight:700;flex-shrink:0;margin-left:4px;}
-.col-body{padding:6px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;flex:1;}
+.col-body{padding:6px;display:flex;flex-direction:column;gap:4px;overflow-y:auto;flex:1;height:0;}
 .col-body::-webkit-scrollbar{width:2px;}
 .col-body::-webkit-scrollbar-thumb{background:#e2e8f0;}
 .kart{background:white;border-radius:7px;padding:9px;border:0.5px solid #e2e8f0;}
