@@ -2121,6 +2121,39 @@ function notAc(e,id){
                     not_dialog(_kb_qid, str(_kb_row.iloc[0]["firma"]))
             except: pass
 
+        # ── KANBAN ALT PANEL — müşteri seç, not yaz, aşama değiştir ──────────
+        st.markdown("---")
+        _kp1, _kp2, _kp3 = st.columns([2, 2, 2])
+
+        _kb_opts = ["— Müşteri seçin —"] + [f"[{int(r['id'])}] {r.get('firma','')}" for _, r in _kb_df.sort_values("firma").iterrows()]
+        _kb_sec = _kp1.selectbox("📋 Müşteri seç (not/aşama)", _kb_opts, key="kb_alt_sec", label_visibility="collapsed")
+
+        if _kb_sec != "— Müşteri seçin —":
+            _kb_sel_id = int(_kb_sec.split("]")[0].replace("[","").strip())
+            _kb_sel_row = _kb_df[_kb_df["id"] == _kb_sel_id]
+            _kb_sel_firma = str(_kb_sel_row.iloc[0]["firma"]) if not _kb_sel_row.empty else ""
+            _kb_sel_asama = str(_kb_sel_row.iloc[0].get("islem_asamasi","") or "") if not _kb_sel_row.empty else ""
+
+            # Aşama değiştir
+            _asama_idx = tum_asama_opts.index(_kb_sel_asama) if _kb_sel_asama in tum_asama_opts else 0
+            _kb_yeni_asama = _kp2.selectbox("Aşama değiştir", tum_asama_opts, index=_asama_idx, key="kb_asama_sec")
+            if _kb_yeni_asama != _kb_sel_asama:
+                if _kp3.button("✅ Aşamayı Kaydet", key="kb_asama_kaydet", use_container_width=True, type="primary"):
+                    try:
+                        _sb_kba = get_sb_client()
+                        if _sb_kba:
+                            _sb_kba.table("cari_kartlar").update({"islem_asamasi": _kb_yeni_asama}).eq("id", _kb_sel_id).execute()
+                        try: db_read.clear()
+                        except: pass
+                        st.success(f"✅ {_kb_sel_firma} → {_kb_yeni_asama}")
+                        st.rerun()
+                    except Exception as _kbae:
+                        st.error(f"Hata: {_kbae}")
+
+            # Not paneli
+            with st.expander(f"📋 {_kb_sel_firma} — Notlar", expanded=True):
+                not_paneli(_kb_sel_id, _kb_sel_firma, key_prefix="kb")
+
         st.caption(f"📋 Kanban — {len(_kb_df)} müşteri · {len(_kanban_filtreli)} sütun")
         st.stop()
 
