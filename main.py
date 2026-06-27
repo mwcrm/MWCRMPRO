@@ -1974,6 +1974,115 @@ elif aktif == "liste":
 
     _rapor_satir(_tum_veri, "_tek_sirasi", "_tek_gizlisi", "tek", _tum_emoji, "", d_adlar=_d_adlar)
 
+    # ── GÖRÜNÜM SEÇİMİ ────────────────────────────────────────────────────────
+    _cl_view = st.session_state.get("_cl_view", "liste")
+    _gv1, _gv2, _gv_rest = st.columns([1, 1, 8])
+    if _gv1.button("☰ Liste", key="cl_view_liste", type="primary" if _cl_view=="liste" else "secondary", use_container_width=True):
+        st.session_state["_cl_view"] = "liste"; st.rerun()
+    if _gv2.button("📋 Kanban", key="cl_view_kanban", type="primary" if _cl_view=="kanban" else "secondary", use_container_width=True):
+        st.session_state["_cl_view"] = "kanban"; st.rerun()
+
+    if _cl_view == "kanban":
+        # ── KANBAN GÖRÜNÜMÜ ───────────────────────────────────────────────────
+        import streamlit.components.v1 as _kb_comp
+        import json as _kbj
+
+        # Veriyi hazırla
+        _kanban_asama_listesi = tum_asama_opts if tum_asama_opts else sorted(df_f["islem_asamasi"].dropna().unique().tolist())
+        _kanban_renk = ["#f59e0b","#2563eb","#16a34a","#7c3aed","#0891b2","#dc2626","#f97316","#0d9488","#6366f1","#84cc16","#ec4899","#14b8a6"]
+
+        _kanban_kolonlar = []
+        for _ki, _ka in enumerate(_kanban_asama_listesi):
+            _kdf = df_f[df_f["islem_asamasi"] == _ka] if "islem_asamasi" in df_f.columns else pd.DataFrame()
+            _kartlar = []
+            for _, _kr in _kdf.iterrows():
+                _hedef = float(_kr.get("beklenen_ciro",0) or 0)
+                _kartlar.append({
+                    "id": int(_kr.get("id",0)),
+                    "firma": str(_kr.get("firma",""))[:30],
+                    "yetkili": str(_kr.get("yetkili","") or "—")[:20],
+                    "il": str(_kr.get("il","") or ""),
+                    "ilce": str(_kr.get("ilce","") or ""),
+                    "durum": str(_kr.get("durum","") or ""),
+                    "hedef": f"{_hedef:,.0f}".replace(",",".") if _hedef > 0 else "",
+                    "not_sayi": str(_kr.get("📨 Notlar","") or "").replace("📨 ",""),
+                    "randevu": str(_kr.get("📅 Son Randevu","") or "")[:10],
+                    "analiz": bool(_kr.get("✅ Analiz","")),
+                })
+            _kanban_kolonlar.append({
+                "asama": _ka,
+                "renk": _kanban_renk[_ki % len(_kanban_renk)],
+                "sayi": len(_kartlar),
+                "kartlar": _kartlar[:30]  # max 30 per column
+            })
+
+        _kanban_json = _kbj.dumps(_kanban_kolonlar, ensure_ascii=False)
+
+        _kanban_html = """<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,sans-serif;}
+body{background:#f1f5f9;padding:8px;overflow-x:auto;}
+.board{display:flex;gap:8px;min-width:max-content;align-items:flex-start;}
+.col{width:220px;flex-shrink:0;background:#f8fafc;border-radius:10px;border:0.5px solid #e2e8f0;overflow:hidden;}
+.col-hdr{padding:10px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #e2e8f0;}
+.col-name{font-size:11px;font-weight:700;color:white;}
+.col-badge{background:rgba(255,255,255,.25);color:white;border-radius:20px;padding:1px 8px;font-size:10px;font-weight:700;}
+.col-body{padding:8px;display:flex;flex-direction:column;gap:5px;max-height:520px;overflow-y:auto;}
+.col-body::-webkit-scrollbar{width:3px;}
+.col-body::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:2px;}
+.kart{background:white;border-radius:8px;padding:10px;border:0.5px solid #e2e8f0;cursor:pointer;transition:.1s;}
+.kart:hover{box-shadow:0 2px 8px rgba(0,0,0,.08);transform:translateY(-1px);}
+.kart-firma{font-size:12px;font-weight:700;color:#0f172a;margin-bottom:3px;line-height:1.3;}
+.kart-yetkili{font-size:10px;color:#94a3b8;margin-bottom:5px;}
+.kart-yer{font-size:10px;color:#64748b;margin-bottom:5px;}
+.kart-footer{display:flex;justify-content:space-between;align-items:center;padding-top:6px;border-top:0.5px solid #f1f5f9;font-size:10px;}
+.chip{display:inline-block;padding:2px 6px;border-radius:20px;font-size:9px;}
+.hedef{font-weight:700;color:#16a34a;}
+.not-badge{color:#2563eb;font-weight:600;}
+.randevu{color:#dc2626;font-weight:600;}
+.analiz{color:#16a34a;}
+</style>
+</head>
+<body>
+<div class="board" id="board"></div>
+<script>
+var data = """ + _kanban_json + """;
+var board = document.getElementById('board');
+data.forEach(function(kol){
+  var col = document.createElement('div');
+  col.className = 'col';
+  var hdr = '<div class="col-hdr" style="background:'+kol.renk+'"><span class="col-name">'+kol.asama+'</span><span class="col-badge">'+kol.sayi+'</span></div>';
+  var body = '<div class="col-body">';
+  kol.kartlar.forEach(function(k){
+    var yer = k.il + (k.ilce ? '/'+k.ilce : '');
+    body += '<div class="kart" onclick="window.parent.postMessage({type:\\'kartsec\\',id:'+k.id+',firma:\\''+k.firma.replace(/\\'/g,\\"\\")+'\\'},\\'*\\')">';
+    body += '<div class="kart-firma">'+k.firma+'</div>';
+    if(k.yetkili && k.yetkili!='—') body += '<div class="kart-yetkili">👤 '+k.yetkili+'</div>';
+    if(yer) body += '<div class="kart-yer">📍 '+yer+'</div>';
+    if(k.durum) body += '<span class="chip" style="background:#f1f5f9;color:#374151;margin-bottom:4px;">'+k.durum+'</span>';
+    body += '<div class="kart-footer">';
+    if(k.hedef) body += '<span class="hedef">'+k.hedef+' ₺</span>';
+    else body += '<span></span>';
+    var sag = '';
+    if(k.analiz) sag += '<span class="analiz">✅</span> ';
+    if(k.not_sayi) sag += '<span class="not-badge">📋'+k.not_sayi+'</span> ';
+    if(k.randevu && k.randevu.length>5) sag += '<span class="randevu">'+k.randevu.substring(0,5)+'</span>';
+    body += '<span>'+sag+'</span>';
+    body += '</div></div>';
+  });
+  body += '</div>';
+  col.innerHTML = hdr + body;
+  board.appendChild(col);
+});
+</script>
+</body></html>"""
+
+        import streamlit.components.v1 as _kbc
+        _kbc.html(_kanban_html, height=600, scrolling=False)
+        st.caption(f"📋 Kanban — {len(df_f)} müşteri · {len(_kanban_asama_listesi)} aşama")
+        st.stop()
+
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
     with st.expander("🔍 Filtreler & Arama", expanded=st.session_state.get("_cl_fil_acik", True)):
         st.session_state["_cl_fil_acik"] = True  # expander açık kalsın
