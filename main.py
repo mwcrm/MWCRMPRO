@@ -970,8 +970,6 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
                         "cari_adi": str(firma_adi),
                         "aciklama": _yeni.strip(),
                         "olusturan": _yazar,
-                        "tarih": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        "tip": "not"
                     }
                     if _sb:
                         _sb.table("cari_aciklamalar").insert(_veri).execute()
