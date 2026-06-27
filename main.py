@@ -2128,20 +2128,18 @@ function notAc(e,id){
         import streamlit.components.v1 as _kbc
         _kbc.html(_kanban_html, height=640, scrolling=False)
 
-        # Not butonu — component value ile açılır (artık query param ile çalışıyor)
-        _ = None  # placeholder
 
-        # ── KANBAN ALT PANEL — müşteri seç, not yaz, aşama değiştir ──────────
-        st.markdown("---")
-        _kp1, _kp2, _kp3 = st.columns([2, 2, 2])
+        # Not butonu — query param ile dialog açıldı (yukarda)
+        _ = None
 
+        # ── KANBAN ALT PANEL — tek satır ─────────────────────────────────────
+        st.markdown("<div style='margin-top:6px'></div>", unsafe_allow_html=True)
         _kb_opts = ["— Müşteri seçin —"] + [f"[{int(r['id'])}] {r.get('firma','')}" for _, r in _kb_df.sort_values("firma").iterrows()]
         _kb_sec_def = st.session_state.get("kb_alt_sec", "— Müşteri seçin —")
-        if _kb_sec_def not in _kb_opts:
-            _kb_sec_def = "— Müşteri seçin —"
-        _kb_sec = _kp1.selectbox("📋 Müşteri seç", _kb_opts,
-                                  index=_kb_opts.index(_kb_sec_def),
-                                  key="kb_alt_sec", label_visibility="collapsed")
+        if _kb_sec_def not in _kb_opts: _kb_sec_def = "— Müşteri seçin —"
+
+        _kp1, _kp2, _kp3, _kp4 = st.columns([3, 2, 1, 1])
+        _kb_sec = _kp1.selectbox("m", _kb_opts, index=_kb_opts.index(_kb_sec_def), key="kb_alt_sec", label_visibility="collapsed")
 
         if _kb_sec != "— Müşteri seçin —":
             _kb_sel_id = int(_kb_sec.split("]")[0].replace("[","").strip())
@@ -2149,25 +2147,22 @@ function notAc(e,id){
             _kb_sel_firma = str(_kb_sel_row.iloc[0]["firma"]) if not _kb_sel_row.empty else ""
             _kb_sel_asama = str(_kb_sel_row.iloc[0].get("islem_asamasi","") or "") if not _kb_sel_row.empty else ""
 
-            # Aşama değiştir
             _asama_idx = tum_asama_opts.index(_kb_sel_asama) if _kb_sel_asama in tum_asama_opts else 0
-            _kb_yeni_asama = _kp2.selectbox("Aşama değiştir", tum_asama_opts, index=_asama_idx, key="kb_asama_sec")
-            if _kb_yeni_asama != _kb_sel_asama:
-                if _kp3.button("✅ Aşamayı Kaydet", key="kb_asama_kaydet", use_container_width=True, type="primary"):
-                    try:
-                        _sb_kba = get_sb_client()
-                        if _sb_kba:
-                            _sb_kba.table("cari_kartlar").update({"islem_asamasi": _kb_yeni_asama}).eq("id", _kb_sel_id).execute()
-                        try: db_read.clear()
-                        except: pass
-                        st.success(f"✅ {_kb_sel_firma} → {_kb_yeni_asama}")
-                        st.rerun()
-                    except Exception as _kbae:
-                        st.error(f"Hata: {_kbae}")
+            _kb_yeni_asama = _kp2.selectbox("a", tum_asama_opts, index=_asama_idx, key="kb_asama_sec", label_visibility="collapsed")
 
-            # Not paneli
-            with st.expander(f"📋 {_kb_sel_firma} — Notlar", expanded=True):
-                not_paneli(_kb_sel_id, _kb_sel_firma, key_prefix="kb")
+            if _kp3.button("✅ Kaydet", key="kb_asama_kaydet", use_container_width=True, type="primary"):
+                try:
+                    _sb_kba = get_sb_client()
+                    if _sb_kba:
+                        _sb_kba.table("cari_kartlar").update({"islem_asamasi": _kb_yeni_asama}).eq("id", _kb_sel_id).execute()
+                    try: db_read.clear()
+                    except: pass
+                    st.rerun()
+                except Exception as _kbae:
+                    st.error(f"Hata: {_kbae}")
+
+            if _kp4.button("📋 Not", key="kb_not_ac", use_container_width=True):
+                not_dialog(_kb_sel_id, _kb_sel_firma)
 
         st.caption(f"📋 Kanban — {len(_kb_df)} müşteri · {len(_kanban_filtreli)} sütun")
         st.stop()
