@@ -2960,12 +2960,18 @@ elif aktif == "kullanici":
             s_sec = sp1.selectbox("Kullanıcı:",s_opts,key="sifre_kul")
             s1 = sp2.text_input("Yeni Şifre:",type="password",key="yeni_sif1")
             s2 = sp3.text_input("Tekrar:",type="password",key="yeni_sif2")
-            if st.button("🔑 Şifreyi Güncelle",use_container_width=True):
-                if s1 and s1==s2:
-                    ok_s = db_update("kullanicilar",{"sifre":s1},"id",int(s_sec.split("]")[0].replace("[","")))
-                    try: db_read.clear()
-                    except: pass
-                    st.success("✅ Şifre güncellendi!")
+            if st.button("🔑 Şifreyi Güncelle", use_container_width=True):
+                if s1 and s1 == s2:
+                    try:
+                        _sb_sf = get_sb_client()
+                        _sf_id = int(s_sec.split("]")[0].replace("[",""))
+                        if _sb_sf:
+                            _sb_sf.table("kullanicilar").update({"sifre": s1}).eq("id", _sf_id).execute()
+                        try: db_read.clear()
+                        except: pass
+                        st.success("✅ Şifre güncellendi! Yeni şifre ile giriş yapabilirsiniz.")
+                    except Exception as _sfe:
+                        st.error(f"Hata: {_sfe}")
                 else:
                     st.error("Şifreler eşleşmiyor veya boş!")
 
