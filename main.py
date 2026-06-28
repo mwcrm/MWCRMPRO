@@ -8143,15 +8143,17 @@ elif aktif == "patron":
                 _gun_data[_tt][_key] = {"f":_fm,"alt":"Teklif hazırlandı","y":_cr["yetkili"],"tel":_cr["gsm"],"adr":(_cr["il"]+("/"+_cr["ilce"] if _cr["ilce"] else "")),"r":0,"a":0,"n":0,"k":0,"m":0,"z":""}
             _gun_data[_tt][_key]["k"] += 1
 
-    # Notlar
+    # Notlar - cari_id → firma adı map
+    _cari_id_map = {}
+    if not _p_cari.empty and "id" in _p_cari.columns:
+        for _, _cr2 in _p_cari.iterrows():
+            _cari_id_map[str(int(_cr2["id"]))] = str(_cr2.get("firma","") or "")
+
     for _nn in _p_notlar:
         _nt = str(_nn.get("created_at",""))[:10]
         if not _nt or _nt < _bas or _nt > _bit: continue
-        _ncid = str(_nn.get("cari_id",""))
-        _nm = ""
-        if not _p_cari.empty and "id" in _p_cari.columns:
-            _nr = _p_cari[_p_cari["id"].astype(str)==_ncid]
-            if not _nr.empty: _nm = str(_nr.iloc[0].get("firma",""))
+        _ncid = str(_nn.get("cari_id","") or "")
+        _nm = _cari_id_map.get(_ncid, "")
         if not _nm: continue
         _cr = _cari_map.get(_nm, {"yetkili":"—","gsm":"—","il":"","ilce":""})
         if _nt not in _gun_data: _gun_data[_nt] = {}
