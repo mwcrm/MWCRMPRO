@@ -8042,8 +8042,22 @@ elif aktif == "patron":
     _p_an   = db_read("musteri_analiz")
     try:
         _sb_pat = get_sb_client()
-        _p_notlar = _sb_pat.table("cari_aciklamalar").select("cari_id,created_at").execute().data or [] if _sb_pat else []
-    except: _p_notlar = []
+        if _sb_pat:
+            _p_notlar_raw = _sb_pat.table("cari_aciklamalar").select("cari_id,created_at,tarih").execute().data or []
+        else:
+            _p_notlar_raw = []
+    except:
+        try:
+            _sb_pat = get_sb_client()
+            _p_notlar_raw = _sb_pat.table("cari_aciklamalar").select("*").execute().data or [] if _sb_pat else []
+        except: _p_notlar_raw = []
+
+    # Tarih normalize — created_at veya tarih kolonundan al
+    _p_notlar = []
+    for _nn in _p_notlar_raw:
+        _nt = str(_nn.get("created_at","") or _nn.get("tarih","") or "")[:10]
+        if _nt:
+            _p_notlar.append({"cari_id": _nn.get("cari_id",""), "tarih": _nt})
 
     # Periyot seçimi
     _periyot = st.session_state.get("patron_periyot", "ay")
@@ -8076,7 +8090,7 @@ elif aktif == "patron":
     _p_an_p   = _tfil(_p_an, "tarih") if not _p_an.empty and "tarih" in _p_an.columns else _p_an
 
     # Not sayıları — dönem filtreli
-    _not_sayi = sum(1 for n in _p_notlar if str(n.get("created_at",""))[:10] >= _bas and str(n.get("created_at",""))[:10] <= _bit)
+    _not_sayi = sum(1 for n in _p_notlar if n["tarih"] >= _bas and n["tarih"] <= _bit)
 
     # KPI
     _kpi_rnd = len(_p_rand_p)
@@ -8150,7 +8164,7 @@ elif aktif == "patron":
             _cari_id_map[str(int(_cr2["id"]))] = str(_cr2.get("firma","") or "")
 
     for _nn in _p_notlar:
-        _nt = str(_nn.get("created_at",""))[:10]
+        _nt = _nn["tarih"]
         if not _nt or _nt < _bas or _nt > _bit: continue
         _ncid = str(_nn.get("cari_id","") or "")
         _nm = _cari_id_map.get(_ncid, "")
