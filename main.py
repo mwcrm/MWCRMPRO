@@ -139,27 +139,25 @@ _FIRMA_FILTER_TABLES = {
 }
 
 def _get_firma_id():
-    """Session'dan firma_id al — 0 = süper admin (hepsini görür)"""
+    """Session'dan firma_id al"""
     try:
         _fid = st.session_state.get("firma_id", 1)
-        # None veya geçersiz gelirse 1 döndür
         return int(_fid) if _fid else 1
     except:
         return 1
+
+def _is_super_admin():
+    """Sadece kullanıcı adı 'admin' olanlar süper admin"""
+    return st.session_state.get("kullanici","") == "admin"
 
 def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None, tum_firmalar=False):
     """Supabase veya SQLite'dan DataFrame döner — firma_id otomatik filtre"""
     sb = get_sb_client()
     
-    # Firma filtresi uygula mı?
     _firma_id = _get_firma_id()
-    # Süper admin = firma_id 0 VE kullanici_adi "admin" olan — sadece o hepsini görür
-    _super_admin = (
-        _firma_id == 0 or
-        (st.session_state.get("kullanici","") == "admin" and 
-         st.session_state.get("firma_id", 1) == 1 and
-         st.session_state.get("rol","") == "admin")
-    )
+    _super_admin = _is_super_admin()
+    
+    # Her zaman filtrele — sadece admin hepsini görür
     _filtre_uygula = (
         table in _FIRMA_FILTER_TABLES and
         not tum_firmalar and
@@ -169,13 +167,8 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
     if sb:
         try:
             q = sb.table(table).select("*")
-            # Otomatik firma filtresi
             if _filtre_uygula:
-                # Sadece bu firmanın kayıtları — NULL olanlar dahil değil
                 q = q.eq("firma_id", _firma_id)
-            elif not _super_admin and table in _FIRMA_FILTER_TABLES:
-                # Super admin değil ama filtre de yok — boş döndür (güvenlik)
-                return pd.DataFrame()
             if filters:
                 for k, v in filters.items():
                     if v == "NOT_NULL":
