@@ -1249,7 +1249,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "firma_yonetimi"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -1266,6 +1266,7 @@ _TAB_ETIKETLER = {
     "admin_rapor": "📊 Rapor Tasarla",
     "harita": "🗺️ Müşteri Haritası",
     "patron": "👑 Yönetim Paneli",
+    "firma_yonetimi": "🏢 Firma Yönetimi",
 }
 
 def get_menu_tercihi(kullanici):
@@ -1284,7 +1285,7 @@ def get_menu_tercihi(kullanici):
                 kayitli = json.loads(res.data[0]["deger"])
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
-                    tam_liste += ["kullanici","admin_rapor"]
+                    tam_liste += ["kullanici","admin_rapor","firma_yonetimi"]
                 tam_liste = _temizle(tam_liste)
                 # Eksik olanları tam_liste'deki sıraya göre doğru pozisyona ekle
                 for i, t in enumerate(tam_liste):
@@ -1308,7 +1309,7 @@ def get_menu_tercihi(kullanici):
                 kayitli = json.loads(row[0])
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
-                    tam_liste += ["kullanici","admin_rapor"]
+                    tam_liste += ["kullanici","admin_rapor","firma_yonetimi"]
                 tam_liste = _temizle(tam_liste)
                 for i, t in enumerate(tam_liste):
                     if t not in kayitli:
@@ -1323,7 +1324,7 @@ def get_menu_tercihi(kullanici):
     except: pass
     tam_liste = _TAB_LISTESI_DEFAULT.copy()
     if st.session_state.get("rol") == "admin":
-        tam_liste += ["kullanici","admin_rapor"]
+        tam_liste += ["kullanici","admin_rapor","firma_yonetimi"]
     return _temizle(tam_liste)
 
 def save_menu_tercihi(kullanici, sira):
@@ -3445,11 +3446,11 @@ elif aktif == "kullanici":
     )
 
     if st.session_state.get("rol") == "admin":
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_firma = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🏢 Firma Yönetimi"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir"])
     elif _surum_yetkisi:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_firma = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🏢 Firma Yönetimi"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir"])
     else:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_firma = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🏢 Firma Yönetimi"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir"])
         kul_tab5 = None
 
     with kul_tab1:
@@ -8231,97 +8232,6 @@ function waGonder(){
 
             _rut_comp.html(_rut_html, height=525, scrolling=False)
 
-    # ── FİRMA YÖNETİMİ SEKMESİ ───────────────────────────────────────────────
-    with kul_tab_firma:
-        st.markdown("### 🏢 Firma Yönetimi")
-        st.caption("Her firma kendi verisini görür — birbirlerinin kayıtlarına erişemezler.")
-
-        _sb_firma = get_sb_client()
-
-        # Mevcut firmaları listele
-        try:
-            _firmalar_res = _sb_firma.table("firmalar").select("*").order("id").execute()
-            _df_firmalar = pd.DataFrame(_firmalar_res.data) if _firmalar_res.data else pd.DataFrame()
-        except:
-            _df_firmalar = pd.DataFrame()
-
-        if not _df_firmalar.empty:
-            st.markdown("#### Mevcut Firmalar")
-            _goster_f = [c for c in ["id","firma_adi","aktif","aciklama"] if c in _df_firmalar.columns]
-            st.dataframe(_df_firmalar[_goster_f] if _goster_f else _df_firmalar,
-                        use_container_width=True, hide_index=True)
-        else:
-            st.info("Henüz firma kaydı yok.")
-
-        st.divider()
-
-        # ── YENİ FİRMA EKLE ───────────────────────────────────────────────────
-        st.markdown("#### ➕ Yeni Firma Ekle")
-        with st.form("yeni_firma_form"):
-            _yf_adi     = st.text_input("Firma Adı *", placeholder="Örn: A Kargo")
-            _yf_aciklama = st.text_input("Açıklama", placeholder="İsteğe bağlı")
-            st.divider()
-            st.markdown("**👤 Firma Kullanıcısı**")
-            _yf_kuladi  = st.text_input("Kullanıcı Adı *", placeholder="Örn: akargo")
-            _yf_sifre   = st.text_input("Şifre *", type="password", placeholder="En az 4 karakter")
-            _yf_rol     = st.selectbox("Rol", ["kullanici","admin"])
-            _yf_submit  = st.form_submit_button("✅ Firma + Kullanıcı Oluştur", type="primary", use_container_width=True)
-
-        if _yf_submit:
-            if not _yf_adi.strip():
-                st.error("❌ Firma adı zorunlu!")
-            elif not _yf_kuladi.strip():
-                st.error("❌ Kullanıcı adı zorunlu!")
-            elif len(_yf_sifre) < 4:
-                st.error("❌ Şifre en az 4 karakter olmalı!")
-            else:
-                try:
-                    # 1. Firma ekle
-                    _firma_insert = _sb_firma.table("firmalar").insert({
-                        "firma_adi": _yf_adi.strip(),
-                        "aciklama": _yf_aciklama.strip(),
-                        "aktif": True
-                    }).execute()
-                    _yeni_firma_id = _firma_insert.data[0]["id"] if _firma_insert.data else None
-
-                    if _yeni_firma_id:
-                        # 2. Kullanıcı ekle
-                        _sb_firma.table("kullanicilar").insert({
-                            "kullanici_adi": _yf_kuladi.strip(),
-                            "sifre": _yf_sifre,
-                            "rol": _yf_rol,
-                            "firma_id": _yeni_firma_id,
-                            "yetkiler": "tam"
-                        }).execute()
-                        st.success(f"✅ **{_yf_adi}** firması ve **{_yf_kuladi}** kullanıcısı oluşturuldu!")
-                        st.info(f"🔑 Giriş: `{_yf_kuladi}` / `{_yf_sifre}`")
-                        st.rerun()
-                    else:
-                        st.error("❌ Firma oluşturulamadı!")
-                except Exception as _fe:
-                    st.error(f"❌ Hata: {_fe}")
-
-        st.divider()
-
-        # ── FİRMA DONDUR / AKTİF ET ───────────────────────────────────────────
-        if not _df_firmalar.empty and "id" in _df_firmalar.columns:
-            st.markdown("#### ⚙️ Firma Durumu Değiştir")
-            _ff_col1, _ff_col2 = st.columns(2)
-            _firma_secim = _ff_col1.selectbox(
-                "Firma Seç",
-                options=_df_firmalar["id"].tolist(),
-                format_func=lambda x: _df_firmalar[_df_firmalar["id"]==x]["firma_adi"].values[0] if len(_df_firmalar[_df_firmalar["id"]==x]) > 0 else str(x),
-                key="firma_durum_sec"
-            )
-            _ff_aktif = _ff_col2.selectbox("Durum", ["Aktif","Dondurulmuş"], key="firma_durum_val")
-            if st.button("💾 Durumu Güncelle", key="firma_durum_btn", use_container_width=True):
-                try:
-                    _sb_firma.table("firmalar").update({"aktif": _ff_aktif == "Aktif"}).eq("id", _firma_secim).execute()
-                    st.success("✅ Güncellendi!")
-                    st.rerun()
-                except Exception as _fe2:
-                    st.error(f"❌ {_fe2}")
-
 elif aktif == "admin_rapor":
     sayfa_log("admin_rapor")
 
@@ -8944,6 +8854,201 @@ render();
 
     _pc.html(_patron_html, height=700, scrolling=True)
 
+
+elif aktif == "firma_yonetimi":
+    sayfa_log("firma_yonetimi")
+
+    # Sadece admin görebilir
+    if st.session_state.get("rol") != "admin":
+        st.error("❌ Bu sayfaya erişim yetkiniz yok.")
+        st.stop()
+
+    st.markdown("## 🏢 Firma Yönetimi")
+    st.caption("Her firma kendi verisini görür — birbirlerinin kayıtlarına kesinlikle erişemezler.")
+
+    _sb_fyr = get_sb_client()
+
+    # Firmaları yükle
+    try:
+        _fyr_res = _sb_fyr.table("firmalar").select("*").order("id").execute()
+        _df_fyr = pd.DataFrame(_fyr_res.data) if _fyr_res.data else pd.DataFrame()
+    except Exception as _fyr_e:
+        _df_fyr = pd.DataFrame()
+        st.warning(f"Firmalar tablosu bulunamadı. Supabase SQL'i çalıştırdınız mı? Hata: {_fyr_e}")
+
+    fyr_tab1, fyr_tab2, fyr_tab3 = st.tabs(["📋 Firmalar", "➕ Yeni Firma Ekle", "⚙️ Firma Düzenle"])
+
+    # ── TAB 1: FİRMA LİSTESİ ──────────────────────────────────────────────────
+    with fyr_tab1:
+        if _df_fyr.empty:
+            st.info("Henüz firma kaydı yok. 'Yeni Firma Ekle' sekmesinden başlayın.")
+        else:
+            st.markdown(f"**Toplam {len(_df_fyr)} firma kayıtlı**")
+            for _, _fr in _df_fyr.iterrows():
+                _fr_id   = _fr.get("id","")
+                _fr_adi  = str(_fr.get("firma_adi",""))
+                _fr_aktif = bool(_fr.get("aktif", True))
+                _fr_acik = str(_fr.get("aciklama","") or "")
+
+                # Firma kullanıcılarını say
+                try:
+                    _fr_kul = _sb_fyr.table("kullanicilar").select("kullanici_adi").eq("firma_id", _fr_id).execute()
+                    _kul_say = len(_fr_kul.data) if _fr_kul.data else 0
+                except:
+                    _kul_say = 0
+
+                # Müşteri sayısı
+                try:
+                    _fr_mus = _sb_fyr.table("cari_kartlar").select("id", count="exact").eq("firma_id", _fr_id).execute()
+                    _mus_say = _fr_mus.count if hasattr(_fr_mus, 'count') else 0
+                except:
+                    _mus_say = 0
+
+                with st.container():
+                    _fc1, _fc2, _fc3, _fc4 = st.columns([4, 2, 2, 2])
+                    _durum_ikon = "🟢" if _fr_aktif else "🔴"
+                    _fc1.markdown(f"**{_durum_ikon} {_fr_adi}** (ID: {_fr_id})")
+                    if _fr_acik:
+                        _fc1.caption(_fr_acik)
+                    _fc2.metric("Kullanıcı", _kul_say)
+                    _fc3.metric("Müşteri", _mus_say)
+                    _durum_txt = "✅ Aktif" if _fr_aktif else "🔴 Dondurulmuş"
+                    _fc4.markdown(f"<br><span style='font-size:13px'>{_durum_txt}</span>", unsafe_allow_html=True)
+                    st.divider()
+
+    # ── TAB 2: YENİ FİRMA EKLE ────────────────────────────────────────────────
+    with fyr_tab2:
+        st.markdown("### ➕ Yeni Firma + Kullanıcı Oluştur")
+        st.info("Firma adını ve ilk kullanıcı bilgilerini girin. Firma hemen aktif olur.")
+
+        with st.form("yeni_firma_form_ana"):
+            _fc1, _fc2 = st.columns(2)
+            _yf_adi      = _fc1.text_input("🏢 Firma Adı *", placeholder="Örn: A Kargo")
+            _yf_aciklama = _fc2.text_input("Açıklama", placeholder="İsteğe bağlı")
+            st.divider()
+            st.markdown("**👤 İlk Kullanıcı Bilgileri**")
+            _uc1, _uc2, _uc3 = st.columns(3)
+            _yf_kuladi = _uc1.text_input("Kullanıcı Adı *", placeholder="Örn: akargo")
+            _yf_sifre  = _uc2.text_input("Şifre *", type="password", placeholder="En az 4 karakter")
+            _yf_rol    = _uc3.selectbox("Rol", ["kullanici", "admin"])
+            _yf_submit = st.form_submit_button("✅ Firma + Kullanıcı Oluştur", type="primary", use_container_width=True)
+
+        if _yf_submit:
+            _hata = ""
+            if not _yf_adi.strip():
+                _hata = "Firma adı zorunlu!"
+            elif not _yf_kuladi.strip():
+                _hata = "Kullanıcı adı zorunlu!"
+            elif len(_yf_sifre) < 4:
+                _hata = "Şifre en az 4 karakter olmalı!"
+            else:
+                # Kullanıcı adı müsait mi?
+                try:
+                    _kul_check = _sb_fyr.table("kullanicilar").select("kullanici_adi").eq("kullanici_adi", _yf_kuladi.strip()).execute()
+                    if _kul_check.data:
+                        _hata = f"'{_yf_kuladi}' kullanıcı adı zaten kullanılıyor!"
+                except:
+                    pass
+
+            if _hata:
+                st.error(f"❌ {_hata}")
+            else:
+                try:
+                    # 1. Firma oluştur
+                    _fi_res = _sb_fyr.table("firmalar").insert({
+                        "firma_adi": _yf_adi.strip(),
+                        "aciklama":  _yf_aciklama.strip(),
+                        "aktif":     True
+                    }).execute()
+                    _yeni_fid = _fi_res.data[0]["id"] if _fi_res.data else None
+
+                    if not _yeni_fid:
+                        st.error("❌ Firma oluşturulamadı!")
+                    else:
+                        # 2. Kullanıcı oluştur
+                        _sb_fyr.table("kullanicilar").insert({
+                            "kullanici_adi": _yf_kuladi.strip(),
+                            "sifre":         _yf_sifre,
+                            "rol":           _yf_rol,
+                            "firma_id":      _yeni_fid,
+                            "yetkiler":      "tam"
+                        }).execute()
+
+                        st.success(f"✅ **{_yf_adi}** firması başarıyla oluşturuldu!")
+                        st.markdown(f"""
+<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:16px;margin-top:8px;">
+  <div style="font-size:14px;font-weight:600;color:#166534;margin-bottom:8px;">🔑 Giriş Bilgileri</div>
+  <div style="font-size:13px;color:#15803d;">
+    <b>URL:</b> mwcrmpro.streamlit.app<br>
+    <b>Kullanıcı Adı:</b> {_yf_kuladi}<br>
+    <b>Şifre:</b> {_yf_sifre}<br>
+    <b>Firma ID:</b> {_yeni_fid}
+  </div>
+</div>
+""", unsafe_allow_html=True)
+                        st.rerun()
+                except Exception as _fe:
+                    st.error(f"❌ Hata: {_fe}")
+
+    # ── TAB 3: FİRMA DÜZENLE ──────────────────────────────────────────────────
+    with fyr_tab3:
+        if _df_fyr.empty:
+            st.info("Henüz firma yok.")
+        else:
+            _fd_sec = st.selectbox(
+                "Firma Seç",
+                options=_df_fyr["id"].tolist(),
+                format_func=lambda x: f"{_df_fyr[_df_fyr['id']==x]['firma_adi'].values[0]} (ID:{x})" if len(_df_fyr[_df_fyr['id']==x]) > 0 else str(x),
+                key="firma_duzenle_sec"
+            )
+            _fd_row = _df_fyr[_df_fyr["id"] == _fd_sec]
+            if not _fd_row.empty:
+                _fd_row = _fd_row.iloc[0]
+                with st.form("firma_duzenle_form"):
+                    _fd_adi  = st.text_input("Firma Adı", value=str(_fd_row.get("firma_adi","")))
+                    _fd_acik = st.text_input("Açıklama", value=str(_fd_row.get("aciklama","") or ""))
+                    _fd_aktif = st.selectbox("Durum", ["Aktif","Dondurulmuş"],
+                        index=0 if bool(_fd_row.get("aktif", True)) else 1)
+                    _fd_save = st.form_submit_button("💾 Güncelle", type="primary", use_container_width=True)
+
+                if _fd_save:
+                    try:
+                        _sb_fyr.table("firmalar").update({
+                            "firma_adi": _fd_adi.strip(),
+                            "aciklama":  _fd_acik.strip(),
+                            "aktif":     _fd_aktif == "Aktif"
+                        }).eq("id", _fd_sec).execute()
+                        st.success("✅ Firma güncellendi!")
+                        if _fd_aktif == "Dondurulmuş":
+                            st.warning("🔴 Bu firma artık sisteme giriş yapamaz.")
+                        st.rerun()
+                    except Exception as _fde:
+                        st.error(f"❌ {_fde}")
+
+                st.divider()
+                # Firmaya kullanıcı ekle
+                st.markdown("**👤 Bu Firmaya Yeni Kullanıcı Ekle**")
+                with st.form("firma_kul_ekle"):
+                    _fk1, _fk2, _fk3 = st.columns(3)
+                    _fk_kad  = _fk1.text_input("Kullanıcı Adı")
+                    _fk_sif  = _fk2.text_input("Şifre", type="password")
+                    _fk_rol  = _fk3.selectbox("Rol", ["kullanici","admin"])
+                    if st.form_submit_button("➕ Kullanıcı Ekle", use_container_width=True):
+                        if _fk_kad and len(_fk_sif) >= 4:
+                            try:
+                                _sb_fyr.table("kullanicilar").insert({
+                                    "kullanici_adi": _fk_kad.strip(),
+                                    "sifre": _fk_sif,
+                                    "rol": _fk_rol,
+                                    "firma_id": _fd_sec,
+                                    "yetkiler": "tam"
+                                }).execute()
+                                st.success(f"✅ {_fk_kad} kullanıcısı eklendi!")
+                                st.rerun()
+                            except Exception as _fke:
+                                st.error(f"❌ {_fke}")
+                        else:
+                            st.warning("Kullanıcı adı ve en az 4 karakterli şifre girin!")
 
 elif aktif == "harita":
     sayfa_log("harita")
