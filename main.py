@@ -950,48 +950,29 @@ body.mw-mobil-aktif div[data-testid="stHorizontalBlock"]:has(.an-kart-btn) > div
 </style>
 """, unsafe_allow_html=True)
 
-# ── MOBİL ALT NAVİGASYON — gizli Streamlit butonları + HTML overlay ──────────
+# ── MOBİL ALT NAVİGASYON ─────────────────────────────────────────────────────
 st.markdown("""<div id="mw-mobile-nav">
-  <button class="mw-nav-btn" id="mwnav-liste"><span class="nav-ikon">📋</span>Liste</button>
-  <button class="mw-nav-btn" id="mwnav-analiz"><span class="nav-ikon">🔍</span>Analiz</button>
-  <button class="mw-nav-btn" id="mwnav-randevu"><span class="nav-ikon">📅</span>Randevu</button>
-  <button class="mw-nav-btn" id="mwnav-teklif"><span class="nav-ikon">📄</span>Teklif</button>
-  <button class="mw-nav-btn" id="mwnav-harita"><span class="nav-ikon">🗺️</span>Harita</button>
+  <a class="mw-nav-btn" id="mwnav-liste" href="?_nav=liste"><span class="nav-ikon">📋</span>Liste</a>
+  <a class="mw-nav-btn" id="mwnav-analiz" href="?_nav=analiz"><span class="nav-ikon">🔍</span>Analiz</a>
+  <a class="mw-nav-btn" id="mwnav-randevu" href="?_nav=randevu"><span class="nav-ikon">📅</span>Randevu</a>
+  <a class="mw-nav-btn" id="mwnav-teklif" href="?_nav=teklif"><span class="nav-ikon">📄</span>Teklif</a>
+  <a class="mw-nav-btn" id="mwnav-harita" href="?_nav=harita"><span class="nav-ikon">🗺️</span>Harita</a>
 </div>""", unsafe_allow_html=True)
 
 # Gizli tab geçiş butonları — mobil nav bunları tetikler
-_MOB_TABS = ["liste","analiz","randevu","teklif","harita"]
-for _mt in _MOB_TABS:
-    st.markdown(f'<div id="mw-st-{_mt}" style="position:absolute;opacity:0;pointer-events:none;height:0;overflow:hidden"></div>', unsafe_allow_html=True)
-    if st.button(f"↗{_mt}", key=f"mw_nav_st_{_mt}"):
-        st.session_state["aktif_tab"] = _mt
+# Mobil nav — query param ile tab geçişi (sadece mobil nav için)
+try:
+    _mob_nav_qp = st.query_params.get("_nav", "")
+    _mob_nav_tablar = ["liste","analiz","randevu","teklif","harita","rapor","yeni","harita"]
+    if _mob_nav_qp and _mob_nav_qp in _mob_nav_tablar:
+        st.session_state["aktif_tab"] = _mob_nav_qp
+        st.query_params.clear()
         st.rerun()
+except Exception:
+    pass
 
 st.markdown("""
-<script>
-(function(){
-  var tabs = ['liste','analiz','randevu','teklif','harita'];
-  tabs.forEach(function(t){
-    var btn = document.getElementById('mwnav-'+t);
-    if(!btn) return;
-    btn.addEventListener('click', function(){
-      // Streamlit gizli butonunu bul ve tıkla
-      var stDiv = document.getElementById('mw-st-'+t);
-      if(stDiv){
-        var stBtn = stDiv.parentElement.querySelector('button');
-        if(stBtn){ stBtn.click(); return; }
-      }
-      // Fallback: tüm gizli butonları tara
-      var allBtns = window.parent.document.querySelectorAll('button');
-      for(var i=0;i<allBtns.length;i++){
-        if(allBtns[i].innerText.trim() === t){
-          allBtns[i].click(); return;
-        }
-      }
-    });
-  });
-})();
-</script>
+
 <style>
 .mw-nav-btn {
   display:flex !important; flex-direction:column !important;
