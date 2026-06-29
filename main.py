@@ -31,28 +31,6 @@ def get_sb_client():
         pass
     return None
 
-def _firma_id_kolon_olustur():
-    """Supabase tablolarına firma_id kolonu ekle ve mevcut kayıtları güncelle"""
-    try:
-        sb = get_sb_client()
-        if not sb:
-            return
-        tablolar = ["cari_kartlar","musteri_analiz","randevular","teklifler",
-                    "kisiler","kisiler_mesaj_log","cari_aciklamalar",
-                    "musteri_calisma_tablosu","kullanici_tercih"]
-        for tbl in tablolar:
-            try:
-                # firma_id=1 olmayan kayıtları bul ve güncelle
-                r = sb.table(tbl).select("id").is_("firma_id","null").limit(500).execute()
-                if r.data:
-                    ids = [row["id"] for row in r.data if row.get("id")]
-                    for chunk in [ids[i:i+50] for i in range(0,len(ids),50)]:
-                        sb.table(tbl).update({"firma_id":1}).in_("id",chunk).execute()
-            except:
-                pass
-    except:
-        pass
-
 @st.cache_resource
 def get_sb_service():
     """Supabase service_role client — log ve admin işlemler için"""
@@ -146,55 +124,12 @@ def get_kullanici_listesi():
     return db_read("kullanicilar", extra_sql="")
 
 @st.cache_data(ttl=120)
-def _cached_placeholder(): pass  # cache decorator boş bırakılamaz
-# Firma_id filtresi OLMAYACAK tablolar (paylaşımlı / sistem tabloları)
-_FIRMA_FILTER_EXEMPT = {
-    "kullanicilar", "firmalar", "sistem_ayarlari", "sistem_tanimlar",
-    "sablon_mesajlar", "duyurular", "kullanici_log", "islem_kaydi"
-}
-
-# Firma_id filtresi OLACAK tablolar
-_FIRMA_FILTER_TABLES = {
-    "cari_kartlar", "musteri_analiz", "randevular", "teklifler",
-    "kisiler", "kisiler_mesaj_log", "cari_aciklamalar",
-    "musteri_calisma_tablosu", "kullanici_tercih"
-}
-
-def _get_firma_id():
-    """Session'dan firma_id al"""
-    try:
-        _fid = st.session_state.get("firma_id", 1)
-        return int(_fid) if _fid else 1
-    except:
-        return 1
-
-def _is_super_admin():
-    """Sadece kullanıcı adı 'admin' olanlar süper admin"""
-    return st.session_state.get("kullanici","") == "admin"
-
-def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None, tum_firmalar=False):
-    """Supabase veya SQLite'dan DataFrame döner — firma_id otomatik filtre"""
+def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
+    """Supabase veya SQLite'dan DataFrame döner"""
     sb = get_sb_client()
-    
-    _firma_id = _get_firma_id()
-    _super_admin = _is_super_admin()
-    
-    # Her zaman filtrele — sadece admin hepsini görür
-    _filtre_uygula = (
-        table in _FIRMA_FILTER_TABLES and
-        not tum_firmalar and
-        not _super_admin
-    )
-    
     if sb:
         try:
             q = sb.table(table).select("*")
-            if _filtre_uygula:
-                # firma_id eşleşmesi VE NULL olmayanlar
-                q = q.eq("firma_id", _firma_id)
-                q = q.not_.is_("firma_id", "null")
-            elif not _super_admin and table in _FIRMA_FILTER_TABLES:
-                return pd.DataFrame()
             if filters:
                 for k, v in filters.items():
                     if v == "NOT_NULL":
@@ -209,31 +144,14 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
                 q = q.limit(limit)
             res = q.execute()
             if res and res.data is not None:
-                _df_res = pd.DataFrame(res.data) if res.data else pd.DataFrame()
-                # Python tarafında da filtrele — Supabase NULL sorununa karşı
-                if _filtre_uygula and not _df_res.empty and "firma_id" in _df_res.columns:
-                    _df_res = _df_res[_df_res["firma_id"] == _firma_id]
-                return _df_res
+                return pd.DataFrame(res.data) if res.data else pd.DataFrame()
             return pd.DataFrame()
         except Exception as _e_read:
             pass  # SQLite fallback
     try:
         sql = f"SELECT * FROM {table}"
-        _extra_parts = []
-        if _filtre_uygula:
-            _extra_parts.append(f"firma_id = {_firma_id}")
         if extra_sql:
-            # WHERE varsa AND ekle, yoksa WHERE ekle
-            _es = extra_sql.strip()
-            if _extra_parts:
-                if _es.upper().startswith("WHERE "):
-                    sql += f" WHERE {' AND '.join(_extra_parts)} AND {_es[6:]}"
-                else:
-                    sql += f" WHERE {' AND '.join(_extra_parts)} {_es}"
-            else:
-                sql += f" {_es}"
-        elif _extra_parts:
-            sql += f" WHERE {' AND '.join(_extra_parts)}"
+            sql += f" {extra_sql}"
         conn = get_conn()
         df = pd.read_sql(sql, conn)
         conn.close()
@@ -242,13 +160,7 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
         return pd.DataFrame()
 
 def db_insert(table, data):
-    """Insert — Supabase önce, SQLite fallback — firma_id otomatik eklenir"""
-    # Firma filtreli tablolara otomatik firma_id ekle
-    if table in _FIRMA_FILTER_TABLES and "firma_id" not in data:
-        _fid = _get_firma_id()
-        if _fid and _fid != 0:
-            data = dict(data)
-            data["firma_id"] = _fid
+    """Insert — Supabase önce, SQLite fallback"""
     sb = get_sb_client()
     _sb_hata = None
     if sb:
@@ -798,33 +710,12 @@ def giris_ekrani():
                     _yetki = "tam" if _yetki_val == "tam" else _yjson.loads(_yetki_val)
                 except:
                     _yetki = "tam"
-                # Firma_id belirle — Supabase'den taze çek
-                _firma_id_giris = 1  # varsayılan
-                try:
-                    if isinstance(row, dict):
-                        _fid_val = row.get("firma_id", None)
-                        if _fid_val is not None and str(_fid_val) not in ["None","nan","0",""]:
-                            _firma_id_giris = int(_fid_val)
-                        else:
-                            # Supabase'den tekrar çek
-                            from supabase import create_client as _sc
-                            _sb_tmp = _sc(
-                                st.secrets.get("SUPABASE_URL",""),
-                                st.secrets.get("SUPABASE_KEY","")
-                            )
-                            _fresh = _sb_tmp.table("kullanicilar").select("firma_id").eq("kullanici_adi", kullanici).execute()
-                            if _fresh.data and _fresh.data[0].get("firma_id"):
-                                _firma_id_giris = int(_fresh.data[0]["firma_id"])
-                except:
-                    _firma_id_giris = 1
-
                 # Tüm state'i tek seferde set et — kopma olmasın
                 st.session_state.update({
                     "giris":            True,
                     "kullanici":        kullanici,
                     "kullanici_ad":     kullanici,
                     "rol":              rol_val,
-                    "firma_id":         _firma_id_giris,
                     "aktif_tab":        "liste",
                     "_yetki_listesi":   _yetki,
                     "_mobil_mod":       _mobil_secildi,
@@ -1297,7 +1188,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "firma_yonetimi"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -1314,7 +1205,6 @@ _TAB_ETIKETLER = {
     "admin_rapor": "📊 Rapor Tasarla",
     "harita": "🗺️ Müşteri Haritası",
     "patron": "👑 Yönetim Paneli",
-    "firma_yonetimi": "🏢 Firma Yönetimi",
 }
 
 def get_menu_tercihi(kullanici):
@@ -1333,7 +1223,7 @@ def get_menu_tercihi(kullanici):
                 kayitli = json.loads(res.data[0]["deger"])
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
-                    tam_liste += ["kullanici","admin_rapor","firma_yonetimi"]
+                    tam_liste += ["kullanici","admin_rapor"]
                 tam_liste = _temizle(tam_liste)
                 # Eksik olanları tam_liste'deki sıraya göre doğru pozisyona ekle
                 for i, t in enumerate(tam_liste):
@@ -1357,7 +1247,7 @@ def get_menu_tercihi(kullanici):
                 kayitli = json.loads(row[0])
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
-                    tam_liste += ["kullanici","admin_rapor","firma_yonetimi"]
+                    tam_liste += ["kullanici","admin_rapor"]
                 tam_liste = _temizle(tam_liste)
                 for i, t in enumerate(tam_liste):
                     if t not in kayitli:
@@ -1372,7 +1262,7 @@ def get_menu_tercihi(kullanici):
     except: pass
     tam_liste = _TAB_LISTESI_DEFAULT.copy()
     if st.session_state.get("rol") == "admin":
-        tam_liste += ["kullanici","admin_rapor","firma_yonetimi"]
+        tam_liste += ["kullanici","admin_rapor"]
     return _temizle(tam_liste)
 
 def save_menu_tercihi(kullanici, sira):
@@ -1425,28 +1315,6 @@ def _surum_kontrol():
 if not st.session_state.get("giris", False):
     giris_ekrani()
     st.stop()
-
-# ── İLK ÇALIŞMADA firma_id kolonlarını güncelle ───────────────────────────────
-if not st.session_state.get("_firma_id_guncellendi", False):
-    _firma_id_kolon_olustur()
-    # OVA'nın kendi eklediği ama firma_id almayan kayıtları düzelt
-    try:
-        _sb_fix = get_sb_client()
-        _fix_fid = st.session_state.get("firma_id", 1)
-        _fix_kul = st.session_state.get("kullanici", "")
-        if _sb_fix and _fix_kul and _fix_fid != 1:
-            for _tbl in ["cari_kartlar","musteri_analiz","randevular","teklifler"]:
-                try:
-                    _r = _sb_fix.table(_tbl).select("id").is_("firma_id","null").eq("olusturan", _fix_kul).execute()
-                    if _r.data:
-                        _ids = [x["id"] for x in _r.data if x.get("id")]
-                        if _ids:
-                            _sb_fix.table(_tbl).update({"firma_id": _fix_fid}).in_("id", _ids).execute()
-                except:
-                    pass
-    except:
-        pass
-    st.session_state["_firma_id_guncellendi"] = True
 
 
 
@@ -1776,14 +1644,6 @@ if "aktif_tab" not in st.session_state:
     st.session_state["aktif_tab"] = "liste"
 aktif = st.session_state["aktif_tab"]
 
-# ── DEBUG — firma_id kontrol (geçici) ────────────────────────────────────────
-if st.session_state.get("kullanici","") not in ["admin",""]:
-    _d_fid = st.session_state.get("firma_id","YOK")
-    _d_kul = st.session_state.get("kullanici","?")
-    _d_rol = st.session_state.get("rol","?")
-    _d_super = _is_super_admin()
-    st.sidebar.error(f"🔒 firma_id={_d_fid} | {_d_kul} | {_d_rol} | superadmin={_d_super}")
-
 # ── MOBİL MOD — body class + nav aktif ikon ──────────────────────────────────
 _mobil_mod_aktif = st.session_state.get("_mobil_mod", False)
 _aktif_tab_js = aktif
@@ -1952,7 +1812,6 @@ if aktif == "yeni":
                 st.session_state["kayit_mesaj"] = f"✅ '{firma}' güncellendi!"
                 st.rerun()
             else:
-                _kayit_firma_id = _get_firma_id()
                 ok = db_insert("cari_kartlar", {
                     "tarih": datetime.now().isoformat(),
                     "firma": firma, "yetkili": yetkili, "gsm": gsm,
@@ -1961,8 +1820,7 @@ if aktif == "yeni":
                     "temsilci": _tem_kayit, "islem_asamasi": _asama_kayit,
                     "segment": _seg_kayit, "aciklama": notlar_v,
                     "silindi": 0, "olusturan": st.session_state["kullanici"],
-                    "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro,
-                    "firma_id": _kayit_firma_id
+                    "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro
                 })
                 try: db_read.clear()
                 except: pass
@@ -2206,17 +2064,15 @@ section[data-testid="stSidebar"] { display: none !important; }
                 df[_tk] = _telefon_temizle(df[_tk])
 
     with st.expander("🔍 Mükerrer (Aynı İsimli) Müşterileri Bul ve Birleştir"):
-        if df.empty or "firma" not in df.columns:
-            st.caption("Veri yok.")
-        else:
-            _firma_gruplari = df.groupby(df["firma"].str.strip().str.upper())["id"].apply(list)
-            _mukerrerler = {k: v for k, v in _firma_gruplari.items() if len(v) > 1}
-            if not _mukerrerler:
-                st.caption("Mükerrer müşteri bulunamadı.")
-            else:
-                st.warning(f"{len(_mukerrerler)} mükerrer firma adı bulundu.")
+        _firma_gruplari = df.groupby(df["firma"].str.strip().str.upper())["id"].apply(list)
+        _mukerrerler = {k: v for k, v in _firma_gruplari.items() if len(v) > 1}
 
-                _mr_tab1, _mr_tab2 = st.tabs(["📋 Toplu Karşılaştırma (hepsi)", "🔎 Tek Seçerek Karşılaştır"])
+        if not _mukerrerler:
+            st.caption("Mükerrer müşteri bulunamadı.")
+        else:
+            st.warning(f"{len(_mukerrerler)} mükerrer firma adı bulundu.")
+
+            _mr_tab1, _mr_tab2 = st.tabs(["📋 Toplu Karşılaştırma (hepsi)", "🔎 Tek Seçerek Karşılaştır"])
 
             with _mr_tab1:
                 @st.cache_data(ttl=60)
@@ -2818,30 +2674,27 @@ function kartSec(id){
         df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
 
     # Segment hesapla ve sırala
-    if df_f.empty or "firma" not in df_f.columns:
-        df_f = pd.DataFrame()
-    else:
-        df_f["_seg_goster"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
-        _seg_sira = {"👑 A+":0,"⭐ A":1,"🔵 B":2,"⚪ C":3,"":4}
-        df_f["_seg_sira"] = df_f["_seg_goster"].map(lambda s: _seg_sira.get(s,4))
-        df_f = df_f.sort_values(["_seg_sira","firma"], ascending=[True,True]).reset_index(drop=True)
-        if siralama_kol == "Firma A-Z":      df_f = df_f.sort_values("firma", ascending=True)
-        elif siralama_kol == "Firma Z-A":    df_f = df_f.sort_values("firma", ascending=False)
-        elif siralama_kol == "İl A-Z" and "il" in df_f.columns:       df_f = df_f.sort_values("il", ascending=True)
-        elif siralama_kol == "Temsilci A-Z" and "temsilci" in df_f.columns: df_f = df_f.sort_values("temsilci", ascending=True)
-        elif siralama_kol == "Hedef ₺↓" and "beklenen_ciro" in df_f.columns:
-            df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["beklenen_ciro"], errors="coerce").fillna(0)
-            df_f = df_f.sort_values("_s", ascending=False).drop(columns=["_s"])
-        elif siralama_kol == "Hedef ₺↑" and "beklenen_ciro" in df_f.columns:
-            df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["beklenen_ciro"], errors="coerce").fillna(0)
-            df_f = df_f.sort_values("_s", ascending=True).drop(columns=["_s"])
-        elif siralama_kol == "Gerçek ₺↓" and "gerceklesen_ciro" in df_f.columns:
-            df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["gerceklesen_ciro"], errors="coerce").fillna(0)
-            df_f = df_f.sort_values("_s", ascending=False).drop(columns=["_s"])
-        elif siralama_kol == "Gerçek ₺↑" and "gerceklesen_ciro" in df_f.columns:
-            df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["gerceklesen_ciro"], errors="coerce").fillna(0)
-            df_f = df_f.sort_values("_s", ascending=True).drop(columns=["_s"])
-        df_f = df_f.reset_index(drop=True)
+    df_f["_seg_goster"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
+    _seg_sira = {"👑 A+":0,"⭐ A":1,"🔵 B":2,"⚪ C":3,"":4}
+    df_f["_seg_sira"] = df_f["_seg_goster"].map(lambda s: _seg_sira.get(s,4))
+    df_f = df_f.sort_values(["_seg_sira","firma"], ascending=[True,True]).reset_index(drop=True)
+    if siralama_kol == "Firma A-Z":      df_f = df_f.sort_values("firma", ascending=True)
+    elif siralama_kol == "Firma Z-A":    df_f = df_f.sort_values("firma", ascending=False)
+    elif siralama_kol == "İl A-Z" and "il" in df_f.columns:       df_f = df_f.sort_values("il", ascending=True)
+    elif siralama_kol == "Temsilci A-Z" and "temsilci" in df_f.columns: df_f = df_f.sort_values("temsilci", ascending=True)
+    elif siralama_kol == "Hedef ₺↓" and "beklenen_ciro" in df_f.columns:
+        df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["beklenen_ciro"], errors="coerce").fillna(0)
+        df_f = df_f.sort_values("_s", ascending=False).drop(columns=["_s"])
+    elif siralama_kol == "Hedef ₺↑" and "beklenen_ciro" in df_f.columns:
+        df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["beklenen_ciro"], errors="coerce").fillna(0)
+        df_f = df_f.sort_values("_s", ascending=True).drop(columns=["_s"])
+    elif siralama_kol == "Gerçek ₺↓" and "gerceklesen_ciro" in df_f.columns:
+        df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["gerceklesen_ciro"], errors="coerce").fillna(0)
+        df_f = df_f.sort_values("_s", ascending=False).drop(columns=["_s"])
+    elif siralama_kol == "Gerçek ₺↑" and "gerceklesen_ciro" in df_f.columns:
+        df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["gerceklesen_ciro"], errors="coerce").fillna(0)
+        df_f = df_f.sort_values("_s", ascending=True).drop(columns=["_s"])
+    df_f = df_f.reset_index(drop=True)
 
     _aktif_fil_sayisi = sum([bool(ara_txt),bool(_asama_sec),bool(_durum_sec),filtre_seg!="Tümü",bool(_il_sec),bool(_ilce_sec),bool(_tem_sec)])
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
@@ -3109,10 +2962,7 @@ function kartSec(id){
         try:
             _sb_an = get_sb_client()
             if _sb_an:
-                _an_q2 = _sb_an.table("musteri_analiz").select("firma")
-                if not _is_super_admin():
-                    _an_q2 = _an_q2.eq("firma_id", _get_firma_id())
-                _an_raw = _an_q2.execute().data or []
+                _an_raw = _sb_an.table("musteri_analiz").select("firma").execute().data or []
                 def _norm_firma(s):
                     return (str(s or "").strip()
                             .upper()
@@ -3174,14 +3024,10 @@ function kartSec(id){
                         "kim": str(_nr.get("olusturan","") or ""),
                         "metin": str(_nr.get("aciklama","") or ""),
                     })
-                if "id" in df_edit.columns:
-                    df_edit["📨 Notlar"] = df_edit["id"].apply(lambda x: f"📨 {_not_sayac.get(str(int(x)),0)}" if _not_sayac.get(str(int(x)),0) > 0 else "")
-                    df_edit["_not_sayi"] = df_edit["id"].apply(lambda x: _not_sayac.get(str(int(x)),0))
-                else:
-                    df_edit["📨 Notlar"] = ""
-                    df_edit["_not_sayi"] = 0
-                if "_not_sayi" in df_edit.columns:
-                    df_edit = df_edit.sort_values("_not_sayi", ascending=False).drop(columns=["_not_sayi"]).reset_index(drop=True)
+                df_edit["📨 Notlar"] = df_edit["id"].apply(lambda x: f"📨 {_not_sayac.get(str(int(x)),0)}" if _not_sayac.get(str(int(x)),0) > 0 else "")
+                # Not sayısına göre sırala — çok notlu üstte, notsuzlar altta
+                df_edit["_not_sayi"] = df_edit["id"].apply(lambda x: _not_sayac.get(str(int(x)),0))
+                df_edit = df_edit.sort_values("_not_sayi", ascending=False).drop(columns=["_not_sayi"]).reset_index(drop=True)
             else:
                 df_edit["📨 Notlar"] = ""
         except Exception as _not_err:
@@ -3459,7 +3305,7 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
     st.divider()
 elif aktif == "kullanici":
     sayfa_log("kullanici")
-    st.markdown("## 👥 Kullanıcı & Firma Yönetimi")
+    st.markdown("## 👥 Kullanıcı Yönetimi")
 
     _ben = st.session_state.get("kullanici","")
     _rol = st.session_state.get("rol","")
@@ -5690,8 +5536,6 @@ elif aktif == "analiz":
                     sb.table("musteri_analiz").update(veri).eq("firma", firma).execute()
                 else:
                     veri["firma"] = firma
-                    if not _is_super_admin():
-                        veri["firma_id"] = _get_firma_id()
                     sb.table("musteri_analiz").insert(veri).execute()
                 return True, ""
         except Exception as e:
@@ -5711,18 +5555,10 @@ elif aktif == "analiz":
         try:
             sb = _sb()
             if sb:
-                _an_fid = _get_firma_id()
-                _an_q = sb.table("musteri_analiz").select("id,firma,potansiyel,sonuc,tarih,yetkili,iletisim,sektor,kaynak,kargo,beklenti,engel,not_alan,sonraki_adim,takip_tar,bek_ciro,ger_ciro,firma_id")
-                if not _is_super_admin():
-                    _an_q = _an_q.eq("firma_id", _an_fid)
-                r = _an_q.order("tarih", desc=True).limit(500).execute()
+                r = sb.table("musteri_analiz").select("id,firma,potansiyel,sonuc,tarih,yetkili,iletisim,sektor,kaynak,kargo,beklenti,engel,not_alan,sonraki_adim,takip_tar,bek_ciro,ger_ciro").order("tarih", desc=True).limit(500).execute()
                 if r.data:
                     df = pd.DataFrame(r.data)
-                    df = df[df["firma"].notna() & (df["firma"] != "")]
-                    # Python tarafında da filtrele
-                    if not _is_super_admin() and "firma_id" in df.columns:
-                        df = df[df["firma_id"] == _an_fid]
-                    return df
+                    return df[df["firma"].notna() & (df["firma"] != "")]
         except Exception as e:
             st.error(f"Liste hatası: {e}")
         return pd.DataFrame()
@@ -6058,7 +5894,6 @@ section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseBu
             st.stop()
 
         _df_tum = _an_liste()
-        _dff = pd.DataFrame()  # her zaman tanımlı olsun
 
         if _df_tum.empty:
             st.info("Henüz analiz kaydı yok. '✏️ Yeni / Düzenle' sekmesinden ekleyin.")
@@ -8957,201 +8792,6 @@ render();
 
     _pc.html(_patron_html, height=700, scrolling=True)
 
-
-elif aktif == "firma_yonetimi":
-    sayfa_log("firma_yonetimi")
-
-    # Sadece admin görebilir
-    if st.session_state.get("rol") != "admin":
-        st.error("❌ Bu sayfaya erişim yetkiniz yok.")
-        st.stop()
-
-    st.markdown("## 🏢 Firma Yönetimi")
-    st.caption("Her firma kendi verisini görür — birbirlerinin kayıtlarına kesinlikle erişemezler.")
-
-    _sb_fyr = get_sb_client()
-
-    # Firmaları yükle
-    try:
-        _fyr_res = _sb_fyr.table("firmalar").select("*").order("id").execute()
-        _df_fyr = pd.DataFrame(_fyr_res.data) if _fyr_res.data else pd.DataFrame()
-    except Exception as _fyr_e:
-        _df_fyr = pd.DataFrame()
-        st.warning(f"Firmalar tablosu bulunamadı. Supabase SQL'i çalıştırdınız mı? Hata: {_fyr_e}")
-
-    fyr_tab1, fyr_tab2, fyr_tab3 = st.tabs(["📋 Firmalar", "➕ Yeni Firma Ekle", "⚙️ Firma Düzenle"])
-
-    # ── TAB 1: FİRMA LİSTESİ ──────────────────────────────────────────────────
-    with fyr_tab1:
-        if _df_fyr.empty:
-            st.info("Henüz firma kaydı yok. 'Yeni Firma Ekle' sekmesinden başlayın.")
-        else:
-            st.markdown(f"**Toplam {len(_df_fyr)} firma kayıtlı**")
-            for _, _fr in _df_fyr.iterrows():
-                _fr_id   = _fr.get("id","")
-                _fr_adi  = str(_fr.get("firma_adi",""))
-                _fr_aktif = bool(_fr.get("aktif", True))
-                _fr_acik = str(_fr.get("aciklama","") or "")
-
-                # Firma kullanıcılarını say
-                try:
-                    _fr_kul = _sb_fyr.table("kullanicilar").select("kullanici_adi").eq("firma_id", _fr_id).execute()
-                    _kul_say = len(_fr_kul.data) if _fr_kul.data else 0
-                except:
-                    _kul_say = 0
-
-                # Müşteri sayısı
-                try:
-                    _fr_mus = _sb_fyr.table("cari_kartlar").select("id", count="exact").eq("firma_id", _fr_id).execute()
-                    _mus_say = _fr_mus.count if hasattr(_fr_mus, 'count') else 0
-                except:
-                    _mus_say = 0
-
-                with st.container():
-                    _fc1, _fc2, _fc3, _fc4 = st.columns([4, 2, 2, 2])
-                    _durum_ikon = "🟢" if _fr_aktif else "🔴"
-                    _fc1.markdown(f"**{_durum_ikon} {_fr_adi}** (ID: {_fr_id})")
-                    if _fr_acik:
-                        _fc1.caption(_fr_acik)
-                    _fc2.metric("Kullanıcı", _kul_say)
-                    _fc3.metric("Müşteri", _mus_say)
-                    _durum_txt = "✅ Aktif" if _fr_aktif else "🔴 Dondurulmuş"
-                    _fc4.markdown(f"<br><span style='font-size:13px'>{_durum_txt}</span>", unsafe_allow_html=True)
-                    st.divider()
-
-    # ── TAB 2: YENİ FİRMA EKLE ────────────────────────────────────────────────
-    with fyr_tab2:
-        st.markdown("### ➕ Yeni Firma + Kullanıcı Oluştur")
-        st.info("Firma adını ve ilk kullanıcı bilgilerini girin. Firma hemen aktif olur.")
-
-        with st.form("yeni_firma_form_ana"):
-            _fc1, _fc2 = st.columns(2)
-            _yf_adi      = _fc1.text_input("🏢 Firma Adı *", placeholder="Örn: A Kargo")
-            _yf_aciklama = _fc2.text_input("Açıklama", placeholder="İsteğe bağlı")
-            st.divider()
-            st.markdown("**👤 İlk Kullanıcı Bilgileri**")
-            _uc1, _uc2, _uc3 = st.columns(3)
-            _yf_kuladi = _uc1.text_input("Kullanıcı Adı *", placeholder="Örn: akargo")
-            _yf_sifre  = _uc2.text_input("Şifre *", type="password", placeholder="En az 4 karakter")
-            _yf_rol    = _uc3.selectbox("Rol", ["kullanici", "admin"])
-            _yf_submit = st.form_submit_button("✅ Firma + Kullanıcı Oluştur", type="primary", use_container_width=True)
-
-        if _yf_submit:
-            _hata = ""
-            if not _yf_adi.strip():
-                _hata = "Firma adı zorunlu!"
-            elif not _yf_kuladi.strip():
-                _hata = "Kullanıcı adı zorunlu!"
-            elif len(_yf_sifre) < 4:
-                _hata = "Şifre en az 4 karakter olmalı!"
-            else:
-                # Kullanıcı adı müsait mi?
-                try:
-                    _kul_check = _sb_fyr.table("kullanicilar").select("kullanici_adi").eq("kullanici_adi", _yf_kuladi.strip()).execute()
-                    if _kul_check.data:
-                        _hata = f"'{_yf_kuladi}' kullanıcı adı zaten kullanılıyor!"
-                except:
-                    pass
-
-            if _hata:
-                st.error(f"❌ {_hata}")
-            else:
-                try:
-                    # 1. Firma oluştur
-                    _fi_res = _sb_fyr.table("firmalar").insert({
-                        "firma_adi": _yf_adi.strip(),
-                        "aciklama":  _yf_aciklama.strip(),
-                        "aktif":     True
-                    }).execute()
-                    _yeni_fid = _fi_res.data[0]["id"] if _fi_res.data else None
-
-                    if not _yeni_fid:
-                        st.error("❌ Firma oluşturulamadı!")
-                    else:
-                        # 2. Kullanıcı oluştur
-                        _sb_fyr.table("kullanicilar").insert({
-                            "kullanici_adi": _yf_kuladi.strip(),
-                            "sifre":         _yf_sifre,
-                            "rol":           _yf_rol,
-                            "firma_id":      _yeni_fid,
-                            "yetkiler":      "tam"
-                        }).execute()
-
-                        st.success(f"✅ **{_yf_adi}** firması başarıyla oluşturuldu!")
-                        st.markdown(f"""
-<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:16px;margin-top:8px;">
-  <div style="font-size:14px;font-weight:600;color:#166534;margin-bottom:8px;">🔑 Giriş Bilgileri</div>
-  <div style="font-size:13px;color:#15803d;">
-    <b>URL:</b> mwcrmpro.streamlit.app<br>
-    <b>Kullanıcı Adı:</b> {_yf_kuladi}<br>
-    <b>Şifre:</b> {_yf_sifre}<br>
-    <b>Firma ID:</b> {_yeni_fid}
-  </div>
-</div>
-""", unsafe_allow_html=True)
-                        st.rerun()
-                except Exception as _fe:
-                    st.error(f"❌ Hata: {_fe}")
-
-    # ── TAB 3: FİRMA DÜZENLE ──────────────────────────────────────────────────
-    with fyr_tab3:
-        if _df_fyr.empty:
-            st.info("Henüz firma yok.")
-        else:
-            _fd_sec = st.selectbox(
-                "Firma Seç",
-                options=_df_fyr["id"].tolist(),
-                format_func=lambda x: f"{_df_fyr[_df_fyr['id']==x]['firma_adi'].values[0]} (ID:{x})" if len(_df_fyr[_df_fyr['id']==x]) > 0 else str(x),
-                key="firma_duzenle_sec"
-            )
-            _fd_row = _df_fyr[_df_fyr["id"] == _fd_sec]
-            if not _fd_row.empty:
-                _fd_row = _fd_row.iloc[0]
-                with st.form("firma_duzenle_form"):
-                    _fd_adi  = st.text_input("Firma Adı", value=str(_fd_row.get("firma_adi","")))
-                    _fd_acik = st.text_input("Açıklama", value=str(_fd_row.get("aciklama","") or ""))
-                    _fd_aktif = st.selectbox("Durum", ["Aktif","Dondurulmuş"],
-                        index=0 if bool(_fd_row.get("aktif", True)) else 1)
-                    _fd_save = st.form_submit_button("💾 Güncelle", type="primary", use_container_width=True)
-
-                if _fd_save:
-                    try:
-                        _sb_fyr.table("firmalar").update({
-                            "firma_adi": _fd_adi.strip(),
-                            "aciklama":  _fd_acik.strip(),
-                            "aktif":     _fd_aktif == "Aktif"
-                        }).eq("id", _fd_sec).execute()
-                        st.success("✅ Firma güncellendi!")
-                        if _fd_aktif == "Dondurulmuş":
-                            st.warning("🔴 Bu firma artık sisteme giriş yapamaz.")
-                        st.rerun()
-                    except Exception as _fde:
-                        st.error(f"❌ {_fde}")
-
-                st.divider()
-                # Firmaya kullanıcı ekle
-                st.markdown("**👤 Bu Firmaya Yeni Kullanıcı Ekle**")
-                with st.form("firma_kul_ekle"):
-                    _fk1, _fk2, _fk3 = st.columns(3)
-                    _fk_kad  = _fk1.text_input("Kullanıcı Adı")
-                    _fk_sif  = _fk2.text_input("Şifre", type="password")
-                    _fk_rol  = _fk3.selectbox("Rol", ["kullanici","admin"])
-                    if st.form_submit_button("➕ Kullanıcı Ekle", use_container_width=True):
-                        if _fk_kad and len(_fk_sif) >= 4:
-                            try:
-                                _sb_fyr.table("kullanicilar").insert({
-                                    "kullanici_adi": _fk_kad.strip(),
-                                    "sifre": _fk_sif,
-                                    "rol": _fk_rol,
-                                    "firma_id": _fd_sec,
-                                    "yetkiler": "tam"
-                                }).execute()
-                                st.success(f"✅ {_fk_kad} kullanıcısı eklendi!")
-                                st.rerun()
-                            except Exception as _fke:
-                                st.error(f"❌ {_fke}")
-                        else:
-                            st.warning("Kullanıcı adı ve en az 4 karakterli şifre girin!")
 
 elif aktif == "harita":
     sayfa_log("harita")
