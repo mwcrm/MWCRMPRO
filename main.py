@@ -2140,15 +2140,14 @@ section[data-testid="stSidebar"] { display: none !important; }
         if df.empty or "firma" not in df.columns:
             st.caption("Veri yok.")
         else:
-         _firma_gruplari = df.groupby(df["firma"].str.strip().str.upper())["id"].apply(list)
-        _mukerrerler = {k: v for k, v in _firma_gruplari.items() if len(v) > 1}
+            _firma_gruplari = df.groupby(df["firma"].str.strip().str.upper())["id"].apply(list)
+            _mukerrerler = {k: v for k, v in _firma_gruplari.items() if len(v) > 1}
+            if not _mukerrerler:
+                st.caption("Mükerrer müşteri bulunamadı.")
+            else:
+                st.warning(f"{len(_mukerrerler)} mükerrer firma adı bulundu.")
 
-        if not _mukerrerler:
-            st.caption("Mükerrer müşteri bulunamadı.")
-        else:
-            st.warning(f"{len(_mukerrerler)} mükerrer firma adı bulundu.")
-
-            _mr_tab1, _mr_tab2 = st.tabs(["📋 Toplu Karşılaştırma (hepsi)", "🔎 Tek Seçerek Karşılaştır"])
+                _mr_tab1, _mr_tab2 = st.tabs(["📋 Toplu Karşılaştırma (hepsi)", "🔎 Tek Seçerek Karşılaştır"])
 
             with _mr_tab1:
                 @st.cache_data(ttl=60)
