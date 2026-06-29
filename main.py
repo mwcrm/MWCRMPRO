@@ -623,108 +623,118 @@ def _tanim_guncelle(tip, eski, yeni):
     return False
 
 def giris_ekrani():
-    st.markdown("<h1 style='text-align:center;color:#1f6feb;'>🏢 MWCRMPRO</h1>", unsafe_allow_html=True)
-    st.markdown("<h4 style='text-align:center;color:#888;'>Cari Yönetim Sistemi</h4><br>", unsafe_allow_html=True)
-
-    # ── CİHAZ SEÇİMİ ──────────────────────────────────────────────────────────
-    if "giris_cihaz" not in st.session_state:
-        st.session_state["giris_cihaz"] = None
-
-    if st.session_state["giris_cihaz"] is None:
-        st.markdown("""
-<div style="max-width:360px;margin:0 auto 24px auto;text-align:center;">
-  <div style="font-size:14px;color:#64748b;margin-bottom:16px;font-weight:500;">Hangi cihazdan bağlanıyorsunuz?</div>
+    # ── LOGO ──────────────────────────────────────────────────────────────────
+    st.markdown("""
+<div style="text-align:center;padding:2rem 0 1.5rem;">
+  <div style="width:64px;height:64px;background:#1d4ed8;border-radius:16px;
+       display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+      <rect x="4" y="4" width="12" height="12" rx="2" fill="white" opacity=".9"/>
+      <rect x="20" y="4" width="12" height="12" rx="2" fill="white" opacity=".7"/>
+      <rect x="4" y="20" width="12" height="12" rx="2" fill="white" opacity=".7"/>
+      <rect x="20" y="20" width="12" height="12" rx="2" fill="white" opacity=".5"/>
+    </svg>
+  </div>
+  <div style="font-size:26px;font-weight:600;color:#0f172a;letter-spacing:-.5px;">MWCRMPRO</div>
+  <div style="font-size:13px;color:#64748b;margin-top:4px;">Cari Yönetim Sistemi</div>
 </div>
 """, unsafe_allow_html=True)
-        _cd1, _cd2 = st.columns(2)
-        if _cd1.button("🖥️  Masaüstü / Laptop", use_container_width=True, type="secondary"):
-            st.session_state["giris_cihaz"] = "masaustu"
-            st.session_state["_mobil_mod"] = False
-            st.session_state["_ekran_kontrol"] = True
-            st.rerun()
-        if _cd2.button("📱  Telefon / Tablet", use_container_width=True, type="primary"):
-            st.session_state["giris_cihaz"] = "mobil"
-            st.session_state["_mobil_mod"] = True
-            st.session_state["_ekran_kontrol"] = True
-            st.rerun()
-        st.stop()
 
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        with st.form("giris_form"):
-            st.subheader("Giriş Yap")
-            kullanici = st.text_input("Kullanıcı Adı")
-            sifre = st.text_input("Şifre", type="password")
-            if st.form_submit_button("Giriş Yap", use_container_width=True):
-                row = None
+    _gc1, _gc2, _gc3 = st.columns([1,2,1])
+    with _gc2:
+        # ── CİHAZ SEÇİMİ — radio buton ile, rerun YOK ────────────────────────
+        st.markdown("""
+<div style="background:white;border:0.5px solid #e2e8f0;border-radius:16px;
+     padding:20px 20px 16px;margin-bottom:12px;">
+  <div style="font-size:13px;color:#64748b;text-align:center;margin-bottom:14px;font-weight:500;">
+    Hangi cihazdan bağlanıyorsunuz?
+  </div>
+</div>
+""", unsafe_allow_html=True)
+        _cihaz = st.radio(
+            "Cihaz",
+            options=["🖥️  Masaüstü / Laptop", "📱  Telefon / Tablet"],
+            horizontal=True,
+            label_visibility="collapsed",
+            key="giris_cihaz_radio"
+        )
+        _mobil_secildi = "Telefon" in _cihaz
 
-                # 1. Supabase ile dene
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
+        # ── GİRİŞ FORMU ────────────────────────────────────────────────────────
+        st.markdown("""
+<div style="background:white;border:0.5px solid #e2e8f0;border-radius:16px;padding:20px 20px 4px;">
+  <div style="font-size:16px;font-weight:600;color:#0f172a;margin-bottom:4px;">Giriş Yap</div>
+</div>
+""", unsafe_allow_html=True)
+
+        with st.form("giris_form", clear_on_submit=False):
+            kullanici = st.text_input("Kullanıcı Adı", placeholder="kullanici_adi")
+            sifre     = st.text_input("Şifre", type="password", placeholder="••••••••")
+            _giris_btn = st.form_submit_button("Giriş Yap →", use_container_width=True, type="primary")
+
+        if _giris_btn:
+            row = None
+            # 1. Supabase
+            try:
+                from supabase import create_client
+                url = st.secrets.get("SUPABASE_URL","")
+                key = st.secrets.get("SUPABASE_KEY","")
+                if url and key:
+                    sb = create_client(url, key)
+                    res = sb.table("kullanicilar").select("*").eq("kullanici_adi", kullanici).eq("sifre", sifre).execute()
+                    if res.data:
+                        row = res.data[0]
+            except: pass
+            # 2. SQLite fallback
+            if row is None:
                 try:
-                    from supabase import create_client
-                    url = st.secrets.get("SUPABASE_URL","")
-                    key = st.secrets.get("SUPABASE_KEY","")
-                    if url and key:
-                        sb = create_client(url, key)
-                        res = sb.table("kullanicilar").select("*").eq("kullanici_adi", kullanici).eq("sifre", sifre).execute()
-                        if res.data:
-                            row = res.data[0]
-                except Exception as e:
-                    pass
+                    conn = get_conn()
+                    r = conn.execute("SELECT * FROM kullanicilar WHERE kullanici_adi=? AND sifre=?", (kullanici, sifre)).fetchone()
+                    conn.close()
+                    if r:
+                        row = {"kullanici_adi": r[1], "sifre": r[2], "rol": r[3]}
+                except: pass
+            # 3. Hardcoded admin
+            if row is None and kullanici == "admin" and sifre == "admin123":
+                row = {"kullanici_adi": "admin", "sifre": "admin123", "rol": "admin"}
 
-                # 2. SQLite fallback
-                if row is None:
-                    try:
-                        conn = get_conn()
-                        r = conn.execute(
-                            "SELECT * FROM kullanicilar WHERE kullanici_adi=? AND sifre=?",
-                            (kullanici, sifre)).fetchone()
-                        conn.close()
-                        if r:
-                            row = {"kullanici_adi": r[1], "sifre": r[2], "rol": r[3]}
-                    except:
-                        pass
-
-                # 3. Hardcoded admin (son çare)
-                if row is None and kullanici == "admin" and sifre == "admin123":
-                    row = {"kullanici_adi": "admin", "sifre": "admin123", "rol": "admin"}
-
-                if row:
-                    st.session_state["giris"] = True
-                    st.session_state["kullanici"] = kullanici
-                    # Rol belirle
-                    if isinstance(row, dict):
-                        rol_val = str(row.get("rol") or "")
-                    else:
-                        rol_val = ""
-                    if not rol_val or rol_val == "None":
-                        rol_val = "admin" if kullanici == "admin" else "kullanici"
-                    st.session_state["rol"] = rol_val
-                    st.session_state["aktif_tab"] = "liste"
-                    # Yetki listesini yükle
-                    try:
-                        import json as _yjson
-                        _yetki_val = str(row.get("yetkiler","tam") or "tam")
-                        if _yetki_val == "tam":
-                            st.session_state["_yetki_listesi"] = "tam"
-                        else:
-                            st.session_state["_yetki_listesi"] = _yjson.loads(_yetki_val)
-                    except:
-                        st.session_state["_yetki_listesi"] = "tam"
-                    # Giriş logla
-                    try:
-                        _sb_logi = get_sb_client()
-                        if _sb_logi:
-                            _sb_logi.table("kullanici_log").insert({
-                                "kullanici": kullanici,
-                                "rol": rol_val,
-                                "sayfa": "giris",
-                                "islem": "GİRİŞ_YAPILDI",
-                                "detay": f"{kullanici} sisteme giriş yaptı",
-                            }).execute()
-                    except: pass
-                    st.rerun()
-                else:
-                    st.error("Kullanıcı adı veya şifre hatalı!")
+            if row:
+                rol_val = str(row.get("rol") or "") if isinstance(row, dict) else ""
+                if not rol_val or rol_val == "None":
+                    rol_val = "admin" if kullanici == "admin" else "kullanici"
+                try:
+                    import json as _yjson
+                    _yetki_val = str(row.get("yetkiler","tam") or "tam")
+                    _yetki = "tam" if _yetki_val == "tam" else _yjson.loads(_yetki_val)
+                except:
+                    _yetki = "tam"
+                # Tüm state'i tek seferde set et — kopma olmasın
+                st.session_state.update({
+                    "giris":            True,
+                    "kullanici":        kullanici,
+                    "kullanici_ad":     kullanici,
+                    "rol":              rol_val,
+                    "aktif_tab":        "liste",
+                    "_yetki_listesi":   _yetki,
+                    "_mobil_mod":       _mobil_secildi,
+                    "_ekran_kontrol":   True,
+                    "giris_cihaz":      "mobil" if _mobil_secildi else "masaustu",
+                })
+                # Giriş logla
+                try:
+                    _sb_logi = get_sb_client()
+                    if _sb_logi:
+                        _sb_logi.table("kullanici_log").insert({
+                            "kullanici": kullanici, "rol": rol_val,
+                            "sayfa": "giris", "islem": "GİRİŞ_YAPILDI",
+                            "detay": f"{kullanici} sisteme giriş yaptı",
+                        }).execute()
+                except: pass
+                st.rerun()
+            else:
+                st.error("❌ Kullanıcı adı veya şifre hatalı!")
 
 def cikis():
     try:
@@ -1597,69 +1607,13 @@ st.markdown(f"""
 </script>
 """, unsafe_allow_html=True)
 
-# ── MOBİL ALT NAV — query param ile tab geçişi ───────────────────────────────
-try:
-    _qp_tab = st.query_params.get("tab", "")
-    _gecerli_tablar = ["liste","analiz","randevu","teklif","ozel_teklif",
-                       "kisiler","rapor","excel","harita","yeni","patron",
-                       "admin_rapor","kullanici","whatsapp"]
-    if _qp_tab and _qp_tab in _gecerli_tablar:
-        st.session_state["aktif_tab"] = _qp_tab
-        st.query_params.clear()
-except Exception:
-    pass
+# Tab her zaman session_state'ten — query param yok, kopma yok
+if "aktif_tab" not in st.session_state:
+    st.session_state["aktif_tab"] = "liste"
 
 aktif = st.session_state["aktif_tab"]
 
-# ── MOBİL MOD BUTONU — telefonda her zaman görünür (floating) ────────────────
-_mobil_aktif_f = st.session_state.get("_mobil_mod", False)
-st.markdown(f"""
-<div id="mw-float-btn" onclick="document.getElementById('mw-float-form').submit()"
-  style="
-    display:none;
-    position:fixed;
-    top:10px;right:10px;z-index:99999;
-    background:{'#2563eb' if _mobil_aktif_f else '#ffffff'};
-    color:{'#ffffff' if _mobil_aktif_f else '#374151'};
-    border:1.5px solid {'#2563eb' if _mobil_aktif_f else '#cbd5e1'};
-    border-radius:22px;
-    padding:8px 16px;
-    font-size:13px;font-weight:600;
-    box-shadow:0 2px 12px rgba(0,0,0,.15);
-    cursor:pointer;
-    user-select:none;
-    align-items:center;gap:6px;
-  ">
-  {'📱 Mobil: AÇIK' if _mobil_aktif_f else '📱 Mobil Mod'}
-</div>
-<script>
-(function(){{
-  var btn = document.getElementById('mw-float-btn');
-  if(!btn) return;
-  // Sadece mobil/tablet ekranda göster (masaüstünde gizle)
-  function checkSize(){{
-    btn.style.display = (window.innerWidth <= 1024) ? 'flex' : 'none';
-  }}
-  checkSize();
-  window.addEventListener('resize', checkSize);
-  btn.addEventListener('click', function(){{
-    // Streamlit'e session_state değişikliği gönder — URL param ile
-    var url = new URL(window.parent.location.href);
-    url.searchParams.set('_mobil_toggle', '1');
-    window.parent.location.href = url.toString();
-  }});
-}})();
-</script>
-""", unsafe_allow_html=True)
 
-# Query param ile mobil toggle oku
-try:
-    if st.query_params.get("_mobil_toggle","") == "1":
-        st.session_state["_mobil_mod"] = not st.session_state.get("_mobil_mod", False)
-        st.query_params.clear()
-        st.rerun()
-except Exception:
-    pass
 
 # Mobil alt nav aktif ikonunu güncelle
 st.markdown(f"""
