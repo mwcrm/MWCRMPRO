@@ -961,13 +961,11 @@ st.markdown("""<div id="mw-mobile-nav">
 
 # Gizli tab geçiş butonları — mobil nav bunları tetikler
 _MOB_TABS = ["liste","analiz","randevu","teklif","harita"]
-_mob_cols = st.columns(len(_MOB_TABS))
-for _mi, _mt in enumerate(_MOB_TABS):
-    with _mob_cols[_mi]:
-        st.markdown(f'<div id="mw-st-{_mt}" style="display:none"></div>', unsafe_allow_html=True)
-        if st.button(_mt, key=f"mw_nav_st_{_mt}", label_visibility="collapsed"):
-            st.session_state["aktif_tab"] = _mt
-            st.rerun()
+for _mt in _MOB_TABS:
+    st.markdown(f'<div id="mw-st-{_mt}" style="position:absolute;opacity:0;pointer-events:none;height:0;overflow:hidden"></div>', unsafe_allow_html=True)
+    if st.button(f"↗{_mt}", key=f"mw_nav_st_{_mt}"):
+        st.session_state["aktif_tab"] = _mt
+        st.rerun()
 
 st.markdown("""
 <script>
@@ -1007,6 +1005,21 @@ st.markdown("""
 }
 .mw-nav-btn.aktif { color:#2563eb !important; background:#eff6ff !important; }
 .mw-nav-btn .nav-ikon { font-size:20px !important; line-height:1 !important; }
+/* Gizli streamlit nav butonları */
+button[data-testid="baseButton-secondary"][kind="secondary"]:is(
+  [data-key="mw_nav_st_liste"],
+  [data-key="mw_nav_st_analiz"],
+  [data-key="mw_nav_st_randevu"],
+  [data-key="mw_nav_st_teklif"],
+  [data-key="mw_nav_st_harita"]
+) { display: none !important; }
+div:has(> button[data-testid="baseButton-secondary"]:is(
+  [data-key="mw_nav_st_liste"],
+  [data-key="mw_nav_st_analiz"],
+  [data-key="mw_nav_st_randevu"],
+  [data-key="mw_nav_st_teklif"],
+  [data-key="mw_nav_st_harita"]
+)) { height: 0 !important; overflow: hidden !important; margin: 0 !important; padding: 0 !important; }
 </style>
 <script>
 function mwTab(tab) {
