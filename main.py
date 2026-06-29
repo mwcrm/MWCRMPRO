@@ -1585,6 +1585,56 @@ except Exception:
 
 aktif = st.session_state["aktif_tab"]
 
+# ── MOBİL MOD BUTONU — telefonda her zaman görünür (floating) ────────────────
+_mobil_aktif_f = st.session_state.get("_mobil_mod", False)
+st.markdown(f"""
+<div id="mw-float-btn" onclick="document.getElementById('mw-float-form').submit()"
+  style="
+    display:none;
+    position:fixed;
+    top:10px;right:10px;z-index:99999;
+    background:{'#2563eb' if _mobil_aktif_f else '#ffffff'};
+    color:{'#ffffff' if _mobil_aktif_f else '#374151'};
+    border:1.5px solid {'#2563eb' if _mobil_aktif_f else '#cbd5e1'};
+    border-radius:22px;
+    padding:8px 16px;
+    font-size:13px;font-weight:600;
+    box-shadow:0 2px 12px rgba(0,0,0,.15);
+    cursor:pointer;
+    user-select:none;
+    align-items:center;gap:6px;
+  ">
+  {'📱 Mobil: AÇIK' if _mobil_aktif_f else '📱 Mobil Mod'}
+</div>
+<script>
+(function(){{
+  var btn = document.getElementById('mw-float-btn');
+  if(!btn) return;
+  // Sadece mobil/tablet ekranda göster (masaüstünde gizle)
+  function checkSize(){{
+    btn.style.display = (window.innerWidth <= 1024) ? 'flex' : 'none';
+  }}
+  checkSize();
+  window.addEventListener('resize', checkSize);
+  btn.addEventListener('click', function(){{
+    // Streamlit'e session_state değişikliği gönder — URL param ile
+    var url = new URL(window.parent.location.href);
+    url.searchParams.set('_mobil_toggle', '1');
+    window.parent.location.href = url.toString();
+  }});
+}})();
+</script>
+""", unsafe_allow_html=True)
+
+# Query param ile mobil toggle oku
+try:
+    if st.query_params.get("_mobil_toggle","") == "1":
+        st.session_state["_mobil_mod"] = not st.session_state.get("_mobil_mod", False)
+        st.query_params.clear()
+        st.rerun()
+except Exception:
+    pass
+
 # Mobil alt nav aktif ikonunu güncelle
 st.markdown(f"""
 <script>
