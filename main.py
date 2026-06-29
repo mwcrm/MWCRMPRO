@@ -3046,7 +3046,10 @@ function kartSec(id){
         try:
             _sb_an = get_sb_client()
             if _sb_an:
-                _an_raw = _sb_an.table("musteri_analiz").select("firma").execute().data or []
+                _an_q2 = _sb_an.table("musteri_analiz").select("firma")
+                if not _is_super_admin():
+                    _an_q2 = _an_q2.eq("firma_id", _get_firma_id())
+                _an_raw = _an_q2.execute().data or []
                 def _norm_firma(s):
                     return (str(s or "").strip()
                             .upper()
@@ -5620,6 +5623,8 @@ elif aktif == "analiz":
                     sb.table("musteri_analiz").update(veri).eq("firma", firma).execute()
                 else:
                     veri["firma"] = firma
+                    if not _is_super_admin():
+                        veri["firma_id"] = _get_firma_id()
                     sb.table("musteri_analiz").insert(veri).execute()
                 return True, ""
         except Exception as e:
@@ -5639,7 +5644,11 @@ elif aktif == "analiz":
         try:
             sb = _sb()
             if sb:
-                r = sb.table("musteri_analiz").select("id,firma,potansiyel,sonuc,tarih,yetkili,iletisim,sektor,kaynak,kargo,beklenti,engel,not_alan,sonraki_adim,takip_tar,bek_ciro,ger_ciro").order("tarih", desc=True).limit(500).execute()
+                _an_fid = _get_firma_id()
+                _an_q = sb.table("musteri_analiz").select("id,firma,potansiyel,sonuc,tarih,yetkili,iletisim,sektor,kaynak,kargo,beklenti,engel,not_alan,sonraki_adim,takip_tar,bek_ciro,ger_ciro")
+                if not _is_super_admin():
+                    _an_q = _an_q.eq("firma_id", _an_fid)
+                r = _an_q.order("tarih", desc=True).limit(500).execute()
                 if r.data:
                     df = pd.DataFrame(r.data)
                     return df[df["firma"].notna() & (df["firma"] != "")]
