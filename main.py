@@ -2547,11 +2547,26 @@ function kartSec(id){
     if "gerceklesen_ciro" in df_edit.columns:
         df_edit["gerceklesen_ciro"] = pd.to_numeric(df_edit["gerceklesen_ciro"], errors="coerce").fillna(0)
     try:
-        _df_analiz_join = db_read("musteri_analiz")
-        if not _df_analiz_join.empty and "firma" in _df_analiz_join.columns:
-            _analiz_firmalar = set(_df_analiz_join["firma"].dropna().astype(str).str.strip().str.upper().tolist())
-            df_edit["✅ Analiz"] = df_edit["firma"].apply(lambda x: "✅" if str(x).strip().upper() in _analiz_firmalar else "")
-        else:
+        # Analiz yapılmış firmaları işaretle — cari_id veya firma adı ile eşleş
+        try:
+            _sb_an = get_sb_client()
+            if _sb_an:
+                _an_raw = _sb_an.table("musteri_analiz").select("firma,cari_id").execute().data or []
+                _analiz_firma_set = set()
+                _analiz_cari_set = set()
+                for _ar in _an_raw:
+                    _af = str(_ar.get("firma","") or "").strip().upper()
+                    if _af: _analiz_firma_set.add(_af)
+                    _ac = str(_ar.get("cari_id","") or "")
+                    if _ac and _ac != "None": _analiz_cari_set.add(_ac)
+                def _analiz_check(row):
+                    if str(row.get("id","")) in _analiz_cari_set: return "✅"
+                    if str(row.get("firma","")).strip().upper() in _analiz_firma_set: return "✅"
+                    return ""
+                df_edit["✅ Analiz"] = df_edit.apply(_analiz_check, axis=1)
+            else:
+                df_edit["✅ Analiz"] = ""
+        except:
             df_edit["✅ Analiz"] = ""
     except:
         df_edit["✅ Analiz"] = ""
