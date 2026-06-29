@@ -2677,10 +2677,13 @@ function kartSec(id){
         df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
 
     # Segment hesapla ve sırala
-    df_f["_seg_goster"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
-    _seg_sira = {"👑 A+":0,"⭐ A":1,"🔵 B":2,"⚪ C":3,"":4}
-    df_f["_seg_sira"] = df_f["_seg_goster"].map(lambda s: _seg_sira.get(s,4))
-    df_f = df_f.sort_values(["_seg_sira","firma"], ascending=[True,True]).reset_index(drop=True)
+    if not df_f.empty:
+        df_f["_seg_goster"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
+        _seg_sira = {"👑 A+":0,"⭐ A":1,"🔵 B":2,"⚪ C":3,"":4}
+        df_f["_seg_sira"] = df_f["_seg_goster"].map(lambda s: _seg_sira.get(s,4))
+        _sort_cols = [c for c in ["_seg_sira","firma"] if c in df_f.columns]
+        if _sort_cols:
+            df_f = df_f.sort_values(_sort_cols, ascending=[True]*len(_sort_cols)).reset_index(drop=True)
     if siralama_kol == "Firma A-Z":      df_f = df_f.sort_values("firma", ascending=True)
     elif siralama_kol == "Firma Z-A":    df_f = df_f.sort_values("firma", ascending=False)
     elif siralama_kol == "İl A-Z" and "il" in df_f.columns:       df_f = df_f.sort_values("il", ascending=True)
