@@ -772,11 +772,23 @@ def giris_ekrani():
                     _yetki = "tam" if _yetki_val == "tam" else _yjson.loads(_yetki_val)
                 except:
                     _yetki = "tam"
-                # Firma_id belirle
+                # Firma_id belirle — Supabase'den taze çek
                 _firma_id_giris = 1  # varsayılan
                 try:
-                    _fid_val = row.get("firma_id", 1) if isinstance(row, dict) else 1
-                    _firma_id_giris = int(_fid_val) if _fid_val else 1
+                    if isinstance(row, dict):
+                        _fid_val = row.get("firma_id", None)
+                        if _fid_val is not None and str(_fid_val) not in ["None","nan","0",""]:
+                            _firma_id_giris = int(_fid_val)
+                        else:
+                            # Supabase'den tekrar çek
+                            from supabase import create_client as _sc
+                            _sb_tmp = _sc(
+                                st.secrets.get("SUPABASE_URL",""),
+                                st.secrets.get("SUPABASE_KEY","")
+                            )
+                            _fresh = _sb_tmp.table("kullanicilar").select("firma_id").eq("kullanici_adi", kullanici).execute()
+                            if _fresh.data and _fresh.data[0].get("firma_id"):
+                                _firma_id_giris = int(_fresh.data[0]["firma_id"])
                 except:
                     _firma_id_giris = 1
 
@@ -1721,7 +1733,8 @@ if st.session_state.get("kullanici","") not in ["admin",""]:
     _d_fid = st.session_state.get("firma_id","YOK")
     _d_kul = st.session_state.get("kullanici","?")
     _d_rol = st.session_state.get("rol","?")
-    st.sidebar.warning(f"DEBUG → firma_id: **{_d_fid}** | kullanıcı: {_d_kul} | rol: {_d_rol}")
+    _d_super = _is_super_admin()
+    st.sidebar.error(f"🔒 firma_id={_d_fid} | {_d_kul} | {_d_rol} | superadmin={_d_super}")
 
 # ── MOBİL MOD — body class + nav aktif ikon ──────────────────────────────────
 _mobil_mod_aktif = st.session_state.get("_mobil_mod", False)
