@@ -187,7 +187,11 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
                 q = q.limit(limit)
             res = q.execute()
             if res and res.data is not None:
-                return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+                _df_res = pd.DataFrame(res.data) if res.data else pd.DataFrame()
+                # Python tarafında da filtrele — Supabase NULL sorununa karşı
+                if _filtre_uygula and not _df_res.empty and "firma_id" in _df_res.columns:
+                    _df_res = _df_res[_df_res["firma_id"] == _firma_id]
+                return _df_res
             return pd.DataFrame()
         except Exception as _e_read:
             pass  # SQLite fallback
@@ -5664,13 +5668,17 @@ elif aktif == "analiz":
             sb = _sb()
             if sb:
                 _an_fid = _get_firma_id()
-                _an_q = sb.table("musteri_analiz").select("id,firma,potansiyel,sonuc,tarih,yetkili,iletisim,sektor,kaynak,kargo,beklenti,engel,not_alan,sonraki_adim,takip_tar,bek_ciro,ger_ciro")
+                _an_q = sb.table("musteri_analiz").select("id,firma,potansiyel,sonuc,tarih,yetkili,iletisim,sektor,kaynak,kargo,beklenti,engel,not_alan,sonraki_adim,takip_tar,bek_ciro,ger_ciro,firma_id")
                 if not _is_super_admin():
                     _an_q = _an_q.eq("firma_id", _an_fid)
                 r = _an_q.order("tarih", desc=True).limit(500).execute()
                 if r.data:
                     df = pd.DataFrame(r.data)
-                    return df[df["firma"].notna() & (df["firma"] != "")]
+                    df = df[df["firma"].notna() & (df["firma"] != "")]
+                    # Python tarafında da filtrele
+                    if not _is_super_admin() and "firma_id" in df.columns:
+                        df = df[df["firma_id"] == _an_fid]
+                    return df
         except Exception as e:
             st.error(f"Liste hatası: {e}")
         return pd.DataFrame()
