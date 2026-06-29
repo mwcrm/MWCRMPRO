@@ -5497,21 +5497,61 @@ section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseBu
         # ── KART GÖRÜNÜMÜ ─────────────────────────────────────────────────────
         _pot_renk = {"çok yüksek":"#22c55e","yüksek":"#22c55e","orta":"#f59e0b","düşük":"#ef4444","çok düşük":"#ef4444"}
 
+        # ── ANALİZ LİSTESİ KART CSS ───────────────────────────────────────────
+        st.markdown("""<style>
+div[data-testid="stHorizontalBlock"]:has(.an-kart-btn) button {
+    background: white !important;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 12px !important;
+    padding: 12px 16px !important;
+    text-align: left !important;
+    justify-content: flex-start !important;
+    height: auto !important;
+    min-height: 64px !important;
+    white-space: normal !important;
+    line-height: 1.5 !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04) !important;
+    transition: all .15s !important;
+}
+div[data-testid="stHorizontalBlock"]:has(.an-kart-btn) button:hover {
+    border-color: #93c5fd !important;
+    box-shadow: 0 2px 8px rgba(59,130,246,.12) !important;
+    transform: translateY(-1px) !important;
+}
+div[data-testid="stHorizontalBlock"]:has(.an-kart-btn) button p {
+    text-align: left !important;
+    white-space: normal !important;
+    font-size: 13px !important;
+    color: #1e293b !important;
+}
+</style>""", unsafe_allow_html=True)
+
         for _ai, (_, _ar) in enumerate(_dff.iterrows()):
             _ar_firma   = str(_ar.get("firma","") or "?")
             _ar_pot     = str(_ar.get("potansiyel","") or "")
             _ar_sonuc   = str(_ar.get("sonuc","") or "")
             _ar_tarih   = fmt_tarih(_ar.get("tarih",""))
+            _ar_yetkili = str(_ar.get("yetkili","") or "")
+            _ar_sektor  = str(_ar.get("sektor","") or "")
+            _ar_bek     = float(_ar.get("bek_ciro",0) or 0)
             _dot_renk   = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(_ar_pot,"⚪")
+            _sonuc_badge = {"anlaşma yapıldı":"✅","teklif verildi":"📄","takip edilecek":"⏰","beklemede":"⏳","ilgisiz":"❌"}.get(_ar_sonuc,"·")
+            _pot_renk_hex = _pot_renk.get(_ar_pot, "#94a3b8")
 
-            _lc1, _lc2, _lc3 = st.columns([7, 1, 1])
-            if _lc1.button(
-                f"{_dot_renk}  {_ar_firma}   ·   {_ar_tarih}   ·   {_ar_pot}   ·   {_ar_sonuc}",
-                key=f"an_ac_{_ai}", use_container_width=True
-            ):
-                st.session_state["an_detay_firma"] = _ar_firma
-                st.rerun()
-            if _lc2.button("↗ Aç", key=f"an_ac2_{_ai}", use_container_width=True):
+            # Kart içeriği — zengin metin
+            _kart_label = (
+                f"{_dot_renk}  **{_ar_firma}**\n\n"
+                f"{_sonuc_badge} {_ar_sonuc.title() if _ar_sonuc else '—'}   ·   "
+                f"📅 {_ar_tarih}"
+                + (f"   ·   💰 {_ar_bek:,.0f}₺" if _ar_bek > 0 else "")
+                + (f"\n👤 {_ar_yetkili}" if _ar_yetkili and _ar_yetkili not in ["nan","None","—"] else "")
+                + (f"   🏭 {_ar_sektor}" if _ar_sektor and _ar_sektor not in ["nan","None","—"] else "")
+            )
+
+            _lc1, _lc3 = st.columns([9, 1])
+            # Görünmez marker span — CSS hook için
+            _lc1.markdown('<span class="an-kart-btn"></span>', unsafe_allow_html=True)
+            if _lc1.button(_kart_label, key=f"an_ac_{_ai}", use_container_width=True):
                 st.session_state["an_detay_firma"] = _ar_firma
                 st.rerun()
             with _lc3:
@@ -5524,7 +5564,7 @@ section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseBu
                     if _c2.button("✗", key=f"an_sil_hayir_{_ai}", use_container_width=True, help="İptal"):
                         st.session_state.pop(_sil_key, None); st.rerun()
                 else:
-                    if st.button("🗑 Sil", key=f"an_sil2_{_ai}", use_container_width=True):
+                    if st.button("🗑", key=f"an_sil2_{_ai}", use_container_width=True, help="Sil"):
                         st.session_state[_sil_key] = True; st.rerun()
 
         st.divider()
