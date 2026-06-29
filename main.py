@@ -625,6 +625,30 @@ def _tanim_guncelle(tip, eski, yeni):
 def giris_ekrani():
     st.markdown("<h1 style='text-align:center;color:#1f6feb;'>🏢 MWCRMPRO</h1>", unsafe_allow_html=True)
     st.markdown("<h4 style='text-align:center;color:#888;'>Cari Yönetim Sistemi</h4><br>", unsafe_allow_html=True)
+
+    # ── CİHAZ SEÇİMİ ──────────────────────────────────────────────────────────
+    if "giris_cihaz" not in st.session_state:
+        st.session_state["giris_cihaz"] = None
+
+    if st.session_state["giris_cihaz"] is None:
+        st.markdown("""
+<div style="max-width:360px;margin:0 auto 24px auto;text-align:center;">
+  <div style="font-size:14px;color:#64748b;margin-bottom:16px;font-weight:500;">Hangi cihazdan bağlanıyorsunuz?</div>
+</div>
+""", unsafe_allow_html=True)
+        _cd1, _cd2 = st.columns(2)
+        if _cd1.button("🖥️  Masaüstü / Laptop", use_container_width=True, type="secondary"):
+            st.session_state["giris_cihaz"] = "masaustu"
+            st.session_state["_mobil_mod"] = False
+            st.session_state["_ekran_kontrol"] = True
+            st.rerun()
+        if _cd2.button("📱  Telefon / Tablet", use_container_width=True, type="primary"):
+            st.session_state["giris_cihaz"] = "mobil"
+            st.session_state["_mobil_mod"] = True
+            st.session_state["_ekran_kontrol"] = True
+            st.rerun()
+        st.stop()
+
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         with st.form("giris_form"):
@@ -1217,6 +1241,8 @@ def _surum_kontrol():
 if not st.session_state.get("giris", False):
     giris_ekrani()
     st.stop()
+
+
 
 # ── SİSTEM AÇIK KALSIN — timeout yok ──────────────────────────────────────────
 # Streamlit oturumu kullanıcı kapatana kadar aktif kalır; ekstra keep-alive gerekmez.
@@ -1817,6 +1843,160 @@ if aktif == "yeni":
 # ── CARİ LİSTE ───────────────────────────────────────────────────────────────
 elif aktif == "liste":
     sayfa_log("liste")
+
+    # ── MOBİL KART GÖRÜNÜMÜ ──────────────────────────────────────────────────
+    if st.session_state.get("_mobil_mod", False):
+        st.markdown("""
+<style>
+/* Mobil liste sayfası — masaüstü elementleri gizle */
+.mw-mob-only { display: block !important; }
+.mw-desk-only { display: none !important; }
+section[data-testid="stSidebar"] { display: none !important; }
+.block-container { padding: 4px 6px 80px 6px !important; }
+/* Kart stilleri */
+.mw-firma-card {
+  background: white;
+  border: 0.5px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: box-shadow .15s;
+}
+.mw-firma-card:active { background: #f8fafc; }
+.mw-kart-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px; }
+.mw-kart-adi { font-size: 14px; font-weight: 600; color: #0f172a; }
+.mw-kart-badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 500; white-space: nowrap; }
+.mw-kart-meta { font-size: 12px; color: #64748b; margin-bottom: 6px; }
+.mw-kart-foot { display: flex; justify-content: space-between; align-items: center; border-top: 0.5px solid #f1f5f9; padding-top: 6px; }
+.mw-kart-ciro { font-size: 13px; font-weight: 600; color: #0f172a; }
+.mw-kart-acts { display: flex; gap: 6px; }
+.mw-act-btn { width: 34px; height: 34px; border-radius: 8px; border: 0.5px solid #e2e8f0; background: #f8fafc; display: flex; align-items: center; justify-content: center; font-size: 16px; text-decoration: none; }
+.mw-analiz-tag { font-size: 11px; color: #16a34a; background: #dcfce7; padding: 2px 7px; border-radius: 20px; }
+/* Alt nav */
+#mw-mobile-nav { display: flex !important; }
+</style>
+""", unsafe_allow_html=True)
+
+        # Veri yükle
+        _sb_m = get_sb_client()
+        try:
+            if _sb_m:
+                _res_m = _sb_m.table("cari_kartlar").select("*").neq("silindi",1).order("tarih",desc=True).execute()
+                _df_m = pd.DataFrame(_res_m.data) if _res_m.data else pd.DataFrame()
+            else:
+                raise Exception()
+        except:
+            _df_m = db_read("cari_kartlar", extra_sql="WHERE silindi=0 OR silindi IS NULL ORDER BY tarih DESC")
+
+        if not _df_m.empty:
+            for _tk in ["gsm","sabit"]:
+                if _tk in _df_m.columns:
+                    _df_m[_tk] = _telefon_temizle(_df_m[_tk])
+
+        # Analiz yapılmış firmalar
+        _analiz_set = set()
+        try:
+            if _sb_m:
+                _an_r = _sb_m.table("musteri_analiz").select("firma").execute().data or []
+                def _nm(s): return str(s or "").strip().upper().replace("İ","I").replace("Ş","S").replace("Ğ","G").replace("Ü","U").replace("Ö","O").replace("Ç","C")
+                _analiz_set = set(_nm(x.get("firma","")) for x in _an_r if x.get("firma"))
+        except: pass
+
+        # Arama & filtre
+        _mc1, _mc2 = st.columns([3,1])
+        _mob_ara = _mc1.text_input("🔍 Ara", placeholder="Firma, yetkili, il...", key="mob_ara", label_visibility="collapsed")
+        _mob_durum = _mc2.selectbox("Durum", ["Tümü","Portföy","Özel Müşteri","Randevu","Tekrar Ara","Fiyat Hazırla","Teklif","Pasif"], key="mob_dur", label_visibility="collapsed")
+
+        # Filtrele
+        _df_mob = _df_m.copy() if not _df_m.empty else pd.DataFrame()
+        if not _df_mob.empty:
+            if _mob_ara:
+                _mask = (
+                    _df_mob.get("firma", pd.Series()).astype(str).str.contains(_mob_ara, case=False, na=False) |
+                    _df_mob.get("yetkili", pd.Series()).astype(str).str.contains(_mob_ara, case=False, na=False) |
+                    _df_mob.get("il", pd.Series()).astype(str).str.contains(_mob_ara, case=False, na=False)
+                )
+                _df_mob = _df_mob[_mask]
+            if _mob_durum != "Tümü":
+                if "durum" in _df_mob.columns:
+                    _df_mob = _df_mob[_df_mob["durum"].astype(str).str.contains(_mob_durum, case=False, na=False)]
+
+        st.caption(f"{len(_df_mob)} müşteri")
+
+        # Durum renk & badge
+        _DURUM_RENK = {
+            "Portföy":         ("#dcfce7","#166534"),
+            "Özel Müşteri":    ("#eff6ff","#1d4ed8"),
+            "Randevu":         ("#dbeafe","#1e40af"),
+            "Tekrar Ara":      ("#fef9c3","#854d0e"),
+            "Fiyat Hazırla":   ("#ede9fe","#5b21b6"),
+            "Teklif":          ("#fef3c7","#92400e"),
+            "Pasif":           ("#f1f5f9","#475569"),
+            "Negatif Portföy": ("#fee2e2","#991b1b"),
+            "Kazanıldı":       ("#dcfce7","#14532d"),
+        }
+
+        # Kartları render et
+        if not _df_mob.empty:
+            for _, _row in _df_mob.iterrows():
+                _firma   = str(_row.get("firma","") or "?")
+                _yetkili = str(_row.get("yetkili","") or "")
+                _gsm     = str(_row.get("gsm","") or "")
+                _il      = str(_row.get("il","") or "")
+                _ilce    = str(_row.get("ilce","") or "")
+                _durum   = str(_row.get("durum","") or "")
+                _asama   = str(_row.get("islem_asamasi","") or "")
+                _bek     = float(_row.get("beklenen_ciro",0) or 0)
+                _ger     = float(_row.get("gerceklesen_ciro",0) or 0)
+                _seg     = str(_row.get("segment","") or "")
+                _cari_id = _row.get("id","")
+
+                # Segment dot
+                _dot = "🟢" if "A" in _seg else ("🔵" if "B" in _seg else ("⚪" if "C" in _seg else ""))
+                # Analiz var mı
+                def _nrm(s): return str(s or "").strip().upper().replace("İ","I").replace("Ş","S").replace("Ğ","G").replace("Ü","U").replace("Ö","O").replace("Ç","C")
+                _analiz_var = _nrm(_firma) in _analiz_set
+                # Badge renk
+                _bg, _tc = _DURUM_RENK.get(_durum, ("#f1f5f9","#475569"))
+                # Telefon link
+                _gsm_clean = _gsm.replace(" ","").replace("-","").replace("(","").replace(")","")
+                if _gsm_clean and not _gsm_clean.startswith("90"): _gsm_clean = "90" + _gsm_clean.lstrip("0")
+
+                # Kart HTML
+                st.markdown(f"""
+<div class="mw-firma-card">
+  <div class="mw-kart-top">
+    <div class="mw-kart-adi">{_dot} {_firma}</div>
+    <span class="mw-kart-badge" style="background:{_bg};color:{_tc};">{_durum}</span>
+  </div>
+  <div class="mw-kart-meta">
+    {"📍 " + _il + ("/" + _ilce if _ilce else "") + "  " if _il else ""}{"👤 " + _yetkili if _yetkili and _yetkili not in ["nan","None"] else ""}
+    {"  🏭 " + _asama if _asama and _asama not in ["nan","None"] else ""}
+  </div>
+  <div class="mw-kart-foot">
+    <div>
+      <div style="font-size:10px;color:#94a3b8;">Hedef / Gerçek</div>
+      <div class="mw-kart-ciro">{int(_bek):,}₺ / {int(_ger):,}₺</div>
+    </div>
+    <div class="mw-kart-acts">
+      {"<span class='mw-analiz-tag'>✅</span>" if _analiz_var else ""}
+      {"<a class='mw-act-btn' href='tel:" + _gsm_clean + "'>📞</a>" if _gsm_clean else ""}
+      {"<a class='mw-act-btn' href='https://wa.me/" + _gsm_clean + "' target='_blank'>💬</a>" if _gsm_clean else ""}
+    </div>
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+                # Nota git butonu
+                if st.button(f"📋 Not / Detay — {_firma[:25]}", key=f"mob_det_{_cari_id}", use_container_width=True):
+                    st.session_state["mob_secili_id"] = _cari_id
+                    st.session_state["mob_secili_firma"] = _firma
+                    st.rerun()
+        else:
+            st.info("Müşteri bulunamadı.")
+        st.stop()
+    # ── MASAÜSTÜ — normal liste devam eder ──────────────────────────────────
     # Kolon genişliklerini localStorage'a kaydet ve geri yükle
     st.markdown("""<script>
 (function(){
