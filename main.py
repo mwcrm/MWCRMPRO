@@ -1257,15 +1257,15 @@ with st.sidebar:
 section[data-testid="stSidebar"] { 
     padding-top: 0.5rem !important; 
     transform: translateX(0px) !important;
-    overflow-y: hidden !important;
+    overflow-y: auto !important;
     height: 100vh !important;
 }
 section[data-testid="stSidebar"] > div:first-child {
-    overflow-y: hidden !important;
+    overflow-y: auto !important;
     height: 100% !important;
 }
 section[data-testid="stSidebar"] > div > div {
-    overflow-y: hidden !important;
+    overflow-y: auto !important;
 }
 /* Gereksiz boşlukları kaldır */
 div[data-testid="stVerticalBlock"] > div:empty { display: none !important; }
@@ -1395,6 +1395,19 @@ button[data-testid="manage-app-button"] { display: none !important; }
     _gizli_menu_render = st.session_state.get("_gizli_menu_list", [])
     _sb_liste = [t for t in _sb_liste if t not in _gizli_menu_render]
 
+    # ── MOBİL MOD BUTONU ──────────────────────────────────────────────────────
+    _mobil_aktif = st.session_state.get("_mobil_mod", False)
+    if st.button(
+        "📱 Mobil Mod: AÇIK" if _mobil_aktif else "📱 Mobil Mod",
+        key="sidebar_mobil_mod",
+        use_container_width=True,
+        type="primary" if _mobil_aktif else "secondary",
+        help="Telefon/Tablet görünümüne geç"
+    ):
+        st.session_state["_mobil_mod"] = not _mobil_aktif
+        st.rerun()
+    st.divider()
+
     for _tab_key in _sb_liste:
         _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
         _aktif_mi = st.session_state["aktif_tab"] == _tab_key
@@ -1522,18 +1535,6 @@ button[data-testid="manage-app-button"] { display: none !important; }
     if _kc2.button("🚪", key="sidebar_cikis", use_container_width=True, help="Çıkış"):
         cikis()
 
-    st.divider()
-    # ── MOBİL MOD BUTONU ──────────────────────────────────────────────────────
-    _mobil_aktif = st.session_state.get("_mobil_mod", False)
-    if st.button(
-        "📱 Mobil Mod: AÇIK" if _mobil_aktif else "📱 Mobil Mod",
-        key="sidebar_mobil_mod",
-        use_container_width=True,
-        type="primary" if _mobil_aktif else "secondary",
-        help="Telefon/Tablet görünümüne geç"
-    ):
-        st.session_state["_mobil_mod"] = not _mobil_aktif
-        st.rerun()
 
 # ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
 st.divider()
