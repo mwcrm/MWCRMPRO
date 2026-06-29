@@ -2558,14 +2558,30 @@ function kartSec(id){
                             .replace("İ","I").replace("Ş","S").replace("Ğ","G")
                             .replace("Ü","U").replace("Ö","O").replace("Ç","C")
                             .replace("  "," "))
-                _analiz_firma_set = set(
+                _analiz_firma_list = [
                     _norm_firma(_ar.get("firma",""))
                     for _ar in _an_raw
                     if _ar.get("firma")
-                )
-                df_edit["✅ Analiz"] = df_edit["firma"].apply(
-                    lambda x: "✅" if _norm_firma(x) in _analiz_firma_set else ""
-                )
+                ]
+                _analiz_firma_set = set(_analiz_firma_list)
+                def _analiz_esles(firma_adi):
+                    _n = _norm_firma(firma_adi)
+                    if not _n:
+                        return ""
+                    # 1) Tam eşleşme
+                    if _n in _analiz_firma_set:
+                        return "✅"
+                    # 2) Kısmi eşleşme — biri diğerinin içinde mi
+                    for _af in _analiz_firma_list:
+                        if not _af:
+                            continue
+                        if _n in _af or _af in _n:
+                            return "✅"
+                        # 3) İlk 8 karakter eşleşmesi
+                        if len(_n) >= 8 and len(_af) >= 8 and _n[:8] == _af[:8]:
+                            return "✅"
+                    return ""
+                df_edit["✅ Analiz"] = df_edit["firma"].apply(_analiz_esles)
             else:
                 df_edit["✅ Analiz"] = ""
         except Exception as _ane:
