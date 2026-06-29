@@ -1917,30 +1917,33 @@ section[data-testid="stSidebar"] { display: none !important; }
                 _gsm_clean = _gsm.replace(" ","").replace("-","").replace("(","").replace(")","")
                 if _gsm_clean and not _gsm_clean.startswith("90"): _gsm_clean = "90" + _gsm_clean.lstrip("0")
 
-                # Kart HTML
-                st.markdown(f"""
-<div class="mw-firma-card">
+                # Kart HTML — değişkenler önceden hesapla
+                _meta_html = ""
+                if _il:
+                    _meta_html += f"📍 {_il}" + (f"/{_ilce}" if _ilce else "")
+                if _yetkili and _yetkili not in ["nan","None",""]:
+                    _meta_html += f"  👤 {_yetkili}"
+                if _asama and _asama not in ["nan","None",""]:
+                    _meta_html += f"  🏭 {_asama}"
+                _analiz_html = "<span class='mw-analiz-tag'>✅</span>" if _analiz_var else ""
+                _tel_html = f"<a class='mw-act-btn' href='tel:{_gsm_clean}'>📞</a>" if _gsm_clean else ""
+                _wa_html  = f"<a class='mw-act-btn' href='https://wa.me/{_gsm_clean}' target='_blank'>💬</a>" if _gsm_clean else ""
+                _ciro_str = f"{int(_bek):,}₺ / {int(_ger):,}₺"
+
+                st.markdown(f"""<div class="mw-firma-card">
   <div class="mw-kart-top">
     <div class="mw-kart-adi">{_dot} {_firma}</div>
     <span class="mw-kart-badge" style="background:{_bg};color:{_tc};">{_durum}</span>
   </div>
-  <div class="mw-kart-meta">
-    {"📍 " + _il + ("/" + _ilce if _ilce else "") + "  " if _il else ""}{"👤 " + _yetkili if _yetkili and _yetkili not in ["nan","None"] else ""}
-    {"  🏭 " + _asama if _asama and _asama not in ["nan","None"] else ""}
-  </div>
+  <div class="mw-kart-meta">{_meta_html}</div>
   <div class="mw-kart-foot">
     <div>
       <div style="font-size:10px;color:#94a3b8;">Hedef / Gerçek</div>
-      <div class="mw-kart-ciro">{int(_bek):,}₺ / {int(_ger):,}₺</div>
+      <div class="mw-kart-ciro">{_ciro_str}</div>
     </div>
-    <div class="mw-kart-acts">
-      {"<span class='mw-analiz-tag'>✅</span>" if _analiz_var else ""}
-      {"<a class='mw-act-btn' href='tel:" + _gsm_clean + "'>📞</a>" if _gsm_clean else ""}
-      {"<a class='mw-act-btn' href='https://wa.me/" + _gsm_clean + "' target='_blank'>💬</a>" if _gsm_clean else ""}
-    </div>
+    <div class="mw-kart-acts">{_analiz_html}{_tel_html}{_wa_html}</div>
   </div>
-</div>
-""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
 
                 # Nota git butonu
                 if st.button(f"📋 Not / Detay — {_firma[:25]}", key=f"mob_det_{_cari_id}", use_container_width=True):
