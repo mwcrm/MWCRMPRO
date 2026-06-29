@@ -2137,7 +2137,10 @@ section[data-testid="stSidebar"] { display: none !important; }
                 df[_tk] = _telefon_temizle(df[_tk])
 
     with st.expander("🔍 Mükerrer (Aynı İsimli) Müşterileri Bul ve Birleştir"):
-        _firma_gruplari = df.groupby(df["firma"].str.strip().str.upper())["id"].apply(list)
+        if df.empty or "firma" not in df.columns:
+            st.caption("Veri yok.")
+        else:
+         _firma_gruplari = df.groupby(df["firma"].str.strip().str.upper())["id"].apply(list)
         _mukerrerler = {k: v for k, v in _firma_gruplari.items() if len(v) > 1}
 
         if not _mukerrerler:
