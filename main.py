@@ -31,6 +31,28 @@ def get_sb_client():
         pass
     return None
 
+def _firma_id_kolon_olustur():
+    """Supabase tablolarına firma_id kolonu ekle ve mevcut kayıtları güncelle"""
+    try:
+        sb = get_sb_client()
+        if not sb:
+            return
+        tablolar = ["cari_kartlar","musteri_analiz","randevular","teklifler",
+                    "kisiler","kisiler_mesaj_log","cari_aciklamalar",
+                    "musteri_calisma_tablosu","kullanici_tercih"]
+        for tbl in tablolar:
+            try:
+                # firma_id=1 olmayan kayıtları bul ve güncelle
+                r = sb.table(tbl).select("id").is_("firma_id","null").limit(500).execute()
+                if r.data:
+                    ids = [row["id"] for row in r.data if row.get("id")]
+                    for chunk in [ids[i:i+50] for i in range(0,len(ids),50)]:
+                        sb.table(tbl).update({"firma_id":1}).in_("id",chunk).execute()
+            except:
+                pass
+    except:
+        pass
+
 @st.cache_resource
 def get_sb_service():
     """Supabase service_role client — log ve admin işlemler için"""
@@ -1403,6 +1425,28 @@ def _surum_kontrol():
 if not st.session_state.get("giris", False):
     giris_ekrani()
     st.stop()
+
+# ── İLK ÇALIŞMADA firma_id kolonlarını güncelle ───────────────────────────────
+if not st.session_state.get("_firma_id_guncellendi", False):
+    _firma_id_kolon_olustur()
+    # OVA'nın kendi eklediği ama firma_id almayan kayıtları düzelt
+    try:
+        _sb_fix = get_sb_client()
+        _fix_fid = st.session_state.get("firma_id", 1)
+        _fix_kul = st.session_state.get("kullanici", "")
+        if _sb_fix and _fix_kul and _fix_fid != 1:
+            for _tbl in ["cari_kartlar","musteri_analiz","randevular","teklifler"]:
+                try:
+                    _r = _sb_fix.table(_tbl).select("id").is_("firma_id","null").eq("olusturan", _fix_kul).execute()
+                    if _r.data:
+                        _ids = [x["id"] for x in _r.data if x.get("id")]
+                        if _ids:
+                            _sb_fix.table(_tbl).update({"firma_id": _fix_fid}).in_("id", _ids).execute()
+                except:
+                    pass
+    except:
+        pass
+    st.session_state["_firma_id_guncellendi"] = True
 
 
 
