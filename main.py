@@ -168,7 +168,11 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
         try:
             q = sb.table(table).select("*")
             if _filtre_uygula:
+                # firma_id eşleşmesi VE NULL olmayanlar
                 q = q.eq("firma_id", _firma_id)
+                q = q.not_.is_("firma_id", "null")
+            elif not _super_admin and table in _FIRMA_FILTER_TABLES:
+                return pd.DataFrame()
             if filters:
                 for k, v in filters.items():
                     if v == "NOT_NULL":
@@ -1711,6 +1715,13 @@ st.divider()
 if "aktif_tab" not in st.session_state:
     st.session_state["aktif_tab"] = "liste"
 aktif = st.session_state["aktif_tab"]
+
+# ── DEBUG — firma_id kontrol (geçici) ────────────────────────────────────────
+if st.session_state.get("kullanici","") not in ["admin",""]:
+    _d_fid = st.session_state.get("firma_id","YOK")
+    _d_kul = st.session_state.get("kullanici","?")
+    _d_rol = st.session_state.get("rol","?")
+    st.sidebar.warning(f"DEBUG → firma_id: **{_d_fid}** | kullanıcı: {_d_kul} | rol: {_d_rol}")
 
 # ── MOBİL MOD — body class + nav aktif ikon ──────────────────────────────────
 _mobil_mod_aktif = st.session_state.get("_mobil_mod", False)
