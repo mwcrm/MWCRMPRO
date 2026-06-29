@@ -169,11 +169,13 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
     if sb:
         try:
             q = sb.table(table).select("*")
-            # Otomatik firma filtresi — NULL olanları da dışla
+            # Otomatik firma filtresi
             if _filtre_uygula:
-                q = q.eq("firma_id", _firma_id).not_.is_("firma_id", "null")
-            elif _super_admin and table in _FIRMA_FILTER_TABLES:
-                pass  # Süper admin hepsini görür
+                # Sadece bu firmanın kayıtları — NULL olanlar dahil değil
+                q = q.eq("firma_id", _firma_id)
+            elif not _super_admin and table in _FIRMA_FILTER_TABLES:
+                # Super admin değil ama filtre de yok — boş döndür (güvenlik)
+                return pd.DataFrame()
             if filters:
                 for k, v in filters.items():
                     if v == "NOT_NULL":
