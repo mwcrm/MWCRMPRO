@@ -1522,6 +1522,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
     if _kc2.button("🚪", key="sidebar_cikis", use_container_width=True, help="Çıkış"):
         cikis()
 
+    st.divider()
     # ── MOBİL MOD BUTONU ──────────────────────────────────────────────────────
     _mobil_aktif = st.session_state.get("_mobil_mod", False)
     if st.button(
@@ -1533,6 +1534,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
     ):
         st.session_state["_mobil_mod"] = not _mobil_aktif
         st.rerun()
+
 # ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
 st.divider()
 
