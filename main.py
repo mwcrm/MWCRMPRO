@@ -2552,22 +2552,24 @@ function kartSec(id){
             _sb_an = get_sb_client()
             if _sb_an:
                 _an_raw = _sb_an.table("musteri_analiz").select("firma").execute().data or []
+                def _norm_firma(s):
+                    return (str(s or "").strip()
+                            .upper()
+                            .replace("İ","I").replace("Ş","S").replace("Ğ","G")
+                            .replace("Ü","U").replace("Ö","O").replace("Ç","C")
+                            .replace("  "," "))
                 _analiz_firma_set = set(
-                    str(_ar.get("firma","") or "").strip().upper()
+                    _norm_firma(_ar.get("firma",""))
                     for _ar in _an_raw
                     if _ar.get("firma")
                 )
                 df_edit["✅ Analiz"] = df_edit["firma"].apply(
-                    lambda x: "✅" if str(x or "").strip().upper() in _analiz_firma_set else ""
+                    lambda x: "✅" if _norm_firma(x) in _analiz_firma_set else ""
                 )
-                # Debug — geçici
-                if _analiz_firma_set:
-                    st.caption(f"Analiz tablosunda {len(_analiz_firma_set)} firma: {list(_analiz_firma_set)[:5]}")
             else:
                 df_edit["✅ Analiz"] = ""
         except Exception as _ane:
             df_edit["✅ Analiz"] = ""
-            st.caption(f"Analiz hata: {_ane}")
     except:
         df_edit["✅ Analiz"] = ""
     _not_detay = {}
