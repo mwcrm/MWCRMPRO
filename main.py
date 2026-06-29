@@ -950,15 +950,85 @@ body.mw-mobil-aktif div[data-testid="stHorizontalBlock"]:has(.an-kart-btn) > div
 </style>
 """, unsafe_allow_html=True)
 
-# ── MOBİL ALT NAVİGASYON HTML ────────────────────────────────────────────────
+# ── MOBİL ALT NAVİGASYON — gizli Streamlit butonları + HTML overlay ──────────
+st.markdown("""<div id="mw-mobile-nav">
+  <button class="mw-nav-btn" id="mwnav-liste"><span class="nav-ikon">📋</span>Liste</button>
+  <button class="mw-nav-btn" id="mwnav-analiz"><span class="nav-ikon">🔍</span>Analiz</button>
+  <button class="mw-nav-btn" id="mwnav-randevu"><span class="nav-ikon">📅</span>Randevu</button>
+  <button class="mw-nav-btn" id="mwnav-teklif"><span class="nav-ikon">📄</span>Teklif</button>
+  <button class="mw-nav-btn" id="mwnav-harita"><span class="nav-ikon">🗺️</span>Harita</button>
+</div>""", unsafe_allow_html=True)
+
+# Gizli tab geçiş butonları — mobil nav bunları tetikler
+_MOB_TABS = ["liste","analiz","randevu","teklif","harita"]
+_mob_cols = st.columns(len(_MOB_TABS))
+for _mi, _mt in enumerate(_MOB_TABS):
+    with _mob_cols[_mi]:
+        st.markdown(f'<div id="mw-st-{_mt}" style="display:none"></div>', unsafe_allow_html=True)
+        if st.button(_mt, key=f"mw_nav_st_{_mt}", label_visibility="collapsed"):
+            st.session_state["aktif_tab"] = _mt
+            st.rerun()
+
 st.markdown("""
-<div id="mw-mobile-nav">
-  <a href="?tab=liste"><span class="nav-ikon">📋</span>Liste</a>
-  <a href="?tab=analiz"><span class="nav-ikon">🔍</span>Analiz</a>
-  <a href="?tab=randevu"><span class="nav-ikon">📅</span>Randevu</a>
-  <a href="?tab=teklif"><span class="nav-ikon">📄</span>Teklif</a>
-  <a href="?tab=harita"><span class="nav-ikon">🗺️</span>Harita</a>
-</div>
+<script>
+(function(){
+  var tabs = ['liste','analiz','randevu','teklif','harita'];
+  tabs.forEach(function(t){
+    var btn = document.getElementById('mwnav-'+t);
+    if(!btn) return;
+    btn.addEventListener('click', function(){
+      // Streamlit gizli butonunu bul ve tıkla
+      var stDiv = document.getElementById('mw-st-'+t);
+      if(stDiv){
+        var stBtn = stDiv.parentElement.querySelector('button');
+        if(stBtn){ stBtn.click(); return; }
+      }
+      // Fallback: tüm gizli butonları tara
+      var allBtns = window.parent.document.querySelectorAll('button');
+      for(var i=0;i<allBtns.length;i++){
+        if(allBtns[i].innerText.trim() === t){
+          allBtns[i].click(); return;
+        }
+      }
+    });
+  });
+})();
+</script>
+<style>
+.mw-nav-btn {
+  display:flex !important; flex-direction:column !important;
+  align-items:center !important; gap:2px !important;
+  background:none !important; border:none !important;
+  color:#64748b !important; font-size:10px !important;
+  font-weight:500 !important; padding:4px 6px !important;
+  border-radius:8px !important; min-width:52px !important;
+  min-height:44px !important; cursor:pointer !important;
+  justify-content:center !important;
+}
+.mw-nav-btn.aktif { color:#2563eb !important; background:#eff6ff !important; }
+.mw-nav-btn .nav-ikon { font-size:20px !important; line-height:1 !important; }
+</style>
+<script>
+function mwTab(tab) {
+  // Streamlit'in sidebar butonlarını bul ve tıkla — session state güvenli
+  var btns = window.parent.document.querySelectorAll('section[data-testid="stSidebar"] button');
+  var tabMap = {
+    'liste':'Cari Liste','analiz':'Müşteri Analizi','randevu':'Randevular',
+    'teklif':'Spot Teklif','ozel_teklif':'Özel Teklif','harita':'Müşteri Haritası',
+    'rapor':'Raporlar','yeni':'Yeni Kart'
+  };
+  var hedef = tabMap[tab] || tab;
+  for(var i=0;i<btns.length;i++){
+    if(btns[i].innerText && btns[i].innerText.indexOf(hedef.substring(0,6)) >= 0){
+      btns[i].click();
+      // Aktif class güncelle
+      document.querySelectorAll('.mw-nav-btn').forEach(function(b){ b.classList.remove('aktif'); });
+      event.currentTarget.classList.add('aktif');
+      return;
+    }
+  }
+}
+</script>
 """, unsafe_allow_html=True)
 
 
@@ -1575,58 +1645,33 @@ button[data-testid="manage-app-button"] { display: none !important; }
 # ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
 st.divider()
 
-# ── MOBİL MOD — body class enjeksiyonu ──────────────────────────────────────
+# Tab her zaman session_state'ten
+if "aktif_tab" not in st.session_state:
+    st.session_state["aktif_tab"] = "liste"
+aktif = st.session_state["aktif_tab"]
+
+# ── MOBİL MOD — body class + nav aktif ikon ──────────────────────────────────
 _mobil_mod_aktif = st.session_state.get("_mobil_mod", False)
+_aktif_tab_js = aktif
 st.markdown(f"""
 <script>
 (function(){{
-  var _aktif = {'true' if _mobil_mod_aktif else 'false'};
   var _body = window.parent ? window.parent.document.body : document.body;
-  if(_aktif){{
+  if({'true' if _mobil_mod_aktif else 'false'}){{
     _body.classList.add('mw-mobil-aktif');
   }} else {{
     _body.classList.remove('mw-mobil-aktif');
   }}
-  // Mobil nav aktif tab güncelle
-  var _aktif_tab = '{st.session_state.get("aktif_tab","liste")}';
-  var _nav = window.parent ? window.parent.document.getElementById('mw-mobile-nav') : document.getElementById('mw-mobile-nav');
-  if(_nav){{
-    _nav.querySelectorAll('a').forEach(function(a){{
-      var t = new URLSearchParams(a.search).get('tab');
-      var match = (t === _aktif_tab) || (_aktif_tab === 'ozel_teklif' && t === 'teklif');
-      if(match) a.classList.add('aktif'); else a.classList.remove('aktif');
-      a.addEventListener('click', function(e){{
-        e.preventDefault();
-        var url = new URL(window.parent.location.href);
-        url.searchParams.set('tab', new URLSearchParams(this.search).get('tab'));
-        window.parent.location.href = url.toString();
-      }});
-    }});
-  }}
-}})();
-</script>
-""", unsafe_allow_html=True)
-
-# Tab her zaman session_state'ten — query param yok, kopma yok
-if "aktif_tab" not in st.session_state:
-    st.session_state["aktif_tab"] = "liste"
-
-aktif = st.session_state["aktif_tab"]
-
-
-
-# Mobil alt nav aktif ikonunu güncelle
-st.markdown(f"""
-<script>
-(function(){{
-  var nav = document.getElementById('mw-mobile-nav');
-  if(!nav) return;
-  var cur = '{aktif}';
-  nav.querySelectorAll('a').forEach(function(a){{
-    var t = new URLSearchParams(a.search).get('tab');
-    var match = (t === cur) || (cur === 'ozel_teklif' && t === 'teklif');
-    if(match){{ a.classList.add('aktif'); }}
-    else {{ a.classList.remove('aktif'); }}
+  // Nav butonlarında aktif class güncelle
+  var _cur = '{_aktif_tab_js}';
+  var _tabMap = {{'liste':'liste','analiz':'analiz','randevu':'randevu',
+    'teklif':'teklif','ozel_teklif':'teklif','harita':'harita'}};
+  var _curNav = _tabMap[_cur] || _cur;
+  document.querySelectorAll('.mw-nav-btn').forEach(function(b){{
+    var _fn = b.getAttribute('onclick') || '';
+    var _m = _fn.match(/mwTab\('([^']+)'\)/);
+    if(_m && _m[1] === _curNav) b.classList.add('aktif');
+    else b.classList.remove('aktif');
   }});
 }})();
 </script>
@@ -1927,7 +1972,7 @@ section[data-testid="stSidebar"] { display: none !important; }
                     _meta_html += f"  🏭 {_asama}"
                 _analiz_html = "<span class='mw-analiz-tag'>✅</span>" if _analiz_var else ""
                 _tel_html = f"<a class='mw-act-btn' href='tel:{_gsm_clean}'>📞</a>" if _gsm_clean else ""
-                _wa_html  = f"<a class='mw-act-btn' href='https://wa.me/{_gsm_clean}' target='_blank'>💬</a>" if _gsm_clean else ""
+                _wa_html  = f"<a class='mw-act-btn' href='https://wa.me/{_gsm_clean}'>💬</a>" if _gsm_clean else ""
                 _ciro_str = f"{int(_bek):,}₺ / {int(_ger):,}₺"
 
                 st.markdown(f"""<div class="mw-firma-card">
@@ -5836,7 +5881,7 @@ section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseBu
                         st.session_state.pop(_kk, None)
                     st.rerun()
                 if _tel2 and "@" not in _tel2:
-                    _kb2.markdown(f"<a href='https://wa.me/{_tel2}' target='_blank'><button style='width:100%;padding:8px;font-size:12px;background:#25d366;color:white;border:none;border-radius:7px;cursor:pointer;font-weight:500'>💬 WA</button></a>", unsafe_allow_html=True)
+                    _kb2.markdown(f"<a href='https://wa.me/{_tel2}' ><button style='width:100%;padding:8px;font-size:12px;background:#25d366;color:white;border:none;border-radius:7px;cursor:pointer;font-weight:500'>💬 WA</button></a>", unsafe_allow_html=True)
                 if _kb3.button("📄 Spot Teklif", key="an_det_spot", use_container_width=True):
                     st.session_state["aktif_tab"]="teklif"; st.session_state["teklif_musteri_onsel"]=_detay_firma; st.rerun()
                 if _kb4.button("⭐ Özel Teklif", key="an_det_ozel", use_container_width=True):
