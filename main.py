@@ -2549,8 +2549,8 @@ function kartSec(id){
     try:
         _df_analiz_join = db_read("musteri_analiz")
         if not _df_analiz_join.empty and "firma" in _df_analiz_join.columns:
-            _analiz_firmalar = set(_df_analiz_join["firma"].dropna().astype(str).str.strip().tolist())
-            df_edit["✅ Analiz"] = df_edit["firma"].apply(lambda x: "✅" if str(x).strip() in _analiz_firmalar else "")
+            _analiz_firmalar = set(_df_analiz_join["firma"].dropna().astype(str).str.strip().str.upper().tolist())
+            df_edit["✅ Analiz"] = df_edit["firma"].apply(lambda x: "✅" if str(x).strip().upper() in _analiz_firmalar else "")
         else:
             df_edit["✅ Analiz"] = ""
     except:
