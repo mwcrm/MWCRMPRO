@@ -802,22 +802,129 @@ section.main > div.block-container,
 
 st.markdown("""
 <style>
-/* Mobil uyumluluk */
-@media (max-width: 768px) {
-    .block-container { padding: 0.5rem !important; }
-    div[data-testid="column"] { min-width: 100% !important; }
-    .stButton>button { width: 100% !important; font-size: 13px !important; }
-    .stDataFrame { font-size: 11px !important; }
-    h1 { font-size: 1.3rem !important; }
-    h2 { font-size: 1.1rem !important; }
-    h3 { font-size: 1rem !important; }
-}
-/* Genel buton iyileştirme */
+/* ── GENEL BUTON & DROPDOWN ── */
 .stButton>button { border-radius: 8px !important; }
-/* Data editor selectbox dropdown - tüm seçenekler görünsün */
 [data-baseweb="popover"] [data-baseweb="menu"] { max-height: 600px !important; overflow-y: auto !important; }
 [data-baseweb="select"] [data-baseweb="menu"] { max-height: 600px !important; }
+
+/* ── MOBİL NAV — her zaman tanımlanır, sadece .mw-mobil-aktif class'ı varsa görünür ── */
+#mw-mobile-nav {
+  display: none;
+  position: fixed !important;
+  bottom: 0 !important; left: 0 !important; right: 0 !important;
+  z-index: 9999 !important;
+  background: white !important;
+  border-top: 0.5px solid #e2e8f0 !important;
+  justify-content: space-around !important;
+  align-items: center !important;
+  padding: 6px 0 10px !important;
+  box-shadow: 0 -2px 12px rgba(0,0,0,.07) !important;
+}
+body.mw-mobil-aktif #mw-mobile-nav { display: flex !important; }
+#mw-mobile-nav a {
+  display: flex !important; flex-direction: column !important;
+  align-items: center !important; gap: 2px !important;
+  text-decoration: none !important; color: #64748b !important;
+  font-size: 10px !important; font-weight: 500 !important;
+  padding: 4px 6px !important; border-radius: 8px !important;
+  min-width: 52px !important; min-height: 44px !important;
+  justify-content: center !important;
+}
+#mw-mobile-nav a.aktif { color: #2563eb !important; background: #eff6ff !important; }
+#mw-mobile-nav a span.nav-ikon { font-size: 20px !important; line-height: 1 !important; }
+
+/* ── MOBİL MOD — sadece body.mw-mobil-aktif varken ── */
+body.mw-mobil-aktif .block-container {
+  padding: 4px 6px 80px 6px !important;
+  max-width: 100vw !important;
+}
+body.mw-mobil-aktif section[data-testid="stSidebar"] {
+  display: none !important;
+}
+body.mw-mobil-aktif h1 { font-size: 1.2rem !important; margin-bottom: 6px !important; }
+body.mw-mobil-aktif h2 { font-size: 1.05rem !important; margin-bottom: 5px !important; }
+body.mw-mobil-aktif h3 { font-size: 0.95rem !important; margin-bottom: 4px !important; }
+body.mw-mobil-aktif div[data-testid="column"] {
+  width: 100% !important; min-width: 100% !important;
+  flex: 0 0 100% !important;
+  padding-left: 0 !important; padding-right: 0 !important;
+}
+body.mw-mobil-aktif div[data-testid="stHorizontalBlock"] {
+  flex-wrap: wrap !important; gap: 6px !important;
+}
+body.mw-mobil-aktif .stButton>button {
+  width: 100% !important; min-height: 44px !important;
+  font-size: 14px !important; border-radius: 10px !important;
+  padding: 10px 14px !important;
+}
+body.mw-mobil-aktif .stButton>button p {
+  font-size: 14px !important; white-space: normal !important; text-align: left !important;
+}
+body.mw-mobil-aktif .stTextInput>div>div>input,
+body.mw-mobil-aktif .stTextArea>div>div>textarea,
+body.mw-mobil-aktif .stSelectbox>div>div,
+body.mw-mobil-aktif .stNumberInput>div>div>input,
+body.mw-mobil-aktif .stDateInput>div>div>input {
+  font-size: 16px !important; min-height: 44px !important; border-radius: 8px !important;
+}
+body.mw-mobil-aktif div[data-baseweb="select"] > div {
+  min-height: 44px !important; font-size: 14px !important;
+}
+body.mw-mobil-aktif .stDataFrame, body.mw-mobil-aktif [data-testid="stDataFrame"],
+body.mw-mobil-aktif [data-testid="stDataEditor"] {
+  overflow-x: auto !important; font-size: 11px !important; width: 100% !important;
+}
+body.mw-mobil-aktif div[data-testid="metric-container"] {
+  background: white !important; border: 0.5px solid #e2e8f0 !important;
+  border-radius: 10px !important; padding: 10px 12px !important; min-width: 0 !important;
+}
+body.mw-mobil-aktif div[data-testid="metric-container"] label { font-size: 11px !important; }
+body.mw-mobil-aktif div[data-testid="metric-container"] [data-testid="stMetricValue"] { font-size: 18px !important; }
+body.mw-mobil-aktif button[data-baseweb="tab"] {
+  font-size: 12px !important; padding: 8px 10px !important; min-height: 40px !important;
+}
+body.mw-mobil-aktif div[data-baseweb="tab-list"] {
+  overflow-x: auto !important; flex-wrap: nowrap !important; scrollbar-width: none !important;
+}
+body.mw-mobil-aktif div[data-baseweb="tab-list"]::-webkit-scrollbar { display: none !important; }
+body.mw-mobil-aktif details > summary {
+  font-size: 14px !important; padding: 12px !important; min-height: 44px !important;
+}
+body.mw-mobil-aktif .stCheckbox label, body.mw-mobil-aktif .stRadio label { font-size: 14px !important; }
+body.mw-mobil-aktif .stSlider [role="slider"] { width: 24px !important; height: 24px !important; }
+body.mw-mobil-aktif [data-testid="stDownloadButton"] button {
+  min-height: 44px !important; font-size: 14px !important; width: 100% !important;
+}
+body.mw-mobil-aktif [data-testid="stAlert"] {
+  font-size: 13px !important; padding: 10px 12px !important; border-radius: 8px !important;
+}
+body.mw-mobil-aktif footer { display: none !important; }
+body.mw-mobil-aktif [data-testid="stHeader"] { display: none !important; }
+body.mw-mobil-aktif iframe[src*="leaflet"], body.mw-mobil-aktif iframe[title*="harita"] {
+  width: 100% !important; min-height: 320px !important; border-radius: 10px !important;
+}
+body.mw-mobil-aktif [data-testid="stModal"] > div {
+  width: 95vw !important; max-width: 95vw !important;
+  margin: 10px auto !important; border-radius: 14px !important;
+}
+body.mw-mobil-aktif div[data-testid="stHorizontalBlock"]:has(.an-kart-btn) > div:first-child {
+  flex: 0 0 85% !important; min-width: 85% !important;
+}
+body.mw-mobil-aktif div[data-testid="stHorizontalBlock"]:has(.an-kart-btn) > div:last-child {
+  flex: 0 0 13% !important; min-width: 13% !important;
+}
 </style>
+""", unsafe_allow_html=True)
+
+# ── MOBİL ALT NAVİGASYON HTML ────────────────────────────────────────────────
+st.markdown("""
+<div id="mw-mobile-nav">
+  <a href="?tab=liste"><span class="nav-ikon">📋</span>Liste</a>
+  <a href="?tab=analiz"><span class="nav-ikon">🔍</span>Analiz</a>
+  <a href="?tab=randevu"><span class="nav-ikon">📅</span>Randevu</a>
+  <a href="?tab=teklif"><span class="nav-ikon">📄</span>Teklif</a>
+  <a href="?tab=harita"><span class="nav-ikon">🗺️</span>Harita</a>
+</div>
 """, unsafe_allow_html=True)
 
 
@@ -1414,9 +1521,84 @@ button[data-testid="manage-app-button"] { display: none !important; }
     )
     if _kc2.button("🚪", key="sidebar_cikis", use_container_width=True, help="Çıkış"):
         cikis()
+
+    # ── MOBİL MOD BUTONU ──────────────────────────────────────────────────────
+    _mobil_aktif = st.session_state.get("_mobil_mod", False)
+    if st.button(
+        "📱 Mobil Mod: AÇIK" if _mobil_aktif else "📱 Mobil Mod",
+        key="sidebar_mobil_mod",
+        use_container_width=True,
+        type="primary" if _mobil_aktif else "secondary",
+        help="Telefon/Tablet görünümüne geç"
+    ):
+        st.session_state["_mobil_mod"] = not _mobil_aktif
+        st.rerun()
 # ── ANA UYGULAMA ──────────────────────────────────────────────────────────────
 st.divider()
+
+# ── MOBİL MOD — body class enjeksiyonu ──────────────────────────────────────
+_mobil_mod_aktif = st.session_state.get("_mobil_mod", False)
+st.markdown(f"""
+<script>
+(function(){{
+  var _aktif = {'true' if _mobil_mod_aktif else 'false'};
+  var _body = window.parent ? window.parent.document.body : document.body;
+  if(_aktif){{
+    _body.classList.add('mw-mobil-aktif');
+  }} else {{
+    _body.classList.remove('mw-mobil-aktif');
+  }}
+  // Mobil nav aktif tab güncelle
+  var _aktif_tab = '{st.session_state.get("aktif_tab","liste")}';
+  var _nav = window.parent ? window.parent.document.getElementById('mw-mobile-nav') : document.getElementById('mw-mobile-nav');
+  if(_nav){{
+    _nav.querySelectorAll('a').forEach(function(a){{
+      var t = new URLSearchParams(a.search).get('tab');
+      var match = (t === _aktif_tab) || (_aktif_tab === 'ozel_teklif' && t === 'teklif');
+      if(match) a.classList.add('aktif'); else a.classList.remove('aktif');
+      a.addEventListener('click', function(e){{
+        e.preventDefault();
+        var url = new URL(window.parent.location.href);
+        url.searchParams.set('tab', new URLSearchParams(this.search).get('tab'));
+        window.parent.location.href = url.toString();
+      }});
+    }});
+  }}
+}})();
+</script>
+""", unsafe_allow_html=True)
+
+# ── MOBİL ALT NAV — query param ile tab geçişi ───────────────────────────────
+try:
+    _qp_tab = st.query_params.get("tab", "")
+    _gecerli_tablar = ["liste","analiz","randevu","teklif","ozel_teklif",
+                       "kisiler","rapor","excel","harita","yeni","patron",
+                       "admin_rapor","kullanici","whatsapp"]
+    if _qp_tab and _qp_tab in _gecerli_tablar:
+        st.session_state["aktif_tab"] = _qp_tab
+        st.query_params.clear()
+except Exception:
+    pass
+
 aktif = st.session_state["aktif_tab"]
+
+# Mobil alt nav aktif ikonunu güncelle
+st.markdown(f"""
+<script>
+(function(){{
+  var nav = document.getElementById('mw-mobile-nav');
+  if(!nav) return;
+  var cur = '{aktif}';
+  nav.querySelectorAll('a').forEach(function(a){{
+    var t = new URLSearchParams(a.search).get('tab');
+    var match = (t === cur) || (cur === 'ozel_teklif' && t === 'teklif');
+    if(match){{ a.classList.add('aktif'); }}
+    else {{ a.classList.remove('aktif'); }}
+  }});
+}})();
+</script>
+""", unsafe_allow_html=True)
+
 # ── OTOMATİK SAYFA TAKİBİ ───────────────────────────────────────────────────
 sayfa_log(aktif)
 
