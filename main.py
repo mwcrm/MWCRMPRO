@@ -1891,6 +1891,7 @@ if aktif == "yeni":
                 st.session_state["kayit_mesaj"] = f"✅ '{firma}' güncellendi!"
                 st.rerun()
             else:
+                _kayit_firma_id = _get_firma_id()
                 ok = db_insert("cari_kartlar", {
                     "tarih": datetime.now().isoformat(),
                     "firma": firma, "yetkili": yetkili, "gsm": gsm,
@@ -1899,7 +1900,8 @@ if aktif == "yeni":
                     "temsilci": _tem_kayit, "islem_asamasi": _asama_kayit,
                     "segment": _seg_kayit, "aciklama": notlar_v,
                     "silindi": 0, "olusturan": st.session_state["kullanici"],
-                    "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro
+                    "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro,
+                    "firma_id": _kayit_firma_id
                 })
                 try: db_read.clear()
                 except: pass
