@@ -141,7 +141,9 @@ _FIRMA_FILTER_TABLES = {
 def _get_firma_id():
     """Session'dan firma_id al — 0 = süper admin (hepsini görür)"""
     try:
-        return st.session_state.get("firma_id", 1)
+        _fid = st.session_state.get("firma_id", 1)
+        # None veya geçersiz gelirse 1 döndür
+        return int(_fid) if _fid else 1
     except:
         return 1
 
@@ -151,10 +153,17 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
     
     # Firma filtresi uygula mı?
     _firma_id = _get_firma_id()
+    # Süper admin = firma_id 0 VE kullanici_adi "admin" olan — sadece o hepsini görür
+    _super_admin = (
+        _firma_id == 0 or
+        (st.session_state.get("kullanici","") == "admin" and 
+         st.session_state.get("firma_id", 1) == 1 and
+         st.session_state.get("rol","") == "admin")
+    )
     _filtre_uygula = (
         table in _FIRMA_FILTER_TABLES and
         not tum_firmalar and
-        _firma_id != 0  # 0 = süper admin, hepsini görür
+        not _super_admin
     )
     
     if sb:
