@@ -99,8 +99,19 @@ def get_cari_listesi():
     sb = get_sb_client()
     if sb:
         try:
-            res = sb.table("cari_kartlar").select("*").neq("silindi",1).order("firma").execute()
-            _df_g = pd.DataFrame(res.data) if res.data else pd.DataFrame()
+            _tum = []
+            _offset = 0
+            _batch = 1000
+            while True:
+                res = sb.table("cari_kartlar").select("*").neq("silindi",1).order("firma").range(_offset, _offset+_batch-1).execute()
+                if res.data:
+                    _tum.extend(res.data)
+                    if len(res.data) < _batch:
+                        break
+                    _offset += _batch
+                else:
+                    break
+            _df_g = pd.DataFrame(_tum) if _tum else pd.DataFrame()
             if not _df_g.empty:
                 for _tk in ["gsm","sabit"]:
                     if _tk in _df_g.columns:
@@ -129,23 +140,40 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
     sb = get_sb_client()
     if sb:
         try:
-            q = sb.table(table).select("*")
-            if filters:
-                for k, v in filters.items():
-                    if v == "NOT_NULL":
-                        q = q.not_.is_(k, "null")
-                    elif v == "neq_1":
-                        q = q.neq(k, 1)
-                    else:
-                        q = q.eq(k, v)
-            if order_col:
-                q = q.order(order_col, desc=desc)
+            def _build_q(offset=None, batch=None):
+                q = sb.table(table).select("*")
+                if filters:
+                    for k, v in filters.items():
+                        if v == "NOT_NULL":
+                            q = q.not_.is_(k, "null")
+                        elif v == "neq_1":
+                            q = q.neq(k, 1)
+                        else:
+                            q = q.eq(k, v)
+                if order_col:
+                    q = q.order(order_col, desc=desc)
+                if limit:
+                    q = q.limit(limit)
+                elif offset is not None:
+                    q = q.range(offset, offset + batch - 1)
+                return q
             if limit:
-                q = q.limit(limit)
-            res = q.execute()
-            if res and res.data is not None:
-                return pd.DataFrame(res.data) if res.data else pd.DataFrame()
-            return pd.DataFrame()
+                res = _build_q().execute()
+                return pd.DataFrame(res.data) if (res and res.data) else pd.DataFrame()
+            else:
+                _tum = []
+                _offset = 0
+                _batch = 1000
+                while True:
+                    res = _build_q(_offset, _batch).execute()
+                    if res and res.data:
+                        _tum.extend(res.data)
+                        if len(res.data) < _batch:
+                            break
+                        _offset += _batch
+                    else:
+                        break
+                return pd.DataFrame(_tum) if _tum else pd.DataFrame()
         except Exception as _e_read:
             pass  # SQLite fallback
     try:
