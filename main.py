@@ -169,9 +169,11 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
     if sb:
         try:
             q = sb.table(table).select("*")
-            # Otomatik firma filtresi
+            # Otomatik firma filtresi — NULL olanları da dışla
             if _filtre_uygula:
-                q = q.eq("firma_id", _firma_id)
+                q = q.eq("firma_id", _firma_id).not_.is_("firma_id", "null")
+            elif _super_admin and table in _FIRMA_FILTER_TABLES:
+                pass  # Süper admin hepsini görür
             if filters:
                 for k, v in filters.items():
                     if v == "NOT_NULL":
