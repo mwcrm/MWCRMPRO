@@ -5987,6 +5987,7 @@ section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseBu
             st.stop()
 
         _df_tum = _an_liste()
+        _dff = pd.DataFrame()  # her zaman tanımlı olsun
 
         if _df_tum.empty:
             st.info("Henüz analiz kaydı yok. '✏️ Yeni / Düzenle' sekmesinden ekleyin.")
