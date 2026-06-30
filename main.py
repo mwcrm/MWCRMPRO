@@ -7466,32 +7466,55 @@ elif aktif == "randevu":
             st.session_state["rand_tarih_deger"] = datetime.now().date()
 
         _rand_saat_opts = [f"{h:02d}:{m:02d}" for h in range(9,21) for m in (0,15,30,45)]
+        _ay_tr_liste = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"]
+        _gun_adlari = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi","Pazar"]
+
+        _td_deger = st.session_state["rand_tarih_deger"]
+        _td_gun = _gun_adlari[_td_deger.weekday()]
+        _td_ay  = _ay_tr_liste[_td_deger.month - 1]
+        _tarih_okunur = f"{_td_deger.day} {_td_ay} {_td_deger.year} {_td_gun}"
+
+        st.markdown(f"""<style>
+.rand-tarih-lbl{{font-size:13px;color:#475569;font-weight:500;margin-bottom:4px;}}
+/* date_input'u görünür ama metnini gizleyip yerine Türkçe metni overlay olarak koyuyoruz */
+div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDateInput"] {{
+    position: relative !important;
+}}
+div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDateInput"] input {{
+    color: transparent !important;
+}}
+</style>""", unsafe_allow_html=True)
 
         _tlbl1, _tlbl2 = st.columns([3,1])
-        _tlbl1.markdown("<div style='font-size:13px;color:#475569;font-weight:500;'>Tarih*</div>", unsafe_allow_html=True)
-        _tlbl2.markdown("<div style='font-size:13px;color:#475569;font-weight:500;'>Saat*</div>", unsafe_allow_html=True)
+        _tlbl1.markdown("<div class='rand-tarih-lbl'>Tarih*</div>", unsafe_allow_html=True)
+        _tlbl2.markdown("<div class='rand-tarih-lbl'>Saat*</div>", unsafe_allow_html=True)
 
         _ptd1, _ptd2, _ptd3, _ptd4 = st.columns([1,2.2,2.2,1.6])
         if _ptd1.button("‹", key="rand_tarih_geri", help="Bir gün geri", use_container_width=True):
             st.session_state["rand_tarih_deger"] -= timedelta(days=1)
-            st.session_state.pop("rand_tarih_secim", None)
             st.rerun()
-        _secilen_tarih = _ptd2.date_input(
-            "Tarih", value=st.session_state["rand_tarih_deger"],
-            key="rand_tarih_secim", label_visibility="collapsed"
-        )
-        if _secilen_tarih != st.session_state["rand_tarih_deger"]:
-            st.session_state["rand_tarih_deger"] = _secilen_tarih
-            st.rerun()
+
+        with _ptd2:
+            st.markdown('<span class="rand-tarih-marker"></span>', unsafe_allow_html=True)
+            _secilen_tarih = st.date_input(
+                "Tarih", value=_td_deger,
+                key="rand_tarih_secim", label_visibility="collapsed"
+            )
+            st.markdown(f"""<div style="
+                position:relative; margin-top:-38px; pointer-events:none;
+                font-size:13px; color:#0f172a; padding:9px 14px;
+                background:transparent; text-align:left;
+            ">📅 {_tarih_okunur}</div>""", unsafe_allow_html=True)
+            if _secilen_tarih != _td_deger:
+                st.session_state["rand_tarih_deger"] = _secilen_tarih
+                st.rerun()
+
         if _ptd3.button("›", key="rand_tarih_ileri", help="Bir gün ileri", use_container_width=True):
             st.session_state["rand_tarih_deger"] += timedelta(days=1)
-            st.session_state.pop("rand_tarih_secim", None)
             st.rerun()
         rand_saat = _ptd4.selectbox("Saat", _rand_saat_opts, index=4, key="rand_saat", label_visibility="collapsed")
 
-        _gun_adlari = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi","Pazar"]
-        _td_gun = _gun_adlari[st.session_state["rand_tarih_deger"].weekday()]
-        st.caption(f"📅 {_td_gun}")
+        st.caption("👆 Tarih kutusuna tıklayarak takvimden de seçim yapabilirsiniz")
 
         with st.form("randevu_form"):
             st.caption(f"Seçili müşteri: **{_rand_mus_sec}**" if _rand_mus_sec != "-- Müşteri Seçin --" else "⚠️ Yukarıdan müşteri seçin")
