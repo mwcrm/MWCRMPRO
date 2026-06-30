@@ -1865,6 +1865,21 @@ if aktif == "yeni":
 elif aktif == "liste":
     sayfa_log("liste")
 
+    # ── VERİTABANI DURUM KONTROLÜ ──────────────────────────────────────────────
+    try:
+        _sb_kontrol = get_sb_client()
+        if _sb_kontrol:
+            _res_say = _sb_kontrol.table("cari_kartlar").select("id", count="exact").execute()
+            _toplam = _res_say.count if hasattr(_res_say, "count") and _res_say.count is not None else len(_res_say.data or [])
+            _res_say2 = _sb_kontrol.table("cari_kartlar").select("id", count="exact").neq("silindi", 1).execute()
+            _aktif = _res_say2.count if hasattr(_res_say2, "count") and _res_say2.count is not None else len(_res_say2.data or [])
+            if _toplam == 0:
+                st.error("⚠️ Supabase'de hiç cari kaydı bulunamadı! Tablo boş olabilir veya farklı bir projeye bağlı olabilirsiniz.")
+            else:
+                st.success(f"✅ Supabase bağlı — Toplam: {_toplam} cari | Aktif (silinmemiş): {_aktif} cari")
+    except Exception as _db_hata:
+        st.error(f"❌ Supabase bağlantı hatası: {_db_hata}")
+
     # ── MOBİL KART GÖRÜNÜMÜ ──────────────────────────────────────────────────
     if st.session_state.get("_mobil_mod", False):
         st.markdown("""
