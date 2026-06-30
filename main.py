@@ -783,6 +783,56 @@ st.markdown("""<script>
 (function(){setInterval(function(){try{var _=window.parent.document.title;}catch(e){}},270000);})();
 </script>""", unsafe_allow_html=True)
 
+# ── TAKVİM TÜRKÇELEŞTİRME — tüm date_input bileşenleri için ──────────────────
+st.markdown("""<script>
+(function(){
+  var AY_TR = {
+    "January":"Ocak","February":"Şubat","March":"Mart","April":"Nisan",
+    "May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos",
+    "September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"
+  };
+  var GUN_TR = {
+    "Mo":"Pt","Tu":"Sa","We":"Ça","Th":"Pe","Fr":"Cu","Sa":"Ct","Su":"Pz",
+    "Monday":"Pazartesi","Tuesday":"Salı","Wednesday":"Çarşamba",
+    "Thursday":"Perşembe","Friday":"Cuma","Saturday":"Cumartesi","Sunday":"Pazar"
+  };
+  function turkceleştir(root){
+    if(!root) return;
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+    var node;
+    while(node = walker.nextNode()){
+      var t = node.nodeValue;
+      if(!t || !t.trim()) continue;
+      var degisti = false;
+      for(var ay in AY_TR){
+        if(t.indexOf(ay) !== -1){ t = t.split(ay).join(AY_TR[ay]); degisti = true; }
+      }
+      for(var gun in GUN_TR){
+        if(t.trim() === gun){ t = GUN_TR[gun]; degisti = true; }
+      }
+      if(degisti) node.nodeValue = t;
+    }
+  }
+  function tumDokumani(){
+    try { turkceleştir(document.body); } catch(e){}
+    try { if(window.parent && window.parent.document) turkceleştir(window.parent.document.body); } catch(e){}
+  }
+  // İlk çalıştırma
+  tumDokumani();
+  // Takvim her açıldığında tekrar çalıştır (MutationObserver)
+  try {
+    var hedefDoc = (window.parent && window.parent.document) ? window.parent.document : document;
+    var observer = new MutationObserver(function(mutations){
+      tumDokumani();
+    });
+    observer.observe(hedefDoc.body, { childList: true, subtree: true });
+  } catch(e){}
+  // Periyodik yedek kontrol
+  setInterval(tumDokumani, 800);
+})();
+</script>""", unsafe_allow_html=True)
+
+
 # ── EKRAN AYARLARI UYGULA ────────────────────────────────────────────────────
 _e_r1      = st.session_state.get("_ekran_r1","")
 _e_r2      = st.session_state.get("_ekran_r2","")
