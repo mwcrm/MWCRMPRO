@@ -7489,10 +7489,7 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
         _tlbl1.markdown("<div class='rand-tarih-lbl'>Tarih*</div>", unsafe_allow_html=True)
         _tlbl2.markdown("<div class='rand-tarih-lbl'>Saat*</div>", unsafe_allow_html=True)
 
-        _ptd1, _ptd2, _ptd3, _ptd4 = st.columns([1,2.2,2.2,1.6])
-        if _ptd1.button("‹", key="rand_tarih_geri", help="Bir gün geri", use_container_width=True):
-            st.session_state["rand_tarih_deger"] -= timedelta(days=1)
-            st.rerun()
+        _ptd2, _ptd4 = st.columns([3,1.6])
 
         with _ptd2:
             st.markdown('<span class="rand-tarih-marker"></span>', unsafe_allow_html=True)
@@ -7509,9 +7506,6 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
                 st.session_state["rand_tarih_deger"] = _secilen_tarih
                 st.rerun()
 
-        if _ptd3.button("›", key="rand_tarih_ileri", help="Bir gün ileri", use_container_width=True):
-            st.session_state["rand_tarih_deger"] += timedelta(days=1)
-            st.rerun()
         rand_saat = _ptd4.selectbox("Saat", _rand_saat_opts, index=4, key="rand_saat", label_visibility="collapsed")
 
         st.caption("👆 Tarih kutusuna tıklayarak takvimden de seçim yapabilirsiniz")
