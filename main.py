@@ -99,19 +99,8 @@ def get_cari_listesi():
     sb = get_sb_client()
     if sb:
         try:
-            _tum = []
-            _offset = 0
-            _batch = 1000
-            while True:
-                res = sb.table("cari_kartlar").select("*").neq("silindi",1).order("firma").range(_offset, _offset+_batch-1).execute()
-                if res.data:
-                    _tum.extend(res.data)
-                    if len(res.data) < _batch:
-                        break
-                    _offset += _batch
-                else:
-                    break
-            _df_g = pd.DataFrame(_tum) if _tum else pd.DataFrame()
+            res = sb.table("cari_kartlar").select("*").neq("silindi",1).order("firma").execute()
+            _df_g = pd.DataFrame(res.data) if res.data else pd.DataFrame()
             if not _df_g.empty:
                 for _tk in ["gsm","sabit"]:
                     if _tk in _df_g.columns:
@@ -140,40 +129,23 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
     sb = get_sb_client()
     if sb:
         try:
-            def _build_q(offset=None, batch=None):
-                q = sb.table(table).select("*")
-                if filters:
-                    for k, v in filters.items():
-                        if v == "NOT_NULL":
-                            q = q.not_.is_(k, "null")
-                        elif v == "neq_1":
-                            q = q.neq(k, 1)
-                        else:
-                            q = q.eq(k, v)
-                if order_col:
-                    q = q.order(order_col, desc=desc)
-                if limit:
-                    q = q.limit(limit)
-                elif offset is not None:
-                    q = q.range(offset, offset + batch - 1)
-                return q
-            if limit:
-                res = _build_q().execute()
-                return pd.DataFrame(res.data) if (res and res.data) else pd.DataFrame()
-            else:
-                _tum = []
-                _offset = 0
-                _batch = 1000
-                while True:
-                    res = _build_q(_offset, _batch).execute()
-                    if res and res.data:
-                        _tum.extend(res.data)
-                        if len(res.data) < _batch:
-                            break
-                        _offset += _batch
+            q = sb.table(table).select("*")
+            if filters:
+                for k, v in filters.items():
+                    if v == "NOT_NULL":
+                        q = q.not_.is_(k, "null")
+                    elif v == "neq_1":
+                        q = q.neq(k, 1)
                     else:
-                        break
-                return pd.DataFrame(_tum) if _tum else pd.DataFrame()
+                        q = q.eq(k, v)
+            if order_col:
+                q = q.order(order_col, desc=desc)
+            if limit:
+                q = q.limit(limit)
+            res = q.execute()
+            if res and res.data is not None:
+                return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+            return pd.DataFrame()
         except Exception as _e_read:
             pass  # SQLite fallback
     try:
@@ -1865,21 +1837,6 @@ if aktif == "yeni":
 elif aktif == "liste":
     sayfa_log("liste")
 
-    # ── VERİTABANI DURUM KONTROLÜ ──────────────────────────────────────────────
-    try:
-        _sb_kontrol = get_sb_client()
-        if _sb_kontrol:
-            _res_say = _sb_kontrol.table("cari_kartlar").select("id", count="exact").execute()
-            _toplam = _res_say.count if hasattr(_res_say, "count") and _res_say.count is not None else len(_res_say.data or [])
-            _res_say2 = _sb_kontrol.table("cari_kartlar").select("id", count="exact").neq("silindi", 1).execute()
-            _aktif = _res_say2.count if hasattr(_res_say2, "count") and _res_say2.count is not None else len(_res_say2.data or [])
-            if _toplam == 0:
-                st.error("⚠️ Supabase'de hiç cari kaydı bulunamadı! Tablo boş olabilir veya farklı bir projeye bağlı olabilirsiniz.")
-            else:
-                st.success(f"✅ Supabase bağlı — Toplam: {_toplam} cari | Aktif (silinmemiş): {_aktif} cari")
-    except Exception as _db_hata:
-        st.error(f"❌ Supabase bağlantı hatası: {_db_hata}")
-
     # ── MOBİL KART GÖRÜNÜMÜ ──────────────────────────────────────────────────
     if st.session_state.get("_mobil_mod", False):
         st.markdown("""
@@ -2094,18 +2051,8 @@ section[data-testid="stSidebar"] { display: none !important; }
     sb_liste = get_sb_client()
     try:
         if sb_liste:
-            _tum_cari = []
-            _off = 0
-            while True:
-                _res = sb_liste.table("cari_kartlar").select("*").neq("silindi",1).order("tarih",desc=True).range(_off, _off+999).execute()
-                if _res.data:
-                    _tum_cari.extend(_res.data)
-                    if len(_res.data) < 1000:
-                        break
-                    _off += 1000
-                else:
-                    break
-            df = pd.DataFrame(_tum_cari) if _tum_cari else pd.DataFrame()
+            res_l = sb_liste.table("cari_kartlar").select("*").neq("silindi",1).order("tarih",desc=True).execute()
+            df = pd.DataFrame(res_l.data) if res_l.data else pd.DataFrame()
         else:
             raise Exception()
     except:
@@ -2117,11 +2064,8 @@ section[data-testid="stSidebar"] { display: none !important; }
                 df[_tk] = _telefon_temizle(df[_tk])
 
     with st.expander("🔍 Mükerrer (Aynı İsimli) Müşterileri Bul ve Birleştir"):
-        if df.empty or "firma" not in df.columns or "id" not in df.columns:
-            _mukerrerler = {}
-        else:
-            _firma_gruplari = df.groupby(df["firma"].str.strip().str.upper())["id"].apply(list)
-            _mukerrerler = {k: v for k, v in _firma_gruplari.items() if len(v) > 1}
+        _firma_gruplari = df.groupby(df["firma"].str.strip().str.upper())["id"].apply(list)
+        _mukerrerler = {k: v for k, v in _firma_gruplari.items() if len(v) > 1}
 
         if not _mukerrerler:
             st.caption("Mükerrer müşteri bulunamadı.")
@@ -2730,13 +2674,10 @@ function kartSec(id){
         df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
 
     # Segment hesapla ve sırala
-    if not df_f.empty:
-        df_f["_seg_goster"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
-        _seg_sira = {"👑 A+":0,"⭐ A":1,"🔵 B":2,"⚪ C":3,"":4}
-        df_f["_seg_sira"] = df_f["_seg_goster"].map(lambda s: _seg_sira.get(s,4))
-        _sort_cols = [c for c in ["_seg_sira","firma"] if c in df_f.columns]
-        if _sort_cols:
-            df_f = df_f.sort_values(_sort_cols, ascending=[True]*len(_sort_cols)).reset_index(drop=True)
+    df_f["_seg_goster"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
+    _seg_sira = {"👑 A+":0,"⭐ A":1,"🔵 B":2,"⚪ C":3,"":4}
+    df_f["_seg_sira"] = df_f["_seg_goster"].map(lambda s: _seg_sira.get(s,4))
+    df_f = df_f.sort_values(["_seg_sira","firma"], ascending=[True,True]).reset_index(drop=True)
     if siralama_kol == "Firma A-Z":      df_f = df_f.sort_values("firma", ascending=True)
     elif siralama_kol == "Firma Z-A":    df_f = df_f.sort_values("firma", ascending=False)
     elif siralama_kol == "İl A-Z" and "il" in df_f.columns:       df_f = df_f.sort_values("il", ascending=True)
