@@ -7515,10 +7515,10 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
             rand_musteri = _rand_mus_sec  # üstteki seçimi kullan, form içinde tekrar gösterme
             rand_tarih = st.session_state["rand_tarih_deger"]
             rand_bolge = st.text_input("Bölge:", value=_rand_bolge_oto, placeholder="İstanbul Beykoz")
-            rc4,rc5,rc6 = st.columns(3)
+            rc4,rc5 = st.columns(2)
             rand_gorev    = rc4.selectbox("Görev*:", ["Ziyaret","Arama","Değerlendirme","Kazanıldı","Kaybedildi","Devam Ediyor","Whatsapp Mesaj","E-mail","Yeni Tarihe Ertele"])
             rand_takip    = rc5.selectbox("Takip:", ["Gidildi","Gidilmedi","Devam Ediyor","Ertelendi"])
-            rand_adet     = rc6.number_input("Adet:", min_value=0, step=1, key="rand_adet")
+            rand_adet     = 0
             rand_temsilci = st.text_input("Satış Temsilcisi*:", key="rand_tem")
             rand_tem_tel  = st.text_input("Temsilci WA No:", value=_rand_tem_tel_oto, placeholder="05xxxxxxxxx", key="rand_tem_tel")
             rand_aciklama = st.text_area("Açıklama:", height=70, key="rand_aciklama", help="Bu not, randevu kaydedilince müşterinin cari kartına da otomatik eklenir.")
