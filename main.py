@@ -791,8 +791,12 @@ st.markdown("""<script>
     "May":"Mayıs","June":"Haziran","July":"Temmuz","August":"Ağustos",
     "September":"Eylül","October":"Ekim","November":"Kasım","December":"Aralık"
   };
-  var GUN_TR = {
-    "Mo":"Pt","Tu":"Sa","We":"Ça","Th":"Pe","Fr":"Cu","Sa":"Ct","Su":"Pz",
+  // Gün kısaltmaları sıralı dizi olarak — "Sa" hem Tuesday hem Saturday kısaltması olduğundan
+  // object key çakışmasını önlemek için pozisyon bazlı eşleştirme kullanılır.
+  // Streamlit/BaseWeb takvimi pazartesi başlangıçlı: Mo,Tu,We,Th,Fr,Sa,Su
+  var GUN_KISA_SIRA = ["Mo","Tu","We","Th","Fr","Sa","Su"];
+  var GUN_KISA_TR   = ["Pt","Sa","Ça","Pe","Cu","Ct","Pa"];
+  var GUN_TAM_TR = {
     "Monday":"Pazartesi","Tuesday":"Salı","Wednesday":"Çarşamba",
     "Thursday":"Perşembe","Friday":"Cuma","Saturday":"Cumartesi","Sunday":"Pazar"
   };
@@ -803,13 +807,29 @@ st.markdown("""<script>
     while(node = walker.nextNode()){
       var t = node.nodeValue;
       if(!t || !t.trim()) continue;
+      var trimmed = t.trim();
       var degisti = false;
+
+      // Ay isimleri — metin içinde geçebilir (örn. "30 June 2026")
       for(var ay in AY_TR){
         if(t.indexOf(ay) !== -1){ t = t.split(ay).join(AY_TR[ay]); degisti = true; }
       }
-      for(var gun in GUN_TR){
-        if(t.trim() === gun){ t = GUN_TR[gun]; degisti = true; }
+
+      // Tam gün isimleri (Monday, Tuesday...)
+      for(var gunTam in GUN_TAM_TR){
+        if(t.indexOf(gunTam) !== -1){ t = t.split(gunTam).join(GUN_TAM_TR[gunTam]); degisti = true; }
       }
+
+      // Kısa gün başlıkları — SADECE node içeriği TAM OLARAK kısaltmaya eşitse değiştir
+      // (içerik karışmasını önlemek için, örn. "Sa" hücre içinde tek başınaysa)
+      if(!degisti){
+        var idx = GUN_KISA_SIRA.indexOf(trimmed);
+        if(idx !== -1 && trimmed === t.trim()){
+          t = t.replace(trimmed, GUN_KISA_TR[idx]);
+          degisti = true;
+        }
+      }
+
       if(degisti) node.nodeValue = t;
     }
   }
