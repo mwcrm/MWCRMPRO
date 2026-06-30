@@ -1533,11 +1533,11 @@ button[data-testid="manage-app-button"] { display: none !important; }
 
     with st.expander("❓ Yardım"):
         st.markdown("📞 [5400344228](tel:05400344228)")
-        st.link_button("📱 WhatsApp", "https://wa.me/905400344228", use_container_width=True)
+        st.button("📱 WhatsApp", use_container_width=True, disabled=True, help="Geçici olarak devre dışı")
         talep = st.text_area("Talep:", height=60, key="sidebar_talep")
         if st.button("📨 Gönder", key="sidebar_wa_btn"):
             if talep.strip():
-                st.markdown(f"[👉 Gönder](https://wa.me/905400344228?text={talep.replace(' ','%20')})")
+                st.caption("👉 Gönder (geçici devre dışı)")
 
     if st.session_state.get("rol") == "admin":
         with st.expander("🎛️ Menü Sırası"):
@@ -1975,7 +1975,7 @@ section[data-testid="stSidebar"] { display: none !important; }
                     _meta_html += f"  🏭 {_asama}"
                 _analiz_html = "<span class='mw-analiz-tag'>✅</span>" if _analiz_var else ""
                 _tel_html = f"<a class='mw-act-btn' href='tel:{_gsm_clean}'>📞</a>" if _gsm_clean else ""
-                _wa_html  = f"<a class='mw-act-btn' href='https://wa.me/{_gsm_clean}'>💬</a>" if _gsm_clean else ""
+                _wa_html  = f"<span class='mw-act-btn' style='opacity:0.35;cursor:not-allowed' title='Geçici devre dışı'>💬</span>" if _gsm_clean else ""
                 _ciro_str = f"{int(_bek):,}₺ / {int(_ger):,}₺"
 
                 st.markdown(f"""<div class="mw-firma-card">
@@ -2829,7 +2829,7 @@ function kartSec(id){
             _gsm_raw = str(kart_row.get("gsm","") or "").replace(" ","").replace("-","")
             if _gsm_raw.startswith("0"): _gsm_raw = "90" + _gsm_raw[1:]
             if _gsm_raw and _ax4.button("💬 WhatsApp", key=f"kwa_{kart_id}", use_container_width=True):
-                st.markdown(f"<a href='https://wa.me/{_gsm_raw}' target='_blank'>WhatsApp aç</a>", unsafe_allow_html=True)
+                st.markdown(f"<span style='opacity:0.4;cursor:not-allowed' title='Geçici devre dışı'>WhatsApp aç (devre dışı)</span>", unsafe_allow_html=True)
             if _ax5.button("💾 Kaydet", key=f"kkaydet_{kart_id}", use_container_width=True, type="primary"):
                 try:
                     _g = {"firma":str(kart_row.get("firma","")), "yetkili":str(kart_row.get("yetkili","")), "gsm":str(kart_row.get("gsm","")), "sabit":str(kart_row.get("sabit","")), "email":str(kart_row.get("email","")), "il":str(kart_row.get("il","")), "ilce":str(kart_row.get("ilce","")), "durum":str(kart_row.get("durum","")), "temsilci":str(kart_row.get("temsilci","")), "islem_asamasi":str(kart_row.get("islem_asamasi",""))}
@@ -4901,7 +4901,7 @@ elif aktif == "teklif":
             _wa_txt = st.text_area("",value=st.session_state["ai_whatsapp"],height=180,key="wa_metin")
             if wa_final_gecerli:
                 from urllib.parse import quote as _tq
-                st.link_button("📱 WhatsApp'ta Aç",f"https://wa.me/{gsm_wa_final}?text={_tq(_wa_txt,safe='')}",use_container_width=True,type="primary")
+                st.button("📱 WhatsApp'ta Aç", use_container_width=True, type="primary", disabled=True, help="Geçici olarak devre dışı", key="wa_btn_teklif1")
                 if st.button("✅ WA Gönderildi Kaydet",use_container_width=True,key="wa_log"):
                     db_insert("islem_kaydi",{"musteri_id":int(secili_musteri["id"]) if secili_musteri else 0,
                         "musteri_adi":hedef_musteri,"islem_turu":"WhatsApp Teklif",
@@ -5278,7 +5278,7 @@ elif aktif == "ozel_teklif":
         elif len(_wno)==10: _wno = "90"+_wno
         if len(_wno)==12 and _wno.isdigit():
             from urllib.parse import quote as _ozq
-            st.link_button("📱 WhatsApp'ta Aç", f"https://wa.me/{_wno}?text={_ozq(_wtxt,safe='')}", use_container_width=True, type="primary")
+            st.button("📱 WhatsApp'ta Aç", use_container_width=True, type="primary", disabled=True, help="Geçici olarak devre dışı", key="wa_btn_ozel1")
             if st.button("✅ WA Gönderildi Kaydet", use_container_width=True, key="oz2_wa_log"):
                 db_insert("islem_kaydi",{
                     "musteri_id": int(_oz_mus["id"]) if _oz_mus is not None else 0,
@@ -5893,7 +5893,7 @@ section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseBu
                         st.session_state.pop(_kk, None)
                     st.rerun()
                 if _tel2 and "@" not in _tel2:
-                    _kb2.markdown(f"<a href='https://wa.me/{_tel2}' ><button style='width:100%;padding:8px;font-size:12px;background:#25d366;color:white;border:none;border-radius:7px;cursor:pointer;font-weight:500'>💬 WA</button></a>", unsafe_allow_html=True)
+                    _kb2.markdown(f"<button style='width:100%;padding:8px;font-size:12px;background:#9ca3af;color:white;border:none;border-radius:7px;cursor:not-allowed;font-weight:500' disabled title='Geçici devre dışı'>💬 WA</button>", unsafe_allow_html=True)
                 if _kb3.button("📄 Spot Teklif", key="an_det_spot", use_container_width=True):
                     st.session_state["aktif_tab"]="teklif"; st.session_state["teklif_musteri_onsel"]=_detay_firma; st.rerun()
                 if _kb4.button("⭐ Özel Teklif", key="an_det_ozel", use_container_width=True):
@@ -6386,8 +6386,7 @@ elif aktif == "whatsapp":
         with col_wa_link:
             if wa_numara and "@c.us" in wa_numara:
                 wa_no_link = wa_numara.replace("@c.us","")
-                wa_url_link = f"https://wa.me/{wa_no_link}?text={wa_mesaj.replace(' ','%20').replace(chr(10),'%0A')}"
-                st.link_button("🔗 WhatsApp Web'de Aç", wa_url_link, use_container_width=True)
+                st.button("🔗 WhatsApp Web'de Aç", use_container_width=True, disabled=True, help="Geçici olarak devre dışı", key="wa_btn_web1")
 
     # ── TOPLU GÖNDER ──────────────────────────────────────────────────────────
     with wa_tab2:
@@ -6628,11 +6627,9 @@ elif aktif == "kisiler":
                     else:
                         mesaj_txt = ""
 
-                    # WA linki — şablon seçilince hemen göster
+                    # WA linki — GEÇİCİ DEVRE DIŞI
                     if mesaj_txt and mesaj_txt.strip():
-                        from urllib.parse import quote
-                        wa_url = f"https://wa.me/{t_wa}?text={quote(mesaj_txt, safe='')}"
-                        c6.link_button("📱", wa_url, use_container_width=True, type="primary")
+                        c6.button("📱", use_container_width=True, type="primary", disabled=True, help="Geçici olarak devre dışı", key=f"wa_btn_kisi_{_kisi_id}")
                         # Log
                         lk = f"logged_{_kisi_id}_{abs(hash(mesaj_txt[:30]))}"
                         if not st.session_state.get(lk) and _kisi_id > 0:
@@ -7024,23 +7021,33 @@ elif aktif == "randevu":
                         }
             except: pass
 
+            # ── GELECEK / GEÇMİŞ AYRIMI ───────────────────────────────────────
+            _gg_secim = st.radio(
+                "Randevu Zamanı",
+                ["📅 Gelecek", "📜 Geçmiş", "🔁 Tümü"],
+                horizontal=True,
+                key="rand_gg_secim",
+                label_visibility="collapsed"
+            )
+            if _gg_secim == "📅 Gelecek":
+                df_rand = df_rand[df_rand["randevu_tarihi"] >= bugun_str]
+            elif _gg_secim == "📜 Geçmiş":
+                df_rand = df_rand[df_rand["randevu_tarihi"] < bugun_str]
+            st.caption(f"{len(df_rand)} randevu gösteriliyor")
+
             # Sıralama hafızası
             if "rand_sort_col" not in st.session_state:
                 st.session_state["rand_sort_col"] = "Tarih"
                 st.session_state["rand_sort_asc"] = True
-            _rs1,_rs2,_rs3 = st.columns([2,1,1])
+            _rs1,_rs2 = st.columns([2,1])
             _sort_col = _rs1.selectbox("Sırala:", ["Tarih","Saat","Müşteri","İl","Bölge","Görev","Sonuç","Temsilci"],
                 index=["Tarih","Saat","Müşteri","İl","Bölge","Görev","Sonuç","Temsilci"].index(st.session_state.get("rand_sort_col","Tarih")),
                 key="rand_sort_sel")
             _sort_asc = _rs2.checkbox("Artan", value=st.session_state.get("rand_sort_asc",True), key="rand_sort_asc_cb")
-            _row_h = _rs3.selectbox("Satır yüksekliği:", ["Küçük","Orta","Büyük"],
-                index=["Küçük","Orta","Büyük"].index(st.session_state.get("rand_row_h","Orta")),
-                key="rand_row_h_sel")
             # Hafızaya kaydet
             st.session_state["rand_sort_col"] = _sort_col
             st.session_state["rand_sort_asc"] = _sort_asc
-            st.session_state["rand_row_h"]    = _row_h
-            _row_h_px = {"Küçük":35,"Orta":57,"Büyük":100}[_row_h]
+            _row_h_px = 35  # her zaman kompakt
 
             _df_goster = pd.DataFrame([{
                 "ID":       int(r.get("id",0) or 0),
@@ -7309,9 +7316,8 @@ elif aktif == "randevu":
                         if _tw3.startswith("0"): _tw3 = "90"+_tw3[1:]
                         elif len(_tw3)==10: _tw3 = "90"+_tw3
                         _msg3 = f"🗓️ YENİ RANDEVU\nMüşteri: {musteri_adi}\nTarih: {rand_tarih} {rand_saat}\nBölge: {rand_bolge}\nGörev: {rand_gorev}\nİyi çalışmalar!"
-                        st.link_button("📱 Temsilciye WA Gönder",
-                            f"https://wa.me/{_tw3}?text={_msg3.replace(' ','%20').replace(chr(10),'%0A')}",
-                            use_container_width=True, type="primary")
+                        st.button("📱 Temsilciye WA Gönder", use_container_width=True, type="primary",
+                            disabled=True, help="Geçici olarak devre dışı", key="wa_btn_temsilci_rand")
                         db_insert("islem_kaydi",{"musteri_id":musteri_id,"musteri_adi":musteri_adi,
                             "islem_turu":"📅 WA Temsilci Uyarısı",
                             "icerik":f"Temsilci: {rand_temsilci} | Tarih: {rand_tarih} {rand_saat} | Bölge: {rand_bolge}",
@@ -8183,7 +8189,7 @@ function mapsAc(){
 function waGonder(){
   var msg='🗺️ *Rut Planı — """ + _tarih_str + """*\\n\\n';
   pins.forEach(function(p){msg+=p.idx+'. '+p.saat+' — *'+p.firma+'*\\n📍 '+p.bolge+'\\n\\n';});
-  window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
+  alert('WhatsApp gönderimi geçici olarak devre dışı.');
 }
 </script></body></html>"""
 
@@ -9043,7 +9049,7 @@ st.markdown(
     " &nbsp;|&nbsp; "
     "<a href='mailto:osnenufu@gmail.com' style='color:#888;text-decoration:none;'>✉️ osnenufu@gmail.com</a>"
     " &nbsp;|&nbsp; "
-    "<a href='https://wa.me/905400344228' target='_blank' style='color:#25D366;text-decoration:none;'>💬 WhatsApp</a>"
+    "<span style='color:#9ca3af;'>💬 WhatsApp (devre dışı)</span>"
     "</div>",
     unsafe_allow_html=True
 )
