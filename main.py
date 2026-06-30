@@ -2967,20 +2967,28 @@ function kartSec(id){
         df_edit["aciklama"] = ""
     df_edit["aciklama"] = df_edit["aciklama"].fillna("").astype(str).replace("nan","")
 
-    # Son randevu bilgisini ekle (tarih + saat + bölge)
+    # Son randevu bilgisini ekle (tarih + saat + bölge) — normalize edilmiş eşleştirme
     try:
         _df_rand_join = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC, randevu_saati DESC")
         if not _df_rand_join.empty and "musteri_adi" in _df_rand_join.columns:
+            def _norm_rand(s):
+                return (str(s or "").strip()
+                        .upper()
+                        .replace("İ","I").replace("Ş","S").replace("Ğ","G")
+                        .replace("Ü","U").replace("Ö","O").replace("Ç","C")
+                        .replace("  "," "))
             _son_rand = {}
             for _, _rj in _df_rand_join.iterrows():
-                _mn = str(_rj.get("musteri_adi","") or "").strip()
-                if _mn and _mn not in _son_rand:
+                _mn_norm = _norm_rand(_rj.get("musteri_adi",""))
+                if _mn_norm and _mn_norm not in _son_rand:
                     _dt = fmt_tarih(str(_rj.get("randevu_tarihi","") or ""))
                     _st = str(_rj.get("randevu_saati","") or "")[:5]
                     _bl = str(_rj.get("bolge","") or "")
                     _sc = str(_rj.get("sonuc","") or "")
-                    _son_rand[_mn] = f"📅 {_dt} {_st}" + (f" · {_bl}" if _bl else "") + (f" [{_sc}]" if _sc else "")
-            df_edit["📅 Son Randevu"] = df_edit["firma"].apply(lambda x: _son_rand.get(str(x),""))
+                    _son_rand[_mn_norm] = f"📅 {_dt} {_st}" + (f" · {_bl}" if _bl else "") + (f" [{_sc}]" if _sc else "")
+            df_edit["📅 Son Randevu"] = df_edit["firma"].apply(lambda x: _son_rand.get(_norm_rand(x),""))
+        else:
+            df_edit["📅 Son Randevu"] = ""
     except:
         df_edit["📅 Son Randevu"] = ""
 
