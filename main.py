@@ -6022,35 +6022,39 @@ div[data-testid="stHorizontalBlock"]:has(.an-m1-marker) button {
             _meta_html = " <span style='color:#cbd5e1'>·</span> ".join(_meta_parts)
             _ciro_html = f"<span class='an-m1-ciro'>💰 {_ar_bek:,.0f}₺</span>" if _ar_bek > 0 else ""
 
-            _ac1, _ac2 = st.columns([10, 1])
+            _ac1, _ac2, _ac3 = st.columns([1, 8, 2])
+
             with _ac1:
-                st.markdown(f"""<div class="an-m1-card">
-  <div class="an-m1-strip" style="background:{_strip};"></div>
-  <div class="an-m1-body">
-    <div class="an-m1-name">{_ar_firma}</div>
-    <div class="an-m1-meta">
-      <span class="an-m1-pot" style="background:{_pbg};color:{_ptc};">{_plbl}</span>
-      <span>{_meta_html}</span>
-      {_ciro_html}
-    </div>
-  </div>
-</div>""", unsafe_allow_html=True)
-                st.markdown('<span class="an-m1-marker"></span>', unsafe_allow_html=True)
-                if st.button("Detayı Aç →", key=f"an_ac_{_ai}", use_container_width=True):
-                    st.session_state["an_detay_firma"] = _ar_firma
-                    st.rerun()
-            with _ac2:
                 _sil_key = f"an_sil_onay_{_ai}"
                 if st.session_state.get(_sil_key):
-                    _c1, _c2 = st.columns(2)
-                    if _c1.button("✓", key=f"an_sil_evet_{_ai}", use_container_width=True, help="Evet sil"):
+                    if st.button("✓", key=f"an_sil_evet_{_ai}", use_container_width=True, help="Evet, sil"):
                         if _an_sil(_ar_firma):
                             st.session_state.pop(_sil_key, None); st.rerun()
-                    if _c2.button("✗", key=f"an_sil_hayir_{_ai}", use_container_width=True, help="İptal"):
+                    if st.button("✗", key=f"an_sil_hayir_{_ai}", use_container_width=True, help="İptal"):
                         st.session_state.pop(_sil_key, None); st.rerun()
                 else:
                     if st.button("🗑", key=f"an_sil2_{_ai}", use_container_width=True, help="Sil"):
                         st.session_state[_sil_key] = True; st.rerun()
+
+            with _ac2:
+                _kart_html = (
+                    f'<div class="an-m1-card">'
+                    f'<div class="an-m1-strip" style="background:{_strip};"></div>'
+                    f'<div class="an-m1-body">'
+                    f'<div class="an-m1-name">{_ar_firma}</div>'
+                    f'<div class="an-m1-meta">'
+                    f'<span class="an-m1-pot" style="background:{_pbg};color:{_ptc};">{_plbl}</span>'
+                    f'<span>{_meta_html}</span>'
+                    f'{_ciro_html}'
+                    f'</div></div></div>'
+                )
+                st.markdown(_kart_html, unsafe_allow_html=True)
+
+            with _ac3:
+                st.markdown('<div class="an-m1-marker" style="height:1px"></div>', unsafe_allow_html=True)
+                if st.button("Detayı Aç →", key=f"an_ac_{_ai}", use_container_width=True):
+                    st.session_state["an_detay_firma"] = _ar_firma
+                    st.rerun()
 
         st.divider()
 
