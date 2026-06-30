@@ -7151,9 +7151,10 @@ elif aktif == "randevu":
                 st.session_state["rand_sort_col"] = "Tarih"
                 st.session_state["rand_sort_asc"] = True
             _rs1,_rs2 = st.columns([2,1])
-            _sort_col = _rs1.selectbox("Sırala:", ["Tarih","Saat","Müşteri","İl","Bölge","Görev","Sonuç","Temsilci"],
-                index=["Tarih","Saat","Müşteri","İl","Bölge","Görev","Sonuç","Temsilci"].index(st.session_state.get("rand_sort_col","Tarih")),
-                key="rand_sort_sel")
+            _sort_col = _rs1.selectbox("Sırala:", ["ID","Tarih","Saat","Müşteri","İl","Bölge","Görev","Sonuç","Temsilci"],
+                index=["ID","Tarih","Saat","Müşteri","İl","Bölge","Görev","Sonuç","Temsilci"].index(st.session_state.get("rand_sort_col","Tarih")) if st.session_state.get("rand_sort_col","Tarih") in ["ID","Tarih","Saat","Müşteri","İl","Bölge","Görev","Sonuç","Temsilci"] else 1,
+                key="rand_sort_sel",
+                help="ID hiçbir zaman değişmez — her randevu ilk oluşturulduğu numarayı korur. Listeyi farklı sütuna göre sıralamak sadece görüntü sırasını değiştirir, ID'leri değiştirmez.")
             _sort_asc = _rs2.checkbox("Artan", value=st.session_state.get("rand_sort_asc",True), key="rand_sort_asc_cb")
             # Hafızaya kaydet
             st.session_state["rand_sort_col"] = _sort_col
