@@ -7339,27 +7339,33 @@ elif aktif == "randevu":
             st.markdown(f"""
 <div style="background:linear-gradient(135deg,#eff6ff,#f0f9ff);border:1px solid #bfdbfe;border-radius:14px;padding:16px 18px;margin-bottom:14px;">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
-    <div>
-      <div style="font-size:16px;font-weight:600;color:#0f172a;">{_rm_firma}</div>
-      <div style="font-size:11px;color:#64748b;margin-top:2px;">
-        {"👤 " + _rm_yetkili if _rm_yetkili and _rm_yetkili not in ["nan","None"] else ""}
-        {" · 🏭 " + _rm_sektor if _rm_sektor and _rm_sektor not in ["nan","None"] else ""}
-      </div>
-    </div>
+    <div style="font-size:16px;font-weight:600;color:#0f172a;">🏢 {_rm_firma}</div>
     <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:{_rbg};color:{_rtc};font-weight:500;white-space:nowrap;">{_remo} {_rm_durum}</span>
   </div>
-  {"<div style='background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:8px 11px;margin-bottom:8px;display:flex;gap:7px;'><span style='font-size:13px'>📍</span><div><div style='font-size:9px;color:#94a3b8;text-transform:uppercase;margin-bottom:1px;'>Açık Adres</div><div style='font-size:12px;color:#334155;line-height:1.4;'>" + (_rm_adres if _rm_adres and _rm_adres not in ['nan','None'] else (_rm_il + ' / ' + _rm_ilce)) + "</div></div></div>" if (_rm_adres and _rm_adres not in ['nan','None']) or _rm_il else ""}
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
-    <div style="background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;">
-      <div style="font-size:9px;color:#94a3b8;">📞 TELEFON</div>
-      <div style="font-size:12px;color:#0f172a;font-weight:500;">{_rm_gsm if _rm_gsm and _rm_gsm not in ['nan','None'] else '—'}</div>
+    <div style="background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;display:flex;gap:7px;">
+      <span style="font-size:13px;">👤</span>
+      <div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Yetkili</div>
+      <div style="font-size:12px;color:#0f172a;font-weight:500;">{_rm_yetkili if _rm_yetkili and _rm_yetkili not in ['nan','None',''] else '—'}</div></div>
     </div>
-    <div style="background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;">
-      <div style="font-size:9px;color:#94a3b8;">💰 SON TEKLİF</div>
-      <div style="font-size:12px;color:#0f172a;font-weight:500;">{_rm_son_teklif if _rm_son_teklif else '—'}</div>
+    <div style="background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;display:flex;gap:7px;">
+      <span style="font-size:13px;">📞</span>
+      <div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Telefon</div>
+      <div style="font-size:12px;color:#0f172a;font-weight:500;">{_rm_gsm if _rm_gsm and _rm_gsm not in ['nan','None',''] else '—'}</div></div>
+    </div>
+    <div style="background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;display:flex;gap:7px;">
+      <span style="font-size:13px;">🗺️</span>
+      <div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Bölge</div>
+      <div style="font-size:12px;color:#0f172a;font-weight:500;">{(_rm_il + ' / ' + _rm_ilce) if _rm_il else '—'}</div></div>
+    </div>
+    <div style="background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;display:flex;gap:7px;">
+      <span style="font-size:13px;">🏭</span>
+      <div><div style="font-size:9px;color:#94a3b8;text-transform:uppercase;">Sektör</div>
+      <div style="font-size:12px;color:#0f172a;font-weight:500;">{_rm_sektor if _rm_sektor and _rm_sektor not in ['nan','None',''] else '—'}</div></div>
     </div>
   </div>
-  {"<div style='background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:9px 11px;'><div style='font-size:9px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px;'>📝 Son Not" + (" · " + _rm_not_tarih if _rm_not_tarih else "") + "</div><div style='font-size:11px;color:#475569;line-height:1.5;'>" + _rm_son_not[:200] + ("..." if len(_rm_son_not) > 200 else "") + "</div></div>" if _rm_son_not else ""}
+  {"<div style='background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:8px 11px;margin-bottom:10px;display:flex;gap:7px;'><span style='font-size:13px'>📍</span><div><div style='font-size:9px;color:#94a3b8;text-transform:uppercase;margin-bottom:1px;'>Açık Adres</div><div style='font-size:12px;color:#334155;line-height:1.4;'>" + (_rm_adres if _rm_adres and _rm_adres not in ['nan','None',''] else (_rm_il + ' / ' + _rm_ilce)) + "</div></div></div>" if (_rm_adres and _rm_adres not in ['nan','None','']) or _rm_il else ""}
+  {"<div style='background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:9px 11px;margin-bottom:10px;'><div style='font-size:9px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px;display:flex;justify-content:space-between;'><span>📝 Son Not</span><span>" + _rm_not_tarih + "</span></div><div style='font-size:12px;color:#334155;line-height:1.55;'>" + _rm_son_not[:220] + ("..." if len(_rm_son_not) > 220 else "") + "</div></div>" if _rm_son_not else ""}
 </div>
 """, unsafe_allow_html=True)
 
@@ -7370,13 +7376,22 @@ elif aktif == "randevu":
         _ptd1, _ptd2, _ptd3 = st.columns([1,3,1])
         if _ptd1.button("‹", key="rand_tarih_geri", help="Bir gün geri", use_container_width=True):
             st.session_state["rand_tarih_deger"] -= timedelta(days=1)
+            st.session_state.pop("rand_tarih_secim", None)
+            st.rerun()
+        _secilen_tarih = _ptd2.date_input(
+            "Tarih", value=st.session_state["rand_tarih_deger"],
+            key="rand_tarih_secim", label_visibility="collapsed"
+        )
+        if _secilen_tarih != st.session_state["rand_tarih_deger"]:
+            st.session_state["rand_tarih_deger"] = _secilen_tarih
+            st.rerun()
+        if _ptd3.button("›", key="rand_tarih_ileri", help="Bir gün ileri", use_container_width=True):
+            st.session_state["rand_tarih_deger"] += timedelta(days=1)
+            st.session_state.pop("rand_tarih_secim", None)
             st.rerun()
         _gun_adlari = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi","Pazar"]
         _td_gun = _gun_adlari[st.session_state["rand_tarih_deger"].weekday()]
-        _ptd2.markdown(f"<div style='text-align:center;border:1px solid #e2e8f0;border-radius:8px;padding:8px;font-size:13px;color:#0f172a;background:white;'>📅 {st.session_state['rand_tarih_deger'].strftime('%d.%m.%Y')} · {_td_gun}</div>", unsafe_allow_html=True)
-        if _ptd3.button("›", key="rand_tarih_ileri", help="Bir gün ileri", use_container_width=True):
-            st.session_state["rand_tarih_deger"] += timedelta(days=1)
-            st.rerun()
+        st.caption(f"📅 {_td_gun}")
 
         with st.form("randevu_form"):
             st.caption(f"Seçili müşteri: **{_rand_mus_sec}**" if _rand_mus_sec != "-- Müşteri Seçin --" else "⚠️ Yukarıdan müşteri seçin")
