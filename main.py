@@ -6,7 +6,7 @@ import os
 import io
 import re
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # ── SUPABASE BAĞLANTISI ───────────────────────────────────────────────────────
 def sb_or_sqlite():
@@ -7278,26 +7278,128 @@ elif aktif == "randevu":
             if _rm2.button("❌", key="rand_mus_temizle", use_container_width=True):
                 st.session_state["rand_mus_reset"] = True; st.rerun()
 
+        # ── MÜŞTERİ ÖZET KARTI — adres, telefon, son not, son teklif ──────────────
+        _rand_musteri_satir = None
+        _rand_bolge_oto = ""
+        _rand_tem_tel_oto = ""
+        if _rand_mus_sec != "-- Müşteri Seçin --" and "[" in _rand_mus_sec:
+            try:
+                _rmid = int(_rand_mus_sec.split("]")[0].replace("[","").strip())
+                _rmrow = df_mrand[df_mrand["id"] == _rmid]
+                if not _rmrow.empty:
+                    _rand_musteri_satir = _rmrow.iloc[0]
+            except: pass
+
+        if _rand_musteri_satir is not None:
+            _rm = _rand_musteri_satir
+            _rm_firma   = str(_rm.get("firma","") or "")
+            _rm_yetkili = str(_rm.get("yetkili","") or "")
+            _rm_sektor  = str(_rm.get("sektor","") or "")
+            _rm_durum   = str(_rm.get("durum","") or "")
+            _rm_il      = str(_rm.get("il","") or "")
+            _rm_ilce    = str(_rm.get("ilce","") or "")
+            _rm_adres   = str(_rm.get("adres","") or "")
+            _rm_gsm     = str(_rm.get("gsm","") or "")
+            _rm_bek     = float(_rm.get("beklenen_ciro",0) or 0)
+
+            _rand_bolge_oto = f"{_rm_il} {_rm_ilce}".strip()
+            _rand_tem_tel_oto = _rm_gsm
+
+            # Son not çek
+            _rm_son_not = ""
+            _rm_not_tarih = ""
+            try:
+                _sb_rmn = get_sb_client()
+                if _sb_rmn:
+                    _rmn_r = _sb_rmn.table("cari_aciklamalar").select("aciklama,created_at").eq("cari_id", int(_rmid)).order("id", desc=True).limit(1).execute()
+                    if _rmn_r.data:
+                        _rm_son_not = str(_rmn_r.data[0].get("aciklama","") or "")
+                        _rm_not_tarih = str(_rmn_r.data[0].get("created_at","") or "")[:10]
+            except: pass
+
+            # Son teklif çek
+            _rm_son_teklif = ""
+            try:
+                _sb_rmt = get_sb_client()
+                if _sb_rmt:
+                    _rmt_r = _sb_rmt.table("teklifler").select("toplam_tutar,durum,tarih").eq("cari_id", int(_rmid)).order("id", desc=True).limit(1).execute()
+                    if _rmt_r.data:
+                        _tt = _rmt_r.data[0].get("toplam_tutar", 0) or 0
+                        _td = str(_rmt_r.data[0].get("durum","") or "")
+                        _rm_son_teklif = f"{float(_tt):,.0f}₺ · {_td}" if _tt else ""
+            except: pass
+
+            _durum_renkler = {
+                "Portföy": ("#dcfce7","#166534","🟢"),
+                "Özel Müşteri": ("#eff6ff","#1d4ed8","🔵"),
+                "Tekrar Ara": ("#fef9c3","#854d0e","🟡"),
+            }
+            _rbg, _rtc, _remo = _durum_renkler.get(_rm_durum, ("#f1f5f9","#475569","⚪"))
+
+            st.markdown(f"""
+<div style="background:linear-gradient(135deg,#eff6ff,#f0f9ff);border:1px solid #bfdbfe;border-radius:14px;padding:16px 18px;margin-bottom:14px;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+    <div>
+      <div style="font-size:16px;font-weight:600;color:#0f172a;">{_rm_firma}</div>
+      <div style="font-size:11px;color:#64748b;margin-top:2px;">
+        {"👤 " + _rm_yetkili if _rm_yetkili and _rm_yetkili not in ["nan","None"] else ""}
+        {" · 🏭 " + _rm_sektor if _rm_sektor and _rm_sektor not in ["nan","None"] else ""}
+      </div>
+    </div>
+    <span style="font-size:11px;padding:3px 10px;border-radius:20px;background:{_rbg};color:{_rtc};font-weight:500;white-space:nowrap;">{_remo} {_rm_durum}</span>
+  </div>
+  {"<div style='background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:8px 11px;margin-bottom:8px;display:flex;gap:7px;'><span style='font-size:13px'>📍</span><div><div style='font-size:9px;color:#94a3b8;text-transform:uppercase;margin-bottom:1px;'>Açık Adres</div><div style='font-size:12px;color:#334155;line-height:1.4;'>" + (_rm_adres if _rm_adres and _rm_adres not in ['nan','None'] else (_rm_il + ' / ' + _rm_ilce)) + "</div></div></div>" if (_rm_adres and _rm_adres not in ['nan','None']) or _rm_il else ""}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+    <div style="background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;">
+      <div style="font-size:9px;color:#94a3b8;">📞 TELEFON</div>
+      <div style="font-size:12px;color:#0f172a;font-weight:500;">{_rm_gsm if _rm_gsm and _rm_gsm not in ['nan','None'] else '—'}</div>
+    </div>
+    <div style="background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:7px 10px;">
+      <div style="font-size:9px;color:#94a3b8;">💰 SON TEKLİF</div>
+      <div style="font-size:12px;color:#0f172a;font-weight:500;">{_rm_son_teklif if _rm_son_teklif else '—'}</div>
+    </div>
+  </div>
+  {"<div style='background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:9px 11px;'><div style='font-size:9px;color:#94a3b8;text-transform:uppercase;margin-bottom:3px;'>📝 Son Not" + (" · " + _rm_not_tarih if _rm_not_tarih else "") + "</div><div style='font-size:11px;color:#475569;line-height:1.5;'>" + _rm_son_not[:200] + ("..." if len(_rm_son_not) > 200 else "") + "</div></div>" if _rm_son_not else ""}
+</div>
+""", unsafe_allow_html=True)
+
+        # ── TARİH İLERİ/GERİ ───────────────────────────────────────────────────
+        if "rand_tarih_deger" not in st.session_state:
+            st.session_state["rand_tarih_deger"] = datetime.now().date()
+        _td1, _td2, _td3 = st.columns([1,5,1])
+        if _td1.button("‹", key="rand_tarih_geri", use_container_width=True, help="Bir gün geri"):
+            st.session_state["rand_tarih_deger"] = st.session_state["rand_tarih_deger"] - timedelta(days=1)
+            st.session_state.pop("rand_tarih", None)
+            st.rerun()
+        if _td3.button("›", key="rand_tarih_ileri", use_container_width=True, help="Bir gün ileri"):
+            st.session_state["rand_tarih_deger"] = st.session_state["rand_tarih_deger"] + timedelta(days=1)
+            st.session_state.pop("rand_tarih", None)
+            st.rerun()
+        _gun_adlari = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi","Pazar"]
+        _td_gun = _gun_adlari[st.session_state["rand_tarih_deger"].weekday()]
+        _td2.markdown(f"<div style='text-align:center;padding-top:6px;font-size:13px;color:#475569;'>📅 {st.session_state['rand_tarih_deger'].strftime('%d.%m.%Y')} · {_td_gun}</div>", unsafe_allow_html=True)
+
         with st.form("randevu_form"):
             rand_musteri = st.selectbox("Müşteri:", musteri_rand_opts,
                 index=musteri_rand_opts.index(_rand_mus_sec) if _rand_mus_sec in musteri_rand_opts else 0,
                 key="rand_musteri")
             rc1,rc2,rc3 = st.columns(3)
-            rand_tarih    = rc1.date_input("Tarih*:", value=datetime.now().date(), key="rand_tarih")
+            rand_tarih    = rc1.date_input("Tarih*:", value=st.session_state["rand_tarih_deger"], key="rand_tarih")
             _rand_saat_opts = [f"{h:02d}:{m:02d}" for h in range(9,21) for m in (0,15,30,45)]
             rand_saat     = rc2.selectbox("Saat*:", _rand_saat_opts, index=4, key="rand_saat")  # default 10:00
-            rand_bolge    = rc3.text_input("Bölge:", placeholder="İstanbul Beykoz")
+            rand_bolge    = rc3.text_input("Bölge:", value=_rand_bolge_oto, placeholder="İstanbul Beykoz")
             rc4,rc5,rc6 = st.columns(3)
             rand_gorev    = rc4.selectbox("Görev*:", ["Ziyaret","Arama","Değerlendirme","Kazanıldı","Kaybedildi","Devam Ediyor","Whatsapp Mesaj","E-mail","Yeni Tarihe Ertele"])
             rand_takip    = rc5.selectbox("Takip:", ["Gidildi","Gidilmedi","Devam Ediyor","Ertelendi"])
             rand_adet     = rc6.number_input("Adet:", min_value=0, step=1, key="rand_adet")
             rand_temsilci = st.text_input("Satış Temsilcisi*:", key="rand_tem")
-            rand_tem_tel  = st.text_input("Temsilci WA No:", placeholder="05xxxxxxxxx", key="rand_tem_tel")
-            rand_aciklama = st.text_area("Açıklama:", height=70, key="rand_aciklama")
+            rand_tem_tel  = st.text_input("Temsilci WA No:", value=_rand_tem_tel_oto, placeholder="05xxxxxxxxx", key="rand_tem_tel")
+            rand_aciklama = st.text_area("Açıklama:", height=70, key="rand_aciklama", help="Bu not, randevu kaydedilince müşterinin cari kartına da otomatik eklenir.")
             rand_sonuc    = st.selectbox("Sonuç:", ["—","Bitti","Devam Ediyor","Gidilmedi","İptal"])
 
             if st.form_submit_button("💾 Randevu Kaydet", use_container_width=True, type="primary"):
                 if rand_musteri == "-- Müşteri Seçin --":
+
                     st.warning("Müşteri seçin!")
                 else:
                     musteri_id=0; musteri_adi=rand_musteri
