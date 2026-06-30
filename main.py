@@ -7372,8 +7372,13 @@ elif aktif == "randevu":
         if "rand_tarih_deger" not in st.session_state:
             st.session_state["rand_tarih_deger"] = datetime.now().date()
 
-        st.markdown("<div style='font-size:13px;color:#475569;font-weight:500;margin-bottom:4px;'>Tarih*</div>", unsafe_allow_html=True)
-        _ptd1, _ptd2, _ptd3 = st.columns([1,3,1])
+        _rand_saat_opts = [f"{h:02d}:{m:02d}" for h in range(9,21) for m in (0,15,30,45)]
+
+        _tlbl1, _tlbl2 = st.columns([3,1])
+        _tlbl1.markdown("<div style='font-size:13px;color:#475569;font-weight:500;'>Tarih*</div>", unsafe_allow_html=True)
+        _tlbl2.markdown("<div style='font-size:13px;color:#475569;font-weight:500;'>Saat*</div>", unsafe_allow_html=True)
+
+        _ptd1, _ptd2, _ptd3, _ptd4 = st.columns([1,2.2,2.2,1.6])
         if _ptd1.button("‹", key="rand_tarih_geri", help="Bir gün geri", use_container_width=True):
             st.session_state["rand_tarih_deger"] -= timedelta(days=1)
             st.session_state.pop("rand_tarih_secim", None)
@@ -7389,6 +7394,8 @@ elif aktif == "randevu":
             st.session_state["rand_tarih_deger"] += timedelta(days=1)
             st.session_state.pop("rand_tarih_secim", None)
             st.rerun()
+        rand_saat = _ptd4.selectbox("Saat", _rand_saat_opts, index=4, key="rand_saat", label_visibility="collapsed")
+
         _gun_adlari = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi","Pazar"]
         _td_gun = _gun_adlari[st.session_state["rand_tarih_deger"].weekday()]
         st.caption(f"📅 {_td_gun}")
@@ -7397,10 +7404,7 @@ elif aktif == "randevu":
             st.caption(f"Seçili müşteri: **{_rand_mus_sec}**" if _rand_mus_sec != "-- Müşteri Seçin --" else "⚠️ Yukarıdan müşteri seçin")
             rand_musteri = _rand_mus_sec  # üstteki seçimi kullan, form içinde tekrar gösterme
             rand_tarih = st.session_state["rand_tarih_deger"]
-            rc2,rc3 = st.columns(2)
-            _rand_saat_opts = [f"{h:02d}:{m:02d}" for h in range(9,21) for m in (0,15,30,45)]
-            rand_saat     = rc2.selectbox("Saat*:", _rand_saat_opts, index=4, key="rand_saat")  # default 10:00
-            rand_bolge    = rc3.text_input("Bölge:", value=_rand_bolge_oto, placeholder="İstanbul Beykoz")
+            rand_bolge = st.text_input("Bölge:", value=_rand_bolge_oto, placeholder="İstanbul Beykoz")
             rc4,rc5,rc6 = st.columns(3)
             rand_gorev    = rc4.selectbox("Görev*:", ["Ziyaret","Arama","Değerlendirme","Kazanıldı","Kaybedildi","Devam Ediyor","Whatsapp Mesaj","E-mail","Yeni Tarihe Ertele"])
             rand_takip    = rc5.selectbox("Takip:", ["Gidildi","Gidilmedi","Devam Ediyor","Ertelendi"])
