@@ -31,6 +31,7 @@ def get_sb_client():
         pass
     return None
 
+
 @st.cache_resource
 def get_sb_service():
     """Supabase service_role client — log ve admin işlemler için"""
@@ -124,6 +125,9 @@ def get_kullanici_listesi():
     return db_read("kullanicilar", extra_sql="")
 
 @st.cache_data(ttl=120)
+def _cached_placeholder(): pass  # cache decorator boş bırakılamaz
+
+
 def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
     """Supabase veya SQLite'dan DataFrame döner"""
     sb = get_sb_client()
@@ -147,7 +151,7 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
                 return pd.DataFrame(res.data) if res.data else pd.DataFrame()
             return pd.DataFrame()
         except Exception as _e_read:
-            pass  # SQLite fallback
+            pass
     try:
         sql = f"SELECT * FROM {table}"
         if extra_sql:
@@ -159,8 +163,9 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
     except:
         return pd.DataFrame()
 
+
 def db_insert(table, data):
-    """Insert — Supabase önce, SQLite fallback"""
+    """Insert — Supabase önce, SQLite fallback — firma_id otomatik eklenir"""
     sb = get_sb_client()
     _sb_hata = None
     if sb:
@@ -710,6 +715,8 @@ def giris_ekrani():
                     _yetki = "tam" if _yetki_val == "tam" else _yjson.loads(_yetki_val)
                 except:
                     _yetki = "tam"
+                _firma_id_giris = 1
+
                 # Tüm state'i tek seferde set et — kopma olmasın
                 st.session_state.update({
                     "giris":            True,
@@ -1188,7 +1195,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "patron"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -1223,7 +1230,7 @@ def get_menu_tercihi(kullanici):
                 kayitli = json.loads(res.data[0]["deger"])
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
-                    tam_liste += ["kullanici","admin_rapor"]
+                    tam_liste += ["kullanici","admin_rapor","patron"]
                 tam_liste = _temizle(tam_liste)
                 # Eksik olanları tam_liste'deki sıraya göre doğru pozisyona ekle
                 for i, t in enumerate(tam_liste):
@@ -1247,7 +1254,7 @@ def get_menu_tercihi(kullanici):
                 kayitli = json.loads(row[0])
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
-                    tam_liste += ["kullanici","admin_rapor"]
+                    tam_liste += ["kullanici","admin_rapor","patron"]
                 tam_liste = _temizle(tam_liste)
                 for i, t in enumerate(tam_liste):
                     if t not in kayitli:
@@ -1262,7 +1269,7 @@ def get_menu_tercihi(kullanici):
     except: pass
     tam_liste = _TAB_LISTESI_DEFAULT.copy()
     if st.session_state.get("rol") == "admin":
-        tam_liste += ["kullanici","admin_rapor"]
+        tam_liste += ["kullanici","admin_rapor","patron"]
     return _temizle(tam_liste)
 
 def save_menu_tercihi(kullanici, sira):
@@ -1315,6 +1322,7 @@ def _surum_kontrol():
 if not st.session_state.get("giris", False):
     giris_ekrani()
     st.stop()
+
 
 
 
@@ -1643,6 +1651,7 @@ st.divider()
 if "aktif_tab" not in st.session_state:
     st.session_state["aktif_tab"] = "liste"
 aktif = st.session_state["aktif_tab"]
+
 
 # ── MOBİL MOD — body class + nav aktif ikon ──────────────────────────────────
 _mobil_mod_aktif = st.session_state.get("_mobil_mod", False)
@@ -2064,37 +2073,39 @@ section[data-testid="stSidebar"] { display: none !important; }
                 df[_tk] = _telefon_temizle(df[_tk])
 
     with st.expander("🔍 Mükerrer (Aynı İsimli) Müşterileri Bul ve Birleştir"):
-        _firma_gruplari = df.groupby(df["firma"].str.strip().str.upper())["id"].apply(list)
-        _mukerrerler = {k: v for k, v in _firma_gruplari.items() if len(v) > 1}
-
-        if not _mukerrerler:
-            st.caption("Mükerrer müşteri bulunamadı.")
+        if df.empty or "firma" not in df.columns:
+            st.caption("Veri yok.")
         else:
-            st.warning(f"{len(_mukerrerler)} mükerrer firma adı bulundu.")
+            _firma_gruplari = df.groupby(df["firma"].str.strip().str.upper())["id"].apply(list)
+            _mukerrerler = {k: v for k, v in _firma_gruplari.items() if len(v) > 1}
+            if not _mukerrerler:
+                st.caption("Mükerrer müşteri bulunamadı.")
+            else:
+                st.warning(f"{len(_mukerrerler)} mükerrer firma adı bulundu.")
 
-            _mr_tab1, _mr_tab2 = st.tabs(["📋 Toplu Karşılaştırma (hepsi)", "🔎 Tek Seçerek Karşılaştır"])
+                _mr_tab1, _mr_tab2 = st.tabs(["📋 Toplu Karşılaştırma (hepsi)", "🔎 Tek Seçerek Karşılaştır"])
 
-            with _mr_tab1:
-                @st.cache_data(ttl=60)
-                def _dc_tum_not_analiz_sayilari():
-                    """Tek seferde tüm notları ve analizleri çek — N+1 sorgu sorununu önler"""
-                    _not_say = {}
-                    _analiz_say = {}
-                    try:
-                        sb_mt = get_sb_service() or get_sb_client()
-                        if sb_mt:
-                            _rn = sb_mt.table("cari_aciklamalar").select("cari_id").execute()
-                            if _rn.data:
-                                for _row in _rn.data:
-                                    _cid_n = _row.get("cari_id")
-                                    _not_say[_cid_n] = _not_say.get(_cid_n, 0) + 1
-                            _ra = sb_mt.table("musteri_analiz").select("firma").execute()
-                            if _ra.data:
-                                for _row in _ra.data:
-                                    _fad_n = _row.get("firma")
-                                    _analiz_say[_fad_n] = _analiz_say.get(_fad_n, 0) + 1
-                    except: pass
-                    return _not_say, _analiz_say
+                with _mr_tab1:
+                    @st.cache_data(ttl=60)
+                    def _dc_tum_not_analiz_sayilari():
+                        """Tek seferde tüm notları ve analizleri çek — N+1 sorgu sorununu önler"""
+                        _not_say = {}
+                        _analiz_say = {}
+                        try:
+                            sb_mt = get_sb_service() or get_sb_client()
+                            if sb_mt:
+                                _rn = sb_mt.table("cari_aciklamalar").select("cari_id").execute()
+                                if _rn.data:
+                                    for _row in _rn.data:
+                                        _cid_n = _row.get("cari_id")
+                                        _not_say[_cid_n] = _not_say.get(_cid_n, 0) + 1
+                                _ra = sb_mt.table("musteri_analiz").select("firma").execute()
+                                if _ra.data:
+                                    for _row in _ra.data:
+                                        _fad_n = _row.get("firma")
+                                        _analiz_say[_fad_n] = _analiz_say.get(_fad_n, 0) + 1
+                        except: pass
+                        return _not_say, _analiz_say
 
                 _not_say_tum, _analiz_say_tum = _dc_tum_not_analiz_sayilari()
 
@@ -2674,27 +2685,30 @@ function kartSec(id){
         df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
 
     # Segment hesapla ve sırala
-    df_f["_seg_goster"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
-    _seg_sira = {"👑 A+":0,"⭐ A":1,"🔵 B":2,"⚪ C":3,"":4}
-    df_f["_seg_sira"] = df_f["_seg_goster"].map(lambda s: _seg_sira.get(s,4))
-    df_f = df_f.sort_values(["_seg_sira","firma"], ascending=[True,True]).reset_index(drop=True)
-    if siralama_kol == "Firma A-Z":      df_f = df_f.sort_values("firma", ascending=True)
-    elif siralama_kol == "Firma Z-A":    df_f = df_f.sort_values("firma", ascending=False)
-    elif siralama_kol == "İl A-Z" and "il" in df_f.columns:       df_f = df_f.sort_values("il", ascending=True)
-    elif siralama_kol == "Temsilci A-Z" and "temsilci" in df_f.columns: df_f = df_f.sort_values("temsilci", ascending=True)
-    elif siralama_kol == "Hedef ₺↓" and "beklenen_ciro" in df_f.columns:
-        df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["beklenen_ciro"], errors="coerce").fillna(0)
-        df_f = df_f.sort_values("_s", ascending=False).drop(columns=["_s"])
-    elif siralama_kol == "Hedef ₺↑" and "beklenen_ciro" in df_f.columns:
-        df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["beklenen_ciro"], errors="coerce").fillna(0)
-        df_f = df_f.sort_values("_s", ascending=True).drop(columns=["_s"])
-    elif siralama_kol == "Gerçek ₺↓" and "gerceklesen_ciro" in df_f.columns:
-        df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["gerceklesen_ciro"], errors="coerce").fillna(0)
-        df_f = df_f.sort_values("_s", ascending=False).drop(columns=["_s"])
-    elif siralama_kol == "Gerçek ₺↑" and "gerceklesen_ciro" in df_f.columns:
-        df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["gerceklesen_ciro"], errors="coerce").fillna(0)
-        df_f = df_f.sort_values("_s", ascending=True).drop(columns=["_s"])
-    df_f = df_f.reset_index(drop=True)
+    if df_f.empty or "firma" not in df_f.columns:
+        df_f = pd.DataFrame()
+    else:
+        df_f["_seg_goster"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
+        _seg_sira = {"👑 A+":0,"⭐ A":1,"🔵 B":2,"⚪ C":3,"":4}
+        df_f["_seg_sira"] = df_f["_seg_goster"].map(lambda s: _seg_sira.get(s,4))
+        df_f = df_f.sort_values(["_seg_sira","firma"], ascending=[True,True]).reset_index(drop=True)
+        if siralama_kol == "Firma A-Z":      df_f = df_f.sort_values("firma", ascending=True)
+        elif siralama_kol == "Firma Z-A":    df_f = df_f.sort_values("firma", ascending=False)
+        elif siralama_kol == "İl A-Z" and "il" in df_f.columns:       df_f = df_f.sort_values("il", ascending=True)
+        elif siralama_kol == "Temsilci A-Z" and "temsilci" in df_f.columns: df_f = df_f.sort_values("temsilci", ascending=True)
+        elif siralama_kol == "Hedef ₺↓" and "beklenen_ciro" in df_f.columns:
+            df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["beklenen_ciro"], errors="coerce").fillna(0)
+            df_f = df_f.sort_values("_s", ascending=False).drop(columns=["_s"])
+        elif siralama_kol == "Hedef ₺↑" and "beklenen_ciro" in df_f.columns:
+            df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["beklenen_ciro"], errors="coerce").fillna(0)
+            df_f = df_f.sort_values("_s", ascending=True).drop(columns=["_s"])
+        elif siralama_kol == "Gerçek ₺↓" and "gerceklesen_ciro" in df_f.columns:
+            df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["gerceklesen_ciro"], errors="coerce").fillna(0)
+            df_f = df_f.sort_values("_s", ascending=False).drop(columns=["_s"])
+        elif siralama_kol == "Gerçek ₺↑" and "gerceklesen_ciro" in df_f.columns:
+            df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["gerceklesen_ciro"], errors="coerce").fillna(0)
+            df_f = df_f.sort_values("_s", ascending=True).drop(columns=["_s"])
+        df_f = df_f.reset_index(drop=True)
 
     _aktif_fil_sayisi = sum([bool(ara_txt),bool(_asama_sec),bool(_durum_sec),filtre_seg!="Tümü",bool(_il_sec),bool(_ilce_sec),bool(_tem_sec)])
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
@@ -3024,10 +3038,14 @@ function kartSec(id){
                         "kim": str(_nr.get("olusturan","") or ""),
                         "metin": str(_nr.get("aciklama","") or ""),
                     })
-                df_edit["📨 Notlar"] = df_edit["id"].apply(lambda x: f"📨 {_not_sayac.get(str(int(x)),0)}" if _not_sayac.get(str(int(x)),0) > 0 else "")
-                # Not sayısına göre sırala — çok notlu üstte, notsuzlar altta
-                df_edit["_not_sayi"] = df_edit["id"].apply(lambda x: _not_sayac.get(str(int(x)),0))
-                df_edit = df_edit.sort_values("_not_sayi", ascending=False).drop(columns=["_not_sayi"]).reset_index(drop=True)
+                if "id" in df_edit.columns:
+                    df_edit["📨 Notlar"] = df_edit["id"].apply(lambda x: f"📨 {_not_sayac.get(str(int(x)),0)}" if _not_sayac.get(str(int(x)),0) > 0 else "")
+                    df_edit["_not_sayi"] = df_edit["id"].apply(lambda x: _not_sayac.get(str(int(x)),0))
+                else:
+                    df_edit["📨 Notlar"] = ""
+                    df_edit["_not_sayi"] = 0
+                if "_not_sayi" in df_edit.columns:
+                    df_edit = df_edit.sort_values("_not_sayi", ascending=False).drop(columns=["_not_sayi"]).reset_index(drop=True)
             else:
                 df_edit["📨 Notlar"] = ""
         except Exception as _not_err:
@@ -3305,7 +3323,7 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
     st.divider()
 elif aktif == "kullanici":
     sayfa_log("kullanici")
-    st.markdown("## 👥 Kullanıcı Yönetimi")
+    st.markdown("## 👥 Kullanıcı & Firma Yönetimi")
 
     _ben = st.session_state.get("kullanici","")
     _rol = st.session_state.get("rol","")
@@ -5894,6 +5912,7 @@ section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseBu
             st.stop()
 
         _df_tum = _an_liste()
+        _dff = pd.DataFrame()  # her zaman tanımlı olsun
 
         if _df_tum.empty:
             st.info("Henüz analiz kaydı yok. '✏️ Yeni / Düzenle' sekmesinden ekleyin.")
@@ -8791,6 +8810,7 @@ render();
 </script></body></html>"""
 
     _pc.html(_patron_html, height=700, scrolling=True)
+
 
 
 elif aktif == "harita":
