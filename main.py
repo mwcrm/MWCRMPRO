@@ -5971,34 +5971,35 @@ section.main div[data-testid="stHorizontalBlock"]:has(button[data-testid="baseBu
         # ── KART GÖRÜNÜMÜ ─────────────────────────────────────────────────────
         _pot_renk = {"çok yüksek":"#22c55e","yüksek":"#22c55e","orta":"#f59e0b","düşük":"#ef4444","çok düşük":"#ef4444"}
 
-        # ── ANALİZ LİSTESİ KART CSS ───────────────────────────────────────────
+        # ── ANALİZ LİSTESİ — MODEL 1: Renkli Şerit + Kompakt Satır ──────────────
         st.markdown("""<style>
-div[data-testid="stHorizontalBlock"]:has(.an-kart-btn) button {
-    background: white !important;
-    border: 1px solid #e2e8f0 !important;
-    border-radius: 12px !important;
-    padding: 12px 16px !important;
-    text-align: left !important;
-    justify-content: flex-start !important;
-    height: auto !important;
-    min-height: 64px !important;
-    white-space: normal !important;
-    line-height: 1.5 !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,.04) !important;
-    transition: all .15s !important;
-}
-div[data-testid="stHorizontalBlock"]:has(.an-kart-btn) button:hover {
-    border-color: #93c5fd !important;
-    box-shadow: 0 2px 8px rgba(59,130,246,.12) !important;
-    transform: translateY(-1px) !important;
-}
-div[data-testid="stHorizontalBlock"]:has(.an-kart-btn) button p {
-    text-align: left !important;
-    white-space: normal !important;
-    font-size: 13px !important;
-    color: #1e293b !important;
+.an-m1-card{display:flex;align-items:stretch;background:white;border:0.5px solid #e2e8f0;border-radius:10px;margin-bottom:6px;overflow:hidden;transition:box-shadow .15s;}
+.an-m1-card:hover{box-shadow:0 2px 8px rgba(0,0,0,.06);}
+.an-m1-strip{width:5px;flex-shrink:0;}
+.an-m1-body{flex:1;padding:11px 14px;}
+.an-m1-name{font-size:13px;font-weight:600;color:#0f172a;margin-bottom:4px;}
+.an-m1-meta{font-size:11px;color:#64748b;display:flex;flex-wrap:wrap;gap:9px;align-items:center;}
+.an-m1-pot{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:500;white-space:nowrap;}
+.an-m1-ciro{font-size:12px;font-weight:600;color:#16a34a;white-space:nowrap;}
+div[data-testid="stHorizontalBlock"]:has(.an-m1-marker) { gap: 6px !important; align-items: stretch !important; margin-bottom: 6px !important; }
+div[data-testid="stHorizontalBlock"]:has(.an-m1-marker) button {
+    height: 100% !important; min-height: 56px !important;
+    border-radius: 8px !important; font-size: 13px !important;
 }
 </style>""", unsafe_allow_html=True)
+
+        _pot_renkler_m1 = {
+            "çok yüksek": ("#dcfce7","#166534","🟢 Çok Yüksek"),
+            "yüksek":     ("#dcfce7","#166534","🟢 Yüksek"),
+            "orta":       ("#fef9c3","#854d0e","🟡 Orta"),
+            "düşük":      ("#ffedd5","#9a3412","🟠 Düşük"),
+            "çok düşük":  ("#fee2e2","#991b1b","🔴 Çok Düşük"),
+        }
+        _strip_renkler_m1 = {
+            "çok yüksek": "#16a34a", "yüksek": "#16a34a", "orta": "#eab308",
+            "düşük": "#f97316", "çok düşük": "#ef4444",
+        }
+        _sonuc_ikon_m1 = {"anlaşma yapıldı":"✅","teklif verildi":"📄","takip edilecek":"⏰","beklemede":"⏳","ilgisiz":"❌"}
 
         for _ai, (_, _ar) in enumerate(_dff.iterrows()):
             _ar_firma   = str(_ar.get("firma","") or "?")
@@ -6008,27 +6009,37 @@ div[data-testid="stHorizontalBlock"]:has(.an-kart-btn) button p {
             _ar_yetkili = str(_ar.get("yetkili","") or "")
             _ar_sektor  = str(_ar.get("sektor","") or "")
             _ar_bek     = float(_ar.get("bek_ciro",0) or 0)
-            _dot_renk   = {"çok yüksek":"🟢","yüksek":"🟢","orta":"🟡","düşük":"🟠","çok düşük":"🔴"}.get(_ar_pot,"⚪")
-            _sonuc_badge = {"anlaşma yapıldı":"✅","teklif verildi":"📄","takip edilecek":"⏰","beklemede":"⏳","ilgisiz":"❌"}.get(_ar_sonuc,"·")
-            _pot_renk_hex = _pot_renk.get(_ar_pot, "#94a3b8")
 
-            # Kart içeriği — zengin metin
-            _kart_label = (
-                f"{_dot_renk}  **{_ar_firma}**\n\n"
-                f"{_sonuc_badge} {_ar_sonuc.title() if _ar_sonuc else '—'}   ·   "
-                f"📅 {_ar_tarih}"
-                + (f"   ·   💰 {_ar_bek:,.0f}₺" if _ar_bek > 0 else "")
-                + (f"\n👤 {_ar_yetkili}" if _ar_yetkili and _ar_yetkili not in ["nan","None","—"] else "")
-                + (f"   🏭 {_ar_sektor}" if _ar_sektor and _ar_sektor not in ["nan","None","—"] else "")
-            )
+            _strip = _strip_renkler_m1.get(_ar_pot, "#94a3b8")
+            _pbg, _ptc, _plbl = _pot_renkler_m1.get(_ar_pot, ("#f1f5f9","#475569","⚪ —"))
+            _sonuc_ic = _sonuc_ikon_m1.get(_ar_sonuc, "·")
 
-            _lc1, _lc3 = st.columns([9, 1])
-            # Görünmez marker span — CSS hook için
-            _lc1.markdown('<span class="an-kart-btn"></span>', unsafe_allow_html=True)
-            if _lc1.button(_kart_label, key=f"an_ac_{_ai}", use_container_width=True):
-                st.session_state["an_detay_firma"] = _ar_firma
-                st.rerun()
-            with _lc3:
+            _meta_parts = [f"{_sonuc_ic} {_ar_sonuc.title() if _ar_sonuc else '—'}", f"📅 {_ar_tarih}"]
+            if _ar_yetkili and _ar_yetkili not in ["nan","None","—",""]:
+                _meta_parts.append(f"👤 {_ar_yetkili}")
+            if _ar_sektor and _ar_sektor not in ["nan","None","—",""]:
+                _meta_parts.append(f"🏭 {_ar_sektor}")
+            _meta_html = " <span style='color:#cbd5e1'>·</span> ".join(_meta_parts)
+            _ciro_html = f"<span class='an-m1-ciro'>💰 {_ar_bek:,.0f}₺</span>" if _ar_bek > 0 else ""
+
+            _ac1, _ac2 = st.columns([10, 1])
+            with _ac1:
+                st.markdown(f"""<div class="an-m1-card">
+  <div class="an-m1-strip" style="background:{_strip};"></div>
+  <div class="an-m1-body">
+    <div class="an-m1-name">{_ar_firma}</div>
+    <div class="an-m1-meta">
+      <span class="an-m1-pot" style="background:{_pbg};color:{_ptc};">{_plbl}</span>
+      <span>{_meta_html}</span>
+      {_ciro_html}
+    </div>
+  </div>
+</div>""", unsafe_allow_html=True)
+                st.markdown('<span class="an-m1-marker"></span>', unsafe_allow_html=True)
+                if st.button("Detayı Aç →", key=f"an_ac_{_ai}", use_container_width=True):
+                    st.session_state["an_detay_firma"] = _ar_firma
+                    st.rerun()
+            with _ac2:
                 _sil_key = f"an_sil_onay_{_ai}"
                 if st.session_state.get(_sil_key):
                     _c1, _c2 = st.columns(2)
