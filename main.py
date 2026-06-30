@@ -7366,27 +7366,23 @@ elif aktif == "randevu":
         if "rand_tarih_deger" not in st.session_state:
             st.session_state["rand_tarih_deger"] = datetime.now().date()
 
-        _pre1, _pre2, _pre3 = st.columns(3)
-        with _pre1:
-            _ptd1, _ptd2, _ptd3 = st.columns([1,4,1])
-            if _ptd1.button("‹", key="rand_tarih_geri", help="Bir gün geri"):
-                st.session_state["rand_tarih_deger"] -= timedelta(days=1)
-                st.session_state.pop("rand_tarih", None)
-                st.rerun()
-            _gun_adlari = ["Pzt","Sal","Çar","Per","Cum","Cmt","Paz"]
-            _td_gun = _gun_adlari[st.session_state["rand_tarih_deger"].weekday()]
-            _ptd2.markdown(f"<div style='text-align:center;font-size:11px;color:#94a3b8;padding-top:6px;'>{_td_gun}</div>", unsafe_allow_html=True)
-            if _ptd3.button("›", key="rand_tarih_ileri", help="Bir gün ileri"):
-                st.session_state["rand_tarih_deger"] += timedelta(days=1)
-                st.session_state.pop("rand_tarih", None)
-                st.rerun()
+        st.markdown("<div style='font-size:13px;color:#475569;font-weight:500;margin-bottom:4px;'>Tarih*</div>", unsafe_allow_html=True)
+        _ptd1, _ptd2, _ptd3 = st.columns([1,3,1])
+        if _ptd1.button("‹", key="rand_tarih_geri", help="Bir gün geri", use_container_width=True):
+            st.session_state["rand_tarih_deger"] -= timedelta(days=1)
+            st.rerun()
+        _gun_adlari = ["Pazartesi","Salı","Çarşamba","Perşembe","Cuma","Cumartesi","Pazar"]
+        _td_gun = _gun_adlari[st.session_state["rand_tarih_deger"].weekday()]
+        _ptd2.markdown(f"<div style='text-align:center;border:1px solid #e2e8f0;border-radius:8px;padding:8px;font-size:13px;color:#0f172a;background:white;'>📅 {st.session_state['rand_tarih_deger'].strftime('%d.%m.%Y')} · {_td_gun}</div>", unsafe_allow_html=True)
+        if _ptd3.button("›", key="rand_tarih_ileri", help="Bir gün ileri", use_container_width=True):
+            st.session_state["rand_tarih_deger"] += timedelta(days=1)
+            st.rerun()
 
         with st.form("randevu_form"):
-            rand_musteri = st.selectbox("Müşteri:", musteri_rand_opts,
-                index=musteri_rand_opts.index(_rand_mus_sec) if _rand_mus_sec in musteri_rand_opts else 0,
-                key="rand_musteri")
-            rc1,rc2,rc3 = st.columns(3)
-            rand_tarih    = rc1.date_input("Tarih*:", value=st.session_state["rand_tarih_deger"], key="rand_tarih")
+            st.caption(f"Seçili müşteri: **{_rand_mus_sec}**" if _rand_mus_sec != "-- Müşteri Seçin --" else "⚠️ Yukarıdan müşteri seçin")
+            rand_musteri = _rand_mus_sec  # üstteki seçimi kullan, form içinde tekrar gösterme
+            rand_tarih = st.session_state["rand_tarih_deger"]
+            rc2,rc3 = st.columns(2)
             _rand_saat_opts = [f"{h:02d}:{m:02d}" for h in range(9,21) for m in (0,15,30,45)]
             rand_saat     = rc2.selectbox("Saat*:", _rand_saat_opts, index=4, key="rand_saat")  # default 10:00
             rand_bolge    = rc3.text_input("Bölge:", value=_rand_bolge_oto, placeholder="İstanbul Beykoz")
