@@ -2094,8 +2094,18 @@ section[data-testid="stSidebar"] { display: none !important; }
     sb_liste = get_sb_client()
     try:
         if sb_liste:
-            res_l = sb_liste.table("cari_kartlar").select("*").neq("silindi",1).order("tarih",desc=True).execute()
-            df = pd.DataFrame(res_l.data) if res_l.data else pd.DataFrame()
+            _tum_cari = []
+            _off = 0
+            while True:
+                _res = sb_liste.table("cari_kartlar").select("*").neq("silindi",1).order("tarih",desc=True).range(_off, _off+999).execute()
+                if _res.data:
+                    _tum_cari.extend(_res.data)
+                    if len(_res.data) < 1000:
+                        break
+                    _off += 1000
+                else:
+                    break
+            df = pd.DataFrame(_tum_cari) if _tum_cari else pd.DataFrame()
         else:
             raise Exception()
     except:
