@@ -7328,6 +7328,22 @@ elif aktif == "randevu":
                     except: pass
                     st.success("✅ Randevu kaydedildi!")
 
+                    # ── Açıklama doluysa cari müşteri notlarına da otomatik kaydet ──
+                    if rand_aciklama and rand_aciklama.strip() and musteri_id > 0:
+                        try:
+                            _sb_rn = get_sb_client()
+                            _yazar_rn = st.session_state.get("kullanici_ad", st.session_state.get("kullanici",""))
+                            _not_metni = f"📅 Randevu notu ({rand_tarih.strftime('%d.%m.%Y')} {rand_saat}): {rand_aciklama.strip()}"
+                            _rn_veri = {"cari_id": int(musteri_id), "aciklama": _not_metni, "olusturan": _yazar_rn, "cari_adi": str(musteri_adi)}
+                            if _sb_rn:
+                                try:
+                                    _sb_rn.table("cari_aciklamalar").insert(_rn_veri).execute()
+                                except Exception:
+                                    _rn_veri2 = {"cari_id": int(musteri_id), "aciklama": _not_metni, "olusturan": _yazar_rn}
+                                    _sb_rn.table("cari_aciklamalar").insert(_rn_veri2).execute()
+                        except Exception:
+                            pass  # not kaydı başarısız olsa bile randevu kaydı bozulmasın
+
                     if rand_tem_tel.strip():
                         import re as _re_r3
                         _tw3 = _re_r3.sub(r"[\s\-\(\)+]","",rand_tem_tel.strip())
