@@ -3694,7 +3694,7 @@ elif aktif == "kullanici":
 
             if st.form_submit_button("💾 Kaydet", use_container_width=True, type="primary"):
                 if yk_kadi and yk_sifre:
-                    yetki = "tam" if tam else _kj.dumps(secili_m)
+                    yetki = "tam" if tam else json.dumps(secili_m)
                     # Önce temel kolonlarla dene
                     veri = {"kullanici_adi": yk_kadi, "sifre": yk_sifre, "rol": yk_rol}
                     # Ek kolonları tek tek ekle
