@@ -729,6 +729,11 @@ def giris_ekrani():
                     "_ekran_kontrol":   True,
                     "giris_cihaz":      "mobil" if _mobil_secildi else "masaustu",
                 })
+                # localStorage'a kaydet — sayfa yenilenince otomatik giriş
+                _ls_veri = json.dumps({"kullanici": kullanici, "sifre": _yf_sifre, "mobil": _mobil_secildi})
+                st.markdown(f"""<script>
+try{{localStorage.setItem('mwcrm_oturum', {repr(_ls_veri)});}}catch(e){{}}
+</script>""", unsafe_allow_html=True)
                 # Giriş logla
                 try:
                     _sb_logi = get_sb_client()
@@ -756,6 +761,9 @@ def cikis():
             }).execute()
     except: pass
     st.session_state.clear()
+    st.markdown("""<script>
+try{localStorage.removeItem('mwcrm_oturum');}catch(e){}
+</script>""", unsafe_allow_html=True)
     st.rerun()
 
 # ── SESSION STATE ─────────────────────────────────────────────────────────────
@@ -1390,6 +1398,57 @@ def _surum_kontrol():
 
 # Giriş kontrolü
 if not st.session_state.get("giris", False):
+    # ── ÖNCE localStorage'dan otomatik giriş dene ────────────────────────────
+    _auto_giris_qp = st.query_params.get("_ag", "")
+    if _auto_giris_qp:
+        try:
+            _ag_veri = json.loads(_auto_giris_qp)
+            _ag_kul  = _ag_veri.get("kullanici","")
+            _ag_sif  = _ag_veri.get("sifre","")
+            _ag_mob  = _ag_veri.get("mobil", False)
+            if _ag_kul and _ag_sif:
+                _ag_row = None
+                try:
+                    from supabase import create_client as _agsc
+                    _ag_sb = _agsc(st.secrets.get("SUPABASE_URL",""), st.secrets.get("SUPABASE_KEY",""))
+                    _ag_res = _ag_sb.table("kullanicilar").select("*").eq("kullanici_adi", _ag_kul).eq("sifre", _ag_sif).execute()
+                    if _ag_res.data: _ag_row = _ag_res.data[0]
+                except: pass
+                if _ag_row:
+                    _ag_rol = str(_ag_row.get("rol","") or "kullanici")
+                    try:
+                        import json as _agj
+                        _ag_yetki_val = str(_ag_row.get("yetkiler","tam") or "tam")
+                        _ag_yetki = "tam" if _ag_yetki_val == "tam" else _agj.loads(_ag_yetki_val)
+                    except: _ag_yetki = "tam"
+                    st.session_state.update({
+                        "giris": True, "kullanici": _ag_kul, "kullanici_ad": _ag_kul,
+                        "rol": _ag_rol, "aktif_tab": "liste",
+                        "_yetki_listesi": _ag_yetki,
+                        "_mobil_mod": _ag_mob, "_ekran_kontrol": True,
+                        "giris_cihaz": "mobil" if _ag_mob else "masaustu",
+                    })
+                    st.query_params.clear()
+                    st.rerun()
+        except: pass
+        st.query_params.clear()
+
+    # localStorage'dan oku ve query param ile gönder
+    if not st.session_state.get("giris", False) and not st.session_state.get("_ls_denendi", False):
+        st.session_state["_ls_denendi"] = True
+        st.markdown("""<script>
+(function(){
+  try{
+    var v = localStorage.getItem('mwcrm_oturum');
+    if(v){
+      var url = new URL(window.parent.location.href);
+      url.searchParams.set('_ag', v);
+      window.parent.location.replace(url.toString());
+    }
+  }catch(e){}
+})();
+</script>""", unsafe_allow_html=True)
+
     giris_ekrani()
     st.stop()
 
