@@ -1640,6 +1640,11 @@ button[data-testid="manage-app-button"] { display: none !important; }
             _sb_liste_temiz.append(_t)
     _sb_liste = _sb_liste_temiz
 
+    # ── ADMIN OLMAYAN KULLANICILARDAN GİZLENECEK SAYFALAR ─────────────────────
+    _SADECE_ADMIN = {"patron", "admin_rapor", "kullanici", "musteri_atama", "excel"}
+    if st.session_state.get("rol") != "admin":
+        _sb_liste = [t for t in _sb_liste if t not in _SADECE_ADMIN]
+
     _TAB_RENKLER = {
         "yeni":        "#16a34a",
         "liste":       "#0369a1",
@@ -9329,6 +9334,7 @@ elif aktif == "harita":
     import json as _hj
     st.markdown("## 🗺️ Müşteri Haritası")
     _hdf_raw = db_read("cari_kartlar", extra_sql="ORDER BY firma")
+    _hdf_raw = _atama_filtresi_uygula(_hdf_raw)
     if not _hdf_raw.empty and "silindi" in _hdf_raw.columns:
         _hdf = _hdf_raw[~_hdf_raw["silindi"].isin([1, "1", True, "true"])]
     else:
