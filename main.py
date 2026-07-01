@@ -9200,20 +9200,27 @@ elif aktif == "musteri_atama":
 
     # ── LİSTE BAŞLIĞI ─────────────────────────────────────────────────────────
     st.markdown("""<style>
-.ma-baslik{display:grid;grid-template-columns:32px 2fr 90px 90px 80px 90px 130px 50px;gap:6px;padding:6px 8px;
-    background:#f8fafc;border-radius:6px;font-size:10px;font-weight:600;color:#64748b;
-    text-transform:uppercase;margin-bottom:4px;}
-.ma-satir{display:grid;grid-template-columns:32px 2fr 90px 90px 80px 90px 130px 50px;gap:6px;
-    padding:8px 8px;background:white;border:0.5px solid #e2e8f0;border-radius:8px;
-    margin-bottom:3px;align-items:center;font-size:12px;}
-.ma-satir:hover{background:#f8fafc;}
-.ma-firma{font-weight:500;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.ma-durum{font-size:10px;padding:2px 7px;border-radius:20px;background:#eff6ff;color:#1d4ed8;white-space:nowrap;}
-.ma-hedef{font-size:12px;font-weight:500;color:#16a34a;text-align:right;}
+.ma-baslik{display:grid;grid-template-columns:40px 3fr 100px 90px 90px 90px 160px 55px;gap:10px;padding:8px 12px;
+    background:#f8fafc;border:0.5px solid #e2e8f0;border-radius:8px;font-size:10px;font-weight:600;color:#64748b;
+    text-transform:uppercase;margin-bottom:6px;letter-spacing:.3px;}
+.ma-satir{display:grid;grid-template-columns:40px 3fr 100px 90px 90px 90px 160px 55px;gap:10px;
+    padding:10px 12px;background:white;border:0.5px solid #e2e8f0;border-radius:10px;
+    margin-bottom:5px;align-items:center;font-size:12px;transition:box-shadow .1s;}
+.ma-satir:hover{box-shadow:0 2px 6px rgba(0,0,0,.06);}
+.ma-firma{font-weight:600;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;}
+.ma-durum{font-size:10px;padding:3px 8px;border-radius:20px;background:#eff6ff;color:#1d4ed8;white-space:nowrap;display:inline-block;}
+.ma-hedef{font-size:12px;font-weight:600;color:#16a34a;text-align:right;}
 .ma-il{font-size:11px;color:#475569;}
+/* Checkbox büyüt */
+div[data-testid="stHorizontalBlock"]:has(.ma-chk-marker) [data-testid="stCheckbox"] input {
+    width:18px !important; height:18px !important;
+}
+div[data-testid="stHorizontalBlock"]:has(.ma-chk-marker) [data-testid="stCheckbox"] {
+    padding-top:4px !important;
+}
 </style>
 <div class="ma-baslik">
-  <span>☑</span><span>Firma</span><span>Durum</span><span>İl</span><span>İlçe</span><span style="text-align:right">Hedef ₺</span><span>Atanan</span><span></span>
+  <span>☑</span><span>Firma</span><span>Durum</span><span>İl</span><span>İlçe</span><span style="text-align:right">Hedef ₺</span><span>Atanan Kullanıcı</span><span></span>
 </div>""", unsafe_allow_html=True)
 
     # ── SATIRLAR ──────────────────────────────────────────────────────────────
@@ -9227,8 +9234,9 @@ elif aktif == "musteri_atama":
         _mhedef  = float(_mrow.get("beklenen_ciro",0) or 0)
         _matanan = str(_mrow.get("atanan_kullanici","") or "")
 
-        _col_chk, _col_firma, _col_dur, _col_il, _col_ilce, _col_hedef, _col_ata, _col_btn = st.columns([1, 5, 2, 2, 2, 2, 3, 1])
+        _col_chk, _col_firma, _col_dur, _col_il, _col_ilce, _col_hedef, _col_ata, _col_btn = st.columns([1, 6, 2, 2, 2, 2, 4, 1])
 
+        st.markdown('<span class="ma-chk-marker" style="display:none"></span>', unsafe_allow_html=True)
         _checked = _col_chk.checkbox("", value=_mid in _secili_ids, key=f"ma_chk_{_mid}", label_visibility="collapsed")
         if _checked and _mid not in _secili_ids:
             st.session_state["ma_secili_ids"].add(_mid)
