@@ -94,6 +94,25 @@ def _telefon_temizle(seri):
         return s
     return seri.apply(_tek)
 
+def _get_atanmis_firmalar():
+    """Giriş yapan kullanıcının atanmış firma adlarını döndürür. Admin için None (hepsi)."""
+    try:
+        _rol = st.session_state.get("rol","")
+        _kul = st.session_state.get("kullanici","")
+        if _rol == "admin" or not _kul:
+            return None  # None = hepsini göster
+        sb = get_sb_client()
+        if sb:
+            _res = sb.table("cari_kartlar").select("firma,id").eq("atanan_kullanici", _kul).neq("silindi",1).execute()
+            if _res.data:
+                return {
+                    "firmalar": set(str(r.get("firma","")).strip().upper() for r in _res.data if r.get("firma")),
+                    "idler": set(int(r.get("id",0)) for r in _res.data if r.get("id"))
+                }
+        return {"firmalar": set(), "idler": set()}  # boş — hiçbir şey görmesin
+    except:
+        return None  # hata durumunda hepsini göster (güvenli taraf)
+
 def _atama_filtresi_uygula(df):
     """Admin hepsini görür, diğerleri sadece kendine atananları"""
     try:
@@ -4537,8 +4556,14 @@ elif aktif == "rapor":
 
     # Veri yükle
     df_rapor = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi=\'0\' OR silindi IS NULL)")
+    df_rapor = _atama_filtresi_uygula(df_rapor)
     df_rand_r = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC")
     df_tek_r  = db_read("teklifler", order_col="tarih")
+    # Randevu ve teklifleri de filtrele
+    if not df_rand_r.empty and "musteri_adi" in df_rand_r.columns:
+        _rp_atanan = _get_atanmis_firmalar()
+        if _rp_atanan is not None and "firmalar" in _rp_atanan:
+            df_rand_r = df_rand_r[df_rand_r["musteri_adi"].apply(lambda x: str(x or "").strip().upper() in _rp_atanan["firmalar"])]
 
     if not df_rapor.empty:
         for col in ["beklenen_ciro","gerceklesen_ciro"]:
@@ -4846,6 +4871,7 @@ elif aktif == "teklif":
 
     # ── TEK SATIR: FİLTRE + MÜŞTERİ + BİLGİLER ──────────────────────────────
     _df_cari_tek = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+    _df_cari_tek = _atama_filtresi_uygula(_df_cari_tek)
 
     if st.session_state.get("tek_mus_reset"):
         st.session_state.pop("tek_mus_reset", None)
@@ -5774,7 +5800,13 @@ elif aktif == "analiz":
                 r = sb.table("musteri_analiz").select("id,firma,potansiyel,sonuc,tarih,yetkili,iletisim,sektor,kaynak,kargo,beklenti,engel,not_alan,sonraki_adim,takip_tar,bek_ciro,ger_ciro").order("tarih", desc=True).limit(500).execute()
                 if r.data:
                     df = pd.DataFrame(r.data)
-                    return df[df["firma"].notna() & (df["firma"] != "")]
+                    df = df[df["firma"].notna() & (df["firma"] != "")]
+                    # Atama filtresi
+                    _atanan = _get_atanmis_firmalar()
+                    if _atanan is not None and "firmalar" in _atanan:
+                        def _norm(s): return str(s or "").strip().upper()
+                        df = df[df["firma"].apply(lambda x: _norm(x) in _atanan["firmalar"])]
+                    return df
         except Exception as e:
             st.error(f"Liste hatası: {e}")
         return pd.DataFrame()
@@ -7119,6 +7151,12 @@ elif aktif == "randevu":
 
     # ── TÜM RANDEVULARI YİKLE ────────────────────────────────────────────────
     df_rand_all = db_read("randevular", extra_sql="ORDER BY randevu_tarihi ASC, randevu_saati ASC")
+    # Atama filtresi — kullanıcı sadece kendi müşterilerinin randevularını görür
+    if not df_rand_all.empty and "musteri_adi" in df_rand_all.columns:
+        _rand_atanan = _get_atanmis_firmalar()
+        if _rand_atanan is not None and "firmalar" in _rand_atanan:
+            def _norm_r(s): return str(s or "").strip().upper()
+            df_rand_all = df_rand_all[df_rand_all["musteri_adi"].apply(lambda x: _norm_r(x) in _rand_atanan["firmalar"])]
     bugun_str = datetime.now().strftime("%Y-%m-%d")
 
     # ── iki sekme ─────────────────────────────────────────────────────────────
