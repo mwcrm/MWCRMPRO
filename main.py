@@ -764,7 +764,7 @@ def giris_ekrani():
                     "giris_cihaz":      "mobil" if _mobil_secildi else "masaustu",
                 })
                 # localStorage'a kaydet — sayfa yenilenince otomatik giriş
-                _ls_veri = json.dumps({"kullanici": kullanici, "sifre": _yf_sifre, "mobil": _mobil_secildi})
+                _ls_veri = json.dumps({"kullanici": kullanici, "sifre": sifre, "mobil": _mobil_secildi})
                 st.markdown(f"""<script>
 try{{localStorage.setItem('mwcrm_oturum', {repr(_ls_veri)});}}catch(e){{}}
 </script>""", unsafe_allow_html=True)
