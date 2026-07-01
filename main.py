@@ -9454,31 +9454,7 @@ elif aktif == "rota_analiz":
 
             st.markdown("<hr style='margin:4px 0;border-color:var(--border)'>", unsafe_allow_html=True)
 
-    with st.expander("📋 Supabase SQL — tabloları oluştur"):
-        _ra_sql = (
-            "CREATE TABLE IF NOT EXISTS rota_analiz (\n"
-            "  id BIGSERIAL PRIMARY KEY,\n"
-            "  cari_id BIGINT,\n"
-            "  firma TEXT,\n"
-            "  yetkili TEXT,\n"
-            "  tel TEXT,\n"
-            "  bolge TEXT,\n"
-            "  aciklama TEXT,\n"
-            "  olusturma_tarihi TIMESTAMPTZ DEFAULT NOW()\n"
-            ");\n"
-            "CREATE TABLE IF NOT EXISTS rota_analiz_detay (\n"
-            "  id BIGSERIAL PRIMARY KEY,\n"
-            "  rota_analiz_id BIGINT REFERENCES rota_analiz(id) ON DELETE CASCADE,\n"
-            "  cikis_il TEXT,\n"
-            "  varis_il TEXT,\n"
-            "  koli INT DEFAULT 0,\n"
-            "  palet INT DEFAULT 0,\n"
-            "  toplam INT DEFAULT 0,\n"
-            "  aciklama TEXT,\n"
-            "  olusturma_tarihi TIMESTAMPTZ DEFAULT NOW()\n"
-            ");"
-        )
-        st.code(_ra_sql, language="sql")
+
 
 
 elif aktif == "harita":
