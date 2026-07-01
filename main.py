@@ -1324,7 +1324,7 @@ _TAB_ETIKETLER = {
     "admin_rapor": "📊 Rapor Tasarla",
     "harita": "🗺️ Müşteri Haritası",
     "patron": "👑 Yönetim Paneli",
-    "musteri_atama": "🎯 Müşteri Atama",
+    
 }
 
 def get_menu_tercihi(kullanici):
@@ -8827,6 +8827,13 @@ elif aktif == "patron":
     from datetime import datetime as _pdt, timedelta as _ptd
     import streamlit.components.v1 as _pc
 
+    # Müşteri Atama hızlı erişim
+    _pat_c1, _pat_c2 = st.columns([1,4])
+    if _pat_c1.button("🎯 Müşteri Atama", use_container_width=True, type="primary"):
+        st.session_state["aktif_tab"] = "musteri_atama"
+        st.rerun()
+    st.divider()
+
     _bugun = _pdt.now().date()
 
     # Veri çek
@@ -9117,9 +9124,9 @@ elif aktif == "musteri_atama":
     except:
         _kul_listesi = []
 
-    # Müşterileri yükle — hedef ve durum ile
+    # Müşterileri yükle — hedef, durum, il, ilçe ile
     try:
-        _ma_res = _sb_ma.table("cari_kartlar").select("id,firma,durum,beklenen_ciro,atanan_kullanici").neq("silindi",1).order("firma").execute()
+        _ma_res = _sb_ma.table("cari_kartlar").select("id,firma,durum,il,ilce,beklenen_ciro,atanan_kullanici").neq("silindi",1).order("firma").execute()
         _df_ma = pd.DataFrame(_ma_res.data) if _ma_res.data else pd.DataFrame()
     except:
         _df_ma = pd.DataFrame()
@@ -9193,20 +9200,20 @@ elif aktif == "musteri_atama":
 
     # ── LİSTE BAŞLIĞI ─────────────────────────────────────────────────────────
     st.markdown("""<style>
-.ma-baslik{display:grid;grid-template-columns:32px 1fr 80px 100px 150px 60px;gap:8px;padding:6px 8px;
+.ma-baslik{display:grid;grid-template-columns:32px 2fr 90px 90px 80px 90px 130px 50px;gap:6px;padding:6px 8px;
     background:#f8fafc;border-radius:6px;font-size:10px;font-weight:600;color:#64748b;
     text-transform:uppercase;margin-bottom:4px;}
-.ma-satir{display:grid;grid-template-columns:32px 1fr 80px 100px 150px 60px;gap:8px;
+.ma-satir{display:grid;grid-template-columns:32px 2fr 90px 90px 80px 90px 130px 50px;gap:6px;
     padding:8px 8px;background:white;border:0.5px solid #e2e8f0;border-radius:8px;
-    margin-bottom:4px;align-items:center;font-size:12px;}
+    margin-bottom:3px;align-items:center;font-size:12px;}
 .ma-satir:hover{background:#f8fafc;}
 .ma-firma{font-weight:500;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .ma-durum{font-size:10px;padding:2px 7px;border-radius:20px;background:#eff6ff;color:#1d4ed8;white-space:nowrap;}
 .ma-hedef{font-size:12px;font-weight:500;color:#16a34a;text-align:right;}
-.ma-atanan{font-size:11px;color:#64748b;}
+.ma-il{font-size:11px;color:#475569;}
 </style>
 <div class="ma-baslik">
-  <span>☑</span><span>Firma</span><span>Durum</span><span style="text-align:right">Hedef ₺</span><span>Atanan</span><span></span>
+  <span>☑</span><span>Firma</span><span>Durum</span><span>İl</span><span>İlçe</span><span style="text-align:right">Hedef ₺</span><span>Atanan</span><span></span>
 </div>""", unsafe_allow_html=True)
 
     # ── SATIRLAR ──────────────────────────────────────────────────────────────
@@ -9215,12 +9222,13 @@ elif aktif == "musteri_atama":
         _mid     = int(_mrow.get("id",0))
         _mfirma  = str(_mrow.get("firma","") or "")
         _mdurum  = str(_mrow.get("durum","") or "")
+        _mil     = str(_mrow.get("il","") or "")
+        _milce   = str(_mrow.get("ilce","") or "")
         _mhedef  = float(_mrow.get("beklenen_ciro",0) or 0)
         _matanan = str(_mrow.get("atanan_kullanici","") or "")
 
-        _col_chk, _col_firma, _col_dur, _col_hedef, _col_ata, _col_btn = st.columns([1, 5, 2, 2, 3, 1])
+        _col_chk, _col_firma, _col_dur, _col_il, _col_ilce, _col_hedef, _col_ata, _col_btn = st.columns([1, 5, 2, 2, 2, 2, 3, 1])
 
-        # Checkbox
         _checked = _col_chk.checkbox("", value=_mid in _secili_ids, key=f"ma_chk_{_mid}", label_visibility="collapsed")
         if _checked and _mid not in _secili_ids:
             st.session_state["ma_secili_ids"].add(_mid)
@@ -9229,18 +9237,17 @@ elif aktif == "musteri_atama":
             st.session_state["ma_secili_ids"].discard(_mid)
             st.rerun()
 
-        # Firma + Durum + Hedef
         _col_firma.markdown(f"<div class='ma-firma' title='{_mfirma}'>{_mfirma}</div>", unsafe_allow_html=True)
         _col_dur.markdown(f"<span class='ma-durum'>{_mdurum}</span>", unsafe_allow_html=True)
+        _col_il.markdown(f"<div class='ma-il'>{_mil}</div>", unsafe_allow_html=True)
+        _col_ilce.markdown(f"<div class='ma-il'>{_milce}</div>", unsafe_allow_html=True)
         _col_hedef.markdown(f"<div class='ma-hedef'>{int(_mhedef):,}₺</div>" if _mhedef > 0 else "<div class='ma-hedef' style='color:#cbd5e1'>—</div>", unsafe_allow_html=True)
 
-        # Atama dropdown
         _secim_idx = 0
         if _matanan and _matanan in _kul_listesi:
             _secim_idx = _kul_listesi.index(_matanan) + 1
         _yeni_atama = _col_ata.selectbox("Kullanıcı", options=_opts_atama, index=_secim_idx, key=f"ma_sec_{_mid}", label_visibility="collapsed")
 
-        # Kaydet
         if _col_btn.button("💾", key=f"ma_kaydet_{_mid}", help="Kaydet"):
             try:
                 _atama_deger = _yeni_atama if _yeni_atama != "— Atanmamış —" else None
