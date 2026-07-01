@@ -2258,34 +2258,29 @@ section[data-testid="stSidebar"] { display: none !important; }
                 _mr_tab1, _mr_tab2 = st.tabs(["📋 Toplu Karşılaştırma (hepsi)", "🔎 Tek Seçerek Karşılaştır"])
 
                 with _mr_tab1:
-                    st.caption("Aynı isimli firmalar gruplanmış. Her grupta tüm kayıtlar gösterilir, istediğiniz tekrarı silebilirsiniz.")
+                    st.caption("Her grupta iki kayıt gösterilir. Hangisini silmek istediğinize siz karar verin. Silinen kayıt listeden kalkar, diğeri kalır.")
                     _silinen_t = 0
+                    _goster_kolon = [c for c in ["id","firma","gsm","il","ilce","temsilci","segment","notlar"] if c in df.columns]
                     for _fname, _fids in list(_mukerrerler.items()):
                         st.markdown("---")
                         st.markdown(f"**{_fname}** — {len(_fids)} kayıt")
-                        # Her ID için tam satırı göster
-                        _satirlar = []
                         for _did in _fids:
                             _satir = df[df["id"] == _did]
-                            if not _satir.empty:
-                                _satirlar.append(_satir.iloc[0])
-                        _goster_kolon = [c for c in ["id","firma","gsm","il","ilce","temsilci","segment","notlar"] if c in df.columns]
-                        for _idx, _s in enumerate(_satirlar):
+                            if _satir.empty:
+                                continue
+                            _s = _satir.iloc[0]
                             _kc1, _kc2 = st.columns([5,1])
                             with _kc1:
                                 _detay = " | ".join([f"**{c}:** {_s.get(c,'')}" for c in _goster_kolon if str(_s.get(c,"")).strip() not in ["","nan","None"]])
                                 st.markdown(f"🔹 {_detay}")
                             with _kc2:
-                                if _idx > 0:  # İlk kaydı koru, tekrarları sil
-                                    if st.button("🗑 Sil", key=f"mr_sil_{_did}", use_container_width=True):
-                                        try:
-                                            _sb_mr = get_sb_client()
-                                            if _sb_mr:
-                                                _sb_mr.table("cari_kartlar").update({"silindi":1}).eq("id", int(_did)).execute()
-                                                _silinen_t += 1
-                                        except: pass
-                                else:
-                                    st.markdown("✅ *Asıl kayıt*")
+                                if st.button("🗑 Sil", key=f"mr_sil_{_did}", use_container_width=True):
+                                    try:
+                                        _sb_mr = get_sb_client()
+                                        if _sb_mr:
+                                            _sb_mr.table("cari_kartlar").update({"silindi":1}).eq("id", int(_did)).execute()
+                                            _silinen_t += 1
+                                    except: pass
                     if _silinen_t:
                         try: get_cari_listesi.clear()
                         except: pass
