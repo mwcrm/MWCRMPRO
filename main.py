@@ -9106,7 +9106,7 @@ elif aktif == "musteri_atama":
         st.stop()
 
     st.markdown("## 🎯 Müşteri Atama")
-    st.caption("Her müşteriye bir kullanıcı atayın. Kullanıcılar sadece kendilerine atanan müşterileri görür.")
+    st.caption("Checkbox ile seç, kullanıcı belirle, tek butonla kaydet.")
 
     _sb_ma = get_sb_client()
 
@@ -9117,9 +9117,9 @@ elif aktif == "musteri_atama":
     except:
         _kul_listesi = []
 
-    # Müşterileri yükle — atama bilgisiyle
+    # Müşterileri yükle — hedef ve durum ile
     try:
-        _ma_res = _sb_ma.table("cari_kartlar").select("id,firma,durum,atanan_kullanici").neq("silindi",1).order("firma").execute()
+        _ma_res = _sb_ma.table("cari_kartlar").select("id,firma,durum,beklenen_ciro,atanan_kullanici").neq("silindi",1).order("firma").execute()
         _df_ma = pd.DataFrame(_ma_res.data) if _ma_res.data else pd.DataFrame()
     except:
         _df_ma = pd.DataFrame()
@@ -9127,21 +9127,6 @@ elif aktif == "musteri_atama":
     if _df_ma.empty:
         st.info("Müşteri bulunamadı.")
         st.stop()
-
-    # Filtreler
-    _ma_f1, _ma_f2, _ma_f3 = st.columns(3)
-    _ma_ara = _ma_f1.text_input("Firma Ara", placeholder="firma adı...", key="ma_ara")
-    _ma_kul_fil = _ma_f2.selectbox("Kullanıcıya Göre", ["Tümü","Atanmamış"] + _kul_listesi, key="ma_kul_fil")
-    _ma_toplu_kul = _ma_f3.selectbox("Toplu Atama İçin Kullanıcı", ["Seçin..."] + _kul_listesi, key="ma_toplu_kul")
-
-    # Filtre uygula
-    _df_goster = _df_ma.copy()
-    if _ma_ara:
-        _df_goster = _df_goster[_df_goster["firma"].astype(str).str.contains(_ma_ara, case=False, na=False)]
-    if _ma_kul_fil == "Atanmamış":
-        _df_goster = _df_goster[_df_goster["atanan_kullanici"].isna() | (_df_goster["atanan_kullanici"] == "")]
-    elif _ma_kul_fil != "Tümü":
-        _df_goster = _df_goster[_df_goster["atanan_kullanici"] == _ma_kul_fil]
 
     # İstatistik
     _atanmis = len(_df_ma[_df_ma["atanan_kullanici"].notna() & (_df_ma["atanan_kullanici"] != "")])
@@ -9153,51 +9138,118 @@ elif aktif == "musteri_atama":
 
     st.divider()
 
-    # Toplu atama butonu
-    if _ma_toplu_kul != "Seçin..." and not _df_goster.empty:
-        if st.button(f"✅ Görüntülenen {len(_df_goster)} müşteriyi **{_ma_toplu_kul}**'a toplu ata", type="primary", use_container_width=True, key="ma_toplu_btn"):
-            _toplu_ids = _df_goster["id"].tolist()
+    # ── FİLTRELER ─────────────────────────────────────────────────────────────
+    _maf1, _maf2 = st.columns(2)
+    _ma_ara = _maf1.text_input("🔍 Firma Ara", placeholder="firma adı...", key="ma_ara")
+    _ma_kul_fil = _maf2.selectbox("Kullanıcıya Göre", ["Tümü", "Atanmamış"] + _kul_listesi, key="ma_kul_fil")
+
+    # Filtre uygula
+    _df_goster = _df_ma.copy()
+    if _ma_ara:
+        _df_goster = _df_goster[_df_goster["firma"].astype(str).str.contains(_ma_ara, case=False, na=False)]
+    if _ma_kul_fil == "Atanmamış":
+        _df_goster = _df_goster[_df_goster["atanan_kullanici"].isna() | (_df_goster["atanan_kullanici"] == "")]
+    elif _ma_kul_fil != "Tümü":
+        _df_goster = _df_goster[_df_goster["atanan_kullanici"] == _ma_kul_fil]
+
+    _df_goster = _df_goster.reset_index(drop=True)
+    st.caption(f"{len(_df_goster)} müşteri gösteriliyor")
+
+    # ── TOPLU ATAMA BARI ──────────────────────────────────────────────────────
+    _opts_kul = ["— Kullanıcı Seç —"] + _kul_listesi
+    _tab1, _tab2 = st.columns([3,1])
+    _ma_toplu_kul = _tab1.selectbox("Seçilenleri şu kullanıcıya ata:", _opts_kul, key="ma_toplu_kul", label_visibility="collapsed")
+
+    # Seçili ID'leri session'dan al
+    if "ma_secili_ids" not in st.session_state:
+        st.session_state["ma_secili_ids"] = set()
+    _secili_ids = st.session_state["ma_secili_ids"]
+
+    # Tümünü seç/kaldır
+    _tumu_sec = _tab2.checkbox(f"Tümünü Seç ({len(_df_goster)})", key="ma_tumunu_sec")
+    if _tumu_sec:
+        _secili_ids = set(_df_goster["id"].tolist())
+        st.session_state["ma_secili_ids"] = _secili_ids
+    elif not _tumu_sec and st.session_state.get("ma_tumunu_sec_onceki", False):
+        _secili_ids = set()
+        st.session_state["ma_secili_ids"] = _secili_ids
+    st.session_state["ma_tumunu_sec_onceki"] = _tumu_sec
+
+    # Toplu ata butonu
+    if _secili_ids and _ma_toplu_kul != "— Kullanıcı Seç —":
+        if st.button(f"✅ Seçili {len(_secili_ids)} müşteriyi **{_ma_toplu_kul}**'a ata", type="primary", use_container_width=True, key="ma_toplu_btn"):
             try:
-                for _tid in _toplu_ids:
+                _basarili = 0
+                for _tid in _secili_ids:
                     _sb_ma.table("cari_kartlar").update({"atanan_kullanici": _ma_toplu_kul}).eq("id", int(_tid)).execute()
-                st.toast(f"✅ {len(_toplu_ids)} müşteri {_ma_toplu_kul}'a atandı!", icon="✅")
+                    _basarili += 1
+                st.session_state["ma_secili_ids"] = set()
+                st.toast(f"✅ {_basarili} müşteri {_ma_toplu_kul}'a atandı!", icon="✅")
                 st.rerun()
             except Exception as _mae:
                 st.error(f"❌ Hata: {_mae}")
 
-    st.caption(f"{len(_df_goster)} müşteri gösteriliyor")
+    st.divider()
 
-    # Liste — her satırda atama kutusu
-    for _, _mrow in _df_goster.iterrows():
-        _mid   = int(_mrow.get("id",0))
-        _mfirma = str(_mrow.get("firma",""))
-        _mdurum = str(_mrow.get("durum","") or "")
+    # ── LİSTE BAŞLIĞI ─────────────────────────────────────────────────────────
+    st.markdown("""<style>
+.ma-baslik{display:grid;grid-template-columns:32px 1fr 80px 100px 150px 60px;gap:8px;padding:6px 8px;
+    background:#f8fafc;border-radius:6px;font-size:10px;font-weight:600;color:#64748b;
+    text-transform:uppercase;margin-bottom:4px;}
+.ma-satir{display:grid;grid-template-columns:32px 1fr 80px 100px 150px 60px;gap:8px;
+    padding:8px 8px;background:white;border:0.5px solid #e2e8f0;border-radius:8px;
+    margin-bottom:4px;align-items:center;font-size:12px;}
+.ma-satir:hover{background:#f8fafc;}
+.ma-firma{font-weight:500;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.ma-durum{font-size:10px;padding:2px 7px;border-radius:20px;background:#eff6ff;color:#1d4ed8;white-space:nowrap;}
+.ma-hedef{font-size:12px;font-weight:500;color:#16a34a;text-align:right;}
+.ma-atanan{font-size:11px;color:#64748b;}
+</style>
+<div class="ma-baslik">
+  <span>☑</span><span>Firma</span><span>Durum</span><span style="text-align:right">Hedef ₺</span><span>Atanan</span><span></span>
+</div>""", unsafe_allow_html=True)
+
+    # ── SATIRLAR ──────────────────────────────────────────────────────────────
+    _opts_atama = ["— Atanmamış —"] + _kul_listesi
+    for _idx, _mrow in _df_goster.iterrows():
+        _mid     = int(_mrow.get("id",0))
+        _mfirma  = str(_mrow.get("firma","") or "")
+        _mdurum  = str(_mrow.get("durum","") or "")
+        _mhedef  = float(_mrow.get("beklenen_ciro",0) or 0)
         _matanan = str(_mrow.get("atanan_kullanici","") or "")
 
-        _mc1, _mc2, _mc3 = st.columns([4, 2, 1])
-        _mc1.markdown(f"**{_mfirma}** <span style='font-size:11px;color:#94a3b8;'>{_mdurum}</span>", unsafe_allow_html=True)
+        _col_chk, _col_firma, _col_dur, _col_hedef, _col_ata, _col_btn = st.columns([1, 5, 2, 2, 3, 1])
 
+        # Checkbox
+        _checked = _col_chk.checkbox("", value=_mid in _secili_ids, key=f"ma_chk_{_mid}", label_visibility="collapsed")
+        if _checked and _mid not in _secili_ids:
+            st.session_state["ma_secili_ids"].add(_mid)
+            st.rerun()
+        elif not _checked and _mid in _secili_ids:
+            st.session_state["ma_secili_ids"].discard(_mid)
+            st.rerun()
+
+        # Firma + Durum + Hedef
+        _col_firma.markdown(f"<div class='ma-firma' title='{_mfirma}'>{_mfirma}</div>", unsafe_allow_html=True)
+        _col_dur.markdown(f"<span class='ma-durum'>{_mdurum}</span>", unsafe_allow_html=True)
+        _col_hedef.markdown(f"<div class='ma-hedef'>{int(_mhedef):,}₺</div>" if _mhedef > 0 else "<div class='ma-hedef' style='color:#cbd5e1'>—</div>", unsafe_allow_html=True)
+
+        # Atama dropdown
         _secim_idx = 0
-        _opts = ["— Atanmamış —"] + _kul_listesi
         if _matanan and _matanan in _kul_listesi:
             _secim_idx = _kul_listesi.index(_matanan) + 1
+        _yeni_atama = _col_ata.selectbox("Kullanıcı", options=_opts_atama, index=_secim_idx, key=f"ma_sec_{_mid}", label_visibility="collapsed")
 
-        _yeni_atama = _mc2.selectbox(
-            "Kullanıcı",
-            options=_opts,
-            index=_secim_idx,
-            key=f"ma_sec_{_mid}",
-            label_visibility="collapsed"
-        )
-
-        if _mc3.button("💾", key=f"ma_kaydet_{_mid}", help="Kaydet"):
+        # Kaydet
+        if _col_btn.button("💾", key=f"ma_kaydet_{_mid}", help="Kaydet"):
             try:
                 _atama_deger = _yeni_atama if _yeni_atama != "— Atanmamış —" else None
                 _sb_ma.table("cari_kartlar").update({"atanan_kullanici": _atama_deger}).eq("id", _mid).execute()
-                st.toast(f"✅ {_mfirma} → {_yeni_atama}", icon="✅")
+                st.toast(f"✅ {_mfirma[:30]} → {_yeni_atama}", icon="✅")
                 st.rerun()
             except Exception as _mae2:
                 st.error(f"❌ {_mae2}")
+
 
 elif aktif == "harita":
     sayfa_log("harita")
