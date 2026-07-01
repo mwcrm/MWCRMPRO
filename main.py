@@ -94,6 +94,21 @@ def _telefon_temizle(seri):
         return s
     return seri.apply(_tek)
 
+def _atama_filtresi_uygula(df):
+    """Admin hepsini görür, diğerleri sadece kendine atananları"""
+    try:
+        _rol = st.session_state.get("rol","")
+        _kul = st.session_state.get("kullanici","")
+        if _rol == "admin" or not _kul:
+            return df  # admin hepsini görür
+        if df.empty or "atanan_kullanici" not in df.columns:
+            return df
+        # Sadece kendine atananlar VEYA atanmamışlar (henüz atama yapılmamış)
+        # Atanmamışları admin görür — kullanıcı sadece kendine atananları
+        return df[df["atanan_kullanici"] == _kul]
+    except:
+        return df
+
 @st.cache_data(ttl=60)
 def get_cari_listesi():
     """60 sn cache'li cari listesi"""
@@ -1273,7 +1288,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "patron"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -1290,6 +1305,7 @@ _TAB_ETIKETLER = {
     "admin_rapor": "📊 Rapor Tasarla",
     "harita": "🗺️ Müşteri Haritası",
     "patron": "👑 Yönetim Paneli",
+    "musteri_atama": "🎯 Müşteri Atama",
 }
 
 def get_menu_tercihi(kullanici):
@@ -1958,7 +1974,8 @@ if aktif == "yeni":
                     "temsilci": _tem_kayit, "islem_asamasi": _asama_kayit,
                     "segment": _seg_kayit, "aciklama": notlar_v,
                     "silindi": 0, "olusturan": st.session_state["kullanici"],
-                    "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro
+                    "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro,
+                    "atanan_kullanici": st.session_state.get("kullanici","")
                 })
                 try: db_read.clear()
                 except: pass
@@ -2200,6 +2217,9 @@ section[data-testid="stSidebar"] { display: none !important; }
         for _tk in ["gsm","sabit"]:
             if _tk in df.columns:
                 df[_tk] = _telefon_temizle(df[_tk])
+
+    # ── ATAMA FİLTRESİ — admin hepsini görür, kullanıcı sadece kendine atananları ──
+    df = _atama_filtresi_uygula(df)
 
     with st.expander("🔍 Mükerrer (Aynı İsimli) Müşterileri Bul ve Birleştir"):
         if df.empty or "firma" not in df.columns:
@@ -9164,6 +9184,107 @@ render();
     _pc.html(_patron_html, height=700, scrolling=True)
 
 
+
+elif aktif == "musteri_atama":
+    sayfa_log("musteri_atama")
+
+    if st.session_state.get("rol") != "admin":
+        st.error("❌ Bu sayfaya erişim yetkiniz yok.")
+        st.stop()
+
+    st.markdown("## 🎯 Müşteri Atama")
+    st.caption("Her müşteriye bir kullanıcı atayın. Kullanıcılar sadece kendilerine atanan müşterileri görür.")
+
+    _sb_ma = get_sb_client()
+
+    # Kullanıcıları yükle
+    try:
+        _kul_res = _sb_ma.table("kullanicilar").select("kullanici_adi,rol").execute()
+        _kul_listesi = [r["kullanici_adi"] for r in _kul_res.data if r.get("kullanici_adi")] if _kul_res.data else []
+    except:
+        _kul_listesi = []
+
+    # Müşterileri yükle — atama bilgisiyle
+    try:
+        _ma_res = _sb_ma.table("cari_kartlar").select("id,firma,durum,atanan_kullanici").neq("silindi",1).order("firma").execute()
+        _df_ma = pd.DataFrame(_ma_res.data) if _ma_res.data else pd.DataFrame()
+    except:
+        _df_ma = pd.DataFrame()
+
+    if _df_ma.empty:
+        st.info("Müşteri bulunamadı.")
+        st.stop()
+
+    # Filtreler
+    _ma_f1, _ma_f2, _ma_f3 = st.columns(3)
+    _ma_ara = _ma_f1.text_input("Firma Ara", placeholder="firma adı...", key="ma_ara")
+    _ma_kul_fil = _ma_f2.selectbox("Kullanıcıya Göre", ["Tümü","Atanmamış"] + _kul_listesi, key="ma_kul_fil")
+    _ma_toplu_kul = _ma_f3.selectbox("Toplu Atama İçin Kullanıcı", ["Seçin..."] + _kul_listesi, key="ma_toplu_kul")
+
+    # Filtre uygula
+    _df_goster = _df_ma.copy()
+    if _ma_ara:
+        _df_goster = _df_goster[_df_goster["firma"].astype(str).str.contains(_ma_ara, case=False, na=False)]
+    if _ma_kul_fil == "Atanmamış":
+        _df_goster = _df_goster[_df_goster["atanan_kullanici"].isna() | (_df_goster["atanan_kullanici"] == "")]
+    elif _ma_kul_fil != "Tümü":
+        _df_goster = _df_goster[_df_goster["atanan_kullanici"] == _ma_kul_fil]
+
+    # İstatistik
+    _atanmis = len(_df_ma[_df_ma["atanan_kullanici"].notna() & (_df_ma["atanan_kullanici"] != "")])
+    _atanmamis = len(_df_ma) - _atanmis
+    _sc1, _sc2, _sc3 = st.columns(3)
+    _sc1.metric("Toplam Müşteri", len(_df_ma))
+    _sc2.metric("Atanmış", _atanmis)
+    _sc3.metric("Atanmamış", _atanmamis)
+
+    st.divider()
+
+    # Toplu atama butonu
+    if _ma_toplu_kul != "Seçin..." and not _df_goster.empty:
+        if st.button(f"✅ Görüntülenen {len(_df_goster)} müşteriyi **{_ma_toplu_kul}**'a toplu ata", type="primary", use_container_width=True, key="ma_toplu_btn"):
+            _toplu_ids = _df_goster["id"].tolist()
+            try:
+                for _tid in _toplu_ids:
+                    _sb_ma.table("cari_kartlar").update({"atanan_kullanici": _ma_toplu_kul}).eq("id", int(_tid)).execute()
+                st.toast(f"✅ {len(_toplu_ids)} müşteri {_ma_toplu_kul}'a atandı!", icon="✅")
+                st.rerun()
+            except Exception as _mae:
+                st.error(f"❌ Hata: {_mae}")
+
+    st.caption(f"{len(_df_goster)} müşteri gösteriliyor")
+
+    # Liste — her satırda atama kutusu
+    for _, _mrow in _df_goster.iterrows():
+        _mid   = int(_mrow.get("id",0))
+        _mfirma = str(_mrow.get("firma",""))
+        _mdurum = str(_mrow.get("durum","") or "")
+        _matanan = str(_mrow.get("atanan_kullanici","") or "")
+
+        _mc1, _mc2, _mc3 = st.columns([4, 2, 1])
+        _mc1.markdown(f"**{_mfirma}** <span style='font-size:11px;color:#94a3b8;'>{_mdurum}</span>", unsafe_allow_html=True)
+
+        _secim_idx = 0
+        _opts = ["— Atanmamış —"] + _kul_listesi
+        if _matanan and _matanan in _kul_listesi:
+            _secim_idx = _kul_listesi.index(_matanan) + 1
+
+        _yeni_atama = _mc2.selectbox(
+            "Kullanıcı",
+            options=_opts,
+            index=_secim_idx,
+            key=f"ma_sec_{_mid}",
+            label_visibility="collapsed"
+        )
+
+        if _mc3.button("💾", key=f"ma_kaydet_{_mid}", help="Kaydet"):
+            try:
+                _atama_deger = _yeni_atama if _yeni_atama != "— Atanmamış —" else None
+                _sb_ma.table("cari_kartlar").update({"atanan_kullanici": _atama_deger}).eq("id", _mid).execute()
+                st.toast(f"✅ {_mfirma} → {_yeni_atama}", icon="✅")
+                st.rerun()
+            except Exception as _mae2:
+                st.error(f"❌ {_mae2}")
 
 elif aktif == "harita":
     sayfa_log("harita")
