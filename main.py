@@ -9182,6 +9182,33 @@ elif aktif == "musteri_atama":
         st.session_state["ma_secili_ids"] = _secili_ids
     st.session_state["ma_tumunu_sec_onceki"] = _tumu_sec
 
+    # Tümünü seç/kaldır
+    _tumu_sec = _tab2.checkbox(f"Tümünü Seç ({len(_df_goster)})", key="ma_tumunu_sec")
+    if _tumu_sec:
+        _secili_ids = set(_df_goster["id"].tolist())
+        st.session_state["ma_secili_ids"] = _secili_ids
+    elif not _tumu_sec and st.session_state.get("ma_tumunu_sec_onceki", False):
+        _secili_ids = set()
+        st.session_state["ma_secili_ids"] = _secili_ids
+    st.session_state["ma_tumunu_sec_onceki"] = _tumu_sec
+
+    # ── SIRALAMA ──────────────────────────────────────────────────────────────
+    if "ma_sort_col" not in st.session_state:
+        st.session_state["ma_sort_col"] = "firma"
+        st.session_state["ma_sort_asc"] = True
+
+    _sort_map = {"firma":"firma","durum":"durum","il":"il","ilce":"ilce","hedef":"beklenen_ciro","atanan":"atanan_kullanici"}
+    _sort_col_key = st.session_state["ma_sort_col"]
+    _sort_asc_val = st.session_state["ma_sort_asc"]
+    if _sort_col_key in _df_goster.columns:
+        _df_goster = _df_goster.sort_values(_sort_col_key, ascending=_sort_asc_val, na_position="last").reset_index(drop=True)
+
+    def _ma_sort_btn(col_key, label):
+        _cur = st.session_state.get("ma_sort_col","firma")
+        _asc = st.session_state.get("ma_sort_asc", True)
+        _ikon = (" ↑" if _asc else " ↓") if _cur == col_key else ""
+        return f"{label}{_ikon}"
+
     # Toplu ata butonu
     if _secili_ids and _ma_toplu_kul != "— Kullanıcı Seç —":
         if st.button(f"✅ Seçili {len(_secili_ids)} müşteriyi **{_ma_toplu_kul}**'a ata", type="primary", use_container_width=True, key="ma_toplu_btn"):
@@ -9199,29 +9226,55 @@ elif aktif == "musteri_atama":
     st.divider()
 
     # ── LİSTE BAŞLIĞI ─────────────────────────────────────────────────────────
+    # ── LİSTE BAŞLIĞI — tıklanabilir sıralama ────────────────────────────────
     st.markdown("""<style>
-.ma-baslik{display:grid;grid-template-columns:40px 3fr 100px 90px 90px 90px 160px 55px;gap:10px;padding:8px 12px;
-    background:#f8fafc;border:0.5px solid #e2e8f0;border-radius:8px;font-size:10px;font-weight:600;color:#64748b;
-    text-transform:uppercase;margin-bottom:6px;letter-spacing:.3px;}
-.ma-satir{display:grid;grid-template-columns:40px 3fr 100px 90px 90px 90px 160px 55px;gap:10px;
-    padding:10px 12px;background:white;border:0.5px solid #e2e8f0;border-radius:10px;
-    margin-bottom:5px;align-items:center;font-size:12px;transition:box-shadow .1s;}
-.ma-satir:hover{box-shadow:0 2px 6px rgba(0,0,0,.06);}
-.ma-firma{font-weight:600;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;}
-.ma-durum{font-size:10px;padding:3px 8px;border-radius:20px;background:#eff6ff;color:#1d4ed8;white-space:nowrap;display:inline-block;}
-.ma-hedef{font-size:12px;font-weight:600;color:#16a34a;text-align:right;}
-.ma-il{font-size:11px;color:#475569;}
-/* Checkbox büyüt */
-div[data-testid="stHorizontalBlock"]:has(.ma-chk-marker) [data-testid="stCheckbox"] input {
-    width:18px !important; height:18px !important;
+.ma-satir-wrap{background:white;border:0.5px solid #e2e8f0;border-radius:10px;margin-bottom:5px;padding:8px 4px;}
+.ma-firma{font-weight:600;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px;padding-top:6px;}
+.ma-durum{font-size:10px;padding:3px 8px;border-radius:20px;background:#eff6ff;color:#1d4ed8;white-space:nowrap;display:inline-block;margin-top:4px;}
+.ma-hedef{font-size:12px;font-weight:600;color:#16a34a;text-align:right;padding-top:6px;}
+.ma-il{font-size:11px;color:#475569;padding-top:6px;}
+/* Başlık butonları */
+div[data-testid="stHorizontalBlock"]:has(.ma-hdr-marker) button {
+    background:none !important; border:none !important;
+    font-size:10px !important; font-weight:600 !important;
+    color:#64748b !important; padding:4px 0 !important;
+    text-transform:uppercase !important; letter-spacing:.3px !important;
+    border-radius:0 !important; border-bottom:1.5px solid transparent !important;
 }
-div[data-testid="stHorizontalBlock"]:has(.ma-chk-marker) [data-testid="stCheckbox"] {
-    padding-top:4px !important;
+div[data-testid="stHorizontalBlock"]:has(.ma-hdr-marker) button:hover {
+    color:#0f172a !important; border-bottom-color:#2563eb !important;
 }
-</style>
-<div class="ma-baslik">
-  <span>☑</span><span>Firma</span><span>Durum</span><span>İl</span><span>İlçe</span><span style="text-align:right">Hedef ₺</span><span>Atanan Kullanıcı</span><span></span>
-</div>""", unsafe_allow_html=True)
+</style>""", unsafe_allow_html=True)
+
+    st.markdown('<span class="ma-hdr-marker" style="display:none"></span>', unsafe_allow_html=True)
+    _hc0, _hc1, _hc2, _hc3, _hc4, _hc5, _hc6, _hc7 = st.columns([1, 6, 2, 2, 2, 2, 4, 1])
+    _hc0.markdown("")
+    if _hc1.button(_ma_sort_btn("firma","FİRMA"), key="ma_hdr_firma", use_container_width=True):
+        if st.session_state["ma_sort_col"] == "firma": st.session_state["ma_sort_asc"] = not _sort_asc_val
+        else: st.session_state["ma_sort_col"] = "firma"; st.session_state["ma_sort_asc"] = True
+        st.rerun()
+    if _hc2.button(_ma_sort_btn("durum","DURUM"), key="ma_hdr_durum", use_container_width=True):
+        if st.session_state["ma_sort_col"] == "durum": st.session_state["ma_sort_asc"] = not _sort_asc_val
+        else: st.session_state["ma_sort_col"] = "durum"; st.session_state["ma_sort_asc"] = True
+        st.rerun()
+    if _hc3.button(_ma_sort_btn("il","İL"), key="ma_hdr_il", use_container_width=True):
+        if st.session_state["ma_sort_col"] == "il": st.session_state["ma_sort_asc"] = not _sort_asc_val
+        else: st.session_state["ma_sort_col"] = "il"; st.session_state["ma_sort_asc"] = True
+        st.rerun()
+    if _hc4.button(_ma_sort_btn("ilce","İLÇE"), key="ma_hdr_ilce", use_container_width=True):
+        if st.session_state["ma_sort_col"] == "ilce": st.session_state["ma_sort_asc"] = not _sort_asc_val
+        else: st.session_state["ma_sort_col"] = "ilce"; st.session_state["ma_sort_asc"] = True
+        st.rerun()
+    if _hc5.button(_ma_sort_btn("beklenen_ciro","HEDEF ₺"), key="ma_hdr_hedef", use_container_width=True):
+        if st.session_state["ma_sort_col"] == "beklenen_ciro": st.session_state["ma_sort_asc"] = not _sort_asc_val
+        else: st.session_state["ma_sort_col"] = "beklenen_ciro"; st.session_state["ma_sort_asc"] = False
+        st.rerun()
+    if _hc6.button(_ma_sort_btn("atanan_kullanici","ATANAN"), key="ma_hdr_atanan", use_container_width=True):
+        if st.session_state["ma_sort_col"] == "atanan_kullanici": st.session_state["ma_sort_asc"] = not _sort_asc_val
+        else: st.session_state["ma_sort_col"] = "atanan_kullanici"; st.session_state["ma_sort_asc"] = True
+        st.rerun()
+    _hc7.markdown("")
+    st.markdown("<hr style='margin:4px 0 8px;border-color:#e2e8f0'>", unsafe_allow_html=True)
 
     # ── SATIRLAR ──────────────────────────────────────────────────────────────
     _opts_atama = ["— Atanmamış —"] + _kul_listesi
