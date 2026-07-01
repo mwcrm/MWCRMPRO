@@ -9183,14 +9183,6 @@ elif aktif == "musteri_atama":
     st.session_state["ma_tumunu_sec_onceki"] = _tumu_sec
 
     # Tümünü seç/kaldır
-    _tumu_sec = _tab2.checkbox(f"Tümünü Seç ({len(_df_goster)})", key="ma_tumunu_sec")
-    if _tumu_sec:
-        _secili_ids = set(_df_goster["id"].tolist())
-        st.session_state["ma_secili_ids"] = _secili_ids
-    elif not _tumu_sec and st.session_state.get("ma_tumunu_sec_onceki", False):
-        _secili_ids = set()
-        st.session_state["ma_secili_ids"] = _secili_ids
-    st.session_state["ma_tumunu_sec_onceki"] = _tumu_sec
 
     # ── SIRALAMA ──────────────────────────────────────────────────────────────
     if "ma_sort_col" not in st.session_state:
