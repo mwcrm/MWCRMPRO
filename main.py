@@ -1307,7 +1307,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "rota_analiz", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -1323,6 +1323,7 @@ _TAB_ETIKETLER = {
     "mesajlar": "💬 Mesajlar",
     "admin_rapor": "📊 Rapor Tasarla",
     "harita": "🗺️ Müşteri Haritası",
+    "rota_analiz": "🚚 Rota Analiz",
     "patron": "👑 Yönetim Paneli",
     
 }
@@ -9317,6 +9318,167 @@ div[data-testid="stHorizontalBlock"]:has(.ma-hdr-marker) button:hover {
                 st.rerun()
             except Exception as _mae2:
                 st.error(f"❌ {_mae2}")
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+elif aktif == "rota_analiz":
+    sayfa_log("rota_analiz")
+    st.markdown("### 🚚 Rota Analiz")
+
+    _RA_ILLER = ["Adana","Adıyaman","Afyonkarahisar","Ağrı","Amasya","Ankara","Antalya","Artvin","Aydın","Balıkesir","Bilecik","Bingöl","Bitlis","Bolu","Burdur","Bursa","Çanakkale","Çankırı","Çorum","Denizli","Diyarbakır","Edirne","Elazığ","Erzincan","Erzurum","Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari","Hatay","Isparta","Mersin","İstanbul","İzmir","Kars","Kastamonu","Kayseri","Kırklareli","Kırşehir","Kocaeli","Konya","Kütahya","Malatya","Manisa","Kahramanmaraş","Mardin","Muğla","Muş","Nevşehir","Niğde","Ordu","Rize","Sakarya","Samsun","Siirt","Sinop","Sivas","Tekirdağ","Tokat","Trabzon","Tunceli","Şanlıurfa","Uşak","Van","Yozgat","Zonguldak","Aksaray","Bayburt","Karaman","Kırıkkale","Batman","Şırnak","Bartın","Ardahan","Iğdır","Yalova","Karabük","Kilis","Osmaniye","Düzce"]
+    _RA_GENISLIK = [0.5, 2, 1.5, 1.2, 1.2, 1.2, 1.2, 0.8, 0.8, 1, 1.5, 0.5]
+    _RA_BASLIKLAR = ["ID","Firma","Yetkili","Tel","Bölge","Çıkış","Varış","Koli","Palet","Toplam ₺","Açıklama",""]
+
+    @st.cache_data(ttl=30)
+    def get_rota_analiz():
+        sb = get_sb_client()
+        if sb:
+            try:
+                res = sb.table("rota_analiz").select("*").order("id").execute()
+                return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+            except: pass
+        return pd.DataFrame()
+
+    _ra_cariler = get_cari_listesi()
+
+    with st.expander("➕ Sisteme kayıtlı müşteriyi ekle"):
+        if not _ra_cariler.empty:
+            _ra_firma_sec = st.selectbox("Müşteri seç", ["-- Seçin --"] + _ra_cariler["firma"].dropna().tolist(), key="ra_firma_sec")
+            _ra_aciklama_yeni = st.text_input("Açıklama", key="ra_aciklama_yeni")
+            if st.button("Ekle", key="ra_ekle_btn") and _ra_firma_sec != "-- Seçin --":
+                _ra_secilen = _ra_cariler[_ra_cariler["firma"] == _ra_firma_sec].iloc[0]
+                try:
+                    _sb_ra2 = get_sb_client()
+                    if _sb_ra2:
+                        _sb_ra2.table("rota_analiz").insert({
+                            "cari_id": int(_ra_secilen.get("id", 0)),
+                            "firma": str(_ra_secilen.get("firma", "")),
+                            "yetkili": str(_ra_secilen.get("yetkili", _ra_secilen.get("temsilci", ""))),
+                            "tel": str(_ra_secilen.get("gsm", "")),
+                            "bolge": str(_ra_secilen.get("il", "")) + (" - " + str(_ra_secilen.get("ilce", "")) if _ra_secilen.get("ilce") else ""),
+                            "aciklama": _ra_aciklama_yeni,
+                        }).execute()
+                        get_rota_analiz.clear()
+                        st.success("Eklendi!")
+                        st.rerun()
+                except Exception as _e_ra:
+                    st.error(f"Hata: {_e_ra}")
+
+    _ra_df = get_rota_analiz()
+    if _ra_df.empty:
+        st.info("Henüz müşteri eklenmedi. Yukarıdan ekleyin.")
+    else:
+        _hdr_cols = st.columns(_RA_GENISLIK)
+        for _hi, _hl in enumerate(_RA_BASLIKLAR):
+            _hdr_cols[_hi].markdown(f"<span style='font-size:11px;color:var(--text-muted);font-weight:500'>{_hl}</span>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin:4px 0;border-color:var(--border)'>", unsafe_allow_html=True)
+
+        for _, _mrow in _ra_df.iterrows():
+            _ra_id    = int(_mrow.get("id", 0))
+            _cari_id  = int(_mrow.get("cari_id", 0))
+            _firma    = str(_mrow.get("firma", ""))
+            _yetkili  = str(_mrow.get("yetkili", ""))
+            _tel      = str(_mrow.get("tel", ""))
+            _bolge    = str(_mrow.get("bolge", ""))
+            _aciklama = str(_mrow.get("aciklama", ""))
+
+            try:
+                _sb_ra3 = get_sb_client()
+                _rotalar = []
+                if _sb_ra3:
+                    _rr = _sb_ra3.table("rota_analiz_detay").select("*").eq("rota_analiz_id", _ra_id).execute()
+                    _rotalar = _rr.data if _rr.data else []
+            except:
+                _rotalar = []
+
+            _toplam = sum(r.get("toplam", 0) or 0 for r in _rotalar)
+
+            for _ri, _r in enumerate(_rotalar):
+                _rc = st.columns(_RA_GENISLIK)
+                if _ri == 0:
+                    _rc[0].markdown(f"<span style='font-size:11px;color:var(--text-muted)'>{_cari_id}</span>", unsafe_allow_html=True)
+                    _rc[1].markdown(f"<span style='font-size:12px;font-weight:500'>{_firma}</span>", unsafe_allow_html=True)
+                    _rc[2].markdown(f"<span style='font-size:12px'>{_yetkili}</span>", unsafe_allow_html=True)
+                    _rc[3].markdown(f"<span style='font-size:11px;color:var(--text-muted)'>{_tel}</span>", unsafe_allow_html=True)
+                    _rc[4].markdown(f"<span style='font-size:11px;color:var(--text-muted)'>{_bolge}</span>", unsafe_allow_html=True)
+                    _rc[10].markdown(f"<span style='font-size:11px;font-style:italic;color:var(--text-muted)'>{_aciklama}</span>", unsafe_allow_html=True)
+                _rc[5].markdown(f"<span style='font-size:12px'>{_r.get('cikis_il','')}</span>", unsafe_allow_html=True)
+                _rc[6].markdown(f"<span style='font-size:12px'>{_r.get('varis_il','')}</span>", unsafe_allow_html=True)
+                _rc[7].markdown(f"<span style='font-size:12px'>{_r.get('koli','')}</span>", unsafe_allow_html=True)
+                _rc[8].markdown(f"<span style='font-size:12px'>{_r.get('palet','')}</span>", unsafe_allow_html=True)
+                _rc[9].markdown(f"<span style='font-size:12px;font-weight:500'>{int(_r.get('toplam',0)):,}</span>", unsafe_allow_html=True)
+                if _rc[11].button("🗑", key=f"ra_sil_r_{_r.get('id',_ri)}"):
+                    try:
+                        _sb_ra3.table("rota_analiz_detay").delete().eq("id", int(_r["id"])).execute()
+                        get_rota_analiz.clear()
+                        st.rerun()
+                    except: pass
+
+            # Ekleme satırı
+            _add = st.columns(_RA_GENISLIK)
+            if len(_rotalar) == 0:
+                _add[0].markdown(f"<span style='font-size:11px;color:var(--text-muted)'>{_cari_id}</span>", unsafe_allow_html=True)
+                _add[1].markdown(f"<span style='font-size:12px;font-weight:500'>{_firma}</span>", unsafe_allow_html=True)
+                _add[2].markdown(f"<span style='font-size:12px'>{_yetkili}</span>", unsafe_allow_html=True)
+                _add[3].markdown(f"<span style='font-size:11px;color:var(--text-muted)'>{_tel}</span>", unsafe_allow_html=True)
+                _add[4].markdown(f"<span style='font-size:11px;color:var(--text-muted)'>{_bolge}</span>", unsafe_allow_html=True)
+                _add[10].markdown(f"<span style='font-size:11px;font-style:italic;color:var(--text-muted)'>{_aciklama}</span>", unsafe_allow_html=True)
+            _cikis_il  = _add[5].selectbox("", _RA_ILLER, key=f"ra_cikis_{_ra_id}", label_visibility="collapsed")
+            _varis_il  = _add[6].selectbox("", _RA_ILLER, key=f"ra_varis_{_ra_id}", label_visibility="collapsed")
+            _koli_v    = _add[7].number_input("", min_value=0, step=1, key=f"ra_koli_{_ra_id}", label_visibility="collapsed")
+            _palet_v   = _add[8].number_input("", min_value=0, step=1, key=f"ra_palet_{_ra_id}", label_visibility="collapsed")
+            _rtoplam_v = _add[9].number_input("", min_value=0, step=1, key=f"ra_toplam_{_ra_id}", label_visibility="collapsed")
+            _racik_v   = _add[10].text_input("", key=f"ra_racik_{_ra_id}", label_visibility="collapsed", placeholder="Açıklama")
+            if _add[11].button("✅", key=f"ra_ekle_r_{_ra_id}"):
+                try:
+                    _sb_ra4 = get_sb_client()
+                    if _sb_ra4:
+                        _sb_ra4.table("rota_analiz_detay").insert({
+                            "rota_analiz_id": _ra_id,
+                            "cikis_il": _cikis_il,
+                            "varis_il": _varis_il,
+                            "koli": int(_koli_v),
+                            "palet": int(_palet_v),
+                            "toplam": int(_rtoplam_v),
+                            "aciklama": _racik_v,
+                        }).execute()
+                        get_rota_analiz.clear()
+                        st.rerun()
+                except Exception as _e_ra2:
+                    st.error(f"Hata: {_e_ra2}")
+
+            if _rotalar:
+                _tot = st.columns(_RA_GENISLIK)
+                _tot[9].markdown(f"<span style='font-size:13px;font-weight:500;color:var(--text-accent)'>{int(_toplam):,} ₺</span>", unsafe_allow_html=True)
+
+            st.markdown("<hr style='margin:4px 0;border-color:var(--border)'>", unsafe_allow_html=True)
+
+    with st.expander("📋 Supabase SQL — tabloları oluştur"):
+        _ra_sql = (
+            "CREATE TABLE IF NOT EXISTS rota_analiz (\n"
+            "  id BIGSERIAL PRIMARY KEY,\n"
+            "  cari_id BIGINT,\n"
+            "  firma TEXT,\n"
+            "  yetkili TEXT,\n"
+            "  tel TEXT,\n"
+            "  bolge TEXT,\n"
+            "  aciklama TEXT,\n"
+            "  olusturma_tarihi TIMESTAMPTZ DEFAULT NOW()\n"
+            ");\n"
+            "CREATE TABLE IF NOT EXISTS rota_analiz_detay (\n"
+            "  id BIGSERIAL PRIMARY KEY,\n"
+            "  rota_analiz_id BIGINT REFERENCES rota_analiz(id) ON DELETE CASCADE,\n"
+            "  cikis_il TEXT,\n"
+            "  varis_il TEXT,\n"
+            "  koli INT DEFAULT 0,\n"
+            "  palet INT DEFAULT 0,\n"
+            "  toplam INT DEFAULT 0,\n"
+            "  aciklama TEXT,\n"
+            "  olusturma_tarihi TIMESTAMPTZ DEFAULT NOW()\n"
+            ");"
+        )
+        st.code(_ra_sql, language="sql")
 
 
 elif aktif == "harita":
