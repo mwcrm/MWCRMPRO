@@ -3234,6 +3234,29 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
     # Sağda not paneli açık mı?
     _not_panel_id = st.session_state.get("_cl_not_panel_id")
 
+    # ── KAYDET BUTONU — TABLONUN ÜSTÜNDE, STICKY ───────────────────────────────
+    st.markdown("""<style>
+.cl-sticky-bar{
+    position: sticky; top: 0; z-index: 999;
+    background: white; padding: 8px 0 6px;
+    border-bottom: 1px solid #e2e8f0;
+    margin-bottom: 6px;
+}
+</style>""", unsafe_allow_html=True)
+
+    with st.container():
+        st.markdown('<div class="cl-sticky-bar">', unsafe_allow_html=True)
+        _sb1, _sb2, _sb3 = st.columns([2, 1, 1])
+        with _sb1:
+            if st.button("💾 Değişiklikleri Kaydet", use_container_width=True, type="primary", key="liste_kaydet_ust"):
+                st.session_state["_kaydet_flag"] = True
+                st.rerun()
+        with _sb3:
+            if st.button("🔄 Kolon Sıfırla", use_container_width=True, key="cl_kolon_sifirla_ust"):
+                st.session_state.pop("_cl_kolon_sira", None)
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
     _tbl_col = st.container()
     _not_col = None
 
@@ -3402,11 +3425,11 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                 except: pass
                 st.session_state.pop("_ls_tablo", None)
                 if kayit_sayi > 0:
-                    st.success(f"✅ {kayit_sayi} satır kaydedildi!" + (f" · {_arsiv_sayi} not 📨 arşivlendi!" if _arsiv_sayi > 0 else ""))
+                    st.toast(f"✅ {kayit_sayi} satır kaydedildi!" + (f" · {_arsiv_sayi} not arşivlendi!" if _arsiv_sayi > 0 else ""), icon="✅")
                 elif _arsiv_sayi > 0:
-                    st.success(f"✅ {_arsiv_sayi} not 📨 arşivlendi!")
+                    st.toast(f"✅ {_arsiv_sayi} not arşivlendi!", icon="📨")
                 else:
-                    st.info("Değişiklik kaydedildi.")
+                    st.toast("Değişiklik kaydedildi.", icon="ℹ️")
                 if hata_list:
                     st.error(f"Hata: {'; '.join(hata_list[:2])}")
                 st.rerun()
