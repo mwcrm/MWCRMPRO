@@ -764,7 +764,7 @@ def giris_ekrani():
                     "giris_cihaz":      "mobil" if _mobil_secildi else "masaustu",
                 })
                 # localStorage'a kaydet — sayfa yenilenince otomatik giriş
-                _ls_veri = json.dumps({"kullanici": kullanici, "sifre": sifre, "mobil": _mobil_secildi})
+                _ls_veri = json.dumps({"kullanici": kullanici, "sifre": _yf_sifre, "mobil": _mobil_secildi})
                 st.markdown(f"""<script>
 try{{localStorage.setItem('mwcrm_oturum', {repr(_ls_veri)});}}catch(e){{}}
 </script>""", unsafe_allow_html=True)
@@ -2258,21 +2258,34 @@ section[data-testid="stSidebar"] { display: none !important; }
                 _mr_tab1, _mr_tab2 = st.tabs(["📋 Toplu Karşılaştırma (hepsi)", "🔎 Tek Seçerek Karşılaştır"])
 
                 with _mr_tab1:
-                    st.caption("Aynı isimli firmalar gruplanmış. İstediğiniz grubu silebilirsiniz.")
-                    _silinen_t = 0; _hata_t = 0
+                    st.caption("Aynı isimli firmalar gruplanmış. Her grupta tüm kayıtlar gösterilir, istediğiniz tekrarı silebilirsiniz.")
+                    _silinen_t = 0
                     for _fname, _fids in list(_mukerrerler.items()):
-                        with st.container():
-                            _tc1, _tc2 = st.columns([4,1])
-                            _tc1.markdown(f"**{_fname}** — {len(_fids)} kayıt (ID: {', '.join(str(x) for x in _fids)})")
-                            if _tc2.button("🗑 Sil", key=f"mr_t1_sil_{_fname[:20]}", use_container_width=True):
-                                try:
-                                    _sb_mr = get_sb_client()
-                                    if _sb_mr:
-                                        for _did in _fids[1:]:
-                                            _sb_mr.table("cari_kartlar").update({"silindi":1}).eq("id", int(_did)).execute()
-                                        _silinen_t += len(_fids) - 1
-                                except:
-                                    _hata_t += 1
+                        st.markdown(f"---
+**{_fname}** — {len(_fids)} kayıt")
+                        # Her ID için tam satırı göster
+                        _satirlar = []
+                        for _did in _fids:
+                            _satir = df[df["id"] == _did]
+                            if not _satir.empty:
+                                _satirlar.append(_satir.iloc[0])
+                        _goster_kolon = [c for c in ["id","firma","gsm","il","ilce","temsilci","segment","notlar"] if c in df.columns]
+                        for _idx, _s in enumerate(_satirlar):
+                            _kc1, _kc2 = st.columns([5,1])
+                            with _kc1:
+                                _detay = " | ".join([f"**{c}:** {_s.get(c,'')}" for c in _goster_kolon if str(_s.get(c,"")).strip() not in ["","nan","None"]])
+                                st.markdown(f"🔹 {_detay}")
+                            with _kc2:
+                                if _idx > 0:  # İlk kaydı koru, tekrarları sil
+                                    if st.button("🗑 Sil", key=f"mr_sil_{_did}", use_container_width=True):
+                                        try:
+                                            _sb_mr = get_sb_client()
+                                            if _sb_mr:
+                                                _sb_mr.table("cari_kartlar").update({"silindi":1}).eq("id", int(_did)).execute()
+                                                _silinen_t += 1
+                                        except: pass
+                                else:
+                                    st.markdown("✅ *Asıl kayıt*")
                     if _silinen_t:
                         try: get_cari_listesi.clear()
                         except: pass
