@@ -9340,7 +9340,7 @@ elif aktif == "rota_analiz":
             except: pass
         return pd.DataFrame()
 
-    _ra_cariler = get_cari_listesi()
+    _ra_cariler = _atama_filtresi_uygula(get_cari_listesi())
 
     with st.expander("➕ Sisteme kayıtlı müşteriyi ekle"):
         if not _ra_cariler.empty:
@@ -9366,6 +9366,12 @@ elif aktif == "rota_analiz":
                     st.error(f"Hata: {_e_ra}")
 
     _ra_df = get_rota_analiz()
+    # Atama filtresi — admin hepsini görür, kullanıcı sadece kendine atananları
+    if not _ra_df.empty:
+        _ra_atama = _atama_filtresi_uygula(get_cari_listesi())
+        if not _ra_atama.empty and "id" in _ra_atama.columns:
+            _ra_izinli_ids = set(_ra_atama["id"].astype(int).tolist())
+            _ra_df = _ra_df[_ra_df["cari_id"].astype(int).isin(_ra_izinli_ids)]
     if _ra_df.empty:
         st.info("Henüz müşteri eklenmedi. Yukarıdan ekleyin.")
     else:
@@ -9428,7 +9434,8 @@ elif aktif == "rota_analiz":
             _varis_il  = _add[6].selectbox("", _RA_ILLER, key=f"ra_varis_{_ra_id}", label_visibility="collapsed")
             _koli_v    = _add[7].number_input("", min_value=0, step=1, key=f"ra_koli_{_ra_id}", label_visibility="collapsed")
             _palet_v   = _add[8].number_input("", min_value=0, step=1, key=f"ra_palet_{_ra_id}", label_visibility="collapsed")
-            _rtoplam_v = _add[9].number_input("", min_value=0, step=1, key=f"ra_toplam_{_ra_id}", label_visibility="collapsed")
+            _rtoplam_v = int(_koli_v) + int(_palet_v)
+            _add[9].markdown(f"<span style='font-size:12px;font-weight:500;color:var(--text-accent)'>{_rtoplam_v:,}</span>", unsafe_allow_html=True)
             _racik_v   = _add[10].text_input("", key=f"ra_racik_{_ra_id}", label_visibility="collapsed", placeholder="Açıklama")
             if _add[11].button("✅", key=f"ra_ekle_r_{_ra_id}"):
                 try:
@@ -9440,7 +9447,7 @@ elif aktif == "rota_analiz":
                             "varis_il": _varis_il,
                             "koli": int(_koli_v),
                             "palet": int(_palet_v),
-                            "toplam": int(_rtoplam_v),
+                            "toplam": _rtoplam_v,
                             "aciklama": _racik_v,
                         }).execute()
                         get_rota_analiz.clear()
