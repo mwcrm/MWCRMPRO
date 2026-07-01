@@ -2261,8 +2261,8 @@ section[data-testid="stSidebar"] { display: none !important; }
                     st.caption("Aynı isimli firmalar gruplanmış. Her grupta tüm kayıtlar gösterilir, istediğiniz tekrarı silebilirsiniz.")
                     _silinen_t = 0
                     for _fname, _fids in list(_mukerrerler.items()):
-                        st.markdown(f"---
-**{_fname}** — {len(_fids)} kayıt")
+                        st.markdown("---")
+                        st.markdown(f"**{_fname}** — {len(_fids)} kayıt")
                         # Her ID için tam satırı göster
                         _satirlar = []
                         for _did in _fids:
