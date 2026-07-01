@@ -1307,7 +1307,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "rota_analiz", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -1324,6 +1324,7 @@ _TAB_ETIKETLER = {
     "admin_rapor": "📊 Rapor Tasarla",
     "harita": "🗺️ Müşteri Haritası",
     "rota_analiz": "🚚 Rota Analiz",
+    "operasyon": "🚛 Operasyon",
     "patron": "👑 Yönetim Paneli",
     
 }
@@ -9462,6 +9463,247 @@ elif aktif == "rota_analiz":
             st.markdown("<hr style='margin:4px 0;border-color:var(--border)'>", unsafe_allow_html=True)
 
 
+
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+elif aktif == "operasyon":
+    sayfa_log("operasyon")
+
+    _op_kul = st.session_state.get("kullanici", "")
+    _op_rol = st.session_state.get("rol", "")
+    _op_admin = (_op_rol == "admin")
+
+    st.markdown("### 🚛 Operasyon")
+
+    # ── SUPABASE TABLO KONTROL ─────────────────────────────────────────────
+    _sb_op = get_sb_client()
+    if _sb_op:
+        try:
+            _sb_op.table("operasyon_ihbar").select("id").limit(1).execute()
+        except:
+            pass
+
+    # ── VERİ YÜKLEME ──────────────────────────────────────────────────────
+    @st.cache_data(ttl=20)
+    def get_op_ihbar():
+        sb = get_sb_client()
+        if sb:
+            try:
+                res = sb.table("operasyon_ihbar").select("*").neq("arsiv", 1).order("tarih", desc=True).execute()
+                return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+            except: pass
+        return pd.DataFrame()
+
+    _op_cariler = _atama_filtresi_uygula(get_cari_listesi())
+    _op_df = get_op_ihbar()
+
+    # Yetki filtresi — admin hepsini, kullanıcı sadece kendinin veya kendine atanmışları görür
+    if not _op_df.empty and not _op_admin:
+        _op_df = _op_df[
+            (_op_df["personel"].astype(str) == _op_kul) |
+            (_op_df["gonderen_musteri"].astype(str).isin(
+                _op_cariler["firma"].dropna().tolist() if not _op_cariler.empty else []
+            ))
+        ]
+
+    # ── KARGO TÜRLERİ ─────────────────────────────────────────────────────
+    KARGO_TURLERI = ["Koli", "Palet", "Sandık", "Top", "Çuval", "Kasa", "Taban yük", "Üst yük", "Diğer"]
+
+    # ── BAŞLIK ──────────────────────────────────────────────────────────────
+    _hdr1, _hdr2 = st.columns([1, 1])
+    _hdr1.markdown(
+        f"**Alım İhbar Kaydı** — {datetime.now().strftime('%d.%m.%Y')}"
+        + (f" — **{len(_op_df)} kayıt**" if not _op_df.empty else "")
+    )
+    if _op_admin and _hdr2.button("📦 Günü Kapat / Arşivle", key="op_arsiv"):
+        try:
+            _sb_op2 = get_sb_client()
+            if _sb_op2:
+                _sb_op2.table("operasyon_ihbar").update({"arsiv": 1}).neq("arsiv", 1).execute()
+                get_op_ihbar.clear()
+                st.success("✅ Günün tüm kayıtları arşivlendi!")
+                st.rerun()
+        except Exception as _e: st.error(f"Hata: {_e}")
+
+    st.markdown("---")
+
+    # ── YEŞİL EKLEME SATIRI (EN ÜSTTE HER ZAMAN) ─────────────────────────
+    with st.container():
+        st.markdown(
+            "<div style='background:var(--bg-success);border:1px solid var(--border-success);"
+            "border-radius:8px;padding:8px 12px;margin-bottom:8px;'>",
+            unsafe_allow_html=True
+        )
+        _ac1, _ac2, _ac3, _ac4, _ac5, _ac6, _ac7, _ac8, _ac9 = st.columns([1.2,1.2,1,1,1,1.4,1.6,1.2,0.4])
+
+        _op_gonderen_firmalar = ["-- Seçin --"] + (_op_cariler["firma"].dropna().tolist() if not _op_cariler.empty else [])
+        _op_alici_firmalar = get_cari_listesi()
+        _op_alici_firmalar = _op_alici_firmalar["firma"].dropna().tolist() if not _op_alici_firmalar.empty else []
+
+        _ac1.markdown(f"<span style='font-size:11px;color:var(--text-muted)'>👤 {_op_kul}</span>", unsafe_allow_html=True)
+        _ac2.markdown(f"<span style='font-size:11px;color:var(--text-muted)'>🕐 {datetime.now().strftime('%d.%m %H:%M')}</span>", unsafe_allow_html=True)
+
+        _gon_sec = _ac3.selectbox("Gönderen", _op_gonderen_firmalar, key="op_gon_sec", label_visibility="collapsed")
+        _gon_sube = _ac4.text_input("G.Şube", key="op_gon_sube", label_visibility="collapsed", placeholder="Gönderen şube")
+        _ali_sec = _ac5.selectbox("Alıcı", ["-- Seçin --"] + _op_alici_firmalar, key="op_ali_sec", label_visibility="collapsed")
+        _ali_sube = _ac6.text_input("A.Şube", key="op_ali_sube", label_visibility="collapsed", placeholder="Alıcı şube")
+
+        with _ac7:
+            _kt1, _kt2, _kt3 = st.columns([1.2, 0.7, 0.7])
+            _kargo_tur = _kt1.selectbox("Tür", KARGO_TURLERI, key="op_kargo_tur", label_visibility="collapsed")
+            _kargo_adet = _kt2.number_input("Adet", min_value=0, step=1, key="op_kargo_adet", label_visibility="collapsed")
+            _kargo_fiyat = _kt3.number_input("₺", min_value=0, step=1, key="op_kargo_fiyat", label_visibility="collapsed")
+
+        _arac_bilgi = _ac8.text_input("Araç/Sürücü/Plaka", key="op_arac", label_visibility="collapsed", placeholder="Plaka · Sürücü · Tel")
+
+        if _ac9.button("✅", key="op_ekle_btn"):
+            if _gon_sec == "-- Seçin --" or _ali_sec == "-- Seçin --":
+                st.warning("Gönderen ve alıcı seçin!")
+            else:
+                try:
+                    _sb_op3 = get_sb_client()
+                    if _sb_op3:
+                        _sb_op3.table("operasyon_ihbar").insert({
+                            "personel": _op_kul,
+                            "tarih": datetime.now().isoformat(),
+                            "gonderen_musteri": _gon_sec,
+                            "gonderen_sube": _gon_sube,
+                            "alici_musteri": _ali_sec,
+                            "alici_sube": _ali_sube,
+                            "kargo_tur": _kargo_tur,
+                            "kargo_adet": int(_kargo_adet),
+                            "kargo_fiyat": int(_kargo_fiyat),
+                            "arac_bilgi": _arac_bilgi,
+                            "arsiv": 0,
+                        }).execute()
+                        get_op_ihbar.clear()
+                        st.success("✅ Kaydedildi!")
+                        st.rerun()
+                except Exception as _e: st.error(f"Hata: {_e}")
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ── KAYIT LİSTESİ ─────────────────────────────────────────────────────
+    if _op_df.empty:
+        st.info("Bugün henüz ihbar kaydı yok.")
+    else:
+        # Başlıklar
+        _bh = st.columns([0.8,0.8,1.5,0.9,1.5,0.9,1.5,1.6,1,0.4])
+        for _col, _lbl in zip(_bh, ["Personel","Tarih/Saat","Gönderen","G.Şube","Alıcı","A.Şube","Kargo","Araç/Sürücü","Açıklama",""]):
+            _col.markdown(f"<span style='font-size:11px;font-weight:500;color:var(--text-muted)'>{_lbl}</span>", unsafe_allow_html=True)
+        st.markdown("<hr style='margin:3px 0 4px;border-color:var(--border)'>", unsafe_allow_html=True)
+
+        _op_toplam = 0
+        for _, _row in _op_df.iterrows():
+            _rid = int(_row.get("id", 0))
+            _rpers = str(_row.get("personel", ""))
+            _rtarih = str(_row.get("tarih", ""))[:16].replace("T"," ")
+            _rgon = str(_row.get("gonderen_musteri", ""))
+            _rgsube = str(_row.get("gonderen_sube", ""))
+            _rali = str(_row.get("alici_musteri", ""))
+            _rasube = str(_row.get("alici_sube", ""))
+            _rtur = str(_row.get("kargo_tur", ""))
+            _radet = int(_row.get("kargo_adet", 0) or 0)
+            _rfiyat = int(_row.get("kargo_fiyat", 0) or 0)
+            _rarac = str(_row.get("arac_bilgi", ""))
+            _racik = str(_row.get("aciklama", ""))
+            _op_toplam += _rfiyat
+
+            _rc = st.columns([0.8,0.8,1.5,0.9,1.5,0.9,1.5,1.6,1,0.4])
+            _rc[0].markdown(f"<span style='font-size:11px'>{_rpers}</span>", unsafe_allow_html=True)
+            _rc[1].markdown(f"<span style='font-size:11px;color:var(--text-muted)'>{_rtarih}</span>", unsafe_allow_html=True)
+            _rc[2].markdown(f"<span style='font-size:11px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block'>{_rgon}</span>", unsafe_allow_html=True)
+            _rc[3].markdown(f"<span style='font-size:11px;color:var(--text-muted)'>{_rgsube}</span>", unsafe_allow_html=True)
+            _rc[4].markdown(f"<span style='font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block'>{_rali}</span>", unsafe_allow_html=True)
+            _rc[5].markdown(f"<span style='font-size:11px;color:var(--text-muted)'>{_rasube}</span>", unsafe_allow_html=True)
+            _rc[6].markdown(
+                f"<span style='font-size:11px;background:var(--bg-accent);color:var(--text-accent);"
+                f"padding:1px 6px;border-radius:4px;'>{_rtur} ×{_radet} — {_rfiyat:,}₺</span>",
+                unsafe_allow_html=True
+            )
+            _rc[7].markdown(f"<span style='font-size:11px;color:var(--text-secondary)'>{_rarac}</span>", unsafe_allow_html=True)
+            _rc[8].markdown(f"<span style='font-size:11px;color:var(--text-muted);font-style:italic'>{_racik}</span>", unsafe_allow_html=True)
+
+            # Sil/düzenle sadece kendi kaydı veya admin
+            if _op_admin or _rpers == _op_kul:
+                if _rc[9].button("🗑", key=f"op_sil_{_rid}"):
+                    try:
+                        _sb_op4 = get_sb_client()
+                        if _sb_op4:
+                            _sb_op4.table("operasyon_ihbar").update({"arsiv": 1}).eq("id", _rid).execute()
+                            get_op_ihbar.clear()
+                            st.rerun()
+                    except: pass
+
+            st.markdown("<hr style='margin:2px 0;border-color:var(--border)'>", unsafe_allow_html=True)
+
+        # Toplam
+        _tot_cols = st.columns([0.8,0.8,1.5,0.9,1.5,0.9,1.5,1.6,1,0.4])
+        _tot_cols[6].markdown(
+            f"<span style='font-size:13px;font-weight:500;color:var(--text-accent)'>{_op_toplam:,} ₺</span>",
+            unsafe_allow_html=True
+        )
+
+    # ── TIR DOLULUK (sadece admin görür) ──────────────────────────────────
+    if _op_admin and not _op_df.empty:
+        st.markdown("---")
+        st.markdown("**🚛 TIR Doluluk Durumu**")
+
+        _subeler = sorted(set(
+            list(_op_df["alici_sube"].dropna().unique()) +
+            list(_op_df["gonderen_sube"].dropna().unique())
+        ))
+        _subeler = [s for s in _subeler if s and s not in ["nan","None",""]]
+
+        if _subeler:
+            _tir_cols = st.columns(min(len(_subeler), 3))
+            for _si, _sube in enumerate(_subeler):
+                _sube_df = _op_df[
+                    (_op_df["alici_sube"].astype(str) == _sube) |
+                    (_op_df["gonderen_sube"].astype(str) == _sube)
+                ]
+                _palet_say = _sube_df[_sube_df["kargo_tur"] == "Palet"]["kargo_adet"].sum()
+                _koli_say = _sube_df[_sube_df["kargo_tur"] == "Koli"]["kargo_adet"].sum()
+                _taban = _sube_df[_sube_df["kargo_tur"] == "Taban yük"].shape[0]
+
+                _pct_palet = min(int((_palet_say / 33) * 100), 100)
+                _pct_koli = min(int((_koli_say / 500) * 100), 100)
+
+                with _tir_cols[_si % 3]:
+                    st.markdown(f"**{_sube}**")
+                    st.markdown(
+                        f"🟡 Palet: {int(_palet_say)}/33 &nbsp;&nbsp; 📦 Koli: {int(_koli_say)}/500"
+                        + (f" &nbsp;&nbsp; ⚠️ Taban yük: {_taban}" if _taban else ""),
+                        unsafe_allow_html=True
+                    )
+                    st.progress(_pct_palet / 100, text=f"Palet doluluk: %{_pct_palet}")
+                    st.progress(_pct_koli / 100, text=f"Koli doluluk: %{_pct_koli}")
+
+    # ── SUPABASE SQL ───────────────────────────────────────────────────────
+    if _op_admin:
+        with st.expander("📋 Supabase SQL — tablo oluştur (ilk kurulum)"):
+            st.code(
+                "CREATE TABLE IF NOT EXISTS operasyon_ihbar (\n"
+                "  id BIGSERIAL PRIMARY KEY,\n"
+                "  personel TEXT,\n"
+                "  tarih TIMESTAMPTZ DEFAULT NOW(),\n"
+                "  gonderen_musteri TEXT,\n"
+                "  gonderen_sube TEXT,\n"
+                "  alici_musteri TEXT,\n"
+                "  alici_sube TEXT,\n"
+                "  kargo_tur TEXT,\n"
+                "  kargo_adet INT DEFAULT 0,\n"
+                "  kargo_fiyat INT DEFAULT 0,\n"
+                "  arac_bilgi TEXT,\n"
+                "  aciklama TEXT,\n"
+                "  arsiv INT DEFAULT 0,\n"
+                "  olusturma_tarihi TIMESTAMPTZ DEFAULT NOW()\n"
+                ");\n"
+                "ALTER TABLE operasyon_ihbar ENABLE ROW LEVEL SECURITY;\n"
+                "CREATE POLICY \"herkese_acik\" ON operasyon_ihbar FOR ALL USING (true) WITH CHECK (true);",
+                language="sql"
+            )
 
 
 elif aktif == "harita":
