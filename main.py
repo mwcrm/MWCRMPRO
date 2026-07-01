@@ -9173,14 +9173,14 @@ elif aktif == "musteri_atama":
     _secili_ids = st.session_state["ma_secili_ids"]
 
     # Tümünü seç/kaldır
-    _tumu_sec = _tab2.checkbox(f"Tümünü Seç ({len(_df_goster)})", key="ma_tumunu_sec")
+    _tumu_sec = _tab2.checkbox(f"Tümünü Seç ({len(_df_goster)})", key="ma_tumunu_sec_v2")
     if _tumu_sec:
         _secili_ids = set(_df_goster["id"].tolist())
         st.session_state["ma_secili_ids"] = _secili_ids
-    elif not _tumu_sec and st.session_state.get("ma_tumunu_sec_onceki", False):
+    elif not _tumu_sec and st.session_state.get("ma_tumunu_sec_v2_onceki", False):
         _secili_ids = set()
         st.session_state["ma_secili_ids"] = _secili_ids
-    st.session_state["ma_tumunu_sec_onceki"] = _tumu_sec
+    st.session_state["ma_tumunu_sec_v2_onceki"] = _tumu_sec
 
     # Tümünü seç/kaldır
 
