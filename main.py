@@ -130,13 +130,27 @@ def _atama_filtresi_uygula(df):
 
 @st.cache_data(ttl=60)
 def get_cari_listesi():
-    """60 sn cache'li cari listesi"""
+    """60 sn cache'li cari listesi — tüm kayıtları çek, silindi filtresi Python'da uygula"""
     sb = get_sb_client()
     if sb:
         try:
-            res = sb.table("cari_kartlar").select("*").neq("silindi",1).order("firma").execute()
-            _df_g = pd.DataFrame(res.data) if res.data else pd.DataFrame()
+            _tum = []
+            _offset = 0
+            _batch = 1000
+            while True:
+                _res = sb.table("cari_kartlar").select("*").order("firma").range(_offset, _offset+_batch-1).execute()
+                if _res.data:
+                    _tum.extend(_res.data)
+                    if len(_res.data) < _batch:
+                        break
+                    _offset += _batch
+                else:
+                    break
+            _df_g = pd.DataFrame(_tum) if _tum else pd.DataFrame()
             if not _df_g.empty:
+                # Silindi filtresi — sadece silindi=1 olanları çıkar (NULL, 0, False hepsi dahil)
+                if "silindi" in _df_g.columns:
+                    _df_g = _df_g[~(_df_g["silindi"].astype(str).str.strip().isin(["1","True","true","1.0"]))]
                 for _tk in ["gsm","sabit"]:
                     if _tk in _df_g.columns:
                         _df_g[_tk] = _telefon_temizle(_df_g[_tk])
@@ -9681,29 +9695,7 @@ elif aktif == "operasyon":
                     st.progress(_pct_koli / 100, text=f"Koli doluluk: %{_pct_koli}")
 
     # ── SUPABASE SQL ───────────────────────────────────────────────────────
-    if _op_admin:
-        with st.expander("📋 Supabase SQL — tablo oluştur (ilk kurulum)"):
-            st.code(
-                "CREATE TABLE IF NOT EXISTS operasyon_ihbar (\n"
-                "  id BIGSERIAL PRIMARY KEY,\n"
-                "  personel TEXT,\n"
-                "  tarih TIMESTAMPTZ DEFAULT NOW(),\n"
-                "  gonderen_musteri TEXT,\n"
-                "  gonderen_sube TEXT,\n"
-                "  alici_musteri TEXT,\n"
-                "  alici_sube TEXT,\n"
-                "  kargo_tur TEXT,\n"
-                "  kargo_adet INT DEFAULT 0,\n"
-                "  kargo_fiyat INT DEFAULT 0,\n"
-                "  arac_bilgi TEXT,\n"
-                "  aciklama TEXT,\n"
-                "  arsiv INT DEFAULT 0,\n"
-                "  olusturma_tarihi TIMESTAMPTZ DEFAULT NOW()\n"
-                ");\n"
-                "ALTER TABLE operasyon_ihbar ENABLE ROW LEVEL SECURITY;\n"
-                "CREATE POLICY \"herkese_acik\" ON operasyon_ihbar FOR ALL USING (true) WITH CHECK (true);",
-                language="sql"
-            )
+
 
 
 elif aktif == "harita":
