@@ -9699,34 +9699,45 @@ elif aktif == "operasyon":
             K = min(koli, 22)
             pp = min(int(palet/33*100),100)
             pk = min(int(koli/500*100),100)
+            # Dorse iç alan: x=74..290, y=28..63
+            # Palet: taban üstünde, y=49..63, her palet w=19px
+            # Koli: palet üstünde, y=37..49
+            # Palet başlangıç x=75, pitch=19
+            DX = 75  # dorse iç başlangıç
+            PW = 19  # palet genişliği
+            PALET_Y = 49  # palet üstü y
+            PALET_H = 14  # palet yüksekliği
+            KOLI_Y = 37   # koli üstü y
+            KOLI_H = 12   # koli yüksekliği
 
             # Palet elemanları
             ps = ""
             for i in range(11):
-                x = 80 + i*19
+                x = DX + i * PW
                 if i < P:
                     ps += (
-                        f'<rect x="{x}" y="49" width="17" height="14" rx="1" fill="#c8a028" stroke="#7a5810" stroke-width="0.8"/>' +
-                        f'<rect x="{x}" y="49" width="17" height="3" fill="#e8c050"/>' +
-                        f'<rect x="{x}" y="60" width="17" height="3" fill="#e8c050"/>' +
-                        f'<rect x="{x+3}" y="53" width="3" height="6" fill="#806018"/>' +
-                        f'<rect x="{x+8}" y="53" width="3" height="6" fill="#806018"/>' +
-                        f'<rect x="{x+13}" y="53" width="3" height="6" fill="#806018"/>' 
+                        f'<rect x="{x}" y="{PALET_Y}" width="17" height="{PALET_H}" rx="1" fill="#c8a028" stroke="#7a5810" stroke-width="0.8"/>' +
+                        f'<rect x="{x}" y="{PALET_Y}" width="17" height="3" fill="#f0cc50"/>' +
+                        f'<rect x="{x}" y="{PALET_Y+PALET_H-3}" width="17" height="3" fill="#f0cc50"/>' +
+                        f'<rect x="{x+3}" y="{PALET_Y+3}" width="3" height="{PALET_H-6}" fill="#806018"/>' +
+                        f'<rect x="{x+8}" y="{PALET_Y+3}" width="3" height="{PALET_H-6}" fill="#806018"/>' +
+                        f'<rect x="{x+13}" y="{PALET_Y+3}" width="3" height="{PALET_H-6}" fill="#806018"/>' 
                     )
                 else:
-                    ps += f'<rect x="{x}" y="49" width="17" height="14" rx="1" fill="none" stroke="#b0aba0" stroke-width="0.7" stroke-dasharray="3,2"/>' 
+                    ps += f'<rect x="{x}" y="{PALET_Y}" width="17" height="{PALET_H}" rx="1" fill="rgba(180,176,168,0.2)" stroke="#b0aba0" stroke-width="0.7" stroke-dasharray="3,2"/>' 
 
             # Koli elemanları — palet üstünde
             ks = ""
             ki = 0
             for i in range(11):
-                x = 80 + i*19
+                x = DX + i * PW
                 for j in range(2):
-                    kx = x + j*9
+                    kx = x + j * 9
                     if ki < K:
                         ks += (
-                            f'<rect x="{kx}" y="39" width="8" height="10" rx="1" fill="#d4a060" stroke="#7a4818" stroke-width="0.6"/>' +
-                            f'<rect x="{kx}" y="39" width="8" height="2" fill="#ecc080"/>' 
+                            f'<rect x="{kx}" y="{KOLI_Y}" width="8" height="{KOLI_H}" rx="1" fill="#d09848" stroke="#7a4818" stroke-width="0.6"/>' +
+                            f'<rect x="{kx}" y="{KOLI_Y}" width="8" height="2" fill="#ecc070"/>' +
+                            f'<line x1="{kx+4}" y1="{KOLI_Y+2}" x2="{kx+4}" y2="{KOLI_Y+KOLI_H}" stroke="#7a4818" stroke-width="0.5"/>' 
                         )
                     ki += 1
 
@@ -9785,7 +9796,11 @@ elif aktif == "operasyon":
 <rect x="70" y="60" width="224" height="4" rx="1" fill="#141414"/>
 <rect x="71" y="17" width="222" height="3" rx="1" fill="#909090"/>
 <rect x="71" y="19" width="222" height="4" rx="1" fill="#a0a098" stroke="#787470" stroke-width="0.7"/>
-<rect x="72" y="23" width="220" height="40" rx="2" fill="#d0ccc4" stroke="#888480" stroke-width="1.2"/>
+<rect x="72" y="23" width="220" height="40" rx="2" fill="#d0ccc4"/>
+{tbs}
+{ps}
+{ks}
+<rect x="72" y="23" width="220" height="40" rx="2" fill="none" stroke="#888480" stroke-width="1.2"/>
 <rect x="72" y="23" width="220" height="5" rx="1" fill="#b0aca4"/>
 <rect x="72" y="58" width="220" height="5" rx="1" fill="#b0aca4"/>
 <rect x="72" y="63" width="220" height="3" rx="1" fill="#b89028" stroke="#786010" stroke-width="0.7"/>
@@ -9808,9 +9823,6 @@ elif aktif == "operasyon":
 <circle cx="244" cy="72" r="4" fill="#121212"/><circle cx="244" cy="72" r="2" fill="#585858"/>
 <circle cx="252" cy="72" r="7" fill="#0c0c0c" stroke="#1c1c1c" stroke-width="0.6"/>
 <circle cx="252" cy="72" r="4" fill="#101010"/><circle cx="252" cy="72" r="2" fill="#484848"/>
-{tbs}
-{ps}
-{ks}
 </svg>
 <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;">{badge_p} {badge_k} {badge_t}</div>
 <div style="margin-top:4px;">
