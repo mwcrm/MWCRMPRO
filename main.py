@@ -9677,543 +9677,146 @@ elif aktif == "operasyon":
         st.markdown("---")
         st.markdown("**🚛 TIR Doluluk Durumu**")
 
-        _subeler = sorted(set(
-            list(_op_df["alici_sube"].dropna().unique()) +
-            list(_op_df["gonderen_sube"].dropna().unique())
-        ))
-        _subeler = [s for s in _subeler if s and s not in ["nan","None",""]]
+        # Rota bazlı grupla: gonderen_sube → alici_sube tek TIR
+        _rotalar = {}
+        for _, _rw in _op_df.iterrows():
+            _gs = str(_rw.get("gonderen_sube","")).strip()
+            _as = str(_rw.get("alici_sube","")).strip()
+            if not _gs or _gs in ["nan","None",""]: _gs = "?"
+            if not _as or _as in ["nan","None",""]: _as = "?"
+            _rota_key = f"{_gs} → {_as}"
+            if _rota_key not in _rotalar:
+                _rotalar[_rota_key] = {"palet":0,"koli":0,"taban":False,"sandik":0,"cuval":0}
+            _tur = str(_rw.get("kargo_tur",""))
+            _adet = int(_rw.get("kargo_adet",0) or 0)
+            if _tur == "Palet": _rotalar[_rota_key]["palet"] += _adet
+            elif _tur == "Koli": _rotalar[_rota_key]["koli"] += _adet
+            elif _tur == "Taban yük": _rotalar[_rota_key]["taban"] = True
+            elif _tur == "Sandık": _rotalar[_rota_key]["sandik"] += _adet
+            elif _tur == "Çuval": _rotalar[_rota_key]["cuval"] += _adet
 
-        if _subeler:
-            for _sube in _subeler:
-                _sube_df = _op_df[
-                    (_op_df["alici_sube"].astype(str) == _sube) |
-                    (_op_df["gonderen_sube"].astype(str) == _sube)
-                ]
-                _palet_say = int(_sube_df[_sube_df["kargo_tur"] == "Palet"]["kargo_adet"].sum())
-                _koli_say  = int(_sube_df[_sube_df["kargo_tur"] == "Koli"]["kargo_adet"].sum())
-                _taban_var = _sube_df[_sube_df["kargo_tur"] == "Taban yük"].shape[0] > 0
-                _pct_p = min(int((_palet_say / 33) * 100), 100)
-                _pct_k = min(int((_koli_say / 500) * 100), 100)
+        if _rotalar:
+            # 4 TIR yan yana HTML
+            _tir_html_all = ""
+            for _rota_adi, _rd in _rotalar.items():
+                _p = min(_rd["palet"], 11)
+                _k = min(_rd["koli"], 22)
+                _tb = _rd["taban"]
+                _pct_p = min(int((_rd["palet"]/33)*100),100)
+                _pct_k = min(int((_rd["koli"]/500)*100),100)
 
-                # TIR SVG görseli — gerçekçi, dinamik doluluk
-                _PALET_MAX = 10  # SVG'de gösterilen maks palet
-                _KOLI_MAX  = 20  # SVG'de gösterilen maks koli (üst sıra)
-                _p_goster = min(_palet_say, _PALET_MAX)
-                _k_goster = min(_koli_say,  _KOLI_MAX)
-
-                # Palet hücreleri (10 adet, 82px genişlik)
-                _palet_svg = ""
-                for _pi in range(_PALET_MAX):
-                    _px = 428 + _pi * 88
-                    if _pi < _p_goster:
-                        _palet_svg += (
-                            f'<rect x="{_px}" y="240" width="82" height="90" rx="1" fill="#d4a030" stroke="#7a5810" stroke-width="2"/>'
-                            f'<rect x="{_px}" y="240" width="82" height="13" rx="1" fill="#f0cc60"/>'
-                            f'<rect x="{_px}" y="317" width="82" height="13" rx="1" fill="#f0cc60"/>'
-                            f'<rect x="{_px+18}" y="255" width="10" height="60" fill="#906018"/>'
-                            f'<rect x="{_px+38}" y="255" width="10" height="60" fill="#906018"/>'
-                            f'<rect x="{_px+58}" y="255" width="10" height="60" fill="#906018"/>'
+                # Küçük TIR SVG (350x130)
+                _palet_s = ""
+                for _pi in range(11):
+                    _px = 106 + _pi * 22
+                    if _pi < _p:
+                        _palet_s += (
+                            f'<rect x="{_px}" y="72" width="20" height="24" rx="1" fill="#d4a030" stroke="#7a5810" stroke-width="1"/>'
+                            f'<rect x="{_px}" y="72" width="20" height="4" fill="#f0cc60"/>'
+                            f'<rect x="{_px}" y="92" width="20" height="4" fill="#f0cc60"/>'
+                            f'<rect x="{_px+4}" y="77" width="3" height="14" fill="#906018"/>'
+                            f'<rect x="{_px+10}" y="77" width="3" height="14" fill="#906018"/>'
+                            f'<rect x="{_px+16}" y="77" width="3" height="14" fill="#906018"/>'
                         )
                     else:
-                        _palet_svg += (
-                            f'<rect x="{_px}" y="240" width="82" height="90" rx="1" fill="#e8e4dc" '
-                            f'stroke="#b0aba0" stroke-width="1.5" stroke-dasharray="7,4"/>'
-                        )
+                        _palet_s += f'<rect x="{_px}" y="72" width="20" height="24" rx="1" fill="#e8e4dc" stroke="#b0aba0" stroke-width="1" stroke-dasharray="4,3"/>'
 
-                # Koli hücreleri palet üstünde (her paletten 2 koli)
-                _koli_svg = ""
+                _koli_s = ""
                 _ki = 0
-                for _pi in range(_PALET_MAX):
-                    _px = 428 + _pi * 88
+                for _pi in range(11):
+                    _px = 106 + _pi * 22
                     for _kj in range(2):
-                        _kx = _px + _kj * 40 + 2
-                        if _ki < _k_goster:
-                            _koli_svg += (
-                                f'<rect x="{_kx}" y="178" width="38" height="62" rx="1" fill="#d4a060" stroke="#804820" stroke-width="1.5"/>'
-                                f'<rect x="{_kx}" y="178" width="38" height="7" fill="#f0c888"/>'
-                                f'<line x1="{_kx+19}" y1="185" x2="{_kx+19}" y2="240" stroke="#804820" stroke-width="1"/>'
-                                f'<line x1="{_kx}" y1="210" x2="{_kx+38}" y2="210" stroke="#904828" stroke-width="1.2"/>'
+                        _kx = _px + _kj * 10
+                        if _ki < _k:
+                            _koli_s += (
+                                f'<rect x="{_kx}" y="56" width="9" height="16" rx="1" fill="#d4a060" stroke="#804820" stroke-width="0.8"/>'
+                                f'<rect x="{_kx}" y="56" width="9" height="3" fill="#f0c888"/>'
                             )
                         _ki += 1
 
-                # Taban yük
-                _taban_svg = ""
-                if _taban_var:
-                    _taban_svg = (
-                        '<rect x="432" y="312" width="875" height="28" rx="1" fill="#3a4858" stroke="#1a2838" stroke-width="1.5"/>'
-                        '<text x="870" y="330" font-size="12" fill="rgba(180,200,220,0.7)" text-anchor="middle" font-family="sans-serif">TABAN YÜK</text>'
-                    )
+                _tb_s = ""
+                if _tb:
+                    _tb_s = '<rect x="108" y="92" width="236" height="8" rx="1" fill="#3a4858" stroke="#1a2838" stroke-width="1"/>'
 
-                _svg = f"""<svg viewBox="0 0 1400 410" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;border-radius:8px;">
-<defs>
-  <linearGradient id="sky_{_sube}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#7ab8e8"/><stop offset="100%" stop-color="#e8f2f8"/></linearGradient>
-  <linearGradient id="road_{_sube}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#525050"/><stop offset="100%" stop-color="#363432"/></linearGradient>
-  <linearGradient id="cab_{_sube}" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#0e2248"/><stop offset="100%" stop-color="#2252b0"/></linearGradient>
-  <linearGradient id="dors_{_sube}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#a0a098"/><stop offset="20%" stop-color="#d8d4cc"/><stop offset="80%" stop-color="#ccc8c0"/><stop offset="100%" stop-color="#989490"/></linearGradient>
-</defs>
-<!-- GÖKYÜZÜ -->
-<rect x="0" y="0" width="1400" height="330" fill="url(#sky_{_sube})"/>
-<!-- ZEMİN -->
-<rect x="0" y="330" width="1400" height="80" fill="url(#road_{_sube})"/>
-<rect x="0" y="330" width="1400" height="4" fill="#454240"/>
-<rect x="50" y="346" width="120" height="7" rx="3.5" fill="#e8d038" opacity="0.6"/>
-<rect x="260" y="346" width="120" height="7" rx="3.5" fill="#e8d038" opacity="0.6"/>
-<rect x="470" y="346" width="120" height="7" rx="3.5" fill="#e8d038" opacity="0.6"/>
-<rect x="680" y="346" width="120" height="7" rx="3.5" fill="#e8d038" opacity="0.6"/>
-<rect x="890" y="346" width="120" height="7" rx="3.5" fill="#e8d038" opacity="0.6"/>
-<rect x="1100" y="346" width="120" height="7" rx="3.5" fill="#e8d038" opacity="0.6"/>
-<rect x="1310" y="346" width="80" height="7" rx="3.5" fill="#e8d038" opacity="0.6"/>
+                _svg_small = f"""<svg viewBox="0 0 350 130" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+<!-- SKY --><rect x="0" y="0" width="350" height="105" fill="#c8e0f4"/>
+<!-- ROAD --><rect x="0" y="105" width="350" height="25" fill="#484440"/>
+<rect x="10" y="110" width="30" height="3" rx="1.5" fill="#e8d038" opacity="0.7"/>
+<rect x="70" y="110" width="30" height="3" rx="1.5" fill="#e8d038" opacity="0.7"/>
+<rect x="130" y="110" width="30" height="3" rx="1.5" fill="#e8d038" opacity="0.7"/>
+<rect x="190" y="110" width="30" height="3" rx="1.5" fill="#e8d038" opacity="0.7"/>
+<rect x="250" y="110" width="30" height="3" rx="1.5" fill="#e8d038" opacity="0.7"/>
+<rect x="310" y="110" width="30" height="3" rx="1.5" fill="#e8d038" opacity="0.7"/>
 <!-- ÇEKİCİ -->
-<rect x="198" y="18" width="12" height="88" rx="6" fill="#686868" stroke="#484848" stroke-width="1.5"/>
-<rect x="212" y="22" width="10" height="84" rx="5" fill="#585858"/>
-<ellipse cx="204" cy="18" rx="7" ry="4" fill="#282828"/>
-<path d="M158,110 Q196,46 250,38 L360,38 Q368,38 368,50 L368,110 Z" fill="#183070" stroke="#0c1a40" stroke-width="2"/>
-<path d="M162,110 L360,110 L360,318 Q360,326 352,326 L170,326 Q162,326 162,318 Z" fill="url(#cab_{_sube})" stroke="#0c1838" stroke-width="2.5"/>
-<path d="M155,155 L162,112 L162,326 Q148,324 146,315 L146,168 Q146,155 155,155 Z" fill="#0e2248" stroke="#080e20" stroke-width="1.5"/>
-<path d="M166,118 L354,118 L354,212 Q354,218 348,218 L172,218 Q166,218 166,212 Z" fill="#6a9fcc" stroke="#0c1838" stroke-width="2.5"/>
-<path d="M173,125 L347,125 L347,212 Q347,215 344,215 L176,215 Q173,215 173,212 Z" fill="#78b0d8"/>
-<line x1="185" y1="127" x2="194" y2="214" stroke="#c0e0f8" stroke-width="4" stroke-linecap="round" opacity="0.45"/>
-<line x1="208" y1="126" x2="215" y2="214" stroke="#c0e0f8" stroke-width="2.5" stroke-linecap="round" opacity="0.28"/>
-<line x1="206" y1="213" x2="305" y2="166" stroke="#0a1428" stroke-width="2.5" stroke-linecap="round"/>
-<path d="M166,218 L354,218 L354,323 Q354,326 350,326 L170,326 Q166,326 166,323 Z" fill="#162e70" stroke="#0c1838" stroke-width="1.5"/>
-<line x1="265" y1="222" x2="265" y2="323" stroke="#0c1838" stroke-width="2.5"/>
-<rect x="258" y="278" width="24" height="9" rx="4.5" fill="#d0a828" stroke="#906010" stroke-width="1.5"/>
-<rect x="278" y="226" width="68" height="46" rx="5" fill="#6a9fcc" stroke="#0c1838" stroke-width="2"/>
-<rect x="168" y="286" width="86" height="38" rx="3" fill="#091428" stroke="#0c1838" stroke-width="1.5"/>
-<line x1="168" y1="295" x2="254" y2="295" stroke="#1c3878" stroke-width="1.3"/>
-<line x1="168" y1="304" x2="254" y2="304" stroke="#1c3878" stroke-width="1.3"/>
-<line x1="168" y1="313" x2="254" y2="313" stroke="#1c3878" stroke-width="1.3"/>
-<line x1="188" y1="286" x2="188" y2="324" stroke="#1c3878" stroke-width="1"/>
-<line x1="210" y1="286" x2="210" y2="324" stroke="#1c3878" stroke-width="1"/>
-<line x1="232" y1="286" x2="232" y2="324" stroke="#1c3878" stroke-width="1"/>
-<rect x="260" y="286" width="82" height="36" rx="5" fill="#c89828" stroke="#886010" stroke-width="2"/>
-<text x="301" y="308" font-size="15" font-weight="500" fill="#1a0800" text-anchor="middle" font-family="sans-serif">MW</text>
-<path d="M146,322 L368,322 L368,336 Q368,340 364,340 L150,340 Q146,340 146,336 Z" fill="#0c0c0c" stroke="#282828" stroke-width="1.5"/>
-<rect x="148" y="224" width="16" height="32" rx="3" fill="#f8f8d0" stroke="#c8a028" stroke-width="1.5"/>
-<rect x="148" y="224" width="16" height="12" rx="2" fill="#ffffc0"/>
-<rect x="148" y="237" width="16" height="10" rx="2" fill="#ffe898"/>
-<rect x="148" y="248" width="16" height="10" rx="2" fill="#ffa080"/>
-<rect x="132" y="148" width="16" height="28" rx="5" fill="#202020" stroke="#161616" stroke-width="1.5"/>
-<rect x="134" y="150" width="12" height="24" rx="3" fill="#78b0d8"/>
-<path d="M148,156 L157,142" stroke="#282828" stroke-width="3" stroke-linecap="round"/>
-<rect x="168" y="330" width="60" height="9" rx="2" fill="#282828"/>
-<rect x="172" y="341" width="54" height="9" rx="2" fill="#202020"/>
-<rect x="148" y="338" width="228" height="11" rx="3" fill="#080808"/>
-<path d="M368,326 L418,326 L418,340 L368,340 Z" fill="#282828"/>
-<path d="M386,313 Q408,308 415,326 L368,326 Q373,309 386,313 Z" fill="#383838"/>
-<!-- ÇEKİCİ LASTİKLER -->
-<circle cx="212" cy="335" r="40" fill="#181818" stroke="#303030" stroke-width="2.5"/>
-<circle cx="212" cy="335" r="28" fill="#141414"/><circle cx="212" cy="335" r="18" fill="#686868"/>
-<circle cx="212" cy="335" r="10" fill="#383838"/><circle cx="212" cy="335" r="4" fill="#a0a0a0"/>
-<circle cx="212" cy="335" r="38" fill="none" stroke="#0c0c0c" stroke-width="5" stroke-dasharray="11,6"/>
-<line x1="212" y1="309" x2="212" y2="361" stroke="#484848" stroke-width="2"/><line x1="186" y1="335" x2="238" y2="335" stroke="#484848" stroke-width="2"/>
-<circle cx="330" cy="335" r="40" fill="#181818" stroke="#303030" stroke-width="2.5"/>
-<circle cx="330" cy="335" r="28" fill="#141414"/><circle cx="330" cy="335" r="18" fill="#686868"/>
-<circle cx="330" cy="335" r="10" fill="#383838"/><circle cx="330" cy="335" r="4" fill="#a0a0a0"/>
-<circle cx="330" cy="335" r="38" fill="none" stroke="#0c0c0c" stroke-width="5" stroke-dasharray="11,6"/>
-<line x1="330" y1="309" x2="330" y2="361" stroke="#484848" stroke-width="2"/><line x1="304" y1="335" x2="356" y2="335" stroke="#484848" stroke-width="2"/>
-<circle cx="364" cy="335" r="40" fill="#0c0c0c" stroke="#202020" stroke-width="2"/>
-<circle cx="364" cy="335" r="28" fill="#101010"/><circle cx="364" cy="335" r="18" fill="#484848"/>
-<circle cx="364" cy="335" r="10" fill="#2c2c2c"/><circle cx="364" cy="335" r="4" fill="#787878"/>
-<!-- DORSE ŞASİ -->
-<rect x="415" y="336" width="960" height="14" rx="4" fill="#181818" stroke="#0c0c0c" stroke-width="1.5"/>
-<!-- DORSE ÇATI -->
-<rect x="413" y="68" width="964" height="13" rx="4" fill="#989490" stroke="#787470" stroke-width="2"/>
-<!-- DORSE GÖVDE -->
-<rect x="417" y="80" width="956" height="258" rx="5" fill="url(#dors_{_sube})" stroke="#686460" stroke-width="3"/>
-<rect x="417" y="80" width="956" height="16" rx="2" fill="#b8b4ac" stroke="#888480" stroke-width="1"/>
-<rect x="417" y="322" width="956" height="16" rx="2" fill="#b8b4ac" stroke="#888480" stroke-width="1"/>
-<!-- DORSE TABAN -->
-<rect x="419" y="328" width="952" height="11" rx="2" fill="#c89030" stroke="#786010" stroke-width="1.5"/>
-<line x1="419" y1="332" x2="1371" y2="332" stroke="#907818" stroke-width="1"/>
-<line x1="419" y1="336" x2="1371" y2="336" stroke="#907818" stroke-width="0.8"/>
-<!-- DORSE ARKA DUVAR -->
-<rect x="1361" y="80" width="18" height="258" rx="3" fill="#787470" stroke="#686460" stroke-width="2.5"/>
-<line x1="1370" y1="80" x2="1370" y2="338" stroke="#585450" stroke-width="2.5" stroke-dasharray="10,7"/>
-<rect x="1363" y="148" width="9" height="6" rx="3" fill="#888480"/>
-<rect x="1363" y="208" width="9" height="6" rx="3" fill="#888480"/>
-<rect x="1363" y="270" width="9" height="6" rx="3" fill="#888480"/>
-<!-- DİKEY BÖLME ÇİZGİLERİ -->
-<line x1="516" y1="94" x2="516" y2="322" stroke="#c0bcb4" stroke-width="1.2"/>
-<line x1="604" y1="94" x2="604" y2="322" stroke="#c0bcb4" stroke-width="1.2"/>
-<line x1="692" y1="94" x2="692" y2="322" stroke="#c0bcb4" stroke-width="1.2"/>
-<line x1="780" y1="94" x2="780" y2="322" stroke="#c0bcb4" stroke-width="1.2"/>
-<line x1="868" y1="94" x2="868" y2="322" stroke="#c0bcb4" stroke-width="1.2"/>
-<line x1="956" y1="94" x2="956" y2="322" stroke="#c0bcb4" stroke-width="1.2"/>
-<line x1="1044" y1="94" x2="1044" y2="322" stroke="#c0bcb4" stroke-width="1.2"/>
-<line x1="1132" y1="94" x2="1132" y2="322" stroke="#c0bcb4" stroke-width="1.2"/>
-<line x1="1220" y1="94" x2="1220" y2="322" stroke="#c0bcb4" stroke-width="1.2"/>
-<line x1="1308" y1="94" x2="1308" y2="322" stroke="#c0bcb4" stroke-width="1.2"/>
-<!-- ORTA KAT AYIRICI -->
-<line x1="419" y1="240" x2="1360" y2="240" stroke="#b0aca4" stroke-width="1.5" stroke-dasharray="12,6"/>
-{_taban_svg}
-{_palet_svg}
-{_koli_svg}
-<!-- DORSE TEKERLERİ 3 AKS -->
-<circle cx="560" cy="335" r="38" fill="#181818" stroke="#303030" stroke-width="2.5"/>
-<circle cx="560" cy="335" r="27" fill="#141414"/><circle cx="560" cy="335" r="17" fill="#686868"/>
-<circle cx="560" cy="335" r="9" fill="#383838"/><circle cx="560" cy="335" r="4" fill="#a0a0a0"/>
-<circle cx="560" cy="335" r="36" fill="none" stroke="#0c0c0c" stroke-width="5" stroke-dasharray="10,6"/>
-<line x1="560" y1="311" x2="560" y2="359" stroke="#484848" stroke-width="2"/><line x1="536" y1="335" x2="584" y2="335" stroke="#484848" stroke-width="2"/>
-<circle cx="596" cy="335" r="38" fill="#0c0c0c" stroke="#202020" stroke-width="2"/>
-<circle cx="596" cy="335" r="27" fill="#101010"/><circle cx="596" cy="335" r="17" fill="#484848"/>
-<circle cx="596" cy="335" r="9" fill="#2c2c2c"/><circle cx="596" cy="335" r="4" fill="#787878"/>
-<circle cx="1000" cy="335" r="38" fill="#181818" stroke="#303030" stroke-width="2.5"/>
-<circle cx="1000" cy="335" r="27" fill="#141414"/><circle cx="1000" cy="335" r="17" fill="#686868"/>
-<circle cx="1000" cy="335" r="9" fill="#383838"/><circle cx="1000" cy="335" r="4" fill="#a0a0a0"/>
-<circle cx="1000" cy="335" r="36" fill="none" stroke="#0c0c0c" stroke-width="5" stroke-dasharray="10,6"/>
-<line x1="1000" y1="311" x2="1000" y2="359" stroke="#484848" stroke-width="2"/><line x1="976" y1="335" x2="1024" y2="335" stroke="#484848" stroke-width="2"/>
-<circle cx="1036" cy="335" r="38" fill="#0c0c0c" stroke="#202020" stroke-width="2"/>
-<circle cx="1036" cy="335" r="27" fill="#101010"/><circle cx="1036" cy="335" r="17" fill="#484848"/>
-<circle cx="1036" cy="335" r="9" fill="#2c2c2c"/><circle cx="1036" cy="335" r="4" fill="#787878"/>
-<circle cx="1280" cy="335" r="38" fill="#181818" stroke="#303030" stroke-width="2.5"/>
-<circle cx="1280" cy="335" r="27" fill="#141414"/><circle cx="1280" cy="335" r="17" fill="#686868"/>
-<circle cx="1280" cy="335" r="9" fill="#383838"/><circle cx="1280" cy="335" r="4" fill="#a0a0a0"/>
-<circle cx="1280" cy="335" r="36" fill="none" stroke="#0c0c0c" stroke-width="5" stroke-dasharray="10,6"/>
-<line x1="1280" y1="311" x2="1280" y2="359" stroke="#484848" stroke-width="2"/><line x1="1256" y1="335" x2="1304" y2="335" stroke="#484848" stroke-width="2"/>
-<circle cx="1316" cy="335" r="38" fill="#0c0c0c" stroke="#202020" stroke-width="2"/>
-<circle cx="1316" cy="335" r="27" fill="#101010"/><circle cx="1316" cy="335" r="17" fill="#484848"/>
-<circle cx="1316" cy="335" r="9" fill="#2c2c2c"/><circle cx="1316" cy="335" r="4" fill="#787878"/>
-<!-- ETİKET -->
-<rect x="419" y="30" width="160" height="26" rx="5" fill="#1050a8" opacity="0.9"/>
-<text x="499" y="47" font-size="13" font-weight="500" fill="#fff" text-anchor="middle" font-family="sans-serif">{_palet_say}/33 palet</text>
-<rect x="589" y="30" width="160" height="26" rx="5" fill="#b05818" opacity="0.9"/>
-<text x="669" y="47" font-size="13" font-weight="500" fill="#fff" text-anchor="middle" font-family="sans-serif">{_koli_say}/500 koli</text>
-<text x="950" y="46" font-size="14" fill="#383430" text-anchor="middle" font-family="sans-serif">İstanbul → {_sube}</text>
+<rect x="4" y="24" width="3" height="22" rx="1.5" fill="#686868"/>
+<path d="M14,36 Q20,14 32,12 L76,12 Q80,12 80,16 L80,36 Z" fill="#1a3c88"/>
+<rect x="14,36" y="0" width="66" height="58" rx="3"/>
+<rect x="14" y="36" width="66" height="58" rx="3" fill="#1a3c88" stroke="#0c1838" stroke-width="1.5"/>
+<path d="M14,50 L80,50 L80,92 Q80,96 76,96 L18,96 Q14,96 14,92 Z" fill="#162e70"/>
+<rect x="16" y="38" width="62" height="28" rx="2" fill="#6a9fcc" stroke="#0c1838" stroke-width="1.5"/>
+<rect x="18" y="40" width="58" height="24" rx="1" fill="#78b0d8"/>
+<line x1="22" y1="41" x2="25" y2="64" stroke="#c0e0f8" stroke-width="2" stroke-linecap="round" opacity="0.5"/>
+<rect x="18" y="68" width="24" height="10" rx="2" fill="#070d1c"/>
+<rect x="44" y="68" width="22" height="10" rx="2" fill="#c89020" stroke="#886010" stroke-width="1"/>
+<text x="55" y="77" font-size="5" font-weight="bold" fill="#1a0800" text-anchor="middle" font-family="sans-serif">MW</text>
+<rect x="14" y="90" width="68" height="5" rx="2" fill="#0c0c0c"/>
+<rect x="16" y="62" width="5" height="9" rx="1" fill="#f8f8d0" stroke="#c8a028" stroke-width="0.8"/>
+<rect x="6" y="44" width="5" height="8" rx="2" fill="#202020"/>
+<rect x="7" y="45" width="3" height="6" rx="1" fill="#78b0d8"/>
+<path d="M82,86 L100,86 L100,92 L82,92 Z" fill="#282828"/>
+<!-- DORSE -->
+<rect x="100" y="22" width="244" height="78" rx="2" fill="#d4d0c8" stroke="#686460" stroke-width="1.5"/>
+<rect x="100" y="22" width="244" height="6" rx="1" fill="#b8b4ac"/>
+<rect x="100" y="94" width="244" height="5" rx="1" fill="#c89030"/>
+<rect x="338" y="22" width="7" height="78" rx="1" fill="#787470" stroke="#686460" stroke-width="1.5"/>
+<line x1="100" y1="60" x2="338" y2="60" stroke="#b0aba0" stroke-width="0.8" stroke-dasharray="6,4"/>
+{_tb_s}
+{_palet_s}
+{_koli_s}
+<!-- TEKLER ÇEKİCİ -->
+<circle cx="28" cy="108" r="11" fill="#181818" stroke="#303030" stroke-width="1.5"/>
+<circle cx="28" cy="108" r="7" fill="#141414"/><circle cx="28" cy="108" r="4" fill="#686868"/>
+<circle cx="28" cy="108" r="2" fill="#a0a0a0"/>
+<circle cx="66" cy="108" r="11" fill="#181818" stroke="#303030" stroke-width="1.5"/>
+<circle cx="66" cy="108" r="7" fill="#141414"/><circle cx="66" cy="108" r="4" fill="#686868"/>
+<circle cx="66" cy="108" r="2" fill="#a0a0a0"/>
+<circle cx="79" cy="108" r="11" fill="#0c0c0c" stroke="#222" stroke-width="1"/>
+<circle cx="79" cy="108" r="7" fill="#101010"/><circle cx="79" cy="108" r="4" fill="#484848"/>
+<!-- TEKLER DORSE -->
+<circle cx="148" cy="108" r="10" fill="#181818" stroke="#282828" stroke-width="1.5"/>
+<circle cx="148" cy="108" r="6" fill="#141414"/><circle cx="148" cy="108" r="3" fill="#686868"/>
+<circle cx="160" cy="108" r="10" fill="#0c0c0c" stroke="#1e1e1e" stroke-width="1"/>
+<circle cx="160" cy="108" r="6" fill="#101010"/><circle cx="160" cy="108" r="3" fill="#484848"/>
+<circle cx="238" cy="108" r="10" fill="#181818" stroke="#282828" stroke-width="1.5"/>
+<circle cx="238" cy="108" r="6" fill="#141414"/><circle cx="238" cy="108" r="3" fill="#686868"/>
+<circle cx="250" cy="108" r="10" fill="#0c0c0c" stroke="#1e1e1e" stroke-width="1"/>
+<circle cx="250" cy="108" r="6" fill="#101010"/><circle cx="250" cy="108" r="3" fill="#484848"/>
+<circle cx="312" cy="108" r="10" fill="#181818" stroke="#282828" stroke-width="1.5"/>
+<circle cx="312" cy="108" r="6" fill="#141414"/><circle cx="312" cy="108" r="3" fill="#686868"/>
+<circle cx="324" cy="108" r="10" fill="#0c0c0c" stroke="#1e1e1e" stroke-width="1"/>
+<circle cx="324" cy="108" r="6" fill="#101010"/><circle cx="324" cy="108" r="3" fill="#484848"/>
 </svg>"""
 
-                st.markdown(f"**{_sube.upper()}** — {_palet_say}/33 palet · {_koli_say}/500 koli" + (" · ⚠️ Taban yük" if _taban_var else ""))
+                _tir_html_all += f"""<div style="min-width:220px;flex:1;background:var(--surface-2,#f5f5f3);border:1px solid #ddd;border-radius:10px;padding:8px;font-family:sans-serif;">
+  <div style="font-size:11px;font-weight:500;color:#333;margin-bottom:4px;">🚛 {_rota_adi}</div>
+  {_svg_small}
+  <div style="display:flex;gap:8px;margin-top:4px;font-size:10px;flex-wrap:wrap;">
+    <span style="background:#1050a8;color:white;padding:2px 6px;border-radius:4px;">{_rd['palet']}/33 palet</span>
+    <span style="background:#b05818;color:white;padding:2px 6px;border-radius:4px;">{_rd['koli']}/500 koli</span>
+    {"<span style='background:#3a4858;color:white;padding:2px 6px;border-radius:4px;'>Taban yük</span>" if _tb else ""}
+  </div>
+  <div style="margin-top:4px;">
+    <div style="height:5px;background:#e0e0e0;border-radius:3px;overflow:hidden;margin-bottom:2px;">
+      <div style="height:100%;width:{_pct_p}%;background:#1050a8;border-radius:3px;"></div>
+    </div>
+    <div style="height:5px;background:#e0e0e0;border-radius:3px;overflow:hidden;">
+      <div style="height:100%;width:{_pct_k}%;background:#b05818;border-radius:3px;"></div>
+    </div>
+  </div>
+</div>"""
 
-                # İnteraktif yükleme simülasyonu
-                _sim_html = f"""
-<div style="font-family:sans-serif;">
-<div style="display:flex;gap:8px;align-items:center;padding:8px 0 6px;flex-wrap:wrap;">
-  <button onclick="setStep_{_sube}(0)" id="b0_{_sube}" style="font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid #aaa;background:#f5f5f5;cursor:pointer;">1. Boş TIR</button>
-  <button onclick="setStep_{_sube}(1)" id="b1_{_sube}" style="font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid #aaa;background:#f5f5f5;cursor:pointer;">2. Taban yük</button>
-  <button onclick="setStep_{_sube}(2)" id="b2_{_sube}" style="font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid #aaa;background:#f5f5f5;cursor:pointer;">3. Paletler</button>
-  <button onclick="setStep_{_sube}(3)" id="b3_{_sube}" style="font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid #aaa;background:#f5f5f5;cursor:pointer;">4. Koli yükleme</button>
-  <button onclick="setStep_{_sube}(4)" id="b4_{_sube}" style="font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid #aaa;background:#f5f5f5;cursor:pointer;">5. Dolu TIR</button>
-  <button onclick="autoPlay_{_sube}()" id="bauto_{_sube}" style="font-size:11px;padding:4px 12px;border-radius:6px;border:1px solid #2a6020;background:#2a6020;color:white;cursor:pointer;">▶ Otomatik</button>
-</div>
-<div id="info_{_sube}" style="font-size:11px;color:#555;padding:2px 0 6px;">Boş TIR hazır bekliyor</div>
-<canvas id="c_{_sube}" width="1400" height="420" style="width:100%;height:auto;display:block;border-radius:8px;"></canvas>
-<div style="display:flex;gap:14px;flex-wrap:wrap;padding:5px 0 0;font-size:11px;color:#444;">
-  <span style="display:flex;align-items:center;gap:4px;"><span style="width:13px;height:13px;border-radius:2px;background:#3a4858;border:1px solid #222;display:inline-block;"></span>Taban yük</span>
-  <span style="display:flex;align-items:center;gap:4px;"><span style="width:13px;height:13px;border-radius:2px;background:#d4a030;border:1px solid #806010;display:inline-block;"></span>Palet</span>
-  <span style="display:flex;align-items:center;gap:4px;"><span style="width:13px;height:13px;border-radius:2px;background:#d09848;border:1px solid #885820;display:inline-block;"></span>Koli</span>
-  <span style="display:flex;align-items:center;gap:4px;"><span style="width:13px;height:13px;border-radius:2px;background:#e0dcd4;border:1px solid #aaa;border-style:dashed;display:inline-block;"></span>Boş yer</span>
-</div>
-</div>
-<script>
-(function(){{
-  const PALET_GERCEK = {_palet_say};
-  const KOLI_GERCEK  = {_koli_say};
-  const TABAN_VAR    = {'true' if _taban_var else 'false'};
-  const SUBE         = "{_sube}";
-  const W=1400, H=420;
-  const FLOOR_Y=342, DORSE_TOP=88, DL=420, DW=958;
-  const TABAN_H=26, PALET_H=88, KOLI_H=58;
-  const PALET_W=84, PALET_MAX=10, KOLI_PER_PALET=2;
-
-  const steps = [
-    {{label:"Boş TIR hazır bekliyor — yükleme başlamadı", taban:false, palets:0, kolis:0}},
-    {{label:"Taban yük yerleştirildi — tüm taban kaplanıyor", taban:TABAN_VAR, palets:0, kolis:0}},
-    {{label:"Paletler taban üstüne yerleştirildi ("+PALET_GERCEK+"/33)", taban:TABAN_VAR, palets:Math.min(PALET_GERCEK,PALET_MAX), kolis:0}},
-    {{label:"Koliler paletlerin üstüne alttan yukarı yükleniyor...", taban:TABAN_VAR, palets:Math.min(PALET_GERCEK,PALET_MAX), kolis:Math.floor(Math.min(KOLI_GERCEK,PALET_MAX*KOLI_PER_PALET)*0.6)}},
-    {{label:"TIR tam yüklü — hazır! "+PALET_GERCEK+" palet · "+KOLI_GERCEK+" koli"+(TABAN_VAR?" · Taban yük":""), taban:TABAN_VAR, palets:Math.min(PALET_GERCEK,PALET_MAX), kolis:Math.min(KOLI_GERCEK,PALET_MAX*KOLI_PER_PALET)}},
-  ];
-
-  let cur=4, autoT=null;
-  const canvas=document.getElementById("c_"+SUBE);
-  const ctx=canvas.getContext("2d");
-
-  function grad(x,y,w,h,c1,c2,horiz){{
-    const g=horiz?ctx.createLinearGradient(x,y,x+w,y):ctx.createLinearGradient(x,y,x,y+h);
-    g.addColorStop(0,c1); g.addColorStop(1,c2); ctx.fillStyle=g;
-    ctx.fillRect(x,y,w,h);
-  }}
-
-  function drawTeker(cx,cy,r,dark){{
-    ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
-    ctx.fillStyle=dark?"#0a0a0a":"#181818"; ctx.fill();
-    ctx.strokeStyle="#303030"; ctx.lineWidth=2.5; ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx,cy,r-11,0,Math.PI*2); ctx.fillStyle=dark?"#101010":"#141414"; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx,cy,r-20,0,Math.PI*2); ctx.fillStyle=dark?"#484848":"#686868"; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx,cy,r-29,0,Math.PI*2); ctx.fillStyle=dark?"#2c2c2c":"#383838"; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx,cy,r-36,0,Math.PI*2); ctx.fillStyle=dark?"#787878":"#a0a0a0"; ctx.fill();
-    ctx.setLineDash([11,6]); ctx.beginPath(); ctx.arc(cx,cy,r-2,0,Math.PI*2);
-    ctx.strokeStyle="rgba(0,0,0,0.6)"; ctx.lineWidth=5; ctx.stroke(); ctx.setLineDash([]);
-    const spokes=[[0,Math.PI],[Math.PI/2,Math.PI*3/2],[Math.PI/4,Math.PI*5/4],[Math.PI*3/4,Math.PI*7/4]];
-    ctx.strokeStyle="rgba(80,80,80,0.6)"; ctx.lineWidth=2;
-    spokes.forEach(([a])=>{{
-      ctx.beginPath(); ctx.moveTo(cx+Math.cos(a)*(r-29),cy+Math.sin(a)*(r-29));
-      ctx.lineTo(cx+Math.cos(a)*(r-12),cy+Math.sin(a)*(r-12)); ctx.stroke();
-    }});
-  }}
-
-  function drawPalet(x,y){{
-    grad(x,y,PALET_W,PALET_H,"#f0cc50","#987010");
-    grad(x,y,PALET_W,13,"#f8e070","#dfc030");
-    grad(x,y+PALET_H-13,PALET_W,13,"#f8e070","#dfc030");
-    ctx.fillStyle="#806010";
-    [x+12,x+PALET_W/2-5,x+PALET_W-22].forEach(bx=>ctx.fillRect(bx,y+13,10,PALET_H-26));
-    ctx.strokeStyle="#604808"; ctx.lineWidth=2; ctx.strokeRect(x,y,PALET_W,PALET_H);
-  }}
-
-  function drawBosPalet(x,y){{
-    ctx.setLineDash([7,4]); ctx.strokeStyle="#b0aca4"; ctx.lineWidth=1.5;
-    ctx.strokeRect(x,y,PALET_W,PALET_H); ctx.setLineDash([]);
-    ctx.fillStyle="rgba(220,216,208,0.3)"; ctx.fillRect(x,y,PALET_W,PALET_H);
-  }}
-
-  function drawKoli(x,y,shade){{
-    const d=shade*12;
-    grad(x,y,38,KOLI_H,`rgb(${{220-d}},${{165-d}},${{90-d}})`,`rgb(${{170-d}},${{115-d}},${{40-d}})`);
-    grad(x,y,38,7,`rgb(${{248-d}},${{210-d}},${{140-d}})`,`rgb(${{210-d}},${{165-d}},${{80-d}})`);
-    ctx.strokeStyle=`rgba(${{110-d}},${{72-d}},${{16-d}},0.7)`; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(x+19,y+7); ctx.lineTo(x+19,y+KOLI_H); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(x,y+KOLI_H*0.42); ctx.lineTo(x+38,y+KOLI_H*0.42); ctx.stroke();
-    ctx.strokeStyle=`rgba(${{140-d}},${{72-d}},${{10-d}},0.8)`; ctx.lineWidth=1.8;
-    ctx.beginPath(); ctx.moveTo(x,y+KOLI_H*0.28); ctx.lineTo(x+38,y+KOLI_H*0.28); ctx.stroke();
-    ctx.strokeStyle=`rgba(${{100-d}},${{65-d}},${{16-d}},0.9)`; ctx.lineWidth=1.5; ctx.strokeRect(x,y,38,KOLI_H);
-  }}
-
-  function draw(){{
-    const step=steps[cur];
-    ctx.clearRect(0,0,W,H);
-
-    // GÖKYÜZÜ
-    grad(0,0,W,345,"#7ab8e8","#e8f2f8");
-    // Güneş
-    ctx.beginPath(); ctx.arc(1320,52,30,0,Math.PI*2); ctx.fillStyle="rgba(252,235,80,0.5)"; ctx.fill();
-    ctx.beginPath(); ctx.arc(1320,52,22,0,Math.PI*2); ctx.fillStyle="rgba(255,248,140,0.4)"; ctx.fill();
-    // Bulutlar
-    [[280,42,62,20],[335,33,42,15],[228,38,36,12],[720,56,50,15],[768,48,32,12]].forEach(([x,y,rx,ry])=>{{
-      ctx.beginPath(); ctx.ellipse(x,y,rx,ry,0,0,Math.PI*2); ctx.fillStyle="rgba(255,255,255,0.75)"; ctx.fill();
-    }});
-
-    // ZEMİN
-    grad(0,345,W,H-345,"#525050","#363432");
-    ctx.fillStyle="#454240"; ctx.fillRect(0,345,W,4);
-    [[50,285],[280,285],[510,285],[740,285],[970,285],[1200,285],[1430,90]].forEach(([x,w])=>{{
-      ctx.beginPath(); ctx.roundRect(x,360,Math.min(w,130),7,3.5); ctx.fillStyle="rgba(230,210,48,0.6)"; ctx.fill();
-    }});
-    ctx.beginPath(); ctx.ellipse(820,348,680,7,0,0,Math.PI*2); ctx.fillStyle="rgba(0,0,0,0.18)"; ctx.fill();
-
-    // ÇEKİCİ — EGZOZ
-    grad(198,16,12,88,"#686868","#505050"); grad(213,20,10,84,"#585858","#484848");
-    ctx.beginPath(); ctx.ellipse(204,16,7,4,0,0,Math.PI*2); ctx.fillStyle="#282828"; ctx.fill();
-
-    // DEFLEKTöR
-    ctx.beginPath(); ctx.moveTo(158,112); ctx.quadraticCurveTo(196,46,250,38); ctx.lineTo(360,38);
-    ctx.quadraticCurveTo(368,38,368,50); ctx.lineTo(368,112); ctx.closePath();
-    grad(158,38,210,74,"#2868d0","#183070",true);
-    ctx.strokeStyle="#0c1a40"; ctx.lineWidth=2; ctx.stroke();
-    ctx.fillStyle="rgba(80,140,210,0.6)"; ctx.font="bold 12px sans-serif"; ctx.textAlign="center";
-    ctx.fillText("MW KARGO",258,86);
-
-    // KABİN
-    const cabg=ctx.createLinearGradient(162,120,370,335);
-    cabg.addColorStop(0,"#0e2248"); cabg.addColorStop(0.5,"#1a3c88"); cabg.addColorStop(1,"#1e4898");
-    ctx.fillStyle=cabg; ctx.beginPath(); ctx.roundRect(162,120,208,218,6); ctx.fill();
-    ctx.strokeStyle="#0c1838"; ctx.lineWidth=2.5; ctx.stroke();
-    // Kabin ön
-    ctx.beginPath(); ctx.moveTo(155,168); ctx.lineTo(162,122); ctx.lineTo(162,340); ctx.lineTo(146,330); ctx.lineTo(146,180); ctx.closePath();
-    ctx.fillStyle="#0a1a3a"; ctx.fill(); ctx.strokeStyle="#080e20"; ctx.lineWidth=1.5; ctx.stroke();
-
-    // ÖN CAM
-    const glg=ctx.createLinearGradient(166,128,362,228);
-    glg.addColorStop(0,"#a8d0f0"); glg.addColorStop(0.5,"#70a8d8"); glg.addColorStop(1,"#4888c0");
-    ctx.fillStyle=glg; ctx.beginPath(); ctx.roundRect(166,128,196,100,5); ctx.fill();
-    ctx.strokeStyle="#0c1838"; ctx.lineWidth=2.5; ctx.stroke();
-    ctx.fillStyle="#78b0d8"; ctx.beginPath(); ctx.roundRect(173,135,182,93,3); ctx.fill();
-    [[185,137,196,226],[210,136,218,226],[232,135,238,226]].forEach(([x1,y1,x2,y2])=>{{
-      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
-      ctx.strokeStyle="rgba(210,238,255,0.42)"; ctx.lineWidth=4; ctx.stroke();
-    }});
-    ctx.strokeStyle="#0a1428"; ctx.lineWidth=2.5;
-    ctx.beginPath(); ctx.moveTo(210,226); ctx.lineTo(318,177); ctx.stroke();
-
-    // KAPI ALT
-    ctx.fillStyle="#162e70"; ctx.beginPath(); ctx.roundRect(166,228,204,112,3); ctx.fill();
-    ctx.strokeStyle="#0c1838"; ctx.lineWidth=2; ctx.stroke();
-    ctx.strokeStyle="#0c1838"; ctx.lineWidth=2.5;
-    ctx.beginPath(); ctx.moveTo(272,232); ctx.lineTo(272,338); ctx.stroke();
-    ctx.beginPath(); ctx.roundRect(264,288,26,10,5); ctx.fillStyle="#d0a828"; ctx.fill();
-    ctx.beginPath(); ctx.roundRect(282,240,70,46,5); ctx.fillStyle="#70a8d8"; ctx.fill(); ctx.strokeStyle="#0c1838"; ctx.lineWidth=2; ctx.stroke();
-
-    // PANJUR
-    ctx.beginPath(); ctx.roundRect(170,298,90,40,3); ctx.fillStyle="#070d1c"; ctx.fill();
-    ctx.strokeStyle="#0c1838"; ctx.lineWidth=1.5; ctx.stroke();
-    [306,316,326,336].forEach(ly=>{{ ctx.beginPath(); ctx.moveTo(170,ly); ctx.lineTo(260,ly); ctx.strokeStyle="#1c3878"; ctx.lineWidth=1.2; ctx.stroke(); }});
-
-    // MW PLAKA
-    const mwg=ctx.createLinearGradient(268,298,356,338);
-    mwg.addColorStop(0,"#d8aa30"); mwg.addColorStop(1,"#c89020");
-    ctx.fillStyle=mwg; ctx.beginPath(); ctx.roundRect(268,298,86,38,5); ctx.fill();
-    ctx.strokeStyle="#886010"; ctx.lineWidth=2; ctx.stroke();
-    ctx.fillStyle="#1a0800"; ctx.font="bold 17px sans-serif"; ctx.textAlign="center";
-    ctx.fillText("MW",311,321);
-
-    // TAMPON
-    ctx.fillStyle="#0c0c0c"; ctx.beginPath(); ctx.roundRect(148,336,226,16,4); ctx.fill();
-    // FAR
-    ctx.fillStyle="#f8f8d0"; ctx.beginPath(); ctx.roundRect(148,228,16,34,3); ctx.fill(); ctx.strokeStyle="#c8a028"; ctx.lineWidth=1.5; ctx.stroke();
-    ctx.fillStyle="#ffffc0"; ctx.fillRect(148,228,16,13);
-    ctx.fillStyle="#ffe898"; ctx.fillRect(148,242,16,11);
-    ctx.fillStyle="#ffa080"; ctx.fillRect(148,254,16,10);
-    // AYNA
-    ctx.fillStyle="#202020"; ctx.beginPath(); ctx.roundRect(132,152,16,30,5); ctx.fill();
-    ctx.fillStyle="#78b0d8"; ctx.beginPath(); ctx.roundRect(134,154,12,26,3); ctx.fill();
-    ctx.strokeStyle="#282828"; ctx.lineWidth=3;
-    ctx.beginPath(); ctx.moveTo(148,160); ctx.lineTo(158,146); ctx.stroke();
-    // BASAMAK
-    [344,356].forEach(y=>{{ ctx.fillStyle="#282828"; ctx.beginPath(); ctx.roundRect(168,y,62,9,2); ctx.fill(); }});
-    ctx.fillStyle="#080808"; ctx.beginPath(); ctx.roundRect(148,352,242,11,3); ctx.fill();
-    // 5. TEKER
-    ctx.fillStyle="#282828"; ctx.fillRect(368,336,52,16);
-    ctx.beginPath(); ctx.moveTo(386,322); ctx.quadraticCurveTo(412,316,418,336); ctx.lineTo(368,336); ctx.quadraticCurveTo(374,318,386,322); ctx.closePath();
-    ctx.fillStyle="#383838"; ctx.fill();
-
-    // ÇEKİCİ TEKERLERİ
-    drawTeker(212,348,42,false); drawTeker(336,348,42,false); drawTeker(372,348,42,true);
-
-    // DORSE ŞASİ
-    grad(DL,348,DW,15,"#282828","#101010");
-    ctx.strokeStyle="#0c0c0c"; ctx.lineWidth=1.5; ctx.strokeRect(DL,348,DW,15);
-
-    // DORSE ÇATI HAVALIKI
-    grad(DL-2,DORSE_TOP-14,DW+4,10,"#989490","#a8a49c");
-    // DORSE ÇATI
-    grad(DL-2,DORSE_TOP-4,DW+4,12,"#808078","#a8a49c");
-    ctx.strokeStyle="#787470"; ctx.lineWidth=2; ctx.strokeRect(DL-2,DORSE_TOP-4,DW+4,12);
-    // Çatı havalık
-    ctx.fillStyle="rgba(80,78,72,0.45)";
-    for(let i=0;i<9;i++){{ ctx.beginPath(); ctx.roundRect(DL+70+i*106,DORSE_TOP-13,28,5,2.5); ctx.fill(); }}
-
-    // DORSE GÖVDE
-    const pg=ctx.createLinearGradient(DL,DORSE_TOP+8,DL,FLOOR_Y-14);
-    pg.addColorStop(0,"#a0a098"); pg.addColorStop(0.12,"#d8d4cc"); pg.addColorStop(0.88,"#ccc8c0"); pg.addColorStop(1,"#989490");
-    ctx.fillStyle=pg; ctx.beginPath(); ctx.roundRect(DL,DORSE_TOP+8,DW,FLOOR_Y-DORSE_TOP-22,4); ctx.fill();
-    ctx.strokeStyle="#686460"; ctx.lineWidth=3; ctx.stroke();
-    ctx.fillStyle="#b8b4ac"; ctx.beginPath(); ctx.roundRect(DL,DORSE_TOP+8,DW,16,2); ctx.fill();
-    ctx.strokeStyle="#888480"; ctx.lineWidth=1; ctx.stroke();
-    ctx.fillStyle="#b8b4ac"; ctx.beginPath(); ctx.roundRect(DL,FLOOR_Y-28,DW,16,2); ctx.fill(); ctx.stroke();
-
-    // DORSE TABAN
-    grad(DL,FLOOR_Y-14,DW,12,"#c89030","#906010");
-    ctx.strokeStyle="#786010"; ctx.lineWidth=1.5; ctx.strokeRect(DL,FLOOR_Y-14,DW,12);
-    [DL+80,DL+180,DL+280,DL+380,DL+480,DL+580,DL+680,DL+780,DL+880].forEach(x=>{{
-      ctx.strokeStyle="#786010"; ctx.lineWidth=1.2;
-      ctx.beginPath(); ctx.moveTo(x,FLOOR_Y-14); ctx.lineTo(x,FLOOR_Y-2); ctx.stroke();
-    }});
-
-    // ARKA DUVAR
-    ctx.fillStyle="#787470"; ctx.beginPath(); ctx.roundRect(DL+DW-4,DORSE_TOP+8,22,FLOOR_Y-DORSE_TOP-22,3); ctx.fill();
-    ctx.strokeStyle="#686460"; ctx.lineWidth=2; ctx.stroke();
-    ctx.setLineDash([10,7]); ctx.strokeStyle="#585450"; ctx.lineWidth=2.5;
-    ctx.beginPath(); ctx.moveTo(DL+DW+8,DORSE_TOP+8); ctx.lineTo(DL+DW+8,FLOOR_Y-14); ctx.stroke(); ctx.setLineDash([]);
-    [150,212,275].forEach(dy=>{{ ctx.fillStyle="#888480"; ctx.beginPath(); ctx.roundRect(DL+DW-2,DORSE_TOP+dy,10,7,3.5); ctx.fill(); }});
-
-    // DİKEY ŞASİ ÇİZGİLERİ
-    ctx.strokeStyle="#c0bcb4"; ctx.lineWidth=1.2;
-    for(let i=1;i<9;i++){{ const x=DL+i*(DW/9); ctx.beginPath(); ctx.moveTo(x,DORSE_TOP+24); ctx.lineTo(x,FLOOR_Y-26); ctx.stroke(); }}
-    // PERÇİN
-    ctx.fillStyle="#787470";
-    [DL+35,DL+150,DL+270,DL+390,DL+510,DL+630,DL+750,DL+870,DL+940].forEach(px=>{{
-      ctx.beginPath(); ctx.arc(px,DORSE_TOP+12,3,0,Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc(px,FLOOR_Y-20,3,0,Math.PI*2); ctx.fill();
-    }});
-
-    // TABAN YÜK
-    if(step.taban){{
-      grad(DL+8,FLOOR_Y-14-TABAN_H,DW-20,TABAN_H,"#4a5868","#2a3848");
-      ctx.strokeStyle="#1a2838"; ctx.lineWidth=1.5; ctx.strokeRect(DL+8,FLOOR_Y-14-TABAN_H,DW-20,TABAN_H);
-      ctx.strokeStyle="rgba(160,190,210,0.25)"; ctx.lineWidth=1;
-      for(let i=0;i<5;i++){{ ctx.beginPath(); ctx.moveTo(DL+10,FLOOR_Y-14-TABAN_H+4+i*5); ctx.lineTo(DL+DW-14,FLOOR_Y-14-TABAN_H+4+i*5); ctx.stroke(); }}
-      ctx.fillStyle="rgba(180,200,220,0.55)"; ctx.font="bold 11px sans-serif"; ctx.textAlign="center";
-      ctx.fillText("TABAN YÜK",DL+DW/2,FLOOR_Y-14-TABAN_H/2+4);
-    }}
-
-    // PALET TABANI Y
-    const tabanEkle = step.taban ? TABAN_H : 0;
-    const paletBaseY = FLOOR_Y - 14 - tabanEkle - PALET_H;
-
-    // PALETLER
-    if(step.palets>0){{
-      for(let i=0;i<PALET_MAX;i++){{
-        const px=DL+8+i*(PALET_W+2);
-        if(i<step.palets) drawPalet(px,paletBaseY);
-        else drawBosPalet(px,paletBaseY);
-      }}
-    }}
-
-    // KOLİLER — palet üstünden alttan yukarı
-    if(step.kolis>0 && step.palets>0){{
-      let sayac=0;
-      let sira=0;
-      while(sayac<step.kolis){{
-        for(let i=0;i<PALET_MAX;i++){{
-          const px=DL+8+i*(PALET_W+2);
-          for(let k=0;k<KOLI_PER_PALET;k++){{
-            if(sayac>=step.kolis) break;
-            const kx=px+k*40+2;
-            const ky=paletBaseY-KOLI_H-sira*(KOLI_H+1);
-            if(ky<DORSE_TOP+24) break;
-            drawKoli(kx,ky,sira);
-            sayac++;
-          }}
-          if(sayac>=step.kolis) break;
-        }}
-        sira++;
-        if(sira>8) break;
-      }}
-    }}
-
-    // DORSE TEKERLERİ
-    drawTeker(DL+155,348,40,false); drawTeker(DL+193,348,40,true);
-    drawTeker(DL+490,348,40,false); drawTeker(DL+528,348,40,true);
-    drawTeker(DL+790,348,40,false); drawTeker(DL+828,348,40,true);
-
-    // ETİKETLER
-    ctx.fillStyle="rgba(16,70,160,0.9)"; ctx.beginPath(); ctx.roundRect(DL,34,168,26,5); ctx.fill();
-    ctx.fillStyle="#fff"; ctx.font="bold 13px sans-serif"; ctx.textAlign="center";
-    ctx.fillText(PALET_GERCEK+"/33 palet",DL+84,51);
-    ctx.fillStyle="rgba(170,78,18,0.9)"; ctx.beginPath(); ctx.roundRect(DL+178,34,168,26,5); ctx.fill();
-    ctx.fillStyle="#fff"; ctx.fillText(KOLI_GERCEK+"/500 koli",DL+262,51);
-    ctx.fillStyle="rgba(30,30,30,0.65)"; ctx.beginPath(); ctx.roundRect(DL+356,34,350,26,5); ctx.fill();
-    ctx.fillStyle="#eee"; ctx.font="13px sans-serif";
-    ctx.fillText("İstanbul → "+SUBE,DL+531,51);
-  }}
-
-  function setStep_{_sube}(s){{
-    cur=s;
-    document.querySelectorAll("[id^='b'][id$='_{_sube}']").forEach((b,i)=>{{
-      b.style.background=i===s?"#1a4090":"#f5f5f5";
-      b.style.color=i===s?"white":"black";
-      b.style.borderColor=i===s?"#1a4090":"#aaa";
-    }});
-    document.getElementById("info_"+SUBE).textContent=steps[s].label;
-    draw();
-  }}
-
-  function autoPlay_{_sube}(){{
-    const btn=document.getElementById("bauto_"+SUBE);
-    if(autoT){{clearInterval(autoT);autoT=null;btn.textContent="▶ Otomatik";return;}}
-    btn.textContent="■ Dur";
-    cur=0; setStep_{_sube}(0);
-    autoT=setInterval(()=>{{
-      if(cur>=4){{clearInterval(autoT);autoT=null;btn.textContent="▶ Otomatik";return;}}
-      setStep_{_sube}(++cur);
-    }},1800);
-  }}
-
-  setStep_{_sube}(4);
-}})();
-</script>"""
-
-                st.components.v1.html(_sim_html, height=480, scrolling=False)
-                st.markdown("---")
+            _final_html = f"""<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-start;">{_tir_html_all}</div>"""
+            st.markdown(_final_html, unsafe_allow_html=True)
 
     # ── SUPABASE SQL ───────────────────────────────────────────────────────
 
