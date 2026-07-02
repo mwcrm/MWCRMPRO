@@ -1688,6 +1688,13 @@ button[data-testid="manage-app-button"] { display: none !important; }
     _gizli_menu_render = st.session_state.get("_gizli_menu_list", [])
     _sb_liste = [t for t in _sb_liste if t not in _gizli_menu_render]
 
+    # Yetki bazlı menü gizleme — admin olmayan kullanıcılardan bazı menüler gizlenir
+    _menu_rol = st.session_state.get("rol", "")
+    # Sadece admin görebilecek menüler
+    _sadece_admin_menuler = ["kisiler"]
+    if _menu_rol != "admin":
+        _sb_liste = [t for t in _sb_liste if t not in _sadece_admin_menuler]
+
     # ── MOBİL MOD BUTONU ──────────────────────────────────────────────────────
     _mobil_aktif = st.session_state.get("_mobil_mod", False)
     if st.button(
@@ -6661,6 +6668,12 @@ elif aktif == "whatsapp":
 # ── TELEFON KİŞİLER ──────────────────────────────────────────────────────────
 elif aktif == "kisiler":
     sayfa_log("kisiler")
+
+    # Yetki kontrolü — sadece admin görebilir
+    if st.session_state.get("rol", "") != "admin":
+        st.warning("⛔ Bu sayfaya erişim yetkiniz yok.")
+        st.stop()
+
     import re as _re_kis
     st.markdown("## 📞 Telefon Kişiler & Rehber")
 
