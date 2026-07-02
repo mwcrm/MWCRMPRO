@@ -9699,144 +9699,88 @@ elif aktif == "operasyon":
             K = min(koli, 22)
             pp = min(int(palet/33*100),100)
             pk = min(int(koli/500*100),100)
+            badge_p = f'<span style="background:#1050a8;color:#d0e0ff;padding:1px 7px;border-radius:3px;font-size:10px;font-family:sans-serif;">{palet}/33 palet</span>'
+            badge_k = f'<span style="background:#7a3808;color:#ffe0c0;padding:1px 7px;border-radius:3px;font-size:10px;font-family:sans-serif;">{koli}/500 koli</span>'
+            badge_t = '<span style="background:#2a3848;color:#b0c8e0;padding:1px 7px;border-radius:3px;font-size:10px;font-family:sans-serif;">Taban</span>' if taban else ""
 
-            # SVG viewBox: 300 x 90
-            # Dorse iç alan: x=74..291, y=28..62  (h=34)
-            # Taban yük: y=55..62 (h=7) — en altta
-            # Palet: y=42..55 (h=13) — taban üstünde
-            # Koli: y=31..42 (h=11) — palet üstünde
+            # TABAN YUK
+            tb = '<rect x="73" y="58" width="216" height="5" fill="#2a3848"/>' if taban else ""
 
-            DORSE_X = 74
-            DORSE_W = 217
-            DORSE_Y = 28
-            DORSE_H = 34
-
-            # Taban yük
-            tbs = ""
-            if taban:
-                tbs = f'<rect x="{DORSE_X+1}" y="56" width="{DORSE_W-2}" height="6" fill="#2a3848"/><text x="{DORSE_X+DORSE_W//2}" y="61" font-size="4" fill="#80a0c0" text-anchor="middle" font-family="sans-serif">TABAN</text>'
-
-            # Palet elemanları — 11 slot, her biri 19px genişlik
-            PAL_Y = 42
-            PAL_H = 14
-            PAL_W = 18
-            PAL_GAP = 1
+            # PALETLER — y=49..63, 11 slot, pitch=20
             ps = ""
             for i in range(11):
-                x = DORSE_X + 2 + i*(PAL_W+PAL_GAP)
-                if x + PAL_W > DORSE_X + DORSE_W - 2:
-                    break
+                x = 73 + i*20
                 if i < P:
-                    ps += f'<rect x="{x}" y="{PAL_Y}" width="{PAL_W}" height="{PAL_H}" fill="#c8a028"/><rect x="{x}" y="{PAL_Y}" width="{PAL_W}" height="3" fill="#f0d050"/><rect x="{x}" y="{PAL_Y+PAL_H-3}" width="{PAL_W}" height="3" fill="#f0d050"/><rect x="{x+3}" y="{PAL_Y+3}" width="3" height="{PAL_H-6}" fill="#7a5810"/><rect x="{x+8}" y="{PAL_Y+3}" width="3" height="{PAL_H-6}" fill="#7a5810"/><rect x="{x+13}" y="{PAL_Y+3}" width="3" height="{PAL_H-6}" fill="#7a5810"/>'
+                    ps += f'<rect x="{x}" y="49" width="18" height="14" fill="#c8a028"/><rect x="{x}" y="49" width="18" height="3" fill="#f0d050"/><rect x="{x}" y="60" width="18" height="3" fill="#f0d050"/><rect x="{x+3}" y="52" width="3" height="7" fill="#7a5810"/><rect x="{x+8}" y="52" width="3" height="7" fill="#7a5810"/><rect x="{x+13}" y="52" width="3" height="7" fill="#7a5810"/>'
                 else:
-                    ps += f'<rect x="{x}" y="{PAL_Y}" width="{PAL_W}" height="{PAL_H}" fill="rgba(160,156,148,0.2)" stroke="#a0a098" stroke-width="0.5" stroke-dasharray="3,2"/>'
+                    ps += f'<rect x="{x}" y="49" width="18" height="14" fill="none" stroke="#a8a49c" stroke-width="0.6" stroke-dasharray="3,2"/>'
 
-            # Koli elemanları — palet başına 2 koli
-            KOLI_Y = 31
-            KOLI_H = 11
-            KOLI_W = 9
+            # KOLİLER — y=37..49, palet basina 2 koli, pitch=10
             ks = ""
             ki = 0
             for i in range(11):
-                x = DORSE_X + 2 + i*(PAL_W+PAL_GAP)
-                if x + PAL_W > DORSE_X + DORSE_W - 2:
-                    break
+                x = 73 + i*20
                 for j in range(2):
-                    kx = x + j*9
+                    kx = x + j*10
                     if ki < K:
-                        ks += f'<rect x="{kx}" y="{KOLI_Y}" width="{KOLI_W}" height="{KOLI_H}" fill="#d09848"/><rect x="{kx}" y="{KOLI_Y}" width="{KOLI_W}" height="2" fill="#f0c060"/><line x1="{kx+4}" y1="{KOLI_Y+2}" x2="{kx+4}" y2="{KOLI_Y+KOLI_H}" stroke="#906020" stroke-width="0.5"/>'
+                        ks += f'<rect x="{kx}" y="37" width="9" height="12" fill="#d09848"/><rect x="{kx}" y="37" width="9" height="2" fill="#f0c060"/>'
                     ki += 1
 
-            badge_p = f'<span style="background:#1050a8;color:#d0e0ff;padding:1px 6px;border-radius:3px;font-size:10px;font-family:sans-serif;">{palet}/33 palet</span>'
-            badge_k = f'<span style="background:#7a3808;color:#ffe0c0;padding:1px 6px;border-radius:3px;font-size:10px;font-family:sans-serif;">{koli}/500 koli</span>'
-            badge_t = '<span style="background:#2a3848;color:#b0c8e0;padding:1px 6px;border-radius:3px;font-size:10px;font-family:sans-serif;">Taban</span>' if taban else ""
-
-            # SVG — katman sırası: zemin → dorse dolgu → YÜKLER → dorse çerçeve → teker/kabin
-            svg = f"""<svg viewBox="0 0 300 90" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
-<rect x="0" y="0" width="300" height="68" fill="#a8c8e8"/>
-<ellipse cx="255" cy="11" rx="18" ry="6" fill="white" opacity="0.6"/>
-<ellipse cx="38" cy="15" rx="13" ry="5" fill="white" opacity="0.55"/>
-<rect x="0" y="68" width="300" height="22" fill="#383634"/>
-<rect x="0" y="68" width="300" height="2" fill="#4c4a48"/>
-<rect x="8" y="74" width="16" height="2" rx="1" fill="#c8b820" opacity="0.7"/>
-<rect x="44" y="74" width="16" height="2" rx="1" fill="#c8b820" opacity="0.7"/>
-<rect x="80" y="74" width="16" height="2" rx="1" fill="#c8b820" opacity="0.7"/>
-<rect x="116" y="74" width="16" height="2" rx="1" fill="#c8b820" opacity="0.7"/>
-<rect x="152" y="74" width="16" height="2" rx="1" fill="#c8b820" opacity="0.7"/>
-<rect x="188" y="74" width="16" height="2" rx="1" fill="#c8b820" opacity="0.7"/>
-<rect x="224" y="74" width="16" height="2" rx="1" fill="#c8b820" opacity="0.7"/>
-<rect x="260" y="74" width="16" height="2" rx="1" fill="#c8b820" opacity="0.7"/>
-<ellipse cx="165" cy="70" rx="138" ry="3" fill="rgba(0,0,0,0.1)"/>
-<rect x="2" y="15" width="2" height="14" rx="1" fill="#585858"/>
-<ellipse cx="3" cy="15" rx="1.5" ry="1" fill="#202020"/>
-<path d="M9,25 Q12,9 18,7 L48,7 Q51,7 51,11 L51,25 Z" fill="#183878" stroke="#0c1838" stroke-width="0.8"/>
-<rect x="9" y="25" width="42" height="35" rx="2" fill="#183878" stroke="#0c1838" stroke-width="1"/>
-<path d="M9,34 L51,34 L51,59 Q51,61 49,61 L11,61 Q9,61 9,59 Z" fill="#112868"/>
-<rect x="10" y="27" width="39" height="17" rx="1" fill="#5080b8" stroke="#0c1838" stroke-width="0.8"/>
-<rect x="11" y="28" width="37" height="15" rx="1" fill="#6090c8"/>
-<line x1="13" y1="29" x2="15" y2="43" stroke="#a0c8e8" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
-<line x1="33" y1="42" x2="45" y2="35" stroke="#081020" stroke-width="0.8" stroke-linecap="round"/>
-<rect x="10" y="47" width="17" height="6" rx="1" fill="#040810"/>
-<rect x="29" y="47" width="19" height="6" rx="2" fill="#a88018"/>
-<text x="38" y="52" font-size="4" font-weight="bold" fill="#100800" text-anchor="middle" font-family="sans-serif">MW</text>
-<rect x="9" y="57" width="44" height="3" rx="1" fill="#060808"/>
-<rect x="3" y="42" width="4" height="6" rx="1" fill="#f0f0c0" stroke="#a88018" stroke-width="0.5"/>
-<rect x="3" y="47" width="4" height="3" rx="1" fill="#f08080"/>
-<rect x="3" y="34" width="3" height="6" rx="1" fill="#181818"/>
-<rect x="59" y="56" width="8" height="3" rx="1" fill="#282828"/>
-<path d="M61,53 Q65,51 67,56 L59,56 Q60,52 61,53 Z" fill="#383838"/>
-<rect x="9" y="57" width="42" height="2" rx="1" fill="#060808"/>
-<circle cx="16" cy="72" r="7" fill="#121212" stroke="#282828" stroke-width="0.8"/>
-<circle cx="16" cy="72" r="4" fill="#101010"/>
-<circle cx="16" cy="72" r="2.2" fill="#505050"/>
-<circle cx="16" cy="72" r="0.9" fill="#888888"/>
-<circle cx="16" cy="72" r="6.5" fill="none" stroke="#080808" stroke-width="1.5" stroke-dasharray="3,2.5"/>
-<line x1="16" y1="65" x2="16" y2="79" stroke="#303030" stroke-width="0.8"/>
-<line x1="9" y1="72" x2="23" y2="72" stroke="#303030" stroke-width="0.8"/>
-<circle cx="36" cy="72" r="7" fill="#121212" stroke="#282828" stroke-width="0.8"/>
-<circle cx="36" cy="72" r="4" fill="#101010"/>
-<circle cx="36" cy="72" r="2.2" fill="#505050"/>
-<circle cx="36" cy="72" r="0.9" fill="#888888"/>
-<circle cx="36" cy="72" r="6.5" fill="none" stroke="#080808" stroke-width="1.5" stroke-dasharray="3,2.5"/>
-<line x1="36" y1="65" x2="36" y2="79" stroke="#303030" stroke-width="0.8"/>
-<line x1="29" y1="72" x2="43" y2="72" stroke="#303030" stroke-width="0.8"/>
-<circle cx="45" cy="72" r="7" fill="#0a0a0a" stroke="#181818" stroke-width="0.6"/>
-<circle cx="45" cy="72" r="4" fill="#0e0e0e"/>
-<circle cx="45" cy="72" r="2.2" fill="#404040"/>
-<rect x="68" y="58" width="224" height="4" rx="1" fill="#101010"/>
-<rect x="69" y="16" width="224" height="3" rx="1" fill="#888480"/>
-<rect x="69" y="18" width="224" height="4" rx="1" fill="#989490"/>
-<rect x="{DORSE_X}" y="{DORSE_Y}" width="{DORSE_W}" height="{DORSE_H}" fill="#ccc8c0"/>
-{tbs}
-{ps}
-{ks}
-<rect x="{DORSE_X}" y="{DORSE_Y}" width="{DORSE_W}" height="{DORSE_H}" fill="none" stroke="#787470" stroke-width="1.2"/>
-<rect x="{DORSE_X}" y="{DORSE_Y}" width="{DORSE_W}" height="4" fill="#a8a49c"/>
-<rect x="{DORSE_X}" y="{DORSE_Y+DORSE_H-4}" width="{DORSE_W}" height="4" fill="#a8a49c"/>
-<rect x="{DORSE_X}" y="62" width="{DORSE_W}" height="3" fill="#b08820"/>
-<rect x="{DORSE_X+DORSE_W-5}" y="{DORSE_Y}" width="5" height="{DORSE_H}" fill="#686460"/>
-<line x1="{DORSE_X+DORSE_W-3}" y1="{DORSE_Y}" x2="{DORSE_X+DORSE_W-3}" y2="{DORSE_Y+DORSE_H}" stroke="#484440" stroke-width="1" stroke-dasharray="4,3"/>
-<line x1="{DORSE_X}" y1="{DORSE_Y+DORSE_H//2}" x2="{DORSE_X+DORSE_W-5}" y2="{DORSE_Y+DORSE_H//2}" stroke="#a8a49c" stroke-width="0.5" stroke-dasharray="5,4"/>
-<circle cx="112" cy="72" r="6.5" fill="#121212" stroke="#222" stroke-width="0.8"/>
-<circle cx="112" cy="72" r="3.8" fill="#101010"/><circle cx="112" cy="72" r="2" fill="#505050"/>
-<circle cx="120" cy="72" r="6.5" fill="#0a0a0a" stroke="#181818" stroke-width="0.6"/>
-<circle cx="120" cy="72" r="3.8" fill="#0e0e0e"/><circle cx="120" cy="72" r="2" fill="#404040"/>
-<circle cx="176" cy="72" r="6.5" fill="#121212" stroke="#222" stroke-width="0.8"/>
-<circle cx="176" cy="72" r="3.8" fill="#101010"/><circle cx="176" cy="72" r="2" fill="#505050"/>
-<line x1="176" y1="65" x2="176" y2="79" stroke="#303030" stroke-width="0.8"/>
-<line x1="169" y1="72" x2="183" y2="72" stroke="#303030" stroke-width="0.8"/>
-<circle cx="184" cy="72" r="6.5" fill="#0a0a0a" stroke="#181818" stroke-width="0.6"/>
-<circle cx="184" cy="72" r="3.8" fill="#0e0e0e"/><circle cx="184" cy="72" r="2" fill="#404040"/>
-<circle cx="240" cy="72" r="6.5" fill="#121212" stroke="#222" stroke-width="0.8"/>
-<circle cx="240" cy="72" r="3.8" fill="#101010"/><circle cx="240" cy="72" r="2" fill="#505050"/>
-<line x1="240" y1="65" x2="240" y2="79" stroke="#303030" stroke-width="0.8"/>
-<line x1="233" y1="72" x2="247" y2="72" stroke="#303030" stroke-width="0.8"/>
-<circle cx="248" cy="72" r="6.5" fill="#0a0a0a" stroke="#181818" stroke-width="0.6"/>
-<circle cx="248" cy="72" r="3.8" fill="#0e0e0e"/><circle cx="248" cy="72" r="2" fill="#404040"/>
-</svg>"""
             return f"""<div style="flex:1;min-width:200px;max-width:320px;border:0.5px solid var(--border);border-radius:10px;padding:8px;background:var(--surface-1);">
 <div style="font-size:11px;font-weight:500;color:var(--text-primary);margin-bottom:5px;font-family:sans-serif;">🚛 {label}</div>
-{svg}
+<svg viewBox="0 0 300 95" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;display:block;">
+<rect x="0" y="0" width="300" height="72" fill="#a8c8e8"/>
+<ellipse cx="255" cy="10" rx="18" ry="6" fill="white" opacity="0.6"/>
+<ellipse cx="38" cy="15" rx="13" ry="5" fill="white" opacity="0.55"/>
+<rect x="0" y="72" width="300" height="23" fill="#383634"/>
+<rect x="0" y="72" width="300" height="2" fill="#4c4a48"/>
+<rect x="8" y="78" width="16" height="2" rx="1" fill="#c8b820" opacity="0.7"/>
+<rect x="50" y="78" width="16" height="2" rx="1" fill="#c8b820" opacity="0.7"/>
+<rect x="92" y="78" width="16" height="2" rx="1" fill="#c8b820" opacity="0.7"/>
+<rect x="134" y="78" width="16" height="2" rx="1" fill="#c8b820" opacity="0.7"/>
+<rect x="176" y="78" width="16" height="2" rx="1" fill="#c8b820" opacity="0.7"/>
+<rect x="218" y="78" width="16" height="2" rx="1" fill="#c8b820" opacity="0.7"/>
+<rect x="260" y="78" width="16" height="2" rx="1" fill="#c8b820" opacity="0.7"/>
+<ellipse cx="165" cy="74" rx="138" ry="3" fill="rgba(0,0,0,0.1)"/>
+<rect x="2" y="16" width="2.5" height="14" rx="1" fill="#585858"/>
+<path d="M9,26 Q13,9 19,7 L50,7 Q53,7 53,11 L53,26 Z" fill="#183878" stroke="#0c1838" stroke-width="0.8"/>
+<rect x="9" y="26" width="44" height="37" rx="2" fill="#183878" stroke="#0c1838" stroke-width="1"/>
+<rect x="10" y="28" width="40" height="18" rx="1" fill="#5080b8" stroke="#0c1838" stroke-width="0.8"/>
+<rect x="11" y="29" width="38" height="16" rx="1" fill="#6090c8"/>
+<line x1="13" y1="30" x2="15" y2="45" stroke="#a0c8e8" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+<line x1="34" y1="44" x2="47" y2="36" stroke="#081020" stroke-width="1" stroke-linecap="round"/>
+<rect x="9" y="46" width="44" height="15" fill="#112868"/>
+<rect x="10" y="48" width="18" height="7" rx="1" fill="#040810"/>
+<rect x="30" y="48" width="20" height="7" rx="2" fill="#a88018"/>
+<text x="40" y="54" font-size="4" font-weight="bold" fill="#100800" text-anchor="middle" font-family="sans-serif">MW</text>
+<rect x="9" y="60" width="44" height="3" rx="1" fill="#060808"/>
+<rect x="3" y="43" width="4" height="7" rx="1" fill="#f0f0c0"/>
+<rect x="3" y="50" width="4" height="3" rx="1" fill="#f08080"/>
+<rect x="3" y="34" width="3" height="6" rx="1" fill="#181818"/>
+<rect x="62" y="59" width="8" height="3" rx="1" fill="#282828"/>
+<circle cx="17" cy="76" r="8" fill="#111" stroke="#2a2a2a" stroke-width="1"/><circle cx="17" cy="76" r="5" fill="#0e0e0e"/><circle cx="17" cy="76" r="2.5" fill="#505050"/><circle cx="17" cy="76" r="1" fill="#888"/><circle cx="17" cy="76" r="7.5" fill="none" stroke="#080808" stroke-width="2" stroke-dasharray="3.5,3"/><line x1="17" y1="68" x2="17" y2="84" stroke="#333" stroke-width="1"/><line x1="9" y1="76" x2="25" y2="76" stroke="#333" stroke-width="1"/>
+<circle cx="38" cy="76" r="8" fill="#111" stroke="#2a2a2a" stroke-width="1"/><circle cx="38" cy="76" r="5" fill="#0e0e0e"/><circle cx="38" cy="76" r="2.5" fill="#505050"/><circle cx="38" cy="76" r="1" fill="#888"/><circle cx="38" cy="76" r="7.5" fill="none" stroke="#080808" stroke-width="2" stroke-dasharray="3.5,3"/><line x1="38" y1="68" x2="38" y2="84" stroke="#333" stroke-width="1"/><line x1="30" y1="76" x2="46" y2="76" stroke="#333" stroke-width="1"/>
+<circle cx="48" cy="76" r="8" fill="#090909" stroke="#181818" stroke-width="0.7"/><circle cx="48" cy="76" r="5" fill="#0c0c0c"/><circle cx="48" cy="76" r="2.5" fill="#404040"/>
+<rect x="70" y="62" width="226" height="5" rx="1" fill="#101010"/>
+<rect x="70" y="18" width="226" height="3" rx="1" fill="#888480"/>
+<rect x="70" y="21" width="226" height="5" rx="1" fill="#989490"/>
+<rect x="71" y="26" width="221" height="37" rx="2" fill="#ccc8c0"/>
+{tb}
+{ps}
+{ks}
+<rect x="71" y="26" width="221" height="37" rx="2" fill="none" stroke="#787470" stroke-width="1.2"/>
+<rect x="71" y="26" width="221" height="4" fill="#b0aca4"/>
+<rect x="71" y="62" width="221" height="3" fill="#b08820"/>
+<rect x="289" y="26" width="5" height="37" fill="#686460"/>
+<line x1="291" y1="26" x2="291" y2="63" stroke="#484440" stroke-width="1" stroke-dasharray="4,3"/>
+<line x1="73" y1="47" x2="289" y2="47" stroke="#a8a49c" stroke-width="0.4" stroke-dasharray="4,4"/>
+<circle cx="115" cy="76" r="8" fill="#111" stroke="#2a2a2a" stroke-width="1"/><circle cx="115" cy="76" r="5" fill="#0e0e0e"/><circle cx="115" cy="76" r="2.5" fill="#505050"/><circle cx="115" cy="76" r="1" fill="#888"/><circle cx="115" cy="76" r="7.5" fill="none" stroke="#080808" stroke-width="2" stroke-dasharray="3.5,3"/><line x1="115" y1="68" x2="115" y2="84" stroke="#333" stroke-width="1"/><line x1="107" y1="76" x2="123" y2="76" stroke="#333" stroke-width="1"/>
+<circle cx="124" cy="76" r="8" fill="#090909" stroke="#181818" stroke-width="0.7"/><circle cx="124" cy="76" r="5" fill="#0c0c0c"/><circle cx="124" cy="76" r="2.5" fill="#404040"/>
+<circle cx="185" cy="76" r="8" fill="#111" stroke="#2a2a2a" stroke-width="1"/><circle cx="185" cy="76" r="5" fill="#0e0e0e"/><circle cx="185" cy="76" r="2.5" fill="#505050"/><circle cx="185" cy="76" r="1" fill="#888"/><circle cx="185" cy="76" r="7.5" fill="none" stroke="#080808" stroke-width="2" stroke-dasharray="3.5,3"/><line x1="185" y1="68" x2="185" y2="84" stroke="#333" stroke-width="1"/><line x1="177" y1="76" x2="193" y2="76" stroke="#333" stroke-width="1"/>
+<circle cx="194" cy="76" r="8" fill="#090909" stroke="#181818" stroke-width="0.7"/><circle cx="194" cy="76" r="5" fill="#0c0c0c"/><circle cx="194" cy="76" r="2.5" fill="#404040"/>
+<circle cx="250" cy="76" r="8" fill="#111" stroke="#2a2a2a" stroke-width="1"/><circle cx="250" cy="76" r="5" fill="#0e0e0e"/><circle cx="250" cy="76" r="2.5" fill="#505050"/><circle cx="250" cy="76" r="1" fill="#888"/><circle cx="250" cy="76" r="7.5" fill="none" stroke="#080808" stroke-width="2" stroke-dasharray="3.5,3"/><line x1="250" y1="68" x2="250" y2="84" stroke="#333" stroke-width="1"/><line x1="242" y1="76" x2="258" y2="76" stroke="#333" stroke-width="1"/>
+<circle cx="259" cy="76" r="8" fill="#090909" stroke="#181818" stroke-width="0.7"/><circle cx="259" cy="76" r="5" fill="#0c0c0c"/><circle cx="259" cy="76" r="2.5" fill="#404040"/>
+</svg>
 <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:5px;">{badge_p} {badge_k} {badge_t}</div>
 <div style="margin-top:4px;">
 <div style="height:3px;background:var(--border);border-radius:2px;overflow:hidden;margin-bottom:3px;"><div style="height:100%;width:{pp}%;background:#1050a8;border-radius:2px;"></div></div>
