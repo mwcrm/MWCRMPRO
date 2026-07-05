@@ -1630,7 +1630,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
     )
 
     # ── MENÜ LİSTESİ ──────────────────────────────────────────────────────────
-    _sb_liste = get_menu_tercihi(st.session_state["kullanici"])
+    _sb_liste = get_menu_tercihi(st.session_state.get("kullanici",""))
     if st.session_state.get("rol") == "admin":
         for _t in ["kullanici","admin_rapor"]:
             if _t not in _sb_liste:
