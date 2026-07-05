@@ -2806,7 +2806,13 @@ function kartSec(id){
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
         try:
             kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
-            kart_row = df_f[df_f["id"]==kart_id].iloc[0]
+            _km = df_f[df_f["id"]==kart_id]
+            if _km.empty:
+                _km = df[df["id"]==kart_id]
+            if _km.empty:
+                st.error("Müşteri bulunamadı, filtreleri temizleyin.")
+                st.stop()
+            kart_row = _km.iloc[0]
             bek = float(kart_row.get("beklenen_ciro",0) or 0)
             ger = float(kart_row.get("gerceklesen_ciro",0) or 0)
             _seg_val = str(kart_row.get("segment","") or "")
@@ -3637,7 +3643,9 @@ elif aktif == "kullanici":
             k3_opts = [f"[{int(r['id'])}] {r['kullanici_adi']}" for _,r in df_kul3.iterrows()]
             k3_sec  = st.selectbox("Kullanıcı:", k3_opts, key="yetki_sec")
             k3_id   = int(k3_sec.split("]")[0].replace("[",""))
-            k3_row  = df_kul3[df_kul3["id"]==k3_id].iloc[0]
+            _k3m = df_kul3[df_kul3["id"]==k3_id]
+            if _k3m.empty: raise Exception("Kullanıcı bulunamadı")
+            k3_row = _k3m.iloc[0]
 
             mv = str(k3_row.get("yetkiler","tam") or "tam")
             try:
