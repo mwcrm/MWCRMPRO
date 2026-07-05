@@ -2758,23 +2758,7 @@ function kartSec(id){
     if _tem_sec:
         df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
 
-    # ── HİÇ FİLTRE SEÇİLİ DEĞİLKEN — sadece işlem görmemiş (Özel Müşteri/Portföy) göster ──
-    # Bir müşteriye durum atanınca (Randevu, Teklif, Tekrar Ara vb.) artık burada görünmesin,
-    # sadece kendi durum filtresinde görünsün. Karışıklığı önler.
-    if not _durum_sec and not _asama_sec and "durum" in df_f.columns:
-        _varsayilan_durumlar = ["Özel Müşteri", "Portföy"]
-        df_f = df_f[df_f["durum"].isin(_varsayilan_durumlar)]
-
-    # ── AŞAMA İÇİN AYNI MANTIK — sadece "İlk Temas" (varsayılan) aşamasındakiler kalsın ──
-    # Aşaması değişen (Teklif, Sözleşme, Kazanıldı, Negatif Portföy vb.) müşteriler
-    # ana listeden çıkıp sadece kendi aşama filtresinde görünür.
-    if not _durum_sec and not _asama_sec and "islem_asamasi" in df_f.columns:
-        _varsayilan_asama = "İlk Temas"
-        df_f = df_f[
-            (df_f["islem_asamasi"] == _varsayilan_asama) |
-            (df_f["islem_asamasi"].isna()) |
-            (df_f["islem_asamasi"].astype(str).str.strip() == "")
-        ]
+    # Tüm müşteriler görünsün — filtre seçilmediyse kısıtlama yok
 
     # Segment hesapla ve sırala
     if df_f.empty or "firma" not in df_f.columns:
@@ -5594,7 +5578,9 @@ elif aktif == "excel":
                             try:
                                 if v is None or (isinstance(v, float) and pd.isna(v)):
                                     return 0.0
-                                return float(v)
+                                # Virgüllü string temizle: "1,000,000" → 1000000
+                                s = str(v).strip().replace(" ","").replace("₺","").replace(",","")
+                                return float(s) if s else 0.0
                             except:
                                 return 0.0
 
