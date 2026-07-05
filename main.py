@@ -5052,6 +5052,11 @@ elif aktif == "teklif":
     with st.expander("📋 Kayıtlı Teklifler"):
         try:
             df_tek = db_read("teklifler", order_col="tarih")
+            # Kullanıcı sadece kendi tekliflerini görsün
+            _tek_kul = st.session_state.get("kullanici","")
+            _tek_rol = st.session_state.get("rol","")
+            if not df_tek.empty and _tek_rol != "admin" and "olusturan" in df_tek.columns:
+                df_tek = df_tek[df_tek["olusturan"].astype(str) == _tek_kul]
             if df_tek.empty:
                 st.info("Henüz kayıtlı teklif yok.")
             else:
@@ -5416,6 +5421,11 @@ elif aktif == "ozel_teklif":
     with st.expander("📋 Kayıtlı Özel Teklifler"):
         try:
             _oz_df_tek = db_read("teklifler", order_col="tarih")
+            # Kullanıcı sadece kendi tekliflerini görsün
+            _oz_tek_kul = st.session_state.get("kullanici","")
+            _oz_tek_rol = st.session_state.get("rol","")
+            if not _oz_df_tek.empty and _oz_tek_rol != "admin" and "olusturan" in _oz_df_tek.columns:
+                _oz_df_tek = _oz_df_tek[_oz_df_tek["olusturan"].astype(str) == _oz_tek_kul]
             if not _oz_df_tek.empty and "satirlar" in _oz_df_tek.columns:
                 _oz_df_tek2 = _oz_df_tek[_oz_df_tek["satirlar"].str.contains('ozel', case=False, na=False)]
             else:
@@ -9196,7 +9206,7 @@ elif aktif == "musteri_atama":
     # ── TOPLU ATAMA BARI ──────────────────────────────────────────────────────
     _opts_kul = ["— Kullanıcı Seç —"] + _kul_listesi
     _tab1, _tab2 = st.columns([3,1])
-    _ma_toplu_kul = _tab1.selectbox("Seçilenleri şu kullanıcıya ata:", _opts_kul, key="ma_toplu_kul", label_visibility="collapsed")
+    _ma_toplu_kul = _tab1.selectbox("👤 Seçilenleri ata:", _opts_kul, key="ma_toplu_kul")
 
     # Seçili ID'leri session'dan al
     if "ma_secili_ids" not in st.session_state:
