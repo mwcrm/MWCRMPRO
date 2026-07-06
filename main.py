@@ -2600,6 +2600,7 @@ section[data-testid="stSidebar"] { display: none !important; }
         st.session_state["_tek_fil"] = None
         # Widget key'lerini sıfırlamak için sayaç artır
         st.session_state["_filtre_sifir_sayac"] = st.session_state.get("_filtre_sifir_sayac", 0) + 1
+        st.session_state["_filtre_sifirla_flag"] = True
         st.rerun()
 
     # ── TEK SATIR: Durum + Aşama birleşik ───────────────────────────────────
@@ -2825,11 +2826,15 @@ function kartSec(id){
         secili_kart_inline = _fc[0].selectbox("m", kart_opts_inline, key=f"kart_sec_inline_{_sfx}", label_visibility="collapsed")
         ara_txt = _fc[1].text_input("a", placeholder="🔍 Firma, yetkili, il...", key=f"ara_liste_{_sfx}", label_visibility="collapsed")
 
-        _asama_def = [x for x in st.session_state.get("_cl_fil_asama_multi",[]) if x in tum_asama_opts]
+        _asama_def = [] if st.session_state.get("_filtre_sifirla_flag") else [x for x in st.session_state.get("_cl_fil_asama_multi",[]) if x in tum_asama_opts]
         _asama_sec = _fc[2].multiselect("a", tum_asama_opts, default=_asama_def, key=f"_cl_fil_asama_multi_{_sfx}", placeholder="Aşama...", label_visibility="collapsed")
 
-        _durum_def = [x for x in st.session_state.get("_cl_fil_durum_multi",[]) if x in tum_durum_opts]
+        _durum_def = [] if st.session_state.get("_filtre_sifirla_flag") else [x for x in st.session_state.get("_cl_fil_durum_multi",[]) if x in tum_durum_opts]
         _durum_sec = _fc[3].multiselect("d", tum_durum_opts, default=_durum_def, key=f"_cl_fil_durum_multi_{_sfx}", placeholder="Durum...", label_visibility="collapsed")
+
+        # Sıfırlama flag'ini temizle
+        if st.session_state.get("_filtre_sifirla_flag"):
+            del st.session_state["_filtre_sifirla_flag"]
 
         filtre_seg = _fc[4].selectbox("s", ["Tümü","👑 A+","⭐ A","🔵 B","⚪ C"], key=f"fil_seg_{_sfx}", label_visibility="collapsed")
 
