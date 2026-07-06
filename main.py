@@ -10034,10 +10034,8 @@ elif aktif == "islem_takip":
 
     # Header
     _h = '<div class="it-wrap">' + _css + '<table class="it-tbl"><thead><tr>'
-    _h += '<th class="td-f">Firma</th><th class="td-b">Beklenen</th><th class="td-i">İller</th>'
     for _n in range(1, _max_gun+1):
         _h += f'<th class="td-g">Gün {_n}</th>'
-    _h += '<th class="td-n">+ Gün</th><th class="td-s">Sonuç</th></tr></thead><tbody>'
 
     # Rows
     _rows = ""
@@ -10067,11 +10065,6 @@ elif aktif == "islem_takip":
         # Beklenen
         _rows += f'<td class="td-b"><div class="hedef">{_bk_f}</div></td>'
 
-        # İller + İlçe
-        _rows += '<td class="td-i">'
-        if _il and _il not in ["nan","None",""]:
-            _rows += f'<span class="il-b">{_il}</span>'
-        _rows += '</td>'
 
         # Gün kolonları
         _gun_listesi = list(_gunler.items())
@@ -10090,8 +10083,6 @@ elif aktif == "islem_takip":
             else:
                 _rows += '<td class="td-g"><div class="bos">—</div></td>'
 
-        # Yeni gün
-        _yeni_no = len(_gun_listesi)+1
         _rows += f'<td class="td-n"><div class="yeni-g"><div class="yeni-g-ust">📅 Gün {_yeni_no}</div><div class="yeni-g-alt">ekle</div></div></td>'
 
         # Sonuç — sadece mevcut aşama
