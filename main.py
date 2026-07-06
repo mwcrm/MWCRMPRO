@@ -156,18 +156,20 @@ def get_cari_listesi():
             _tum = []
             _offset = 0
             _batch = 500
-            while True:
+            _max_iter = 20  # max 20 * 500 = 10000 kayıt
+            _iter = 0
+            while _iter < _max_iter:
                 _res = (sb.table("cari_kartlar")
                     .select("*")
                     .order("id", desc=False)
-                    .limit(_batch)
-                    .offset(_offset)
+                    .range(_offset, _offset + _batch - 1)
                     .execute())
                 if _res.data:
                     _tum.extend(_res.data)
                     if len(_res.data) < _batch:
                         break
                     _offset += _batch
+                    _iter += 1
                 else:
                     break
             _df_g = pd.DataFrame(_tum) if _tum else pd.DataFrame()
@@ -2343,8 +2345,7 @@ section[data-testid="stSidebar"] { display: none !important; }
                 _res_l = (sb_liste.table("cari_kartlar")
                     .select("*")
                     .order("id", desc=False)
-                    .limit(_liste_batch)
-                    .offset(_liste_offset)
+                    .range(_liste_offset, _liste_offset + _liste_batch - 1)
                     .execute())
                 if _res_l.data:
                     _liste_tum.extend(_res_l.data)
