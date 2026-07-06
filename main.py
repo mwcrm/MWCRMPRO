@@ -2807,101 +2807,46 @@ function kartSec(id){
         st.stop()
 
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
-    with st.expander("🔍 Filtreler & Arama", expanded=st.session_state.get("_cl_fil_acik", True)):
-        st.session_state["_cl_fil_acik"] = True  # expander açık kalsın
-        # ── TEK SATIR FİLTRE ───────────────────────────────────────────────────
-        if st.session_state.get("kart_sec_reset"):
-            st.session_state.pop("kart_sec_reset", None)
-            st.session_state.pop("kart_sec", None)
-
-        kart_opts_inline = ["-- Müşteri Seçin --", "🔵 Tümü"] + [
-            f"[{int(r['id'])}] {r.get('firma','')}" for _, r in df.iterrows()
-        ]
-        if st.session_state.get("kart_sec_reset"):
-            st.session_state.pop("kart_sec_reset", None)
-            st.session_state.pop("kart_sec", None)
-
-        _fc = st.columns([2, 1.5, 1.2, 1.2, 0.7, 0.8, 0.8, 0.9, 0.8])
-        _sfx = st.session_state.get("_filtre_sifir_sayac", 0)
-
-        secili_kart_inline = _fc[0].selectbox("m", kart_opts_inline, key=f"kart_sec_inline_{_sfx}", label_visibility="collapsed")
-        ara_txt = _fc[1].text_input("a", placeholder="🔍 Firma, yetkili, il...", key=f"ara_liste_{_sfx}", label_visibility="collapsed")
-
-        _asama_def = [] if st.session_state.get("_filtre_sifirla_flag") else [x for x in st.session_state.get("_cl_fil_asama_multi",[]) if x in tum_asama_opts]
-        _asama_sec = _fc[2].multiselect("a", tum_asama_opts, default=_asama_def, key=f"_cl_fil_asama_multi_{_sfx}", placeholder="Aşama...", label_visibility="collapsed")
-
-        _durum_def = [] if st.session_state.get("_filtre_sifirla_flag") else [x for x in st.session_state.get("_cl_fil_durum_multi",[]) if x in tum_durum_opts]
-        _durum_sec = _fc[3].multiselect("d", tum_durum_opts, default=_durum_def, key=f"_cl_fil_durum_multi_{_sfx}", placeholder="Durum...", label_visibility="collapsed")
-
-        # Sıfırlama flag'ini temizle
-        if st.session_state.get("_filtre_sifirla_flag"):
-            del st.session_state["_filtre_sifirla_flag"]
-
-        filtre_seg = _fc[4].selectbox("s", ["Tümü","👑 A+","⭐ A","🔵 B","⚪ C"], key=f"fil_seg_{_sfx}", label_visibility="collapsed")
-
-        _il_opts = sorted(df["il"].dropna().astype(str).unique().tolist()) if "il" in df.columns else []
-        _il_def  = [x for x in st.session_state.get("_cl_fil_il_multi",[]) if x in _il_opts]
-        _il_sec  = _fc[5].multiselect("i", _il_opts, default=_il_def, key=f"_cl_fil_il_multi_{_sfx}", placeholder="İl...", label_visibility="collapsed")
-
-        _ilce_opts = sorted((df[df["il"].astype(str).isin(_il_sec)] if _il_sec else df)["ilce"].dropna().astype(str).unique().tolist()) if "ilce" in df.columns else []
+    with st.expander("🔍 Filtreler & Arama", expanded=True):
+        _fc = st.columns([1.5, 1.5, 1, 1, 0.8, 0.8, 1, 1])
+        ara_txt    = _fc[0].text_input("", placeholder="🔍 Firma, yetkili, il...", key="ara_liste", label_visibility="collapsed")
+        _asama_sec = _fc[1].multiselect("", tum_asama_opts, key="fil_asama", placeholder="Aşama...", label_visibility="collapsed")
+        _durum_sec = _fc[2].multiselect("", tum_durum_opts, key="fil_durum", placeholder="Durum...", label_visibility="collapsed")
+        filtre_seg = _fc[3].selectbox("", ["Tümü","👑 A+","⭐ A","🔵 B","⚪ C"], key="fil_seg", label_visibility="collapsed")
+        _il_opts   = sorted(df["il"].dropna().astype(str).unique().tolist()) if "il" in df.columns else []
+        _il_sec    = _fc[4].multiselect("", _il_opts, key="fil_il", placeholder="İl...", label_visibility="collapsed")
+        _ilce_opts = sorted(df["ilce"].dropna().astype(str).unique().tolist()) if "ilce" in df.columns else []
         _ilce_opts = [x for x in _ilce_opts if x not in ["nan","None",""]]
-        _ilce_sec  = _fc[6].multiselect("ilce", _ilce_opts, default=[x for x in st.session_state.get("_cl_fil_ilce_multi",[]) if x in _ilce_opts], key=f"_cl_fil_ilce_multi_{_sfx}", placeholder="İlçe...", label_visibility="collapsed")
+        _ilce_sec  = _fc[5].multiselect("", _ilce_opts, key="fil_ilce", placeholder="İlçe...", label_visibility="collapsed")
+        _tem_opts  = sorted(df["temsilci"].dropna().astype(str).unique().tolist()) if "temsilci" in df.columns else []
+        _tem_sec   = _fc[6].multiselect("", _tem_opts, key="fil_temsilci", placeholder="Temsilci...", label_visibility="collapsed")
+        siralama_kol = _fc[7].selectbox("", ["—","Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Hedef ₺↓","Hedef ₺↑"], key="fil_siralama", label_visibility="collapsed")
 
-        _tem_opts = sorted(df["temsilci"].dropna().astype(str).unique().tolist()) if "temsilci" in df.columns else []
-        _tem_def  = [x for x in st.session_state.get("_cl_fil_temsilci_multi",[]) if x in _tem_opts]
-        _tem_sec  = _fc[7].multiselect("t", _tem_opts, default=_tem_def, key=f"_cl_fil_temsilci_multi_{_sfx}", placeholder="Temsilci...", label_visibility="collapsed")
-
-        siralama_kol = _fc[8].selectbox("sr", ["—","Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z","Hedef ₺↓","Hedef ₺↑","Gerçek ₺↓","Gerçek ₺↑"], key=f"siralama_kol_{_sfx}", label_visibility="collapsed")
-
-        # Eski sistemle uyumluluk
         kart_opts = ["-- Müşteri Seçin --"] + [
             f"[{int(r['id'])}] {r.get('firma','')} | {r.get('il','')} | {r.get('islem_asamasi','')}"
             for _, r in df.iterrows()
         ]
-        if secili_kart_inline == "🔵 Tümü":
-            secili_kart = "-- Müşteri Seçin --"  # Tümü seçilince tek müşteri filtrelemesi yok
-        elif secili_kart_inline != "-- Müşteri Seçin --":
-            _id_str = secili_kart_inline.split("]")[0].replace("[","").strip()
-            _esles = [o for o in kart_opts if f"[{_id_str}]" in o]
-            secili_kart = _esles[0] if _esles else "-- Müşteri Seçin --"
-        else:
-            secili_kart = "-- Müşteri Seçin --"
+        secili_kart = "-- Müşteri Seçin --"
 
-    # Filtre uygula — session state'ten oku (expander dışından erişim için)
-    _sfx2 = st.session_state.get("_filtre_sifir_sayac", 0)
+    # ── FİLTRE UYGULA ─────────────────────────────────────────────────────────
     df_f = df.copy()
-    _tumu_secildi = st.session_state.get(f"kart_sec_inline_{_sfx2}") == "🔵 Tümü"
-    _ara_txt2   = st.session_state.get(f"ara_liste_{_sfx2}", "")
-    _asama_sec2 = st.session_state.get(f"_cl_fil_asama_multi_{_sfx2}", [])
-    _durum_sec2 = st.session_state.get(f"_cl_fil_durum_multi_{_sfx2}", [])
-    _fil_seg2   = st.session_state.get(f"fil_seg_{_sfx2}", "Tümü")
-    _il_sec2    = st.session_state.get(f"_cl_fil_il_multi_{_sfx2}", [])
-    _ilce_sec2  = st.session_state.get(f"_cl_fil_ilce_multi_{_sfx2}", [])
-    _tem_sec2   = st.session_state.get(f"_cl_fil_temsilci_multi_{_sfx2}", [])
+    if ara_txt:
+        df_f = df_f[df_f.apply(lambda r: ara_txt.lower() in str(r).lower(), axis=1)]
+    if _asama_sec:
+        df_f = df_f[df_f["islem_asamasi"].isin(_asama_sec)]
+    if _durum_sec:
+        df_f = df_f[df_f["durum"].isin(_durum_sec)]
+    if filtre_seg != "Tümü" and "islem_asamasi" in df_f.columns:
+        df_f["_seg_tmp"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
+        df_f = df_f[df_f["_seg_tmp"]==filtre_seg]
+    if _il_sec:
+        df_f = df_f[df_f["il"].astype(str).isin(_il_sec)]
+    if _ilce_sec:
+        df_f = df_f[df_f["ilce"].astype(str).isin(_ilce_sec)]
+    if _tem_sec:
+        df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
 
-    if not _tumu_secildi:
-        if _ara_txt2:
-            df_f = df_f[df_f.apply(lambda r: _ara_txt2.lower() in str(r).lower(), axis=1)]
-        if _asama_sec2:
-            df_f = df_f[df_f["islem_asamasi"].isin(_asama_sec2)]
-        if _durum_sec2:
-            df_f = df_f[df_f["durum"].isin(_durum_sec2)]
-        if _fil_seg2 != "Tümü":
-            df_f["_seg_tmp"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
-            df_f = df_f[df_f["_seg_tmp"]=="" if _fil_seg2=="Segmentsiz" else df_f["_seg_tmp"]==_fil_seg2]
-        if _il_sec2:
-            df_f = df_f[df_f["il"].astype(str).isin(_il_sec2)]
-        if _ilce_sec2:
-            df_f = df_f[df_f["ilce"].astype(str).isin(_ilce_sec2)]
-        if _tem_sec2:
-            df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec2)]
-
-    # eski isimlerle uyumluluk
-    ara_txt = _ara_txt2; _asama_sec = _asama_sec2; _durum_sec = _durum_sec2
-    filtre_seg = _fil_seg2; _il_sec = _il_sec2; _ilce_sec = _ilce_sec2; _tem_sec = _tem_sec2
-
-
-    # Segment hesapla ve sırala
+        # Segment hesapla ve sırala
     if df_f.empty or "firma" not in df_f.columns:
         df_f = pd.DataFrame()
     else:
