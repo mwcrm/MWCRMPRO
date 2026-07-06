@@ -142,15 +142,14 @@ def _get_atanmis_firmalar():
 def _atama_filtresi_uygula(df):
     """Admin hepsini görür, diğerleri sadece kendine atananları"""
     try:
-        _rol = st.session_state.get("rol","")
-        _kul = st.session_state.get("kullanici","")
-        if _rol == "admin" or not _kul:
-            return df  # admin hepsini görür
+        _rol = str(st.session_state.get("rol","")).strip().lower()
+        _kul = str(st.session_state.get("kullanici","")).strip()
+        # Admin veya kullanıcı yoksa hepsini göster
+        if _rol in ["admin","admin "] or not _kul:
+            return df
         if df.empty or "atanan_kullanici" not in df.columns:
             return df
-        # Sadece kendine atananlar VEYA atanmamışlar (henüz atama yapılmamış)
-        # Atanmamışları admin görür — kullanıcı sadece kendine atananları
-        return df[df["atanan_kullanici"] == _kul]
+        return df[df["atanan_kullanici"].astype(str) == _kul]
     except:
         return df
 
