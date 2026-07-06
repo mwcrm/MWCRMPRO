@@ -89,10 +89,29 @@ def _telefon_temizle(seri):
         s = str(v).strip()
         if s.lower() in ["nan", "none", ""]:
             return ""
+        # Float .0 temizle
         if s.endswith(".0"):
             s = s[:-2]
+        # Bilimsel notasyon temizle (1e+10 gibi)
+        try:
+            if "e" in s.lower() or "E" in s:
+                s = str(int(float(s)))
+        except:
+            pass
         return s
     return seri.apply(_tek)
+
+def _no_temizle(v):
+    """Tek değer için .0 ve float temizleyici — her yerde kullan"""
+    if v is None: return ""
+    s = str(v).strip()
+    if s.lower() in ["nan","none",""]: return ""
+    if s.endswith(".0"): s = s[:-2]
+    try:
+        if "e" in s.lower():
+            s = str(int(float(s)))
+    except: pass
+    return s
 
 def _get_atanmis_firmalar():
     """Giriş yapan kullanıcının atanmış firma adlarını döndürür. Admin için None (hepsi)."""
@@ -1215,9 +1234,15 @@ def fmt_tel(n):
     try:
         if not n or str(n).strip() in ["", "None", "nan", "-"]: return ""
         s = str(n).strip()
+        # Float .0 temizle
         if s.endswith(".0"): s = s[:-2]
-        # Sadece rakam bırak
-        s = _re_tel.sub(r"[^0-9]", "", s)
+        # Bilimsel notasyon: 5.52e+09 gibi
+        try:
+            if "e" in s.lower(): s = str(int(float(s)))
+        except: pass
+        # Sadece rakam, +, boşluk, tire bırak
+        import re as _re2
+        s = _re2.sub(r"[^0-9\+\s\-]", "", s).strip()
         return s
     except: return ""
 
@@ -1951,6 +1976,22 @@ if aktif == "yeni":
     # Böylece farklı bir müşteriye geçildiğinde (veya yeni boş karta geçildiğinde)
     # Streamlit eski session_state değerini değil, müşterinin GERÇEK verisini gösterir.
     _form_id = str(duzenle.get("id")) if duzenle else "new"
+    # Her düzenlemede form key'lerini temizle — eski değer yapışmasın
+    _form_keys = [
+        f"yeni_firma_{_form_id}", f"yeni_yetkili_{_form_id}",
+        f"yeni_gsm_{_form_id}", f"yeni_sabit_{_form_id}", f"yeni_email_{_form_id}",
+        f"yeni_adres_{_form_id}", f"yeni_notlar_{_form_id}",
+        f"yeni_il_dis_{_form_id}", f"yeni_ilce_dis_{_form_id}",
+        f"yeni_durum_dis_{_form_id}", f"yeni_temsilci_dis_{_form_id}",
+        f"yeni_seg_dis_{_form_id}", f"yeni_asama_dis_{_form_id}",
+    ]
+    # Sadece müşteri değişince temizle
+    _onceki_form_id = st.session_state.get("_onceki_form_id","")
+    if _onceki_form_id != _form_id:
+        for _fk in _form_keys:
+            if _fk in st.session_state:
+                del st.session_state[_fk]
+        st.session_state["_onceki_form_id"] = _form_id
 
     st.divider()
     if duzenle:
@@ -1960,9 +2001,10 @@ if aktif == "yeni":
 
     il_listesi = sorted(ILLER_ILCELER.keys())
     mevcut_il   = duzenle.get("il","") if duzenle and duzenle.get("il","") in il_listesi else il_listesi[0]
-    # Eski session key'lerini temizle
-    for _dk in ["yeni_il_sec","yeni_ilce_sec","yeni_il_form","yeni_ilce_form"]:
-        if _dk in st.session_state and not duzenle:
+    # Eski session key'lerini temizle — her durumda temizle ki eski değer yapışmasın
+    for _dk in ["yeni_il_sec","yeni_ilce_sec","yeni_il_form","yeni_ilce_form",
+                f"yeni_il_dis_{_form_id}", f"yeni_ilce_dis_{_form_id}"]:
+        if _dk in st.session_state:
             del st.session_state[_dk]
     _asama_base = _tanimlar_yukle("asama")
     try:
@@ -7667,8 +7709,8 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
                         if _tw3.startswith("0"): _tw3 = "90"+_tw3[1:]
                         elif len(_tw3)==10: _tw3 = "90"+_tw3
                         _msg3 = f"🗓️ YENİ RANDEVU\nMüşteri: {musteri_adi}\nTarih: {rand_tarih} {rand_saat}\nBölge: {rand_bolge}\nGörev: {rand_gorev}\nİyi çalışmalar!"
-                        st.button("📱 Temsilciye WA Gönder", use_container_width=True, type="primary",
-                            disabled=True, help="Geçici olarak devre dışı", key="wa_btn_temsilci_rand")
+                        st.form_submit_button("📱 Temsilciye WA Gönder", use_container_width=True, type="primary",
+                            disabled=True, help="Geçici olarak devre dışı")
                         db_insert("islem_kaydi",{"musteri_id":musteri_id,"musteri_adi":musteri_adi,
                             "islem_turu":"📅 WA Temsilci Uyarısı",
                             "icerik":f"Temsilci: {rand_temsilci} | Tarih: {rand_tarih} {rand_saat} | Bölge: {rand_bolge}",
