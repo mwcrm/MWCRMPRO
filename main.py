@@ -145,11 +145,16 @@ def _atama_filtresi_uygula(df):
         _rol = str(st.session_state.get("rol","")).strip().lower()
         _kul = str(st.session_state.get("kullanici","")).strip()
         # Admin veya kullanıcı yoksa hepsini göster
-        if _rol in ["admin","admin "] or not _kul:
+        if "admin" in _rol or _kul in ["admin",""] or not _kul:
             return df
         if df.empty or "atanan_kullanici" not in df.columns:
             return df
-        return df[df["atanan_kullanici"].astype(str) == _kul]
+        # Kendine atananlar VEYA atanmamışlar (NULL) → admin olmayan da görebilsin
+        return df[
+            (df["atanan_kullanici"].astype(str) == _kul) |
+            (df["atanan_kullanici"].isna()) |
+            (df["atanan_kullanici"].astype(str).isin(["None","nan",""]))
+        ]
     except:
         return df
 
