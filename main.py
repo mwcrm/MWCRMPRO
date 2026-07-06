@@ -2371,8 +2371,6 @@ section[data-testid="stSidebar"] { display: none !important; }
     # ── ATAMA FİLTRESİ — admin hepsini görür, kullanıcı sadece kendine atananları ──
     df = _atama_filtresi_uygula(df)
 
-    # DEBUG — geçici
-    st.sidebar.info(f"🔍 df: {len(df)} kayıt | rol: {st.session_state.get('rol','?')} | kul: {st.session_state.get('kullanici','?')}")
 
     with st.expander("🔍 Mükerrer (Aynı İsimli) Müşterileri Bul ve Birleştir"):
         if df.empty or "firma" not in df.columns:
@@ -2869,25 +2867,38 @@ function kartSec(id){
         else:
             secili_kart = "-- Müşteri Seçin --"
 
-    # Filtre uygula
+    # Filtre uygula — session state'ten oku (expander dışından erişim için)
+    _sfx2 = st.session_state.get("_filtre_sifir_sayac", 0)
     df_f = df.copy()
-    _tumu_secildi = locals().get("secili_kart_inline","") == "🔵 Tümü"
-    if not _tumu_secildi and ara_txt:
-        df_f = df_f[df_f.apply(lambda r: ara_txt.lower() in str(r).lower(), axis=1)]
-    if not _tumu_secildi and _asama_sec:
-        df_f = df_f[df_f["islem_asamasi"].isin(_asama_sec)]
-    if not _tumu_secildi and _durum_sec:
-        df_f = df_f[df_f["durum"].isin(_durum_sec)]
-    if not _tumu_secildi and filtre_seg != "Tümü":
-        df_f["_seg_tmp"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
-        if filtre_seg == "Segmentsiz": df_f = df_f[df_f["_seg_tmp"]==""]
-        else: df_f = df_f[df_f["_seg_tmp"]==filtre_seg]
-    if not _tumu_secildi and _il_sec:
-        df_f = df_f[df_f["il"].astype(str).isin(_il_sec)]
-    if not _tumu_secildi and _ilce_sec:
-        df_f = df_f[df_f["ilce"].astype(str).isin(_ilce_sec)]
-    if not _tumu_secildi and _tem_sec:
-        df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
+    _tumu_secildi = st.session_state.get(f"kart_sec_inline_{_sfx2}") == "🔵 Tümü"
+    _ara_txt2   = st.session_state.get(f"ara_liste_{_sfx2}", "")
+    _asama_sec2 = st.session_state.get(f"_cl_fil_asama_multi_{_sfx2}", [])
+    _durum_sec2 = st.session_state.get(f"_cl_fil_durum_multi_{_sfx2}", [])
+    _fil_seg2   = st.session_state.get(f"fil_seg_{_sfx2}", "Tümü")
+    _il_sec2    = st.session_state.get(f"_cl_fil_il_multi_{_sfx2}", [])
+    _ilce_sec2  = st.session_state.get(f"_cl_fil_ilce_multi_{_sfx2}", [])
+    _tem_sec2   = st.session_state.get(f"_cl_fil_temsilci_multi_{_sfx2}", [])
+
+    if not _tumu_secildi:
+        if _ara_txt2:
+            df_f = df_f[df_f.apply(lambda r: _ara_txt2.lower() in str(r).lower(), axis=1)]
+        if _asama_sec2:
+            df_f = df_f[df_f["islem_asamasi"].isin(_asama_sec2)]
+        if _durum_sec2:
+            df_f = df_f[df_f["durum"].isin(_durum_sec2)]
+        if _fil_seg2 != "Tümü":
+            df_f["_seg_tmp"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
+            df_f = df_f[df_f["_seg_tmp"]=="" if _fil_seg2=="Segmentsiz" else df_f["_seg_tmp"]==_fil_seg2]
+        if _il_sec2:
+            df_f = df_f[df_f["il"].astype(str).isin(_il_sec2)]
+        if _ilce_sec2:
+            df_f = df_f[df_f["ilce"].astype(str).isin(_ilce_sec2)]
+        if _tem_sec2:
+            df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec2)]
+
+    # eski isimlerle uyumluluk
+    ara_txt = _ara_txt2; _asama_sec = _asama_sec2; _durum_sec = _durum_sec2
+    filtre_seg = _fil_seg2; _il_sec = _il_sec2; _ilce_sec = _ilce_sec2; _tem_sec = _tem_sec2
 
 
     # Segment hesapla ve sırala
