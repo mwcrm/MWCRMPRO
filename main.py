@@ -2583,25 +2583,31 @@ section[data-testid="stSidebar"] { display: none !important; }
                                 st.session_state["_cl_fil_durum_multi"] = []
                         st.rerun()
 
+    # Toplam butonuna basınca tüm filtreleri sıfırla
+    if st.session_state.get("_tek_fil") == "Toplam":
+        for _fk in ["_cl_fil_asama_multi","_cl_fil_durum_multi","_cl_sec_kart","_cl_fil_il_multi","_cl_fil_ilce_multi"]:
+            if _fk in st.session_state: del st.session_state[_fk]
+        st.session_state["_tek_fil"] = None
+
     # ── TEK SATIR: Durum + Aşama birleşik ───────────────────────────────────
     _d_veri = [("Toplam", len(df))]
     for _dn in tum_durum_opts:
+        if str(_dn).upper() in ["NONE","NAN",""]: continue  # NONE gösterme
         _dc = len(df[df["durum"]==_dn]) if "durum" in df.columns else 0
         _d_veri.append((_dn, _dc))
-    _a_veri = [(a, len(df[df["islem_asamasi"]==a]) if "islem_asamasi" in df.columns else 0) for a in tum_asama_opts] if tum_asama_opts else []
+    _a_veri = [(a, len(df[df["islem_asamasi"]==a]) if "islem_asamasi" in df.columns else 0) for a in tum_asama_opts if str(a).upper() not in ["NONE","NAN",""]] if tum_asama_opts else []
     _tum_veri = _d_veri + _a_veri
     _tum_emoji = {**_DURUM_EMOJI, **_ASAMA_EMOJI}
     _d_adlar = {x[0] for x in _d_veri}
 
     _rapor_satir(_tum_veri, "_tek_sirasi", "_tek_gizlisi", "tek", _tum_emoji, "", d_adlar=_d_adlar)
 
-    # ── GÖRÜNÜM SEÇİMİ ────────────────────────────────────────────────────────
+    # ── GÖRÜNÜM SEÇİMİ — Sadece Kanban butonu göster ───────────────────────
     _cl_view = st.session_state.get("_cl_view", "liste")
-    _gv1, _gv2, _gv_rest = st.columns([1, 1, 8])
-    if _gv1.button("☰ Liste", key="cl_view_liste", type="primary" if _cl_view=="liste" else "secondary", use_container_width=True):
-        st.session_state["_cl_view"] = "liste"; st.rerun()
+    _gv2, _gv_rest = st.columns([1, 9])
     if _gv2.button("📋 Kanban", key="cl_view_kanban", type="primary" if _cl_view=="kanban" else "secondary", use_container_width=True):
-        st.session_state["_cl_view"] = "kanban"; st.rerun()
+        st.session_state["_cl_view"] = "kanban" if _cl_view=="liste" else "liste"
+        st.rerun()
 
     if _cl_view == "kanban":
         # ── KART TIKLAMASI — query param ile müşteri seç ─────────────────────
