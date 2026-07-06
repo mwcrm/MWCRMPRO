@@ -10001,7 +10001,6 @@ elif aktif == "islem_takip":
     _h  = '<div class="it-wrap">' + _css
     _h += '<table class="it-tbl"><thead><tr>'
     _h += '<th class="td-f">Firma</th>'
-    _h += '<th class="td-b">Beklenen</th>'
     for _n in range(1, _max_gun+1):
         _h += f'<th class="td-g">Gün {_n}</th>'
     _h += '<th class="td-s">Aşama</th>'
@@ -10028,6 +10027,7 @@ elif aktif == "islem_takip":
         # Firma kolonu
         _rows += '<td class="td-f">'
         _rows += f'<div class="f-adi">{_firma}</div>'
+        if _bk_f: _rows += f'<div style="font-size:11px;font-weight:600;color:#16a34a;margin:2px 0;">{_bk_f}</div>'
         _rows += '<div class="f-det">'
         if _yt and _yt not in ["nan","None",""]: _rows += f'{_yt}<br>'
         if _gm and _gm not in ["nan","None",""]: _rows += f'{_gm}<br>'
@@ -10036,8 +10036,7 @@ elif aktif == "islem_takip":
         if _loc: _rows += f'{_loc}'
         _rows += f'</div>{_it_badge(_dr)}</td>'
 
-        # Beklenen
-        _rows += f'<td class="td-b"><div class="hedef">{_bk_f}</div></td>'
+
 
         # Gün kolonları
         _gun_listesi = list(_gunler.items())
