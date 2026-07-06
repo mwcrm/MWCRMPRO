@@ -9963,12 +9963,18 @@ elif aktif == "islem_takip":
         return "📝"
 
     def _it_sonuc(durum, asama):
-        d = (str(durum)+str(asama)).lower()
-        if "kazan" in d: return "<span style='color:#16a34a;font-size:11px;font-weight:500;'>🏆 Kazanıldı</span>"
-        if "negatif" in d or "kayb" in d: return "<span style='color:#dc2626;font-size:11px;font-weight:500;'>✗ Kaybedildi</span>"
-        if any(x in d for x in ["teklif","randevu","tekrar","arama","devam","fiyat"]): return "<span style='color:#d97706;font-size:11px;font-weight:500;'>↻ Devam ediyor</span>"
-        if "portf" in d: return "<span style='color:#2563eb;font-size:11px;font-weight:500;'>📁 Portföy</span>"
-        return "<span style='color:#6b7280;font-size:11px;'>— Bekliyor</span>"
+        # Sadece sistemdeki aşamayı göster
+        _a = str(asama).strip() if asama and str(asama) not in ["","nan","None"] else str(durum).strip()
+        if not _a or _a in ["","nan","None"]: return ""
+        _emojiler = {
+            "İlk Temas":"👋","Teklif":"📄","Deneme":"🧪","Sözleşme":"📝",
+            "Kazanıldı":"🏆","Kaybedildi":"❌","Negatif Portföy":"👎",
+            "Gereksizler":"🗑️","Portföy":"💼","Hedef":"🎯","Aktif":"✅",
+            "Tekrar Ara":"📞","Pasif":"⚫","Takip":"👁️","Randevu":"📅",
+            "Fiyat Hazırla":"💰","NONE":"—","None":"—",
+        }
+        _em = _emojiler.get(_a, "📌")
+        return f"<span style='font-size:10px;font-weight:500;color:#0f172a;'>{_em} {_a}</span>"
 
     def _it_badge(durum):
         d = str(durum).lower()
@@ -10088,20 +10094,15 @@ elif aktif == "islem_takip":
         _yeni_no = len(_gun_listesi)+1
         _rows += f'<td class="td-n"><div class="yeni-g"><div class="yeni-g-ust">📅 Gün {_yeni_no}</div><div class="yeni-g-alt">ekle</div></div></td>'
 
-        # Sonuç — aşama dropdown
-        _opt = lambda v,k: 'selected' if k in (_dr+_as).lower() else ''
-        _rows += '<td class="td-s"><div style="display:flex;flex-direction:column;gap:3px;">'
-        _rows += f'<div style="margin-bottom:3px;">{_it_sonuc(_dr,_as)}</div>'
+        # Sonuç — sistemdeki aşama + değiştir dropdown
+        _rows += '<td class="td-s"><div style="display:flex;flex-direction:column;gap:4px;">'
+        _rows += f'<div>{_it_sonuc(_dr,_as)}</div>'
+        _cur_as = _as if _as and _as not in ['','nan','None'] else _dr
         _rows += '<select style="font-size:9px;padding:2px 4px;border-radius:5px;border:0.5px solid #e2e8f0;background:#f8fafc;color:#0f172a;width:100%;">'
-        _rows += '<option value="">— Aşama seç —</option>'
-        _rows += f'<option value="Portföy" {_opt("Portföy","portf")}>📁 Portföy</option>'
-        _rows += f'<option value="İlk Temas" {_opt("İlk Temas","ilk")}>👋 İlk Temas</option>'
-        _rows += f'<option value="Randevu" {_opt("Randevu","randevu")}>📅 Randevu</option>'
-        _rows += f'<option value="Fiyat Hazırla" {_opt("Fiyat Hazırla","fiyat")}>💰 Fiyat Hazırla</option>'
-        _rows += f'<option value="Teklif" {_opt("Teklif","teklif")}>📄 Teklif</option>'
-        _rows += f'<option value="Tekrar Ara" {_opt("Tekrar Ara","tekrar")}>🔄 Tekrar Ara</option>'
-        _rows += f'<option value="Kazanıldı" {_opt("Kazanıldı","kazan")}>🏆 Kazanıldı</option>'
-        _rows += f'<option value="Negatif Portföy" {_opt("Negatif Portföy","negatif")}>✗ Negatif</option>'
+        _rows += '<option value="">— Değiştir —</option>'
+        for _ao in ['İlk Temas','Randevu','Fiyat Hazırla','Teklif','Deneme','Sözleşme','Tekrar Ara','Kazanıldı','Kaybedildi','Negatif Portföy','Portföy','Hedef','Aktif','Pasif']:
+            _sel = 'selected' if _ao == _cur_as else ''
+            _rows += f'<option value="{_ao}" {_sel}>{_ao}</option>'
         _rows += '</select></div></td>'
         _rows += '</tr>'
 
