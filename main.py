@@ -2575,7 +2575,7 @@ section[data-testid="stSidebar"] { display: none !important; }
                                 # Tüm filtreleri sıfırla
                                 for _fk in ["_cl_fil_durum_multi","_cl_fil_asama_multi",
                                             "_cl_fil_il_multi","_cl_fil_ilce_multi",
-                                            "_cl_fil_temsilci_multi","_cl_sec_kart"]:
+                                            "_cl_fil_temsilci_multi","_cl_sec_kart","siralama_kol"]:
                                     if _fk in st.session_state:
                                         del st.session_state[_fk]
                             elif d_adlar and _ad in d_adlar:
@@ -2589,7 +2589,7 @@ section[data-testid="stSidebar"] { display: none !important; }
     # Toplam basınca tüm filtreleri sıfırla
     if st.session_state.get("_tek_sec_tek") == "Toplam" or st.session_state.get("_tek_fil") == "Toplam":
         for _fk in ["_cl_fil_asama_multi","_cl_fil_durum_multi","_cl_sec_kart",
-                    "_cl_fil_il_multi","_cl_fil_ilce_multi","_tek_sec_tek"]:
+                    "_cl_fil_il_multi","_cl_fil_ilce_multi","_tek_sec_tek","siralama_kol"]:
             if _fk in st.session_state: del st.session_state[_fk]
         st.session_state["_tek_fil"] = None
         st.rerun()
@@ -2836,7 +2836,7 @@ function kartSec(id){
         _tem_def  = [x for x in st.session_state.get("_cl_fil_temsilci_multi",[]) if x in _tem_opts]
         _tem_sec  = _fc[7].multiselect("t", _tem_opts, default=_tem_def, key="_cl_fil_temsilci_multi", placeholder="Temsilci...", label_visibility="collapsed")
 
-        siralama_kol = _fc[8].selectbox("sr", ["Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z","Hedef ₺↓","Hedef ₺↑","Gerçek ₺↓","Gerçek ₺↑"], key="siralama_kol", label_visibility="collapsed")
+        siralama_kol = _fc[8].selectbox("sr", ["—","Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z","Hedef ₺↓","Hedef ₺↑","Gerçek ₺↓","Gerçek ₺↑"], key="siralama_kol", label_visibility="collapsed")
 
         # Eski sistemle uyumluluk
         kart_opts = ["-- Müşteri Seçin --"] + [
