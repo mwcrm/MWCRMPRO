@@ -1321,7 +1321,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "teklif", "ozel_teklif", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -1331,6 +1331,7 @@ _TAB_ETIKETLER = {
     "excel": "📥 Excel Aktar",
     "kisiler": "📞 Telefon Kişiler",
     "analiz": "🔍 Müşteri Analizi",
+    "islem_takip": "📋 İşlem Takip",
     
     "randevu": "📅 Randevular",
     "kullanici": "👥 Kullanıcı Yönetimi",
@@ -2758,7 +2759,23 @@ function kartSec(id){
     if _tem_sec:
         df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
 
-    # Tüm müşteriler görünsün — filtre seçilmediyse kısıtlama yok
+    # ── HİÇ FİLTRE SEÇİLİ DEĞİLKEN — sadece işlem görmemiş (Özel Müşteri/Portföy) göster ──
+    # Bir müşteriye durum atanınca (Randevu, Teklif, Tekrar Ara vb.) artık burada görünmesin,
+    # sadece kendi durum filtresinde görünsün. Karışıklığı önler.
+    if not _durum_sec and not _asama_sec and "durum" in df_f.columns:
+        _varsayilan_durumlar = ["Özel Müşteri", "Portföy"]
+        df_f = df_f[df_f["durum"].isin(_varsayilan_durumlar)]
+
+    # ── AŞAMA İÇİN AYNI MANTIK — sadece "İlk Temas" (varsayılan) aşamasındakiler kalsın ──
+    # Aşaması değişen (Teklif, Sözleşme, Kazanıldı, Negatif Portföy vb.) müşteriler
+    # ana listeden çıkıp sadece kendi aşama filtresinde görünür.
+    if not _durum_sec and not _asama_sec and "islem_asamasi" in df_f.columns:
+        _varsayilan_asama = "İlk Temas"
+        df_f = df_f[
+            (df_f["islem_asamasi"] == _varsayilan_asama) |
+            (df_f["islem_asamasi"].isna()) |
+            (df_f["islem_asamasi"].astype(str).str.strip() == "")
+        ]
 
     # Segment hesapla ve sırala
     if df_f.empty or "firma" not in df_f.columns:
@@ -2790,13 +2807,7 @@ function kartSec(id){
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
         try:
             kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
-            _km = df_f[df_f["id"]==kart_id]
-            if _km.empty:
-                _km = df[df["id"]==kart_id]
-            if _km.empty:
-                st.error("Müşteri bulunamadı, filtreleri temizleyin.")
-                st.stop()
-            kart_row = _km.iloc[0]
+            kart_row = df_f[df_f["id"]==kart_id].iloc[0]
             bek = float(kart_row.get("beklenen_ciro",0) or 0)
             ger = float(kart_row.get("gerceklesen_ciro",0) or 0)
             _seg_val = str(kart_row.get("segment","") or "")
@@ -3627,9 +3638,7 @@ elif aktif == "kullanici":
             k3_opts = [f"[{int(r['id'])}] {r['kullanici_adi']}" for _,r in df_kul3.iterrows()]
             k3_sec  = st.selectbox("Kullanıcı:", k3_opts, key="yetki_sec")
             k3_id   = int(k3_sec.split("]")[0].replace("[",""))
-            _k3m = df_kul3[df_kul3["id"]==k3_id]
-            if _k3m.empty: raise Exception("Kullanıcı bulunamadı")
-            k3_row = _k3m.iloc[0]
+            k3_row  = df_kul3[df_kul3["id"]==k3_id].iloc[0]
 
             mv = str(k3_row.get("yetkiler","tam") or "tam")
             try:
@@ -5052,11 +5061,6 @@ elif aktif == "teklif":
     with st.expander("📋 Kayıtlı Teklifler"):
         try:
             df_tek = db_read("teklifler", order_col="tarih")
-            # Kullanıcı sadece kendi tekliflerini görsün
-            _tek_kul = st.session_state.get("kullanici","")
-            _tek_rol = st.session_state.get("rol","")
-            if not df_tek.empty and _tek_rol != "admin" and "olusturan" in df_tek.columns:
-                df_tek = df_tek[df_tek["olusturan"].astype(str) == _tek_kul]
             if df_tek.empty:
                 st.info("Henüz kayıtlı teklif yok.")
             else:
@@ -5421,11 +5425,6 @@ elif aktif == "ozel_teklif":
     with st.expander("📋 Kayıtlı Özel Teklifler"):
         try:
             _oz_df_tek = db_read("teklifler", order_col="tarih")
-            # Kullanıcı sadece kendi tekliflerini görsün
-            _oz_tek_kul = st.session_state.get("kullanici","")
-            _oz_tek_rol = st.session_state.get("rol","")
-            if not _oz_df_tek.empty and _oz_tek_rol != "admin" and "olusturan" in _oz_df_tek.columns:
-                _oz_df_tek = _oz_df_tek[_oz_df_tek["olusturan"].astype(str) == _oz_tek_kul]
             if not _oz_df_tek.empty and "satirlar" in _oz_df_tek.columns:
                 _oz_df_tek2 = _oz_df_tek[_oz_df_tek["satirlar"].str.contains('ozel', case=False, na=False)]
             else:
@@ -5588,9 +5587,7 @@ elif aktif == "excel":
                             try:
                                 if v is None or (isinstance(v, float) and pd.isna(v)):
                                     return 0.0
-                                # Virgüllü string temizle: "1,000,000" → 1000000
-                                s = str(v).strip().replace(" ","").replace("₺","").replace(",","")
-                                return float(s) if s else 0.0
+                                return float(v)
                             except:
                                 return 0.0
 
@@ -9206,7 +9203,7 @@ elif aktif == "musteri_atama":
     # ── TOPLU ATAMA BARI ──────────────────────────────────────────────────────
     _opts_kul = ["— Kullanıcı Seç —"] + _kul_listesi
     _tab1, _tab2 = st.columns([3,1])
-    _ma_toplu_kul = _tab1.selectbox("👤 Seçilenleri ata:", _opts_kul, key="ma_toplu_kul")
+    _ma_toplu_kul = _tab1.selectbox("Seçilenleri şu kullanıcıya ata:", _opts_kul, key="ma_toplu_kul", label_visibility="collapsed")
 
     # Seçili ID'leri session'dan al
     if "ma_secili_ids" not in st.session_state:
@@ -9803,6 +9800,214 @@ elif aktif == "operasyon":
 
     # ── SUPABASE SQL ───────────────────────────────────────────────────────
 
+
+
+
+# ── İŞLEM TAKİP ───────────────────────────────────────────────────────────────
+elif aktif == "islem_takip":
+    sayfa_log("islem_takip")
+
+    _it_kul = st.session_state.get("kullanici", "")
+    _it_rol = st.session_state.get("rol", "")
+    _it_admin = (_it_rol == "admin")
+
+    st.markdown("## 📋 İşlem Takip")
+
+    _sb_it = get_sb_client()
+    if not _sb_it:
+        st.error("Veritabanı bağlantısı kurulamadı.")
+        st.stop()
+
+    # ── TÜM İŞLEMLERİ ÇEK ────────────────────────────────────────────────────
+    # Notlar
+    try:
+        _it_notlar = _sb_it.table("notlar").select("*").order("tarih", desc=False).execute()
+        _df_notlar = pd.DataFrame(_it_notlar.data) if _it_notlar.data else pd.DataFrame()
+    except: _df_notlar = pd.DataFrame()
+
+    # Randevular
+    try:
+        _it_rdv = _sb_it.table("randevular").select("*").order("randevu_tarihi", desc=False).execute()
+        _df_rdv = pd.DataFrame(_it_rdv.data) if _it_rdv.data else pd.DataFrame()
+    except: _df_rdv = pd.DataFrame()
+
+    # Teklifler
+    try:
+        _it_tek = _sb_it.table("teklifler").select("*").order("tarih", desc=False).execute()
+        _df_tek = pd.DataFrame(_it_tek.data) if _it_tek.data else pd.DataFrame()
+    except: _df_tek = pd.DataFrame()
+
+    # Cari listesi (firma bilgileri)
+    _it_cariler = get_cari_listesi()
+
+    # ── İŞLEMLERİ BİRLEŞTİR ──────────────────────────────────────────────────
+    # Her işlem: {musteri_id, firma, tarih, tur, aciklama, kullanici}
+    _it_tum_islemler = []
+
+    # Notlardan
+    if not _df_notlar.empty:
+        for _, _nr in _df_notlar.iterrows():
+            _mid = str(_nr.get("musteri_id") or _nr.get("cari_id") or "")
+            _firma = str(_nr.get("musteri_adi") or _nr.get("firma") or "")
+            _tarih = str(_nr.get("tarih") or _nr.get("olusturma_tarihi") or "")[:10]
+            _tur = str(_nr.get("tur") or _nr.get("islem_turu") or "Not")
+            _acik = str(_nr.get("icerik") or _nr.get("aciklama") or _nr.get("not_metni") or "")
+            _kul = str(_nr.get("kullanici") or _nr.get("olusturan") or "")
+            if not _it_admin and _kul != _it_kul:
+                continue
+            _it_tum_islemler.append({
+                "musteri_id": _mid, "firma": _firma,
+                "tarih": _tarih, "tur": _tur,
+                "aciklama": _acik[:80], "kullanici": _kul
+            })
+
+    # Randevulardan
+    if not _df_rdv.empty:
+        for _, _rr in _df_rdv.iterrows():
+            _firma = str(_rr.get("musteri_adi") or _rr.get("firma") or "")
+            _tarih = str(_rr.get("olusturma_tarihi") or _rr.get("randevu_tarihi") or "")[:10]
+            _rdv_tar = str(_rr.get("randevu_tarihi") or "")[:10]
+            _kul = str(_rr.get("kullanici") or _rr.get("olusturan") or "")
+            if not _it_admin and _kul != _it_kul:
+                continue
+            _it_tum_islemler.append({
+                "musteri_id": str(_rr.get("musteri_id") or ""),
+                "firma": _firma,
+                "tarih": _tarih,
+                "tur": "Randevu",
+                "aciklama": f"Randevu: {_rdv_tar}" if _rdv_tar else "Randevu girildi",
+                "kullanici": _kul
+            })
+
+    # Tekliflerden
+    if not _df_tek.empty:
+        for _, _tr2 in _df_tek.iterrows():
+            _firma = str(_tr2.get("musteri_adi") or "")
+            _tarih = str(_tr2.get("tarih") or _tr2.get("olusturma_tarihi") or "")[:10]
+            _kul = str(_tr2.get("olusturan") or "")
+            if not _it_admin and _kul != _it_kul:
+                continue
+            _it_tum_islemler.append({
+                "musteri_id": str(_tr2.get("cari_id") or ""),
+                "firma": _firma,
+                "tarih": _tarih,
+                "tur": "Teklif",
+                "aciklama": f"Teklif oluşturuldu",
+                "kullanici": _kul
+            })
+
+    if not _it_tum_islemler:
+        st.info("Henüz kayıtlı işlem bulunamadı.")
+        st.stop()
+
+    # ── MÜŞTERİ BAZINDA GRUPLA ────────────────────────────────────────────────
+    # {firma: [islem1, islem2, ...]} — tarih sırasıyla
+    _it_gruplu = {}
+    for _ism in _it_tum_islemler:
+        _f = _ism["firma"] or _ism["musteri_id"] or "?"
+        if not _f or _f in ["", "nan", "None"]: continue
+        if _f not in _it_gruplu:
+            _it_gruplu[_f] = []
+        _it_gruplu[_f].append(_ism)
+
+    # Her müşteri için işlemleri tarih sırasıyla sırala
+    for _f in _it_gruplu:
+        _it_gruplu[_f] = sorted(_it_gruplu[_f], key=lambda x: x["tarih"])
+
+    # En çok işlem yapılan üstte
+    _it_sirali = sorted(_it_gruplu.items(), key=lambda x: len(x[1]), reverse=True)
+
+    # Cari listeden durum bilgisi al
+    _it_durum_map = {}
+    if not _it_cariler.empty and "firma" in _it_cariler.columns:
+        for _, _cr in _it_cariler.iterrows():
+            _it_durum_map[str(_cr.get("firma",""))] = str(_cr.get("durum","") or _cr.get("islem_asamasi","") or "")
+
+    # ── FİLTRELER ────────────────────────────────────────────────────────────
+    _it_ara = st.text_input("🔍 Firma ara", placeholder="firma adı...", key="it_ara")
+    if _it_ara:
+        _it_sirali = [(f, i) for f, i in _it_sirali if _it_ara.lower() in f.lower()]
+
+    st.caption(f"{len(_it_sirali)} müşteri · toplam {sum(len(i) for _,i in _it_sirali)} işlem")
+    st.markdown("---")
+
+    # ── İŞLEM TÜRÜ İKONU ─────────────────────────────────────────────────────
+    def _it_ikon(tur):
+        t = str(tur).lower()
+        if "arama" in t or "telefon" in t: return "📞"
+        if "mesaj" in t or "whatsapp" in t: return "💬"
+        if "teklif" in t: return "📄"
+        if "randevu" in t: return "📅"
+        if "analiz" in t: return "🔍"
+        if "not" in t: return "📝"
+        if "email" in t or "mail" in t: return "✉️"
+        return "📌"
+
+    def _it_sonuc_html(durum):
+        d = str(durum).lower()
+        if "kazan" in d: return "<span style='color:#16a34a;font-size:10px;font-weight:500;'>🏆 Kazanıldı</span>"
+        if "negatif" in d or "kayb" in d: return "<span style='color:#dc2626;font-size:10px;font-weight:500;'>✗ Kaybedildi</span>"
+        if "teklif" in d or "randevu" in d or "tekrar" in d or "arama" in d: return "<span style='color:#d97706;font-size:10px;font-weight:500;'>↻ Devam ediyor</span>"
+        return "<span style='color:#6b7280;font-size:10px;'>— Bekliyor</span>"
+
+    # ── TABLO HEADER ─────────────────────────────────────────────────────────
+    _it_max_islem = max((len(i) for _, i in _it_sirali), default=1)
+    _islem_sayisi = max(_it_max_islem, 3)  # en az 3 kolon
+
+    _hdr_html = """<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:11px;min-width:800px;">
+<thead><tr style="background:var(--surface-1);border-bottom:0.5px solid var(--border);">
+<th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;border-right:0.5px solid var(--border);width:200px;">Firma</th>
+<th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;border-right:0.5px solid var(--border);width:80px;">Beklenen</th>"""
+
+    for _n in range(1, _islem_sayisi + 1):
+        _hdr_html += f'<th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;border-right:0.5px solid var(--border);background:rgba(59,130,246,0.04);min-width:140px;">İşlem {_n}</th>'
+
+    _hdr_html += '<th style="padding:6px 10px;text-align:left;font-size:9px;font-weight:500;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;width:90px;">Sonuç</th></tr></thead><tbody>'
+
+    # ── SATIRLAR ─────────────────────────────────────────────────────────────
+    _satirlar_html = ""
+    for _sira, (_firma, _islemler) in enumerate(_it_sirali):
+        _durum = _it_durum_map.get(_firma, "")
+        _beklenen = ""
+        if not _it_cariler.empty and "firma" in _it_cariler.columns:
+            _cr_f = _it_cariler[_it_cariler["firma"] == _firma]
+            if not _cr_f.empty:
+                _bk = _cr_f.iloc[0].get("beklenen_ciro", 0) or 0
+                try: _beklenen = f"{int(float(_bk)):,}".replace(",", ".") + " ₺" if float(_bk) > 0 else ""
+                except: _beklenen = ""
+
+        _satirlar_html += f"""<tr style="border-bottom:0.5px solid var(--border);vertical-align:top;" onmouseover="this.style.background='var(--surface-1)'" onmouseout="this.style.background='var(--surface-2)'">
+<td style="padding:8px 10px;border-right:0.5px solid var(--border);background:var(--surface-2);">
+  <div style="font-size:11px;font-weight:500;color:var(--text-primary);">{_firma}</div>
+  <div style="font-size:9px;color:var(--text-muted);margin-top:2px;">Sıra {_sira} · {len(_islemler)} işlem</div>
+</td>
+<td style="padding:8px 10px;border-right:0.5px solid var(--border);background:var(--surface-2);">
+  <div style="font-size:11px;font-weight:500;color:#16a34a;">{_beklenen}</div>
+</td>"""
+
+        # İşlem kolonları
+        for _n in range(_islem_sayisi):
+            if _n < len(_islemler):
+                _ism = _islemler[_n]
+                _ikon = _it_ikon(_ism["tur"])
+                _acik = _ism["aciklama"][:60] + "..." if len(_ism["aciklama"]) > 60 else _ism["aciklama"]
+                _satirlar_html += f"""<td style="padding:8px 10px;border-right:0.5px solid var(--border);background:rgba(59,130,246,0.02);">
+  <div style="background:var(--surface-1);border:0.5px solid var(--border);border-radius:7px;padding:6px 8px;">
+    <div style="font-size:9px;color:var(--text-muted);">{_ism["tarih"]}</div>
+    <div style="font-size:10px;font-weight:500;color:var(--text-primary);margin:2px 0;">{_ikon} {_ism["tur"]}</div>
+    <div style="font-size:10px;color:var(--text-secondary);line-height:1.3;">{_acik}</div>
+    <div style="font-size:9px;color:var(--text-muted);margin-top:2px;">İşlem {_n+1} / {len(_islemler)}</div>
+  </div>
+</td>"""
+            else:
+                _satirlar_html += '<td style="padding:8px 10px;border-right:0.5px solid var(--border);background:rgba(59,130,246,0.01);"></td>'
+
+        _satirlar_html += f"""<td style="padding:8px 10px;background:var(--surface-2);">
+  {_it_sonuc_html(_durum)}
+</td></tr>"""
+
+    _tablo_html = _hdr_html + _satirlar_html + "</tbody></table></div>"
+    st.markdown(_tablo_html, unsafe_allow_html=True)
 
 
 elif aktif == "harita":
