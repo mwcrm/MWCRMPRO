@@ -22,11 +22,18 @@ def sb_or_sqlite():
 def get_sb_client():
     """Supabase client — tek seferlik oluştur, cache'le"""
     try:
-        from supabase import create_client
+        from supabase import create_client, ClientOptions
         url = st.secrets.get("SUPABASE_URL","")
         key = st.secrets.get("SUPABASE_KEY","")
         if url and key:
-            return create_client(url, key)
+            try:
+                # Max rows limitini kaldır
+                opts = ClientOptions(postgrest_client_timeout=60)
+                client = create_client(url, key, options=opts)
+                client.postgrest.auth(key)
+                return client
+            except:
+                return create_client(url, key)
     except:
         pass
     return None
@@ -149,34 +156,52 @@ def _atama_filtresi_uygula(df):
 
 @st.cache_data(ttl=60)
 def get_cari_listesi():
-    """60 sn cache'li cari listesi — tüm kayıtları çek, silindi filtresi Python'da uygula"""
-    sb = get_sb_client()
-    if sb:
+    """60 sn cache'li cari listesi — HTTP Range ile limitsiz çek"""
+    import requests as _rq
+    _url = st.secrets.get("SUPABASE_URL","")
+    _key = st.secrets.get("SUPABASE_SERVICE_KEY","") or st.secrets.get("SUPABASE_KEY","")
+    _tum = []
+    if _url and _key:
         try:
-            _tum = []
             _offset = 0
             while True:
-                _res = (sb.table("cari_kartlar")
-                    .select("*")
-                    .order("id", desc=False)
-                    .range(_offset, _offset + 999)
-                    .execute())
-                if not _res.data:
+                _hdrs = {
+                    "apikey": _key,
+                    "Authorization": f"Bearer {_key}",
+                    "Range-Unit": "items",
+                    "Range": f"{_offset}-{_offset+999}"
+                }
+                _r = _rq.get(
+                    f"{_url}/rest/v1/cari_kartlar?select=*&order=id.asc",
+                    headers=_hdrs, timeout=30
+                )
+                if _r.status_code not in [200, 206]:
                     break
-                _tum.extend(_res.data)
-                if len(_res.data) < 1000:
+                _batch = _r.json()
+                if not _batch:
+                    break
+                _tum.extend(_batch)
+                if len(_batch) < 1000:
                     break
                 _offset += 1000
-            _df_g = pd.DataFrame(_tum) if _tum else pd.DataFrame()
-            if not _df_g.empty:
-                # Silindi filtresi — sadece silindi=1 olanları çıkar (NULL, 0, False hepsi dahil)
-                if "silindi" in _df_g.columns:
-                    _df_g = _df_g[~(_df_g["silindi"].astype(str).str.strip().isin(["1","True","true","1.0"]))]
-                for _tk in ["gsm","sabit"]:
-                    if _tk in _df_g.columns:
-                        _df_g[_tk] = _telefon_temizle(_df_g[_tk])
-            return _df_g
-        except: pass
+        except:
+            pass
+    if not _tum:
+        try:
+            sb = get_sb_client()
+            if sb:
+                _res = sb.table("cari_kartlar").select("*").order("id",desc=False).execute()
+                _tum = _res.data or []
+        except:
+            pass
+    _df_g = pd.DataFrame(_tum) if _tum else pd.DataFrame()
+    if not _df_g.empty:
+        if "silindi" in _df_g.columns:
+            _df_g = _df_g[~(_df_g["silindi"].astype(str).str.strip().isin(["1","True","true","1.0"]))]
+        for _tk in ["gsm","sabit"]:
+            if _tk in _df_g.columns:
+                _df_g[_tk] = _telefon_temizle(_df_g[_tk])
+    return _df_g
     try:
         conn = get_conn()
         df = pd.read_sql("SELECT * FROM cari_kartlar WHERE silindi=0 OR silindi='0' OR silindi IS NULL ORDER BY firma", conn)
@@ -2333,20 +2358,8 @@ section[data-testid="stSidebar"] { display: none !important; }
     try:
         if sb_liste:
             # Sayfalama ile TÜM kayıtları çek — Supabase max limit aşmak için
-            _liste_tum = []
-            _liste_offset = 0
-            while True:
-                _res_l = (sb_liste.table("cari_kartlar")
-                    .select("*")
-                    .order("id", desc=False)
-                    .range(_liste_offset, _liste_offset + 999)
-                    .execute())
-                if not _res_l.data:
-                    break
-                _liste_tum.extend(_res_l.data)
-                if len(_res_l.data) < 1000:
-                    break
-                _liste_offset += 1000
+            # get_cari_listesi ile aynı limitsiz çekme
+            _liste_tum = get_cari_listesi().to_dict("records") if not get_cari_listesi().empty else []
             df = pd.DataFrame(_liste_tum) if _liste_tum else pd.DataFrame()
             # Silindi filtresi Python tarafında
             if not df.empty and "silindi" in df.columns:
