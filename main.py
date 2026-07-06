@@ -2883,7 +2883,15 @@ function kartSec(id){
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
         try:
             kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
-            kart_row = df_f[df_f["id"]==kart_id].iloc[0]
+            # Önce filtrelenmiş listede ara, yoksa tüm listede ara
+            _km = df_f[df_f["id"]==kart_id]
+            if _km.empty:
+                _km = get_cari_listesi()
+                _km = _km[_km["id"]==kart_id]
+            if _km.empty:
+                st.warning("⚠️ Seçili müşteri bulunamadı. Filtreyi temizleyip tekrar deneyin.")
+                st.stop()
+            kart_row = _km.iloc[0]
             bek = float(kart_row.get("beklenen_ciro",0) or 0)
             ger = float(kart_row.get("gerceklesen_ciro",0) or 0)
             _seg_val = str(kart_row.get("segment","") or "")
@@ -3714,7 +3722,9 @@ elif aktif == "kullanici":
             k3_opts = [f"[{int(r['id'])}] {r['kullanici_adi']}" for _,r in df_kul3.iterrows()]
             k3_sec  = st.selectbox("Kullanıcı:", k3_opts, key="yetki_sec")
             k3_id   = int(k3_sec.split("]")[0].replace("[",""))
-            k3_row  = df_kul3[df_kul3["id"]==k3_id].iloc[0]
+            _k3m = df_kul3[df_kul3["id"]==k3_id]
+            if _k3m.empty: raise Exception("Kullanıcı bulunamadı")
+            k3_row = _k3m.iloc[0]
 
             mv = str(k3_row.get("yetkiler","tam") or "tam")
             try:
@@ -5146,7 +5156,9 @@ elif aktif == "teklif":
                 _sec_tek = st.selectbox("Teklif Seç:", _tek_opts, key="tek_sec")
                 if _sec_tek != "-- Teklif Seçin --" and "[" in _sec_tek:
                     _tek_id = int(_sec_tek.split("]")[0].replace("[","").strip())
-                    _tek_row = df_tek[df_tek["id"]==_tek_id].iloc[0]
+                    _tkmatch = df_tek[df_tek["id"]==_tek_id]
+                    if _tkmatch.empty: raise Exception("Teklif bulunamadı")
+                    _tek_row = _tkmatch.iloc[0]
                     st.caption(f"📅 {fmt_tarih(_tek_row.get('tarih',''))} · 👤 {_tek_row.get('olusturan','')} · 📝 {_tek_row.get('notlar','')}")
                     try:
                         _data = json.loads(_tek_row.get("satirlar","{}"))
@@ -5516,7 +5528,9 @@ elif aktif == "ozel_teklif":
 
                 if _oz_tek_sec != "-- Teklif Seçin --" and "[" in _oz_tek_sec:
                     _oz_tid = int(_oz_tek_sec.split("]")[0].replace("[","").strip())
-                    _oz_trow = _oz_df_tek2[_oz_df_tek2["id"]==_oz_tid].iloc[0]
+                    _oztmatch = _oz_df_tek2[_oz_df_tek2["id"]==_oz_tid]
+                    if _oztmatch.empty: raise Exception("Teklif bulunamadı")
+                    _oz_trow = _oztmatch.iloc[0]
                     st.caption(f"📅 {fmt_tarih(_oz_trow.get('tarih',''))} · 👤 {_oz_trow.get('olusturan','')} · 📝 {_oz_trow.get('notlar','')}")
                     try:
                         _oz_data = _ozj.loads(_oz_trow.get("satirlar","{}"))
@@ -6560,7 +6574,9 @@ elif aktif == "whatsapp":
             wa_secim = st.selectbox("Müşteri:", musteri_opts_wa, key="wa_musteri_sec")
             if wa_secim != "-- Seçin --":
                 wa_mid = int(wa_secim.split("]")[0].replace("[","").strip())
-                wa_row = df_wa[df_wa["id"] == wa_mid].iloc[0]
+                _wam = df_wa[df_wa["id"] == wa_mid]
+                if _wam.empty: raise Exception("WA bulunamadı")
+                wa_row = _wam.iloc[0]
                 wa_numara = wa_numara_formatla(wa_row["gsm"])
                 wa_firma = str(wa_row["firma"])
                 st.info(f"📱 {wa_numara} — {wa_firma}")
@@ -6848,7 +6864,7 @@ elif aktif == "kisiler":
                         # Şablondan doldur
                         sab_row = df_sab_all[df_sab_all["ad"]==sec]
                         if not sab_row.empty:
-                            sablon_txt = str(sab_row.iloc[0]["metin"])
+                            sablon_txt = str(sab_row.iloc[0]["metin"]) if not sab_row.empty else ""
                             if firma_h:
                                 header = f"*{firma_h}*" + (f" | {gorev_h}" if gorev_h else "") + "\n\n"
                                 sablon_txt = header + sablon_txt
@@ -7510,7 +7526,7 @@ elif aktif == "randevu":
                 _rmid = int(_rand_mus_sec.split("]")[0].replace("[","").strip())
                 _rmrow = df_mrand[df_mrand["id"] == _rmid]
                 if not _rmrow.empty:
-                    _rand_musteri_satir = _rmrow.iloc[0]
+                    _rand_musteri_satir = _rmrow.iloc[0] if not _rmrow.empty else None
             except: pass
 
         if _rand_musteri_satir is not None:
