@@ -593,6 +593,17 @@ def sayfa_log(sayfa):
             kullanici_log_kaydet("SAYFA_GİRİŞİ", sayfa, f"→ {sayfa}")
     except:
         pass
+    # Sekme başlığını güncelle
+    _menu_adlari = {
+        "yeni": "Yeni Kart", "liste": "Cari Liste", "analiz": "Müşteri Analizi",
+        "randevu": "Randevular", "teklif": "Spot Teklif", "ozel_teklif": "Özel Teklif",
+        "rota_analiz": "Rota Analiz", "operasyon": "Operasyon", "kisiler": "Telefon Kişiler",
+        "rapor": "Raporlar", "excel": "Excel", "kullanici": "Kullanıcılar",
+        "admin_rapor": "Admin Rapor", "harita": "Müşteri Haritası", "patron": "Patron",
+        "musteri_atama": "Müşteri Atama", "islem_takip": "İşlem Takip",
+    }
+    _ad = _menu_adlari.get(sayfa, sayfa)
+    st.markdown(f"<script>document.title='MWCRMPRO | {_ad}'</script>", unsafe_allow_html=True)
 
 
 def _tanimlar_yukle(tip):
