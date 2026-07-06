@@ -10083,8 +10083,6 @@ elif aktif == "islem_takip":
             else:
                 _rows += '<td class="td-g"><div class="bos">—</div></td>'
 
-        _rows += f'<td class="td-n"><div class="yeni-g"><div class="yeni-g-ust">📅 Gün {_yeni_no}</div><div class="yeni-g-alt">ekle</div></div></td>'
-
         # Sonuç — sadece mevcut aşama
         _rows += f'<td class="td-s">{_it_sonuc(_dr,_as)}</td>'
         _rows += '</tr>'
