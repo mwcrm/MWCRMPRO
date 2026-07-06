@@ -3412,6 +3412,19 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
         if _do_kaydet:
             _editor_state = st.session_state.get("cari_editor", {})
             _edited_rows  = _editor_state.get("edited_rows", {})
+            # edited_rows yoksa edited_df'ten al
+            if not _edited_rows and "edited_df" in dir():
+                try:
+                    _orig = df_edit.reset_index(drop=True)
+                    _ed   = edited_df.reset_index(drop=True)
+                    _edited_rows = {}
+                    for _ei in range(min(len(_orig), len(_ed))):
+                        _rd = {}
+                        for _ec in _ed.columns:
+                            if str(_orig.at[_ei,_ec]) != str(_ed.at[_ei,_ec]):
+                                _rd[_ec] = _ed.at[_ei,_ec]
+                        if _rd: _edited_rows[str(_ei)] = _rd
+                except: pass
             _tablo_json   = st.session_state.get("_ls_tablo")
             kayit_sayi = 0
             hata_list  = []
