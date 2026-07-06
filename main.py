@@ -10094,16 +10094,8 @@ elif aktif == "islem_takip":
         _yeni_no = len(_gun_listesi)+1
         _rows += f'<td class="td-n"><div class="yeni-g"><div class="yeni-g-ust">📅 Gün {_yeni_no}</div><div class="yeni-g-alt">ekle</div></div></td>'
 
-        # Sonuç — sistemdeki aşama + değiştir dropdown
-        _rows += '<td class="td-s"><div style="display:flex;flex-direction:column;gap:4px;">'
-        _rows += f'<div>{_it_sonuc(_dr,_as)}</div>'
-        _cur_as = _as if _as and _as not in ['','nan','None'] else _dr
-        _rows += '<select style="font-size:9px;padding:2px 4px;border-radius:5px;border:0.5px solid #e2e8f0;background:#f8fafc;color:#0f172a;width:100%;">'
-        _rows += '<option value="">— Değiştir —</option>'
-        for _ao in ['İlk Temas','Randevu','Fiyat Hazırla','Teklif','Deneme','Sözleşme','Tekrar Ara','Kazanıldı','Kaybedildi','Negatif Portföy','Portföy','Hedef','Aktif','Pasif']:
-            _sel = 'selected' if _ao == _cur_as else ''
-            _rows += f'<option value="{_ao}" {_sel}>{_ao}</option>'
-        _rows += '</select></div></td>'
+        # Sonuç — sadece mevcut aşama
+        _rows += f'<td class="td-s">{_it_sonuc(_dr,_as)}</td>'
         _rows += '</tr>'
 
     st.markdown(_h + _rows + '</tbody></table></div>', unsafe_allow_html=True)
