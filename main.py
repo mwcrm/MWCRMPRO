@@ -2573,8 +2573,12 @@ section[data-testid="stSidebar"] { display: none !important; }
                             st.session_state["_cl_fil_asama_multi"] = [_ad]
                         else:  # tek — durum+asama birleşik
                             if _ad == "Toplam":
-                                st.session_state["_cl_fil_durum_multi"] = []
-                                st.session_state["_cl_fil_asama_multi"] = []
+                                # Tüm filtreleri sıfırla
+                                for _fk in ["_cl_fil_durum_multi","_cl_fil_asama_multi",
+                                            "_cl_fil_il_multi","_cl_fil_ilce_multi",
+                                            "_cl_fil_temsilci_multi","_cl_sec_kart"]:
+                                    if _fk in st.session_state:
+                                        del st.session_state[_fk]
                             elif d_adlar and _ad in d_adlar:
                                 st.session_state["_cl_fil_durum_multi"] = [_ad]
                                 st.session_state["_cl_fil_asama_multi"] = []
@@ -2583,11 +2587,13 @@ section[data-testid="stSidebar"] { display: none !important; }
                                 st.session_state["_cl_fil_durum_multi"] = []
                         st.rerun()
 
-    # Toplam butonuna basınca tüm filtreleri sıfırla
-    if st.session_state.get("_tek_fil") == "Toplam":
-        for _fk in ["_cl_fil_asama_multi","_cl_fil_durum_multi","_cl_sec_kart","_cl_fil_il_multi","_cl_fil_ilce_multi"]:
+    # Toplam basınca tüm filtreleri sıfırla
+    if st.session_state.get("_tek_sec_tek") == "Toplam" or st.session_state.get("_tek_fil") == "Toplam":
+        for _fk in ["_cl_fil_asama_multi","_cl_fil_durum_multi","_cl_sec_kart",
+                    "_cl_fil_il_multi","_cl_fil_ilce_multi","_tek_sec_tek"]:
             if _fk in st.session_state: del st.session_state[_fk]
         st.session_state["_tek_fil"] = None
+        st.rerun()
 
     # ── TEK SATIR: Durum + Aşama birleşik ───────────────────────────────────
     _d_veri = [("Toplam", len(df))]
@@ -2600,14 +2606,15 @@ section[data-testid="stSidebar"] { display: none !important; }
     _tum_emoji = {**_DURUM_EMOJI, **_ASAMA_EMOJI}
     _d_adlar = {x[0] for x in _d_veri}
 
-    _rapor_satir(_tum_veri, "_tek_sirasi", "_tek_gizlisi", "tek", _tum_emoji, "", d_adlar=_d_adlar)
-
-    # ── GÖRÜNÜM SEÇİMİ — Sadece Kanban butonu göster ───────────────────────
+    # Kanban butonu — buton satırında sağ tarafta
     _cl_view = st.session_state.get("_cl_view", "liste")
-    _gv2, _gv_rest = st.columns([1, 9])
-    if _gv2.button("📋 Kanban", key="cl_view_kanban", type="primary" if _cl_view=="kanban" else "secondary", use_container_width=True):
-        st.session_state["_cl_view"] = "kanban" if _cl_view=="liste" else "liste"
-        st.rerun()
+    _bsatir1, _bsatir2 = st.columns([9, 1])
+    with _bsatir1:
+        _rapor_satir(_tum_veri, "_tek_sirasi", "_tek_gizlisi", "tek", _tum_emoji, "", d_adlar=_d_adlar)
+    with _bsatir2:
+        if st.button("📋 Kanban", key="cl_view_kanban", type="primary" if _cl_view=="kanban" else "secondary", use_container_width=True):
+            st.session_state["_cl_view"] = "kanban" if _cl_view=="liste" else "liste"
+            st.rerun()
 
     if _cl_view == "kanban":
         # ── KART TIKLAMASI — query param ile müşteri seç ─────────────────────
