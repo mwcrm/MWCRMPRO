@@ -10061,7 +10061,7 @@ elif aktif == "islem_takip":
         # Beklenen
         _rows += f'<td class="td-b"><div class="hedef">{_bk_f}</div></td>'
 
-        # İller — ilçeyi il olarak göster, yoksa durum
+        # İller + İlçe
         _rows += '<td class="td-i">'
         if _il and _il not in ["nan","None",""]:
             _rows += f'<span class="il-b">{_il}</span>'
@@ -10088,8 +10088,21 @@ elif aktif == "islem_takip":
         _yeni_no = len(_gun_listesi)+1
         _rows += f'<td class="td-n"><div class="yeni-g"><div class="yeni-g-ust">📅 Gün {_yeni_no}</div><div class="yeni-g-alt">ekle</div></div></td>'
 
-        # Sonuç
-        _rows += f'<td class="td-s">{_it_sonuc(_dr,_as)}</td>'
+        # Sonuç — aşama dropdown
+        _opt = lambda v,k: 'selected' if k in (_dr+_as).lower() else ''
+        _rows += '<td class="td-s"><div style="display:flex;flex-direction:column;gap:3px;">'
+        _rows += f'<div style="margin-bottom:3px;">{_it_sonuc(_dr,_as)}</div>'
+        _rows += '<select style="font-size:9px;padding:2px 4px;border-radius:5px;border:0.5px solid #e2e8f0;background:#f8fafc;color:#0f172a;width:100%;">'
+        _rows += '<option value="">— Aşama seç —</option>'
+        _rows += f'<option value="Portföy" {_opt("Portföy","portf")}>📁 Portföy</option>'
+        _rows += f'<option value="İlk Temas" {_opt("İlk Temas","ilk")}>👋 İlk Temas</option>'
+        _rows += f'<option value="Randevu" {_opt("Randevu","randevu")}>📅 Randevu</option>'
+        _rows += f'<option value="Fiyat Hazırla" {_opt("Fiyat Hazırla","fiyat")}>💰 Fiyat Hazırla</option>'
+        _rows += f'<option value="Teklif" {_opt("Teklif","teklif")}>📄 Teklif</option>'
+        _rows += f'<option value="Tekrar Ara" {_opt("Tekrar Ara","tekrar")}>🔄 Tekrar Ara</option>'
+        _rows += f'<option value="Kazanıldı" {_opt("Kazanıldı","kazan")}>🏆 Kazanıldı</option>'
+        _rows += f'<option value="Negatif Portföy" {_opt("Negatif Portföy","negatif")}>✗ Negatif</option>'
+        _rows += '</select></div></td>'
         _rows += '</tr>'
 
     st.markdown(_h + _rows + '</tbody></table></div>', unsafe_allow_html=True)
