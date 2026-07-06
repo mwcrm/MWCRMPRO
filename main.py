@@ -603,7 +603,7 @@ def sayfa_log(sayfa):
         "musteri_atama": "Müşteri Atama", "islem_takip": "İşlem Takip",
     }
     _ad = _menu_adlari.get(sayfa, sayfa)
-    st.components.v1.html(f"<script>window.parent.document.title='MWCRMPRO | {_ad}'</script>", height=0)
+
 
 
 def _tanimlar_yukle(tip):
@@ -826,7 +826,30 @@ try{localStorage.removeItem('mwcrm_oturum');}catch(e){}
     st.rerun()
 
 # ── SESSION STATE ─────────────────────────────────────────────────────────────
-st.set_page_config(page_title="MWCRMPRO", layout="wide", initial_sidebar_state="expanded")
+_sayfa_adlari_cfg = {
+    "yeni":"Yeni Kart","liste":"Cari Liste","analiz":"Müşteri Analizi",
+    "randevu":"Randevular","teklif":"Spot Teklif","ozel_teklif":"Özel Teklif",
+    "rota_analiz":"Rota Analiz","operasyon":"Operasyon","kisiler":"Telefon Kişiler",
+    "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
+    "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
+    "musteri_atama":"Müşteri Atama","islem_takip":"İşlem Takip",
+}
+_aktif_cfg = st.session_state.get("aktif_tab","liste")
+_baslik_cfg = "MWCRMPRO | " + _sayfa_adlari_cfg.get(_aktif_cfg,"MWCRMPRO")
+st.set_page_config(page_title=_baslik_cfg, layout="wide", initial_sidebar_state="expanded")
+
+# Sekme başlığını aktif menüye göre güncelle
+_sayfa_adlari = {
+    "yeni":"Yeni Kart","liste":"Cari Liste","analiz":"Müşteri Analizi",
+    "randevu":"Randevular","teklif":"Spot Teklif","ozel_teklif":"Özel Teklif",
+    "rota_analiz":"Rota Analiz","operasyon":"Operasyon","kisiler":"Telefon Kişiler",
+    "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
+    "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
+    "musteri_atama":"Müşteri Atama","islem_takip":"İşlem Takip",
+}
+_aktif_sayfa = st.session_state.get("aktif_tab","liste")
+_sayfa_adi = _sayfa_adlari.get(_aktif_sayfa, _aktif_sayfa)
+st.markdown(f"<script>document.title='MWCRMPRO | {_sayfa_adi}'</script>", unsafe_allow_html=True)
 st.markdown("""<style>
 section[data-testid="stSidebar"]{transform:none!important;display:flex!important;}
 button[data-testid="collapsedControl"]{display:none!important;}
