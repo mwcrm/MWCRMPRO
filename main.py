@@ -2813,7 +2813,7 @@ function kartSec(id){
             st.session_state.pop("kart_sec_reset", None)
             st.session_state.pop("kart_sec", None)
 
-        kart_opts_inline = ["-- Müşteri Seçin --"] + [
+        kart_opts_inline = ["-- Müşteri Seçin --", "🔵 Tümü"] + [
             f"[{int(r['id'])}] {r.get('firma','')}" for _, r in df.iterrows()
         ]
         if st.session_state.get("kart_sec_reset"):
@@ -2857,7 +2857,9 @@ function kartSec(id){
             f"[{int(r['id'])}] {r.get('firma','')} | {r.get('il','')} | {r.get('islem_asamasi','')}"
             for _, r in df.iterrows()
         ]
-        if secili_kart_inline != "-- Müşteri Seçin --":
+        if secili_kart_inline == "🔵 Tümü":
+            secili_kart = "-- Müşteri Seçin --"  # Tümü seçilince tek müşteri filtrelemesi yok
+        elif secili_kart_inline != "-- Müşteri Seçin --":
             _id_str = secili_kart_inline.split("]")[0].replace("[","").strip()
             _esles = [o for o in kart_opts if f"[{_id_str}]" in o]
             secili_kart = _esles[0] if _esles else "-- Müşteri Seçin --"
@@ -2866,21 +2868,22 @@ function kartSec(id){
 
     # Filtre uygula
     df_f = df.copy()
-    if ara_txt:
+    _tumu_secildi = locals().get("secili_kart_inline","") == "🔵 Tümü"
+    if not _tumu_secildi and ara_txt:
         df_f = df_f[df_f.apply(lambda r: ara_txt.lower() in str(r).lower(), axis=1)]
-    if _asama_sec:
+    if not _tumu_secildi and _asama_sec:
         df_f = df_f[df_f["islem_asamasi"].isin(_asama_sec)]
-    if _durum_sec:
+    if not _tumu_secildi and _durum_sec:
         df_f = df_f[df_f["durum"].isin(_durum_sec)]
-    if filtre_seg != "Tümü":
+    if not _tumu_secildi and filtre_seg != "Tümü":
         df_f["_seg_tmp"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
         if filtre_seg == "Segmentsiz": df_f = df_f[df_f["_seg_tmp"]==""]
         else: df_f = df_f[df_f["_seg_tmp"]==filtre_seg]
-    if _il_sec:
+    if not _tumu_secildi and _il_sec:
         df_f = df_f[df_f["il"].astype(str).isin(_il_sec)]
-    if _ilce_sec:
+    if not _tumu_secildi and _ilce_sec:
         df_f = df_f[df_f["ilce"].astype(str).isin(_ilce_sec)]
-    if _tem_sec:
+    if not _tumu_secildi and _tem_sec:
         df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
 
 
