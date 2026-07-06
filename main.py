@@ -2371,6 +2371,9 @@ section[data-testid="stSidebar"] { display: none !important; }
     # ── ATAMA FİLTRESİ — admin hepsini görür, kullanıcı sadece kendine atananları ──
     df = _atama_filtresi_uygula(df)
 
+    # DEBUG — geçici
+    st.sidebar.info(f"🔍 df: {len(df)} kayıt | rol: {st.session_state.get('rol','?')} | kul: {st.session_state.get('kullanici','?')}")
+
     with st.expander("🔍 Mükerrer (Aynı İsimli) Müşterileri Bul ve Birleştir"):
         if df.empty or "firma" not in df.columns:
             st.caption("Veri yok.")
