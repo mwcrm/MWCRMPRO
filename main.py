@@ -2819,8 +2819,14 @@ function kartSec(id){
         _asama_def = [x for x in st.session_state.get("_cl_fil_asama_multi",[]) if x in tum_asama_opts]
         _asama_sec = _fc[2].multiselect("a", tum_asama_opts, default=_asama_def, key="_cl_fil_asama_multi", placeholder="Aşama...", label_visibility="collapsed")
 
-        _durum_def = [x for x in st.session_state.get("_cl_fil_durum_multi",[]) if x in tum_durum_opts]
-        _durum_sec = _fc[3].multiselect("d", tum_durum_opts, default=_durum_def, key="_cl_fil_durum_multi", placeholder="Durum...", label_visibility="collapsed")
+        _durum_opts_tumu = ["Tümü"] + [x for x in tum_durum_opts if str(x).upper() not in ["NONE","NAN",""]]
+        _durum_def = [x for x in st.session_state.get("_cl_fil_durum_multi",[]) if x in _durum_opts_tumu]
+        _durum_sec_raw = _fc[3].multiselect("d", _durum_opts_tumu, default=_durum_def, key="_cl_fil_durum_multi", placeholder="Durum...", label_visibility="collapsed")
+        if "Tümü" in _durum_sec_raw:
+            for _fk2 in ["_cl_fil_durum_multi","_cl_fil_asama_multi","_cl_fil_il_multi","_cl_fil_ilce_multi"]:
+                if _fk2 in st.session_state: del st.session_state[_fk2]
+            st.rerun()
+        _durum_sec = _durum_sec_raw
 
         filtre_seg = _fc[4].selectbox("s", ["Tümü","👑 A+","⭐ A","🔵 B","⚪ C"], key="fil_seg", label_visibility="collapsed")
 
@@ -3314,7 +3320,6 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
         with _sb1:
             if st.button("💾 Değişiklikleri Kaydet", use_container_width=True, type="primary", key="liste_kaydet_ust"):
                 st.session_state["_kaydet_flag"] = True
-                st.rerun()
         with _sb3:
             if st.button("🔄 Kolon Sıfırla", use_container_width=True, key="cl_kolon_sifirla_ust"):
                 st.session_state.pop("_cl_kolon_sira", None)
@@ -3395,25 +3400,15 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
 
 
     # ── BUTONLAR ──────────────────────────────────────────────────────────────
-    # Kaydet flag'i — ilk tıkta set et, ikinci render'da çalıştır
-    if st.session_state.get("_kaydet_flag"):
-        st.session_state.pop("_kaydet_flag")
-        _editor_state = st.session_state.get("cari_editor", {})
-        _edited_rows  = _editor_state.get("edited_rows", {})
-        _tablo_json   = st.session_state.get("_ls_tablo")
-        _do_kaydet = True
-    else:
-        _do_kaydet = False
-
     btn_k, btn_a, btn_s, btn_kolon = st.columns(4)
     with btn_kolon:
         if st.button("🔄 Kolon Sırasını Sıfırla", use_container_width=True, key="cl_kolon_sifirla"):
             st.session_state.pop("_cl_kolon_sira", None)
             st.rerun()
+    _do_kaydet = st.session_state.pop("_kaydet_flag", False)
     with btn_k:
         if st.button("💾 Değişiklikleri Kaydet", use_container_width=True, type="primary", key="liste_kaydet"):
-            st.session_state["_kaydet_flag"] = True
-            st.rerun()
+            _do_kaydet = True
         if _do_kaydet:
             _editor_state = st.session_state.get("cari_editor", {})
             _edited_rows  = _editor_state.get("edited_rows", {})
