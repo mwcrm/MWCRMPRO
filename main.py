@@ -155,23 +155,18 @@ def get_cari_listesi():
         try:
             _tum = []
             _offset = 0
-            _batch = 500
-            _max_iter = 20  # max 20 * 500 = 10000 kayıt
-            _iter = 0
-            while _iter < _max_iter:
+            while True:
                 _res = (sb.table("cari_kartlar")
                     .select("*")
                     .order("id", desc=False)
-                    .range(_offset, _offset + _batch - 1)
+                    .range(_offset, _offset + 999)
                     .execute())
-                if _res.data:
-                    _tum.extend(_res.data)
-                    if len(_res.data) < _batch:
-                        break
-                    _offset += _batch
-                    _iter += 1
-                else:
+                if not _res.data:
                     break
+                _tum.extend(_res.data)
+                if len(_res.data) < 1000:
+                    break
+                _offset += 1000
             _df_g = pd.DataFrame(_tum) if _tum else pd.DataFrame()
             if not _df_g.empty:
                 # Silindi filtresi — sadece silindi=1 olanları çıkar (NULL, 0, False hepsi dahil)
@@ -2340,20 +2335,18 @@ section[data-testid="stSidebar"] { display: none !important; }
             # Sayfalama ile TÜM kayıtları çek — Supabase max limit aşmak için
             _liste_tum = []
             _liste_offset = 0
-            _liste_batch = 500  # Daha küçük batch, güvenli
             while True:
                 _res_l = (sb_liste.table("cari_kartlar")
                     .select("*")
                     .order("id", desc=False)
-                    .range(_liste_offset, _liste_offset + _liste_batch - 1)
+                    .range(_liste_offset, _liste_offset + 999)
                     .execute())
-                if _res_l.data:
-                    _liste_tum.extend(_res_l.data)
-                    if len(_res_l.data) < _liste_batch:
-                        break
-                    _liste_offset += _liste_batch
-                else:
+                if not _res_l.data:
                     break
+                _liste_tum.extend(_res_l.data)
+                if len(_res_l.data) < 1000:
+                    break
+                _liste_offset += 1000
             df = pd.DataFrame(_liste_tum) if _liste_tum else pd.DataFrame()
             # Silindi filtresi Python tarafında
             if not df.empty and "silindi" in df.columns:
