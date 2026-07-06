@@ -1411,10 +1411,11 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "tum_liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
+    "tum_liste": "📊 Tüm Cari Liste",
     "rapor": "📊 Raporlar",
     "teklif": "📄 Spot Teklif",
     "ozel_teklif": "⭐ Özel Teklif",
@@ -2144,6 +2145,31 @@ if aktif == "yeni":
             st.rerun()
 
 # ── CARİ LİSTE ───────────────────────────────────────────────────────────────
+elif aktif == "tum_liste":
+    sayfa_log("tum_liste")
+    st.markdown("## 📊 Tüm Cari Liste")
+
+    _tl_df = get_cari_listesi()
+    _tl_df = _atama_filtresi_uygula(_tl_df)
+
+    if _tl_df.empty:
+        st.info("Kayıt bulunamadı.")
+    else:
+        # Basit arama
+        _tl_ara = st.text_input("🔍 Ara (firma, yetkili, il...)", key="tl_ara", placeholder="yazmaya başlayın...")
+        if _tl_ara:
+            _tl_df = _tl_df[_tl_df.apply(lambda r: _tl_ara.lower() in str(r).lower(), axis=1)]
+
+        st.caption(f"{len(_tl_df)} müşteri")
+
+        # Gösterilecek sütunlar
+        _tl_cols = [c for c in ["id","firma","yetkili","gsm","il","ilce","durum","islem_asamasi","beklenen_ciro","atanan_kullanici"] if c in _tl_df.columns]
+        st.dataframe(
+            _tl_df[_tl_cols].reset_index(drop=True),
+            use_container_width=True,
+            height=min(len(_tl_df) * 35 + 80, 40000),
+        )
+
 elif aktif == "liste":
     sayfa_log("liste")
 
