@@ -9978,10 +9978,10 @@ elif aktif == "islem_takip":
 .it-tbl tbody td{padding:8px 10px;border-right:0.5px solid #e2e8f0;background:white;}
 .it-tbl tbody td:last-child{border-right:none;}
 .it-tbl tbody tr:hover td{background:#f8fafc!important;}
-.td-f{width:190px;min-width:190px;}
-.td-b{width:82px;min-width:82px;}
-.td-g{width:170px;min-width:170px;background:#f0f7ff!important;}
-.td-s{width:100px;min-width:100px;}
+.td-f{width:190px;min-width:190px;max-width:190px;}
+.td-g{background:#f0f7ff!important;}
+.td-s{width:90px;min-width:90px;max-width:90px;}
+.it-tbl{width:100%;table-layout:fixed;}
 .f-adi{font-size:12px;font-weight:600;color:#0f172a;line-height:1.4;}
 .f-det{font-size:10px;color:#94a3b8;line-height:1.6;margin-top:2px;}
 .hedef{font-size:12px;font-weight:600;color:#16a34a;}
@@ -10062,7 +10062,8 @@ elif aktif == "islem_takip":
         _rows += f'<td class="td-s"><div class="asama-txt">{_it_asama(_dr,_as)}</div></td>'
         _rows += '</tr>'
 
-    st.markdown(_h + _rows + '</tbody></table></div>', unsafe_allow_html=True)
+    _html_full = _h + _rows + '</tbody></table></div>'
+    st.components.v1.html(_html_full, height=max(600, len(_it_sirali)*120), scrolling=True)
 
 
 elif aktif == "harita":
