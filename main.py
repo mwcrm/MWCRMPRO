@@ -2355,22 +2355,9 @@ section[data-testid="stSidebar"] { display: none !important; }
 
     # ── VERİ YÜKLE ──────────────────────────────────────────────────────────────
     sb_liste = get_sb_client()
-    try:
-        if sb_liste:
-            # Sayfalama ile TÜM kayıtları çek — Supabase max limit aşmak için
-            # get_cari_listesi ile aynı limitsiz çekme
-            _liste_tum = get_cari_listesi().to_dict("records") if not get_cari_listesi().empty else []
-            df = pd.DataFrame(_liste_tum) if _liste_tum else pd.DataFrame()
-            # Silindi filtresi Python tarafında
-            if not df.empty and "silindi" in df.columns:
-                df = df[~(df["silindi"].astype(str).str.strip().isin(["1","True","true","1.0"]))]
-            # Tarihe göre sırala
-            if not df.empty and "tarih" in df.columns:
-                df = df.sort_values("tarih", ascending=False)
-        else:
-            raise Exception()
-    except:
-        df = db_read("cari_kartlar", extra_sql="WHERE silindi=0 OR silindi='0' OR silindi IS NULL ORDER BY tarih DESC")
+    df = get_cari_listesi()
+    if not df.empty and "tarih" in df.columns:
+        df = df.sort_values("tarih", ascending=False).reset_index(drop=True)
 
     if not df.empty:
         for _tk in ["gsm","sabit"]:
@@ -3527,41 +3514,7 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                 except: pass
                 st.success("✅ Silindi!"); st.rerun()
 
-    # ── FİLTRELENMİŞ FİRMALARA TOPLU NOT / ÇALIŞMA ───────────────────────────
-    if len(df_f) > 0:
-        with st.expander(f"📝 Filtrelenmiş {len(df_f)} Firmaya Toplu Not / Çalışma Ekle", expanded=False):
-            st.caption(f"Şu an filtrede görünen **{len(df_f)} firma**ya aynı notu/çalışmayı ekleyebilirsiniz.")
-            _toplu_not_col1, _toplu_not_col2 = st.columns([3,1])
-            _toplu_not_metni = _toplu_not_col1.text_area(
-                "Not metni:", height=80,
-                placeholder="Örn: 'Mayıs kampanyası bilgilendirmesi yapıldı'",
-                key="toplu_not_metni"
-            )
-            _toplu_not_kim = st.session_state.get("kullanici", "")
-            if _toplu_not_col2.button(f"💾 {len(df_f)} Firmaya Ekle", use_container_width=True, key="toplu_not_kaydet", type="primary"):
-                if _toplu_not_metni and _toplu_not_metni.strip():
-                    _toplu_eklenen = 0
-                    _toplu_hata = 0
-                    for _, _tf in df_f.iterrows():
-                        try:
-                            _tcid = int(_tf["id"])
-                            if sb_liste:
-                                sb_liste.table("cari_aciklamalar").insert({
-                                    "cari_id": _tcid,
-                                    "cari_adi": str(_tf.get("firma","")),
-                                    "aciklama": _toplu_not_metni.strip(),
-                                    "olusturan": _toplu_not_kim,
-                                }).execute()
-                            _toplu_eklenen += 1
-                        except:
-                            _toplu_hata += 1
-                    if _toplu_eklenen:
-                        st.success(f"✅ {_toplu_eklenen} firmaya not eklendi!" + (f" (Hata: {_toplu_hata})" if _toplu_hata else ""))
-                        st.rerun()
-                    else:
-                        st.error("Not eklenemedi.")
-                else:
-                    st.warning("Not metni boş olamaz!")
+
 
     st.divider()
 elif aktif == "kullanici":
