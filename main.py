@@ -603,7 +603,7 @@ def sayfa_log(sayfa):
         "musteri_atama": "Müşteri Atama", "islem_takip": "İşlem Takip",
     }
     _ad = _menu_adlari.get(sayfa, sayfa)
-    st.markdown(f"<script>document.title='MWCRMPRO | {_ad}'</script>", unsafe_allow_html=True)
+    st.components.v1.html(f"<script>window.parent.document.title='MWCRMPRO | {_ad}'</script>", height=0)
 
 
 def _tanimlar_yukle(tip):
