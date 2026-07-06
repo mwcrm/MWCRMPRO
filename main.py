@@ -155,9 +155,14 @@ def get_cari_listesi():
         try:
             _tum = []
             _offset = 0
-            _batch = 1000
+            _batch = 500
             while True:
-                _res = sb.table("cari_kartlar").select("*").order("firma").range(_offset, _offset+_batch-1).execute()
+                _res = (sb.table("cari_kartlar")
+                    .select("*")
+                    .order("id", desc=False)
+                    .limit(_batch)
+                    .offset(_offset)
+                    .execute())
                 if _res.data:
                     _tum.extend(_res.data)
                     if len(_res.data) < _batch:
@@ -2330,8 +2335,31 @@ section[data-testid="stSidebar"] { display: none !important; }
     sb_liste = get_sb_client()
     try:
         if sb_liste:
-            res_l = sb_liste.table("cari_kartlar").select("*").neq("silindi",1).order("tarih",desc=True).execute()
-            df = pd.DataFrame(res_l.data) if res_l.data else pd.DataFrame()
+            # Sayfalama ile TÜM kayıtları çek — Supabase max limit aşmak için
+            _liste_tum = []
+            _liste_offset = 0
+            _liste_batch = 500  # Daha küçük batch, güvenli
+            while True:
+                _res_l = (sb_liste.table("cari_kartlar")
+                    .select("*")
+                    .order("id", desc=False)
+                    .limit(_liste_batch)
+                    .offset(_liste_offset)
+                    .execute())
+                if _res_l.data:
+                    _liste_tum.extend(_res_l.data)
+                    if len(_res_l.data) < _liste_batch:
+                        break
+                    _liste_offset += _liste_batch
+                else:
+                    break
+            df = pd.DataFrame(_liste_tum) if _liste_tum else pd.DataFrame()
+            # Silindi filtresi Python tarafında
+            if not df.empty and "silindi" in df.columns:
+                df = df[~(df["silindi"].astype(str).str.strip().isin(["1","True","true","1.0"]))]
+            # Tarihe göre sırala
+            if not df.empty and "tarih" in df.columns:
+                df = df.sort_values("tarih", ascending=False)
         else:
             raise Exception()
     except:
