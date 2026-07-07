@@ -3118,7 +3118,11 @@ function kartSec(id){
                 import json as _kgj
                 _r_kg = _sb_kg.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kol_genislik").execute()
                 if _r_kg.data:
-                    st.session_state["_kol_genislik"] = _kgj.loads(_r_kg.data[0]["deger"])
+                    _kg_loaded = _kgj.loads(_r_kg.data[0]["deger"])
+                    # Varsayılanlarla birleştir — eksik kolonlar olabilir
+                    _kg_merged = _KOL_VARSAYILAN.copy()
+                    _kg_merged.update(_kg_loaded)
+                    st.session_state["_kol_genislik"] = _kg_merged
                 else:
                     st.session_state["_kol_genislik"] = _KOL_VARSAYILAN.copy()
                 _r_gizli_cl = _sb_kg.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kol_gizli").execute()
@@ -4345,7 +4349,8 @@ function updateBot(v){{
                 st.session_state["_kol_genislik"] = _yeni_kg_ui
                 st.session_state["_kol_gizli"] = _gizli_ui
                 st.session_state.pop("_kol_genislik_init", None)
-                st.success("✅ Kaydedildi!")
+                st.toast("✅ Kolon ayarları kaydedildi!", icon="✅")
+                st.rerun()
             except Exception as _kgue:
                 st.error(f"Hata: {_kgue}")
 
