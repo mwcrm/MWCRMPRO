@@ -10623,6 +10623,47 @@ elif aktif == "bolgeler":
         )
         _bl_df["_bolge"] = _bl_df["_bolge"].fillna("Havuz (Bölgesiz)")
 
+        # Notlar / Analiz / Son Randevu — Cari Liste'deki ile aynı kaynaklardan hesaplanır
+        try:
+            _sb_bl = get_sb_client()
+        except Exception:
+            _sb_bl = None
+
+        _bl_df["✅ Analiz"] = ""
+        if _sb_bl:
+            try:
+                _an_raw_bl = _sb_bl.table("musteri_analiz").select("firma").execute().data or []
+                _analiz_set_bl = {_bl_sadelestir(_a.get("firma","")) for _a in _an_raw_bl if _a.get("firma")}
+                _bl_df["✅ Analiz"] = _bl_df["firma"].apply(lambda x: "✅" if _bl_sadelestir(x) in _analiz_set_bl else "")
+            except Exception:
+                pass
+
+        _bl_df["📅 Son Randevu"] = ""
+        try:
+            _df_rand_bl = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC, randevu_saati DESC")
+            if not _df_rand_bl.empty and "musteri_adi" in _df_rand_bl.columns:
+                _son_rand_bl = {}
+                for _, _rj in _df_rand_bl.iterrows():
+                    _mn_bl = _bl_sadelestir(_rj.get("musteri_adi",""))
+                    if _mn_bl and _mn_bl not in _son_rand_bl:
+                        _dt_bl = fmt_tarih(str(_rj.get("randevu_tarihi","") or ""))
+                        _st_bl = str(_rj.get("randevu_saati","") or "")[:5]
+                        _son_rand_bl[_mn_bl] = f"📅 {_dt_bl} {_st_bl}"
+                _bl_df["📅 Son Randevu"] = _bl_df["firma"].apply(lambda x: _son_rand_bl.get(_bl_sadelestir(x), ""))
+        except Exception:
+            pass
+
+        _bl_df["📨 Notlar"] = ""
+        if _sb_bl and "id" in _bl_df.columns:
+            try:
+                _not_raw_bl = _sb_bl.table("cari_aciklamalar").select("cari_id").execute().data or []
+                import collections as _bl_coll
+                _not_sayac_bl = _bl_coll.Counter([str(_r.get("cari_id","")) for _r in _not_raw_bl])
+                _bl_df["📨 Notlar"] = _bl_df["id"].apply(
+                    lambda x: f"📨 {_not_sayac_bl.get(str(int(x)),0)}" if _not_sayac_bl.get(str(int(x)),0) > 0 else "")
+            except Exception:
+                pass
+
         with st.expander("📤 Genel Excel indirme / yükleme"):
             _dl_kolon = [c for c in ["firma","yetkili","gsm","il","ilce","atanan_kullanici",
                                       "durum","beklenen_ciro","gerceklesen_ciro"] if c in _bl_df.columns]
@@ -10718,10 +10759,6 @@ elif aktif == "bolgeler":
                             "✅ Analiz","📅 Son Randevu","aciklama","📨 Notlar",
                             "asama1","asama2","asama3","asama4","sonuc"]
             _g_kolon = [c for c in _bl_col_sira if c in _sec_df.columns]
-            _bl_gizli = {"_bolge","silindi","tarih","olusturan"}
-            for _c in _sec_df.columns:
-                if _c not in _g_kolon and _c not in _bl_gizli:
-                    _g_kolon.append(_c)  # ileride eklenen yeni sütunlar otomatik sona eklenir
 
             st.dataframe(_sec_df[_g_kolon], use_container_width=True, hide_index=True,
                          column_config={k: v for k, v in _bl_col_config.items() if k in _g_kolon})
