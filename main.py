@@ -3433,6 +3433,39 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                     st.error(f"Hata: {_re}")
 
 
+    # ── RANDEVU EKLE PANELİ ──────────────────────────────────────────────────
+    with st.expander("📅 Randevu Ekle", expanded=False):
+        _rdv_firma_listesi = ["-- Firma Seçin --"] + sorted(df_edit["firma"].dropna().tolist()) if "firma" in df_edit.columns else ["-- Firma Seçin --"]
+        _rdv_ra1, _rdv_ra2, _rdv_ra3, _rdv_ra4 = st.columns([2,1,1,1])
+        _rdv_sec_firma = _rdv_ra1.selectbox("Firma", _rdv_firma_listesi, key="cl_rdv_firma_sec", label_visibility="collapsed")
+        _rdv_tarih2 = _rdv_ra2.date_input("Tarih", key="cl_rdv_tarih2", label_visibility="collapsed")
+        _rdv_saat2  = _rdv_ra3.selectbox("Saat", [f"{h:02d}:{m:02d}" for h in range(8,21) for m in [0,30]], key="cl_rdv_saat2", label_visibility="collapsed")
+        _rdv_gorev2 = _rdv_ra4.selectbox("Görev", ["Ziyaret","Toplantı","Online","Telefon","Diğer"], key="cl_rdv_gorev2", label_visibility="collapsed")
+        _rdv_not2 = st.text_input("Not", key="cl_rdv_not2", placeholder="Randevu notu...", label_visibility="collapsed")
+        if st.button("📅 Kaydet", key="cl_rdv_kaydet2", type="primary", use_container_width=True):
+            if _rdv_sec_firma != "-- Firma Seçin --":
+                try:
+                    _rdv_sb = get_sb_client()
+                    _rdv_cid_row = df_edit[df_edit["firma"] == _rdv_sec_firma]
+                    _rdv_cid = int(_rdv_cid_row.iloc[0]["id"]) if not _rdv_cid_row.empty else 0
+                    if _rdv_sb:
+                        _rdv_sb.table("randevular").insert({
+                            "musteri_id":    _rdv_cid,
+                            "musteri_adi":   _rdv_sec_firma,
+                            "randevu_tarihi": str(_rdv_tarih2),
+                            "randevu_saati":  _rdv_saat2,
+                            "aciklama":       _rdv_not2,
+                            "gorev":          _rdv_gorev2,
+                            "olusturan":      st.session_state.get("kullanici",""),
+                        }).execute()
+                        st.success(f"✅ {_rdv_sec_firma} — {_rdv_tarih2} {_rdv_saat2} randevusu eklendi!")
+                        st.cache_data.clear()
+                        st.rerun()
+                except Exception as _rdve:
+                    st.error(f"Hata: {_rdve}")
+            else:
+                st.warning("Firma seçin!")
+
     # ── BUTONLAR ──────────────────────────────────────────────────────────────
     btn_k, btn_a, btn_s, btn_kolon = st.columns(4)
     with btn_kolon:
