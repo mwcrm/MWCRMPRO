@@ -3069,7 +3069,17 @@ function kartSec(id){
         _ml_kapsam = ", ".join(_il_sec)
     else:
         _ml_kapsam = "Tüm kayıtlar (il filtresi yok)"
-    st.markdown(f"#### 📍 {_ml_kapsam}")
+    _ml_bas1, _ml_bas2 = st.columns([5, 1])
+    with _ml_bas1:
+        st.markdown(f"#### 📍 {_ml_kapsam}")
+    with _ml_bas2:
+        if _il_sec or st.session_state.get("_bl_ilce_filtre"):
+            if st.button("🌍 Tümü / Hepsi", key="_ml_tumu_btn", use_container_width=True):
+                for _fk3 in ["_cl_fil_il_multi", "_cl_fil_ilce_multi", "_bl_ilce_filtre"]:
+                    if _fk3 in st.session_state:
+                        del st.session_state[_fk3]
+                st.session_state.pop("_bl_ilce_filtre_ad", None)
+                st.rerun()
     _ml1, _ml2, _ml3 = st.columns(3)
     _ml1.metric("Listelenen müşteri", len(df_f))
     if "beklenen_ciro" in df_f.columns:
