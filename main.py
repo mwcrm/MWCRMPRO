@@ -3077,6 +3077,21 @@ function kartSec(id){
     if "gerceklesen_ciro" in df_f.columns:
         _ml3.metric("Gerçekleşen", f"{pd.to_numeric(df_f['gerceklesen_ciro'], errors='coerce').fillna(0).sum():,.0f} ₺")
 
+    # Birden fazla il seçiliyken, toplamın altında her ilin kendi ayrı kırılımı da gösterilir
+    if len(_il_sec) > 1 and "il" in df_f.columns and not df_f.empty:
+        with st.expander(f"📊 {len(_il_sec)} ilin ayrı ayrı kırılımı", expanded=True):
+            _il_kirilim = df_f.groupby("il").size().reset_index(name="Müşteri Sayısı")
+            if "beklenen_ciro" in df_f.columns:
+                _il_hedef_map = df_f.groupby("il")["beklenen_ciro"].apply(
+                    lambda s: pd.to_numeric(s, errors="coerce").fillna(0).sum())
+                _il_kirilim["Hedef ₺"] = _il_kirilim["il"].map(_il_hedef_map)
+            if "gerceklesen_ciro" in df_f.columns:
+                _il_gercek_map = df_f.groupby("il")["gerceklesen_ciro"].apply(
+                    lambda s: pd.to_numeric(s, errors="coerce").fillna(0).sum())
+                _il_kirilim["Gerçekleşen ₺"] = _il_kirilim["il"].map(_il_gercek_map)
+            _il_kirilim = _il_kirilim.sort_values("Müşteri Sayısı", ascending=False).reset_index(drop=True)
+            st.dataframe(_il_kirilim, use_container_width=True, hide_index=True)
+
     _aktif_fil_sayisi = sum([bool(ara_txt),bool(_asama_sec),bool(_durum_sec),filtre_seg!="Tümü",bool(_il_sec),bool(_ilce_sec),bool(_tem_sec)])
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
         try:
