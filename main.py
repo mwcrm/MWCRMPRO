@@ -10684,9 +10684,47 @@ elif aktif == "bolgeler":
                 _g2.metric("Hedef ciro", f"{pd.to_numeric(_sec_df['beklenen_ciro'], errors='coerce').fillna(0).sum():,.0f} ₺")
             if "gerceklesen_ciro" in _sec_df.columns:
                 _g3.metric("Gerçekleşen", f"{pd.to_numeric(_sec_df['gerceklesen_ciro'], errors='coerce').fillna(0).sum():,.0f} ₺")
-            _g_kolon = [c for c in ["firma","yetkili","gsm","il","ilce","atanan_kullanici",
-                                     "durum","beklenen_ciro","gerceklesen_ciro"] if c in _sec_df.columns]
-            st.dataframe(_sec_df[_g_kolon], use_container_width=True, hide_index=True)
+
+            # Cari Liste ile birebir aynı sütun düzeni/format — her il/bölge için sabit,
+            # yeni bir sütun eklenirse (örn. ileride Aşama 5) otomatik en sona eklenir.
+            _bl_col_config = {
+                "id":               st.column_config.NumberColumn("ID", disabled=True, width="small"),
+                "firma":            st.column_config.TextColumn("Firma", width="medium"),
+                "yetkili":          st.column_config.TextColumn("Yetkili", width="medium"),
+                "gsm":              st.column_config.TextColumn("GSM", width="medium"),
+                "sabit":            st.column_config.TextColumn("S. Tel", width="medium"),
+                "email":            st.column_config.TextColumn("Email", width="medium"),
+                "adres":            st.column_config.TextColumn("Adres", width="large"),
+                "il":               st.column_config.TextColumn("İl", width="small"),
+                "ilce":             st.column_config.TextColumn("İlçe", width="small"),
+                "durum":            st.column_config.TextColumn("Durum", width="small"),
+                "temsilci":         st.column_config.TextColumn("Temsilci", width="small"),
+                "atanan_kullanici": st.column_config.TextColumn("Atanan Kullanıcı", width="small"),
+                "islem_asamasi":    st.column_config.TextColumn("Aşama", width="small"),
+                "beklenen_ciro":    st.column_config.NumberColumn("Hedef ₺", format="%,.0f ₺", width="small"),
+                "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width="small"),
+                "aciklama":         st.column_config.TextColumn("Açıklama", width="large"),
+                "✅ Analiz":        st.column_config.TextColumn("✅ Analiz", width="small"),
+                "📅 Son Randevu":   st.column_config.TextColumn("📅 Son Randevu", width="medium"),
+                "📨 Notlar":        st.column_config.TextColumn("📨 Notlar", width="small"),
+                "asama1":           st.column_config.TextColumn("Aşama 1", width="medium"),
+                "asama2":           st.column_config.TextColumn("Aşama 2", width="medium"),
+                "asama3":           st.column_config.TextColumn("Aşama 3", width="medium"),
+                "asama4":           st.column_config.TextColumn("Aşama 4", width="medium"),
+                "sonuc":            st.column_config.TextColumn("Sonuç", width="medium"),
+            }
+            _bl_col_sira = ["id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum",
+                            "temsilci","atanan_kullanici","islem_asamasi","beklenen_ciro","gerceklesen_ciro",
+                            "✅ Analiz","📅 Son Randevu","aciklama","📨 Notlar",
+                            "asama1","asama2","asama3","asama4","sonuc"]
+            _g_kolon = [c for c in _bl_col_sira if c in _sec_df.columns]
+            _bl_gizli = {"_bolge","silindi","tarih","olusturan"}
+            for _c in _sec_df.columns:
+                if _c not in _g_kolon and _c not in _bl_gizli:
+                    _g_kolon.append(_c)  # ileride eklenen yeni sütunlar otomatik sona eklenir
+
+            st.dataframe(_sec_df[_g_kolon], use_container_width=True, hide_index=True,
+                         column_config={k: v for k, v in _bl_col_config.items() if k in _g_kolon})
         else:
             _bl_ozet = (_bl_df.groupby("_bolge").size()
                         .reset_index(name="musteri_sayisi")
