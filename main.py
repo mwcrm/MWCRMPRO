@@ -1356,44 +1356,38 @@ def not_dialog(cari_id, firma_adi=""):
                 st.error(f"Hata: {_re}")
 
 def not_paneli(cari_id, firma_adi="", key_prefix="np"):
-    """Her yerde kullanılan ortak not paneli — oku, yaz, sil"""
+    """Her yerde kullanılan ortak not paneli — Model 5: ultra minimal"""
     _sb = get_sb_client()
     _notlar = _notlar_yukle(cari_id)
 
-    # Sırala — en yeni üstte
     try:
         _notlar = sorted(_notlar, key=lambda x: str(x.get("created_at","") or x.get("tarih","") or x.get("id",0)), reverse=True)
     except: pass
 
-    if firma_adi:
-        st.markdown(f"<div style='font-size:15px;font-weight:700;color:#1e40af;margin-bottom:4px'>📋 {firma_adi}</div>", unsafe_allow_html=True)
-    
-    # Tablo kolonlarını göster — hangi kolonlar var anlayalım
-    if _notlar:
-        _kolon_adlari = list(_notlar[0].keys())
-        st.caption(f"{len(_notlar)} not · kolonlar: {', '.join(_kolon_adlari)}")
-    else:
-        st.caption("0 not")
+    st.caption(f"{len(_notlar)} not")
 
-    # Notları göster
+    # Model 5 — ultra minimal: tarih | metin | kim | 🗑
+    _css5 = """<style>
+.np5-satir{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:0.5px solid #e2e8f0;}
+.np5-satir:last-child{border-bottom:none;}
+.np5-tarih{font-size:9px;color:#94a3b8;min-width:58px;white-space:nowrap;}
+.np5-txt{font-size:11px;color:#0f172a;flex:1;line-height:1.4;}
+.np5-kim{font-size:9px;color:#94a3b8;white-space:nowrap;}
+</style>"""
+    st.markdown(_css5, unsafe_allow_html=True)
+
     for _nn in _notlar:
         _nid = _nn.get("id","")
-        # Metin kolonu — birden fazla adı olabilir
         _txt = str(_nn.get("aciklama","") or _nn.get("metin","") or _nn.get("not","") or _nn.get("icerik","") or "")
-        _kim = str(_nn.get("olusturan","") or _nn.get("kim","") or _nn.get("kullanici","") or "")
+        _kim = str(_nn.get("olusturan","") or _nn.get("kullanici","") or "")
         _tar = fmt_tarih(str(_nn.get("created_at","") or _nn.get("tarih","") or ""))
-
         if not _txt: continue
 
-        st.markdown(
-            f"<div style='border-left:4px solid #3b82f6;padding:10px 14px;margin-bottom:8px;"
-            f"border-radius:0 8px 8px 0;background:#eff6ff;'>"
-            f"<div style='font-size:11px;color:#94a3b8;margin-bottom:5px'>📅 {_tar} &nbsp;·&nbsp; 👤 {_kim}</div>"
-            f"<div style='color:#1e293b;font-size:14px;line-height:1.7;white-space:pre-wrap'>{_txt.replace('<','&lt;').replace('>','&gt;')}</div>"
-            f"</div>",
-            unsafe_allow_html=True
-        )
-        if st.button("🗑 Sil", key=f"{key_prefix}_sil_{_nid}_{cari_id}"):
+        _col1, _col2, _col3, _col4 = st.columns([0.8, 5, 1, 0.6])
+        _col1.markdown(f"<div class='np5-tarih'>{_tar[:8]}</div>", unsafe_allow_html=True)
+        _col2.markdown(f"<div class='np5-txt'>{_txt.replace('<','&lt;')}</div>", unsafe_allow_html=True)
+        _col3.markdown(f"<div class='np5-kim'>{_kim}</div>", unsafe_allow_html=True)
+        if _col4.button("🗑", key=f"{key_prefix}_sil_{_nid}_{cari_id}"):
             try:
                 if _sb: _sb.table("cari_aciklamalar").delete().eq("id", int(_nid)).execute()
                 try: _notlar_yukle.clear()
@@ -1402,34 +1396,24 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
             except Exception as _se:
                 st.error(f"Sil hatası: {_se}")
 
-    # Yeni not yaz
-    st.markdown("<div style='margin-top:10px'></div>", unsafe_allow_html=True)
-    _yeni = st.text_area("✏️ Yeni not:", key=f"{key_prefix}_yeni_{cari_id}", placeholder="Buraya yazın...", height=90)
-
-    if st.button("💾 Kaydet", key=f"{key_prefix}_kaydet_{cari_id}", use_container_width=True, type="primary"):
+    # Yeni not — tek satır
+    st.markdown("<div style='margin-top:8px;'></div>", unsafe_allow_html=True)
+    _nc1, _nc2 = st.columns([5, 1])
+    _yeni = _nc1.text_input("", key=f"{key_prefix}_yeni_{cari_id}", placeholder="Not yaz...", label_visibility="collapsed")
+    if _nc2.button("Kaydet", key=f"{key_prefix}_kaydet_{cari_id}", type="primary", use_container_width=True):
         if _yeni and _yeni.strip():
             try:
-                _yazar = st.session_state.get("kullanici_ad", st.session_state.get("kullanici",""))
-                # Önce minimal insert dene, hata verirse kolon adlarını göster
-                _veri = {"cari_id": int(cari_id), "aciklama": _yeni.strip(), "olusturan": _yazar}
-                try:
-                    _veri["cari_adi"] = str(firma_adi)
-                    if _sb: _sb.table("cari_aciklamalar").insert(_veri).execute()
-                except Exception as _e1:
-                    # cari_adi yoksa onsuz dene
-                    _veri2 = {"cari_id": int(cari_id), "aciklama": _yeni.strip(), "olusturan": _yazar}
-                    if _sb: _sb.table("cari_aciklamalar").insert(_veri2).execute()
+                _yazar = st.session_state.get("kullanici","")
+                _veri = {"cari_id": int(cari_id), "aciklama": _yeni.strip(), "olusturan": _yazar, "cari_adi": str(firma_adi)}
+                if _sb: _sb.table("cari_aciklamalar").insert(_veri).execute()
                 try: _notlar_yukle.clear()
                 except: pass
-                try: db_read.clear()
-                except: pass
-                st.success("✅ Not kaydedildi!")
+                st.success("✅ Eklendi!")
                 st.rerun()
             except Exception as _ne:
-                st.error(f"Kayıt hatası: {_ne}")
-                st.info(f"Tablo kolonları: {_ornek_kolon}")
+                st.error(f"Hata: {_ne}")
         else:
-            st.warning("Not boş olamaz!")
+            st.warning("Not boş!")
 
 
 
