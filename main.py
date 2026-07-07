@@ -1324,6 +1324,7 @@ def _notlar_yukle(cari_id):
     return []
 
 @st.dialog("📋 Notlar", width="large")
+@st.dialog("📋 Notlar", width="large")
 def not_dialog(cari_id, firma_adi=""):
     """Ekran ortasında açılan not penceresi"""
     not_paneli(cari_id, firma_adi, key_prefix="dlg")
