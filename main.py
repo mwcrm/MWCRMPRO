@@ -153,6 +153,36 @@ def _atama_filtresi_uygula(df):
     except:
         return df
 
+# ── BÖLGE EŞLEŞTİRME (il + ilçe → bölge adı) ────────────────────────────────
+_BL_ISTANBUL_ANADOLU = {"adalar","atasehir","beykoz","cekmekoy","kadikoy","kartal",
+    "maltepe","pendik","sancaktepe","sultanbeyli","sile","tuzla","umraniye","uskudar"}
+_BL_ISTANBUL_AVRUPA = {"arnavutkoy","avcilar","bagcilar","bahcelievler","bakirkoy",
+    "basaksehir","bayrampasa","besiktas","beylikduzu","beyoglu","buyukcekmece",
+    "catalca","esenler","esenyurt","eyupsultan","fatih","gaziosmanpasa","gungoren",
+    "kagithane","kucukcekmece","sariyer","silivri","sisli","zeytinburnu"}
+_BL_IL_ADI = {
+    "tekirdag":"Tekirdağ","kocaeli":"Kocaeli","bursa":"Bursa","manisa":"Manisa",
+    "ankara":"Ankara","konya":"Konya","eskisehir":"Eskişehir","denizli":"Denizli","aydin":"Aydın",
+}
+
+def _bl_sadelestir(s):
+    s = str(s or "").strip().lower()
+    for _k,_v in {"ı":"i","i̇":"i","ş":"s","ğ":"g","ü":"u","ö":"o","ç":"c"}.items():
+        s = s.replace(_k,_v)
+    return s
+
+def il_ilce_bolge_bul(il, ilce):
+    """il+ilçe bilgisinden bölge adı üretir. Eşleşme yoksa None döner (havuza düşer)."""
+    _il = _bl_sadelestir(il)
+    _ilce = _bl_sadelestir(ilce)
+    if "istanbul" in _il:
+        if _ilce in _BL_ISTANBUL_ANADOLU:
+            return "İstanbul Anadolu"
+        if _ilce in _BL_ISTANBUL_AVRUPA:
+            return "İstanbul Avrupa"
+        return None
+    return _BL_IL_ADI.get(_il)
+
 @st.cache_data(ttl=60)
 def get_cari_listesi():
     """60 sn cache'li cari listesi — HTTP Range ile limitsiz çek"""
@@ -1417,7 +1447,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "bolgeler"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -1438,6 +1468,7 @@ _TAB_ETIKETLER = {
     "operasyon": "🚛 Operasyon",
     "patron": "👑 Yönetim Paneli",
     "musteri_atama": "🎯 Müşteri Atama",
+    "bolgeler": "📍 Bölgeler",
     
 }
 
@@ -1841,6 +1872,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
 
         _MENU_GRUPLARI = [
             ("Müşteri işlemleri",   ["yeni", "liste", "analiz", "islem_takip"]),
+            ("Bölgeler",            ["bolgeler"]),
             ("Randevu ve teklifler", ["randevu", "teklif", "ozel_teklif"]),
             ("Saha operasyonu",     ["rota_analiz", "operasyon", "harita"]),
             ("Raporlama",           ["rapor", "admin_rapor", "excel"]),
@@ -3715,7 +3747,7 @@ elif aktif == "kullanici":
     TUM_MENULER = {
         "yeni":"➕ Yeni Kart","liste":"📋 Cari Liste","randevu":"📅 Randevular",
         "teklif":"📄 Teklif","kisiler":"📞 Kişiler","rapor":"📊 Raporlar",
-        "excel":"📥 Excel","mesajlar":"💬 Mesajlar",
+        "excel":"📥 Excel","mesajlar":"💬 Mesajlar","bolgeler":"📍 Bölgeler",
         "admin_rapor":"📊 Rapor Tasarla","kullanici_log":"📊 Kullanıcı Log",
         "surum_yonetimi":"🚀 Sürüm Yönetimi"
     }
@@ -10566,6 +10598,111 @@ Object.entries(rnk).forEach(function(e){
                      .sort_values(["Müşteri Sayısı"] + _grp_cols[:1], ascending=[False, True])
                      .head(50))
             st.dataframe(_il_g, use_container_width=True, hide_index=True)
+
+elif aktif == "bolgeler":
+    sayfa_log("bolgeler")
+    import io as _bl_io
+    st.markdown("## 📍 Bölgeler")
+
+    _bl_raw = db_read("cari_kartlar", extra_sql="ORDER BY firma")
+    if not _bl_raw.empty and "silindi" in _bl_raw.columns:
+        _bl_raw = _bl_raw[~_bl_raw["silindi"].isin([1, "1", True, "true"])]
+    _bl_raw = _atama_filtresi_uygula(_bl_raw)
+
+    if _bl_raw.empty:
+        st.info("Henüz müşteri kaydı yok.")
+    else:
+        _bl_df = _bl_raw.copy()
+        _il_kol = "il" if "il" in _bl_df.columns else None
+        _ilce_kol = "ilce" if "ilce" in _bl_df.columns else None
+        _bl_df["_bolge"] = _bl_df.apply(
+            lambda r: il_ilce_bolge_bul(
+                r.get(_il_kol, "") if _il_kol else "",
+                r.get(_ilce_kol, "") if _ilce_kol else ""
+            ), axis=1
+        )
+        _bl_df["_bolge"] = _bl_df["_bolge"].fillna("Havuz (Bölgesiz)")
+
+        with st.expander("📤 Genel Excel indirme / yükleme"):
+            _dl_kolon = [c for c in ["firma","yetkili","gsm","il","ilce","atanan_kullanici",
+                                      "durum","beklenen_ciro","gerceklesen_ciro"] if c in _bl_df.columns]
+            _dl_df = _bl_df[_dl_kolon + ["_bolge"]].rename(columns={"_bolge":"bolge"})
+            _dl_buf = _bl_io.BytesIO()
+            _dl_df.to_excel(_dl_buf, index=False)
+            _dl_buf.seek(0)
+            st.download_button("📥 Bölgeli listeyi indir (.xlsx)", data=_dl_buf,
+                                file_name="bolgeler_listesi.xlsx", key="bl_dl_btn")
+
+            st.caption("Yüklerken 'firma' sütunu zorunludur. il / ilçe / atanan_kullanici sütunları varsa güncellenir.")
+            _bl_yukl = st.file_uploader("Excel yükle (il / ilçe / kullanıcı atamasını topluca güncelle)",
+                                         type=["xlsx","xls"], key="bl_yukl")
+            if _bl_yukl is not None:
+                _bl_ydf = pd.read_excel(_bl_yukl)
+                _bl_ydf.columns = [str(c).strip().lower().replace(" ","_") for c in _bl_ydf.columns]
+                if "firma" not in _bl_ydf.columns:
+                    st.error("❌ Zorunlu sütun eksik: firma")
+                else:
+                    st.success(f"{len(_bl_ydf)} satır okundu.")
+                    if st.button("✅ Güncellemeleri uygula", type="primary", key="bl_uygula_btn"):
+                        _bl_basarili = 0
+                        _bl_hata = []
+                        for _, _r in _bl_ydf.iterrows():
+                            _f_ad = str(_r.get("firma","") or "").strip()
+                            if not _f_ad:
+                                continue
+                            _guncel = {}
+                            for _kol in ["il","ilce","atanan_kullanici"]:
+                                if _kol in _bl_ydf.columns:
+                                    _v = _r.get(_kol,"")
+                                    if pd.notna(_v) and str(_v).strip():
+                                        _guncel[_kol] = str(_v).strip()
+                            if not _guncel:
+                                continue
+                            try:
+                                db_update("cari_kartlar", _guncel, "firma", _f_ad)
+                                _bl_basarili += 1
+                            except Exception as _e:
+                                _bl_hata.append(f"{_f_ad}: {_e}")
+                        st.success(f"🎉 {_bl_basarili} kayıt güncellendi.")
+                        if _bl_hata:
+                            st.error(f"{len(_bl_hata)} kayıtta hata:")
+                            for _h in _bl_hata[:20]:
+                                st.code(_h)
+
+        st.divider()
+
+        if st.session_state.get("_secili_bolge"):
+            _sec = st.session_state["_secili_bolge"]
+            if st.button("⬅️ Bölgelere dön", key="bl_geri_btn"):
+                st.session_state["_secili_bolge"] = None
+                st.rerun()
+            st.markdown(f"### {_sec}")
+            _sec_df = _bl_df[_bl_df["_bolge"] == _sec]
+            _g1, _g2, _g3 = st.columns(3)
+            _g1.metric("Müşteri sayısı", len(_sec_df))
+            if "beklenen_ciro" in _sec_df.columns:
+                _g2.metric("Hedef ciro", f"{pd.to_numeric(_sec_df['beklenen_ciro'], errors='coerce').fillna(0).sum():,.0f} ₺")
+            if "gerceklesen_ciro" in _sec_df.columns:
+                _g3.metric("Gerçekleşen", f"{pd.to_numeric(_sec_df['gerceklesen_ciro'], errors='coerce').fillna(0).sum():,.0f} ₺")
+            _g_kolon = [c for c in ["firma","yetkili","gsm","il","ilce","atanan_kullanici",
+                                     "durum","beklenen_ciro","gerceklesen_ciro"] if c in _sec_df.columns]
+            st.dataframe(_sec_df[_g_kolon], use_container_width=True, hide_index=True)
+        else:
+            _bl_ozet = (_bl_df.groupby("_bolge").size()
+                        .reset_index(name="musteri_sayisi")
+                        .sort_values("musteri_sayisi", ascending=False))
+            _bl_hedef_var = "beklenen_ciro" in _bl_df.columns
+            if _bl_hedef_var:
+                _hedef_map = _bl_df.groupby("_bolge")["beklenen_ciro"].apply(
+                    lambda s: pd.to_numeric(s, errors="coerce").fillna(0).sum())
+                _bl_ozet["hedef_ciro"] = _bl_ozet["_bolge"].map(_hedef_map)
+            for _, _row in _bl_ozet.iterrows():
+                _etik = f"{_row['_bolge']}   ·   {int(_row['musteri_sayisi'])} müşteri"
+                if _bl_hedef_var:
+                    _etik += f"   ·   {_row['hedef_ciro']:,.0f} ₺ hedef"
+                if st.button(_etik, use_container_width=True, key=f"bl_git_{_row['_bolge']}"):
+                    st.session_state["_secili_bolge"] = _row["_bolge"]
+                    st.rerun()
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
