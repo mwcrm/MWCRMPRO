@@ -10002,7 +10002,7 @@ elif aktif == "islem_takip":
             elif "randevu" in _a: _tur = "Randevu"
             else: _tur = "Not"
             if _firma and _tarih and _tarih not in ["","nan","None"]:
-                _it_islemler.append({"firma":_firma,"cid":_cid,"tarih":_tarih,"tur":_tur,"aciklama":_acik,"kul":_kul})
+                _it_islemler.append({"id":str(_r.get("id","")), "firma":_firma,"cid":_cid,"tarih":_tarih,"tur":_tur,"aciklama":_acik,"kul":_kul,"kaynak":"not"})
 
     # Randevular
     if not _df_rdv.empty:
@@ -10013,7 +10013,7 @@ elif aktif == "islem_takip":
             _tarih = str(_r.get("tarih","") or "")[:10]
             _rdv_t = str(_r.get("randevu_tarihi","") or "")[:10]
             if _firma and _tarih and _tarih not in ["","nan","None"]:
-                _it_islemler.append({"firma":_firma,"cid":_cid,"tarih":_tarih,"tur":"Randevu","aciklama":f"Randevu: {_rdv_t}","kul":_kul})
+                _it_islemler.append({"id":"", "firma":_firma,"cid":_cid,"tarih":_tarih,"tur":"Randevu","aciklama":f"Randevu: {_rdv_t}","kul":_kul,"kaynak":"randevu"})
 
     # Teklifler — mükerrer önle
     _not_firma_tarih = {(_i["firma"],_i["tarih"]) for _i in _it_islemler if _i["tur"]=="Teklif"}
@@ -10024,7 +10024,7 @@ elif aktif == "islem_takip":
             _firma, _cid = _it_firma_bul(_r, "musteri_id", "musteri_adi")
             _tarih = str(_r.get("tarih","") or "")[:10]
             if _firma and _tarih and (_firma,_tarih) not in _not_firma_tarih and _tarih not in ["","nan","None"]:
-                _it_islemler.append({"firma":_firma,"cid":_cid,"tarih":_tarih,"tur":"Teklif","aciklama":"Teklif oluşturuldu","kul":_kul})
+                _it_islemler.append({"id":"", "firma":_firma,"cid":_cid,"tarih":_tarih,"tur":"Teklif","aciklama":"Teklif oluşturuldu","kul":_kul,"kaynak":"teklif"})
 
     if not _it_islemler:
         st.info("Henüz kayıtlı işlem bulunamadı.")
@@ -10134,22 +10134,26 @@ elif aktif == "islem_takip":
             _acik = _ism["aciklama"][:120] + ("..." if len(_ism["aciklama"])>120 else "")
             _arsiv = _ism.get("arsiv", False) or str(_ism.get("arsiv","")).lower() in ["1","true"]
             _islem_stil = "opacity:0.4;" if _arsiv else ""
-            _col1, _col2, _col3, _col4, _col5 = st.columns([1.2, 1, 5, 0.8, 0.8])
+            _nid = str(_ism.get("id",""))
+            _kaynak = _ism.get("kaynak","not")
+            # Sadece notlar için sil/arşivle göster
+            if _kaynak == "not" and _nid and _nid not in ["","None","nan"]:
+                _col1, _col2, _col3, _col4, _col5 = st.columns([1.2, 1, 5, 0.7, 0.7])
+            else:
+                _col1, _col2, _col3 = st.columns([1.2, 1, 6.4])
+                _col4 = _col5 = None
             _col1.markdown(f"<span style='font-size:10px;color:#94a3b8;{_islem_stil}'>{_ism['tarih']}</span>", unsafe_allow_html=True)
             _col2.markdown(f"<span style='font-size:10px;font-weight:500;color:#0f172a;{_islem_stil}'>{_ikon} {_ism['tur']}</span>", unsafe_allow_html=True)
             _col3.markdown(f"<span style='font-size:10px;color:#475569;{_islem_stil}'>{_acik}</span>", unsafe_allow_html=True)
-            # Arşivle butonu
-            _nid = _ism.get("id","")
-            if _nid and not _arsiv:
-                if _col4.button("📦", key=f"it_arsiv_{_nid}", help="Arşivle"):
-                    try:
-                        if _sb_islem:
-                            _sb_islem.table("cari_aciklamalar").update({"arsiv": True}).eq("id", int(_nid)).execute()
-                            st.cache_data.clear()
-                            st.rerun()
-                    except: pass
-            # Sil butonu
-            if _nid:
+            if _col4 and _col5:
+                if not _arsiv:
+                    if _col4.button("📦", key=f"it_arsiv_{_nid}", help="Arşivle"):
+                        try:
+                            if _sb_islem:
+                                _sb_islem.table("cari_aciklamalar").update({"arsiv": True}).eq("id", int(_nid)).execute()
+                                st.cache_data.clear()
+                                st.rerun()
+                        except: pass
                 if _col5.button("🗑", key=f"it_sil_{_nid}", help="Sil"):
                     try:
                         if _sb_islem:
@@ -10158,28 +10162,33 @@ elif aktif == "islem_takip":
                             st.rerun()
                     except: pass
 
-        # Not ekle — firma başına
+        # Not ekle — sade, küçük
         _cid_firm = _islemler[0].get("cid","") if _islemler else ""
-        with st.expander(f"✏️ {_firma} — Not ekle", expanded=False):
-            _yeni_not = st.text_area("Not", key=f"it_not_{_firma}", placeholder="Yeni not yaz...", height=70, label_visibility="collapsed")
-            if st.button("💾 Kaydet", key=f"it_not_kaydet_{_firma}", type="primary"):
+        _not_key = f"it_not_ac_{_firma}"
+        _nc1, _nc2 = st.columns([8,2])
+        if _nc2.button("✏️ not ekle", key=f"it_not_btn_{_firma}", use_container_width=False):
+            st.session_state[_not_key] = not st.session_state.get(_not_key, False)
+        if st.session_state.get(_not_key, False):
+            _yeni_not = st.text_area("", key=f"it_not_{_firma}", placeholder="Not yaz...", height=60, label_visibility="collapsed")
+            if st.button("Kaydet", key=f"it_not_kaydet_{_firma}", type="primary"):
                 if _yeni_not and _yeni_not.strip():
                     try:
                         if _sb_islem:
                             _sb_islem.table("cari_aciklamalar").insert({
-                                "cari_id": int(_cid_firm) if _cid_firm and _cid_firm.isdigit() else 0,
+                                "cari_id": int(_cid_firm) if _cid_firm and str(_cid_firm).isdigit() else 0,
                                 "cari_adi": _firma,
                                 "aciklama": _yeni_not.strip(),
                                 "olusturan": st.session_state.get("kullanici",""),
                             }).execute()
-                            st.success("✅ Not eklendi!")
+                            st.success("✅ Eklendi!")
+                            st.session_state[_not_key] = False
                             st.cache_data.clear()
                             st.rerun()
                     except Exception as _ne:
                         st.error(f"Hata: {_ne}")
                 else:
-                    st.warning("Not boş olamaz!")
-        st.markdown("<hr style='margin:8px 0;border:none;border-top:0.5px solid #e2e8f0;'>", unsafe_allow_html=True)
+                    st.warning("Not boş!")
+        st.markdown("<div style='height:4px;border-top:0.5px solid #e2e8f0;margin:6px 0;'></div>", unsafe_allow_html=True)
 
     # Son HTML varsa render et (boş olabilir)
     if _html and _html.strip() not in ["", "<div class=\"it3-wrap\">", "</div>"]:
