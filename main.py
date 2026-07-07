@@ -1437,6 +1437,7 @@ _TAB_ETIKETLER = {
     "rota_analiz": "🚚 Rota Analiz",
     "operasyon": "🚛 Operasyon",
     "patron": "👑 Yönetim Paneli",
+    "musteri_atama": "🎯 Müşteri Atama",
     
 }
 
@@ -1805,17 +1806,108 @@ button[data-testid="manage-app-button"] { display: none !important; }
         st.rerun()
     st.divider()
 
-    for _tab_key in _sb_liste:
-        _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
-        _aktif_mi = st.session_state["aktif_tab"] == _tab_key
-        _renk = _TAB_RENKLER.get(_tab_key, "#374151")
-        if not _aktif_mi:
-            st.markdown(f"<style>section[data-testid='stSidebar'] div[data-testid='stVerticalBlock'] > div:last-child .stButton>button p {{ color: {_renk} !important; }}</style>", unsafe_allow_html=True)
-        if st.button(_etiket, use_container_width=True,
-                     type="primary" if _aktif_mi else "secondary",
-                     key=f"sb_{_tab_key}"):
-            st.session_state["aktif_tab"] = _tab_key
-            st.rerun()
+    # ── MENÜ GÖRÜNÜMÜ: Kurumsal (gruplu, lacivert) / Klasik ─────────────────────
+    _menu_klasik = st.checkbox("🧭 Klasik menü görünümü",
+                               value=st.session_state.get("_menu_klasik", False),
+                               key="_menu_klasik_cb")
+    st.session_state["_menu_klasik"] = _menu_klasik
+
+    if _menu_klasik:
+        # Klasik düz görünüm — eski kod aynen korunur
+        for _tab_key in _sb_liste:
+            _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
+            _aktif_mi = st.session_state["aktif_tab"] == _tab_key
+            _renk = _TAB_RENKLER.get(_tab_key, "#374151")
+            if not _aktif_mi:
+                st.markdown(f"<style>section[data-testid='stSidebar'] div[data-testid='stVerticalBlock'] > div:last-child .stButton>button p {{ color: {_renk} !important; }}</style>", unsafe_allow_html=True)
+            if st.button(_etiket, use_container_width=True,
+                         type="primary" if _aktif_mi else "secondary",
+                         key=f"sb_{_tab_key}"):
+                st.session_state["aktif_tab"] = _tab_key
+                st.rerun()
+    else:
+        # Birleşik açık görünüm: arama + sık kullanılanlar + hep açık gruplar (açık tema)
+        st.markdown("""<style>
+        section[data-testid='stSidebar'] { background-color:#ffffff; }
+        section[data-testid='stSidebar'] hr { border-color:#eceae2; }
+        section[data-testid='stSidebar'] .stButton>button[kind='secondary'] { background:transparent; border:none; justify-content:flex-start; text-align:left; }
+        section[data-testid='stSidebar'] .stButton>button[kind='secondary'] p { color:#3d3d3a !important; }
+        section[data-testid='stSidebar'] .stButton>button[kind='secondary']:hover { background:#f6f5f0; }
+        section[data-testid='stSidebar'] .stButton>button[kind='primary'] { background:#eef4fc; border:none; border-left:3px solid #2568c7; border-radius:6px; justify-content:flex-start; text-align:left; }
+        section[data-testid='stSidebar'] .stButton>button[kind='primary'] p { color:#1a4f9e !important; font-weight:600; }
+        section[data-testid='stSidebar'] label p, section[data-testid='stSidebar'] .stMarkdown p { color:#3d3d3a; }
+        section[data-testid='stSidebar'] summary p, section[data-testid='stSidebar'] summary span { color:#3d3d3a !important; }
+        </style>""", unsafe_allow_html=True)
+
+        _MENU_GRUPLARI = [
+            ("SATIŞ",    ["yeni", "liste", "analiz", "islem_takip"]),
+            ("PLANLAMA", ["randevu", "teklif", "ozel_teklif"]),
+            ("SAHA",     ["rota_analiz", "operasyon", "harita"]),
+            ("RAPORLAR", ["rapor", "admin_rapor", "excel"]),
+            ("YÖNETİM",  ["kullanici", "patron", "musteri_atama", "kisiler", "mesajlar"]),
+        ]
+
+        if "_favori_sayfalar" not in st.session_state:
+            st.session_state["_favori_sayfalar"] = ["liste", "randevu"]
+
+        def _menu_butonu(_tab_key, _yildiz_goster=True):
+            _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
+            _aktif_mi = st.session_state["aktif_tab"] == _tab_key
+            if _yildiz_goster:
+                _c1, _c2 = st.columns([1, 7])
+                with _c1:
+                    _favori_mi = _tab_key in st.session_state["_favori_sayfalar"]
+                    if st.button("★" if _favori_mi else "☆", key=f"fav_{_tab_key}"):
+                        if _favori_mi:
+                            st.session_state["_favori_sayfalar"].remove(_tab_key)
+                        else:
+                            st.session_state["_favori_sayfalar"].append(_tab_key)
+                        st.rerun()
+                with _c2:
+                    if st.button(_etiket, use_container_width=True,
+                                 type="primary" if _aktif_mi else "secondary",
+                                 key=f"sb_{_tab_key}"):
+                        st.session_state["aktif_tab"] = _tab_key
+                        st.rerun()
+            else:
+                if st.button(_etiket, use_container_width=True,
+                             type="primary" if _aktif_mi else "secondary",
+                             key=f"sb_{_tab_key}"):
+                    st.session_state["aktif_tab"] = _tab_key
+                    st.rerun()
+
+        _arama = st.text_input("", placeholder="🔎 Sayfa ara…", key="_menu_arama", label_visibility="collapsed")
+
+        if _arama.strip():
+            _arama_kucuk = _arama.strip().lower()
+            _eslesen = [t for t in _sb_liste if _arama_kucuk in _TAB_ETIKETLER.get(t, t).lower()]
+            if _eslesen:
+                for _tab_key in _eslesen:
+                    _menu_butonu(_tab_key, _yildiz_goster=False)
+            else:
+                st.caption("Eşleşen sayfa yok")
+        else:
+            _favoriler_gecerli = [t for t in st.session_state["_favori_sayfalar"] if t in _sb_liste]
+            if _favoriler_gecerli:
+                st.markdown("<div style='font-size:10.5px;letter-spacing:1.2px;font-weight:600;color:#9a988f;padding:10px 4px 2px;'>SIK KULLANILAN</div>", unsafe_allow_html=True)
+                for _tab_key in _favoriler_gecerli:
+                    _menu_butonu(_tab_key)
+
+            _gruplanan = set()
+            for _g_ad, _g_keys in _MENU_GRUPLARI:
+                _g_items = [t for t in _sb_liste if t in _g_keys]
+                if not _g_items:
+                    continue
+                st.markdown(f"<div style='font-size:10.5px;letter-spacing:1.2px;font-weight:600;color:#9a988f;padding:10px 4px 2px;'>{_g_ad}</div>", unsafe_allow_html=True)
+                for _tab_key in _g_items:
+                    _gruplanan.add(_tab_key)
+                    _menu_butonu(_tab_key)
+
+            _kalanlar = [t for t in _sb_liste if t not in _gruplanan]
+            if _kalanlar:
+                st.markdown("<div style='font-size:10.5px;letter-spacing:1.2px;font-weight:600;color:#9a988f;padding:10px 4px 2px;'>DİĞER</div>", unsafe_allow_html=True)
+                for _tab_key in _kalanlar:
+                    _menu_butonu(_tab_key)
 
     # ── ALT BÖLÜM ─────────────────────────────────────────────────────────────
     st.divider()
