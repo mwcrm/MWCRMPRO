@@ -1751,8 +1751,8 @@ button[data-testid="manage-app-button"] { display: none !important; }
 """, unsafe_allow_html=True)
 
     st.markdown(
-        "<div style='font-size:15px;font-weight:700;color:#1f6feb;"
-        "padding:14px 10px 14px;letter-spacing:0.8px;border-bottom:2px solid #1f6feb;margin-bottom:10px;'>"
+        "<div style='display:flex;align-items:center;gap:9px;font-size:15px;font-weight:700;color:#1a4f9e;"
+        "padding:14px 10px 14px;letter-spacing:0.4px;border-bottom:2px solid #2568c7;margin-bottom:10px;'>"
         "🏢 MWCRMPRO</div>",
         unsafe_allow_html=True
     )
@@ -1827,10 +1827,19 @@ button[data-testid="manage-app-button"] { display: none !important; }
     st.markdown("""<style>
     section[data-testid='stSidebar'] { background-color:#ffffff; }
     section[data-testid='stSidebar'] hr { border-color:#eceae2; }
-    section[data-testid='stSidebar'] .stButton>button[kind='secondary'] { background:transparent; border:none; justify-content:flex-start; text-align:left; }
-    section[data-testid='stSidebar'] .stButton>button[kind='secondary'] p { color:#3d3d3a !important; }
-    section[data-testid='stSidebar'] .stButton>button[kind='secondary']:hover { background:#f6f5f0; }
-    section[data-testid='stSidebar'] .stButton>button[kind='primary'] { background:#eef4fc; border:none; border-left:3px solid #2568c7; border-radius:6px; justify-content:flex-start; text-align:left; }
+    section[data-testid='stSidebar'] .stButton>button[kind='secondary'] {
+        background:transparent; border:none; border-radius:8px;
+        justify-content:flex-start; text-align:left;
+        transition:background-color .15s ease, color .15s ease;
+    }
+    section[data-testid='stSidebar'] .stButton>button[kind='secondary'] p { color:#3d3d3a !important; font-weight:500; transition:color .15s ease; }
+    section[data-testid='stSidebar'] .stButton>button[kind='secondary']:hover { background:#f6f8fb; }
+    section[data-testid='stSidebar'] .stButton>button[kind='secondary']:hover p { color:#1a4f9e !important; }
+    section[data-testid='stSidebar'] .stButton>button[kind='primary'] {
+        background:#eef4fc; border:none; border-left:3px solid #2568c7; border-radius:8px;
+        justify-content:flex-start; text-align:left;
+        transition:background-color .15s ease;
+    }
     section[data-testid='stSidebar'] .stButton>button[kind='primary'] p { color:#1a4f9e !important; font-weight:600; }
     section[data-testid='stSidebar'] label p, section[data-testid='stSidebar'] .stMarkdown p { color:#3d3d3a; }
     section[data-testid='stSidebar'] summary p, section[data-testid='stSidebar'] summary span { color:#3d3d3a !important; }
