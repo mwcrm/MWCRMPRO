@@ -10686,41 +10686,7 @@ elif aktif == "bolgeler":
         st.caption("Bu toplam, kaç bölgeye dağılmış olursa olsun senin (veya admin için herkesin) tüm müşterilerini kapsar." if _bl_rol != "admin"
                    else "Bu toplam, tüm kullanıcıların tüm bölgelerdeki tüm müşterilerini kapsar.")
         st.divider()
-        st.markdown("#### 📍 Bölge bölge kırılım")
-
-        st.caption("Yeni müşteri eklemek için mevcut 📥 Excel Aktar sayfasını kullanabilirsiniz — il/ilçe bilgisi girildiğinde bölgesi burada otomatik hesaplanır.")
-        st.divider()
-
-        _bl_ozet = (_bl_df.groupby("_bolge").size()
-                    .reset_index(name="musteri_sayisi")
-                    .sort_values("musteri_sayisi", ascending=False))
-        _bl_hedef_var = "beklenen_ciro" in _bl_df.columns
-        if _bl_hedef_var:
-            _hedef_map = _bl_df.groupby("_bolge")["beklenen_ciro"].apply(
-                lambda s: pd.to_numeric(s, errors="coerce").fillna(0).sum())
-            _bl_ozet["hedef_ciro"] = _bl_ozet["_bolge"].map(_hedef_map)
-        st.caption("Bir bölgeye tıklayınca Cari Liste ekranı o bölgeye filtrelenmiş olarak açılır — Mükerrer Birleştir, hızlı filtreler, Kolon Ayarları, notlar dahil her şey aynı çalışır.")
-        for _, _row in _bl_ozet.iterrows():
-            _etik = f"{_row['_bolge']}   ·   {int(_row['musteri_sayisi'])} müşteri"
-            if _bl_hedef_var:
-                _etik += f"   ·   {_row['hedef_ciro']:,.0f} ₺ hedef"
-            if st.button(_etik, use_container_width=True, key=f"bl_git_{_row['_bolge']}"):
-                _bl_secilen_df = _bl_df[_bl_df["_bolge"] == _row["_bolge"]]
-                if "il" in _bl_secilen_df.columns:
-                    st.session_state["_cl_fil_il_multi"] = sorted(
-                        _bl_secilen_df["il"].dropna().astype(str).unique().tolist())
-                if "_cl_fil_ilce_multi" in st.session_state:
-                    del st.session_state["_cl_fil_ilce_multi"]
-                if "ilce" in _bl_secilen_df.columns and _row["_bolge"] in ("İstanbul Anadolu", "İstanbul Avrupa"):
-                    # İstanbul bölge ayrımı ilçe bazlı — görünmez filtre kullanılır, pill taşmasın diye
-                    st.session_state["_bl_ilce_filtre"] = sorted(
-                        _bl_secilen_df["ilce"].dropna().astype(str).unique().tolist())
-                    st.session_state["_bl_ilce_filtre_ad"] = _row["_bolge"]
-                elif "_bl_ilce_filtre" in st.session_state:
-                    del st.session_state["_bl_ilce_filtre"]
-                    st.session_state.pop("_bl_ilce_filtre_ad", None)
-                st.session_state["aktif_tab"] = "liste"
-                st.rerun()
+        st.caption("Yeni müşteri eklemek için mevcut 📥 Excel Aktar sayfasını kullanabilirsiniz — il/ilçe bilgisi girildiğinde bölgesi otomatik hesaplanır. Tek tek bölge listesi için Cari Liste ekranının en üstündeki 📍 Bölgeler kutucuklarını kullanın.")
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
