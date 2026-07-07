@@ -4267,13 +4267,15 @@ function updateBot(v){{
         _KOL_VARS_UI = {
             "firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
             "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
-            "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50
+            "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50,
+            "asama1":100,"asama2":100,"asama3":100,"asama4":100,"sonuc":100
         }
         _KG_UI_ETIKET = {
             "firma":"Firma","yetkili":"Yetkili","gsm":"GSM","sabit":"S.Tel",
             "email":"Email","adres":"Adres","il":"İl","ilce":"İlçe",
             "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"Aşama",
-            "aciklama":"Açıklama","📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID"
+            "aciklama":"Açıklama","📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID",
+            "asama1":"Aşama 1","asama2":"Aşama 2","asama3":"Aşama 3","asama4":"Aşama 4","sonuc":"Sonuç"
         }
         try:
             _sb_kg_ui = get_sb_client()
@@ -4319,7 +4321,7 @@ function updateBot(v){{
                 # Slider — gizliyse devre dışı
                 _yeni_kg_ui[_k] = st.slider(
                     f"{'~~' if _gizli_mi else ''}{_etiket}",
-                    min_value=40, max_value=400,
+                    min_value=20, max_value=400,
                     value=int(_kg_ui_mevcut.get(_k, _KOL_VARS_UI.get(_k,100))),
                     step=10, key=f"ui_kg_{_k}",
                     disabled=_gizli_mi
