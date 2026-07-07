@@ -3398,6 +3398,36 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
         _sel_firma = str(_sel_rows.iloc[0].get("firma","")) if not _sel_rows.empty else ""
         not_dialog(_sel_id, _sel_firma)
 
+        # ── RANDEVU EKLE — seçili müşteriye ─────────────────────────────────
+        with st.expander(f"📅 {_sel_firma} — Randevu Ekle", expanded=False):
+            _rc1, _rc2, _rc3 = st.columns(3)
+            _rdv_tarih = _rc1.date_input("Randevu Tarihi", key=f"cl_rdv_tarih_{_sel_id}")
+            _rdv_saat  = _rc2.selectbox("Saat", [f"{h:02d}:{m:02d}" for h in range(8,21) for m in [0,30]], key=f"cl_rdv_saat_{_sel_id}")
+            _rdv_bolge = _rc3.text_input("Bölge/Konum", key=f"cl_rdv_bolge_{_sel_id}", placeholder="İstanbul - Kadıköy")
+            _rdv_not   = st.text_area("Not", key=f"cl_rdv_not_{_sel_id}", placeholder="Randevu notu...", height=70)
+            _rdv_gorev = st.selectbox("Görev", ["Ziyaret","Toplantı","Online Görüşme","Telefon","Diğer"], key=f"cl_rdv_gorev_{_sel_id}")
+            if st.button(f"📅 Randevu Kaydet", key=f"cl_rdv_kaydet_{_sel_id}", type="primary", use_container_width=True):
+                try:
+                    _sb_rdv = get_sb_client()
+                    if _sb_rdv:
+                        _sb_rdv.table("randevular").insert({
+                            "musteri_id":   _sel_id,
+                            "musteri_adi":  _sel_firma,
+                            "randevu_tarihi": str(_rdv_tarih),
+                            "randevu_saati":  _rdv_saat,
+                            "bolge":          _rdv_bolge,
+                            "aciklama":       _rdv_not,
+                            "gorev":          _rdv_gorev,
+                            "olusturan":      st.session_state.get("kullanici",""),
+                        }).execute()
+                        st.success(f"✅ {_sel_firma} için randevu eklendi!")
+                        st.cache_data.clear()
+                        st.rerun()
+                    else:
+                        st.error("Bağlantı hatası!")
+                except Exception as _re:
+                    st.error(f"Hata: {_re}")
+
 
     # ── BUTONLAR ──────────────────────────────────────────────────────────────
     btn_k, btn_a, btn_s, btn_kolon = st.columns(4)
