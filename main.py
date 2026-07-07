@@ -7802,22 +7802,29 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
 
         _col_config_r = {
             "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
-            "id":            st.column_config.NumberColumn("ID", disabled=True),
+            "id":            st.column_config.NumberColumn("ID", disabled=True, width=_w("id")),
             "tarih":         None, "olusturan": None, "silindi": None,
-            "beklenen_ciro": None, "gerceklesen_ciro": None,
-            "adres":         None, "aciklama":   None,
-            "firma":         st.column_config.TextColumn("Firma"),
-            "yetkili":       st.column_config.TextColumn("Yetkili"),
-            "gsm":           st.column_config.TextColumn("GSM"),
-            "sabit":         st.column_config.TextColumn("S. Tel"),
-            "email":         st.column_config.TextColumn("Email"),
-            "il":            st.column_config.TextColumn("İl"),
-            "ilce":          st.column_config.TextColumn("İlçe"),
-            "durum":         st.column_config.SelectboxColumn("Durum", options=_tum_durum_r),
-            "temsilci":      st.column_config.TextColumn("Temsilci"),
-            "islem_asamasi": st.column_config.SelectboxColumn("Aşama", options=_tum_asama_r),
+            "beklenen_ciro": st.column_config.NumberColumn("Hedef ₺", format="%,.0f ₺", width="small"),
+            "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width="small"),
+            "firma":         st.column_config.TextColumn("Firma",    width=_w("firma")),
+            "yetkili":       st.column_config.TextColumn("Yetkili",  width=_w("yetkili")),
+            "gsm":           st.column_config.TextColumn("GSM",      width=_w("gsm")),
+            "sabit":         st.column_config.TextColumn("S. Tel",   width=_w("sabit")),
+            "email":         st.column_config.TextColumn("Email",    width=_w("email")),
+            "adres":         st.column_config.TextColumn("Adres",    width=_w("adres")),
+            "il":            st.column_config.TextColumn("İl",       width=_w("il")),
+            "ilce":          st.column_config.TextColumn("İlçe",     width=_w("ilce")),
+            "durum":         st.column_config.SelectboxColumn("Durum", options=_tum_durum_r, width=_w("durum")),
+            "temsilci":      st.column_config.TextColumn("Temsilci", width=_w("temsilci")),
+            "islem_asamasi": st.column_config.SelectboxColumn("Aşama", options=_tum_asama_r, width=_w("islem_asamasi")),
+            "aciklama":      st.column_config.TextColumn("Açıklama", width=_w("aciklama")),
+            "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
+            "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
         }
-        _col_order_r = ["Seç","id","firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi"]
+        # Gizli kolonları col_order'dan çıkar
+        _col_order_r = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","aciklama","beklenen_ciro","gerceklesen_ciro","📅 Son Randevu","📨 Notlar"]
+        _kol_gizli_map_r = {"firma":"firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email","adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci","islem_asamasi":"islem_asamasi","aciklama":"aciklama"}
+        _col_order_r = ["Seç"] + [c for c in _col_order_r[1:] if not any(c == _kol_gizli_map_r.get(g,g) for g in _GIZLI_KOLONLAR)]
 
         _secili_asama = st.selectbox("Aşama Seç:", _tum_asama_r, key="asama_sayfa_sec")
         _df_asama = _df_as[_df_as["islem_asamasi"]==_secili_asama].copy() if not _df_as.empty else pd.DataFrame()
