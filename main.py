@@ -1850,14 +1850,14 @@ button[data-testid="manage-app-button"] { display: none !important; }
         if "_favori_sayfalar" not in st.session_state:
             st.session_state["_favori_sayfalar"] = ["liste", "randevu"]
 
-        def _menu_butonu(_tab_key, _yildiz_goster=True):
+        def _menu_butonu(_tab_key, _yer, _yildiz_goster=True):
             _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
             _aktif_mi = st.session_state["aktif_tab"] == _tab_key
             if _yildiz_goster:
                 _c1, _c2 = st.columns([1, 7])
                 with _c1:
                     _favori_mi = _tab_key in st.session_state["_favori_sayfalar"]
-                    if st.button("★" if _favori_mi else "☆", key=f"fav_{_tab_key}"):
+                    if st.button("★" if _favori_mi else "☆", key=f"fav_{_yer}_{_tab_key}"):
                         if _favori_mi:
                             st.session_state["_favori_sayfalar"].remove(_tab_key)
                         else:
@@ -1866,13 +1866,13 @@ button[data-testid="manage-app-button"] { display: none !important; }
                 with _c2:
                     if st.button(_etiket, use_container_width=True,
                                  type="primary" if _aktif_mi else "secondary",
-                                 key=f"sb_{_tab_key}"):
+                                 key=f"sb_{_yer}_{_tab_key}"):
                         st.session_state["aktif_tab"] = _tab_key
                         st.rerun()
             else:
                 if st.button(_etiket, use_container_width=True,
                              type="primary" if _aktif_mi else "secondary",
-                             key=f"sb_{_tab_key}"):
+                             key=f"sb_{_yer}_{_tab_key}"):
                     st.session_state["aktif_tab"] = _tab_key
                     st.rerun()
 
@@ -1883,7 +1883,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
             _eslesen = [t for t in _sb_liste if _arama_kucuk in _TAB_ETIKETLER.get(t, t).lower()]
             if _eslesen:
                 for _tab_key in _eslesen:
-                    _menu_butonu(_tab_key, _yildiz_goster=False)
+                    _menu_butonu(_tab_key, "arama", _yildiz_goster=False)
             else:
                 st.caption("Eşleşen sayfa yok")
         else:
@@ -1891,7 +1891,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
             if _favoriler_gecerli:
                 st.markdown("<div style='font-size:10.5px;letter-spacing:1.2px;font-weight:600;color:#9a988f;padding:10px 4px 2px;'>SIK KULLANILAN</div>", unsafe_allow_html=True)
                 for _tab_key in _favoriler_gecerli:
-                    _menu_butonu(_tab_key)
+                    _menu_butonu(_tab_key, "fav")
 
             _gruplanan = set()
             for _g_ad, _g_keys in _MENU_GRUPLARI:
@@ -1901,13 +1901,13 @@ button[data-testid="manage-app-button"] { display: none !important; }
                 st.markdown(f"<div style='font-size:10.5px;letter-spacing:1.2px;font-weight:600;color:#9a988f;padding:10px 4px 2px;'>{_g_ad}</div>", unsafe_allow_html=True)
                 for _tab_key in _g_items:
                     _gruplanan.add(_tab_key)
-                    _menu_butonu(_tab_key)
+                    _menu_butonu(_tab_key, "grp")
 
             _kalanlar = [t for t in _sb_liste if t not in _gruplanan]
             if _kalanlar:
                 st.markdown("<div style='font-size:10.5px;letter-spacing:1.2px;font-weight:600;color:#9a988f;padding:10px 4px 2px;'>DİĞER</div>", unsafe_allow_html=True)
                 for _tab_key in _kalanlar:
-                    _menu_butonu(_tab_key)
+                    _menu_butonu(_tab_key, "diger")
 
     # ── ALT BÖLÜM ─────────────────────────────────────────────────────────────
     st.divider()
