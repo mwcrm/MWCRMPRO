@@ -10623,47 +10623,6 @@ elif aktif == "bolgeler":
         )
         _bl_df["_bolge"] = _bl_df["_bolge"].fillna("Havuz (Bölgesiz)")
 
-        # Notlar / Analiz / Son Randevu — Cari Liste'deki ile aynı kaynaklardan hesaplanır
-        try:
-            _sb_bl = get_sb_client()
-        except Exception:
-            _sb_bl = None
-
-        _bl_df["✅ Analiz"] = ""
-        if _sb_bl:
-            try:
-                _an_raw_bl = _sb_bl.table("musteri_analiz").select("firma").execute().data or []
-                _analiz_set_bl = {_bl_sadelestir(_a.get("firma","")) for _a in _an_raw_bl if _a.get("firma")}
-                _bl_df["✅ Analiz"] = _bl_df["firma"].apply(lambda x: "✅" if _bl_sadelestir(x) in _analiz_set_bl else "")
-            except Exception:
-                pass
-
-        _bl_df["📅 Son Randevu"] = ""
-        try:
-            _df_rand_bl = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC, randevu_saati DESC")
-            if not _df_rand_bl.empty and "musteri_adi" in _df_rand_bl.columns:
-                _son_rand_bl = {}
-                for _, _rj in _df_rand_bl.iterrows():
-                    _mn_bl = _bl_sadelestir(_rj.get("musteri_adi",""))
-                    if _mn_bl and _mn_bl not in _son_rand_bl:
-                        _dt_bl = fmt_tarih(str(_rj.get("randevu_tarihi","") or ""))
-                        _st_bl = str(_rj.get("randevu_saati","") or "")[:5]
-                        _son_rand_bl[_mn_bl] = f"📅 {_dt_bl} {_st_bl}"
-                _bl_df["📅 Son Randevu"] = _bl_df["firma"].apply(lambda x: _son_rand_bl.get(_bl_sadelestir(x), ""))
-        except Exception:
-            pass
-
-        _bl_df["📨 Notlar"] = ""
-        if _sb_bl and "id" in _bl_df.columns:
-            try:
-                _not_raw_bl = _sb_bl.table("cari_aciklamalar").select("cari_id").execute().data or []
-                import collections as _bl_coll
-                _not_sayac_bl = _bl_coll.Counter([str(_r.get("cari_id","")) for _r in _not_raw_bl])
-                _bl_df["📨 Notlar"] = _bl_df["id"].apply(
-                    lambda x: f"📨 {_not_sayac_bl.get(str(int(x)),0)}" if _not_sayac_bl.get(str(int(x)),0) > 0 else "")
-            except Exception:
-                pass
-
         with st.expander("📤 Genel Excel indirme / yükleme"):
             _dl_kolon = [c for c in ["firma","yetkili","gsm","il","ilce","atanan_kullanici",
                                       "durum","beklenen_ciro","gerceklesen_ciro"] if c in _bl_df.columns]
@@ -10712,72 +10671,33 @@ elif aktif == "bolgeler":
 
         st.divider()
 
-        if st.session_state.get("_secili_bolge"):
-            _sec = st.session_state["_secili_bolge"]
-            if st.button("⬅️ Bölgelere dön", key="bl_geri_btn"):
-                st.session_state["_secili_bolge"] = None
-                st.rerun()
-            st.markdown(f"### {_sec}")
-            _sec_df = _bl_df[_bl_df["_bolge"] == _sec]
-            _g1, _g2, _g3 = st.columns(3)
-            _g1.metric("Müşteri sayısı", len(_sec_df))
-            if "beklenen_ciro" in _sec_df.columns:
-                _g2.metric("Hedef ciro", f"{pd.to_numeric(_sec_df['beklenen_ciro'], errors='coerce').fillna(0).sum():,.0f} ₺")
-            if "gerceklesen_ciro" in _sec_df.columns:
-                _g3.metric("Gerçekleşen", f"{pd.to_numeric(_sec_df['gerceklesen_ciro'], errors='coerce').fillna(0).sum():,.0f} ₺")
-
-            # Cari Liste ile birebir aynı sütun düzeni/format — her il/bölge için sabit,
-            # yeni bir sütun eklenirse (örn. ileride Aşama 5) otomatik en sona eklenir.
-            _bl_col_config = {
-                "id":               st.column_config.NumberColumn("ID", disabled=True, width="small"),
-                "firma":            st.column_config.TextColumn("Firma", width="medium"),
-                "yetkili":          st.column_config.TextColumn("Yetkili", width="medium"),
-                "gsm":              st.column_config.TextColumn("GSM", width="medium"),
-                "sabit":            st.column_config.TextColumn("S. Tel", width="medium"),
-                "email":            st.column_config.TextColumn("Email", width="medium"),
-                "adres":            st.column_config.TextColumn("Adres", width="large"),
-                "il":               st.column_config.TextColumn("İl", width="small"),
-                "ilce":             st.column_config.TextColumn("İlçe", width="small"),
-                "durum":            st.column_config.TextColumn("Durum", width="small"),
-                "temsilci":         st.column_config.TextColumn("Temsilci", width="small"),
-                "atanan_kullanici": st.column_config.TextColumn("Atanan Kullanıcı", width="small"),
-                "islem_asamasi":    st.column_config.TextColumn("Aşama", width="small"),
-                "beklenen_ciro":    st.column_config.NumberColumn("Hedef ₺", format="%,.0f ₺", width="small"),
-                "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width="small"),
-                "aciklama":         st.column_config.TextColumn("Açıklama", width="large"),
-                "✅ Analiz":        st.column_config.TextColumn("✅ Analiz", width="small"),
-                "📅 Son Randevu":   st.column_config.TextColumn("📅 Son Randevu", width="medium"),
-                "📨 Notlar":        st.column_config.TextColumn("📨 Notlar", width="small"),
-                "asama1":           st.column_config.TextColumn("Aşama 1", width="medium"),
-                "asama2":           st.column_config.TextColumn("Aşama 2", width="medium"),
-                "asama3":           st.column_config.TextColumn("Aşama 3", width="medium"),
-                "asama4":           st.column_config.TextColumn("Aşama 4", width="medium"),
-                "sonuc":            st.column_config.TextColumn("Sonuç", width="medium"),
-            }
-            _bl_col_sira = ["id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum",
-                            "temsilci","atanan_kullanici","islem_asamasi","beklenen_ciro","gerceklesen_ciro",
-                            "✅ Analiz","📅 Son Randevu","aciklama","📨 Notlar",
-                            "asama1","asama2","asama3","asama4","sonuc"]
-            _g_kolon = [c for c in _bl_col_sira if c in _sec_df.columns]
-
-            st.dataframe(_sec_df[_g_kolon], use_container_width=True, hide_index=True,
-                         column_config={k: v for k, v in _bl_col_config.items() if k in _g_kolon})
-        else:
-            _bl_ozet = (_bl_df.groupby("_bolge").size()
-                        .reset_index(name="musteri_sayisi")
-                        .sort_values("musteri_sayisi", ascending=False))
-            _bl_hedef_var = "beklenen_ciro" in _bl_df.columns
+        _bl_ozet = (_bl_df.groupby("_bolge").size()
+                    .reset_index(name="musteri_sayisi")
+                    .sort_values("musteri_sayisi", ascending=False))
+        _bl_hedef_var = "beklenen_ciro" in _bl_df.columns
+        if _bl_hedef_var:
+            _hedef_map = _bl_df.groupby("_bolge")["beklenen_ciro"].apply(
+                lambda s: pd.to_numeric(s, errors="coerce").fillna(0).sum())
+            _bl_ozet["hedef_ciro"] = _bl_ozet["_bolge"].map(_hedef_map)
+        st.caption("Bir bölgeye tıklayınca Cari Liste ekranı o bölgeye filtrelenmiş olarak açılır — Mükerrer Birleştir, hızlı filtreler, Kolon Ayarları, notlar dahil her şey aynı çalışır.")
+        for _, _row in _bl_ozet.iterrows():
+            _etik = f"{_row['_bolge']}   ·   {int(_row['musteri_sayisi'])} müşteri"
             if _bl_hedef_var:
-                _hedef_map = _bl_df.groupby("_bolge")["beklenen_ciro"].apply(
-                    lambda s: pd.to_numeric(s, errors="coerce").fillna(0).sum())
-                _bl_ozet["hedef_ciro"] = _bl_ozet["_bolge"].map(_hedef_map)
-            for _, _row in _bl_ozet.iterrows():
-                _etik = f"{_row['_bolge']}   ·   {int(_row['musteri_sayisi'])} müşteri"
-                if _bl_hedef_var:
-                    _etik += f"   ·   {_row['hedef_ciro']:,.0f} ₺ hedef"
-                if st.button(_etik, use_container_width=True, key=f"bl_git_{_row['_bolge']}"):
-                    st.session_state["_secili_bolge"] = _row["_bolge"]
-                    st.rerun()
+                _etik += f"   ·   {_row['hedef_ciro']:,.0f} ₺ hedef"
+            if st.button(_etik, use_container_width=True, key=f"bl_git_{_row['_bolge']}"):
+                _bl_secilen_df = _bl_df[_bl_df["_bolge"] == _row["_bolge"]]
+                if "il" in _bl_secilen_df.columns:
+                    st.session_state["_cl_fil_il_multi"] = sorted(
+                        _bl_secilen_df["il"].dropna().astype(str).unique().tolist())
+                if "ilce" in _bl_secilen_df.columns:
+                    if _row["_bolge"] in ("İstanbul Anadolu", "İstanbul Avrupa"):
+                        # İstanbul bölge ayrımı ilçe bazlı olduğu için ilçe filtresi de gerekli
+                        st.session_state["_cl_fil_ilce_multi"] = sorted(
+                            _bl_secilen_df["ilce"].dropna().astype(str).unique().tolist())
+                    elif "_cl_fil_ilce_multi" in st.session_state:
+                        del st.session_state["_cl_fil_ilce_multi"]
+                st.session_state["aktif_tab"] = "liste"
+                st.rerun()
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
