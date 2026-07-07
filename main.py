@@ -6795,6 +6795,20 @@ elif aktif == "whatsapp":
 elif aktif == "kisiler":
     sayfa_log("kisiler")
 
+    # PIN koruması — sadece PIN bilen girebilir
+    _KIS_PIN = "255266"
+    if st.session_state.get("_kisiler_pin_ok") != True:
+        st.markdown("## 🔐 Telefon Kişiler")
+        st.markdown("Bu sayfa PIN korumalıdır.")
+        _pin_gir = st.text_input("PIN girin:", type="password", key="kisiler_pin_input", max_chars=10)
+        if st.button("Giriş", key="kisiler_pin_btn", type="primary"):
+            if _pin_gir == _KIS_PIN:
+                st.session_state["_kisiler_pin_ok"] = True
+                st.rerun()
+            else:
+                st.error("❌ Yanlış PIN!")
+        st.stop()
+
     # Yetki kontrolü — sadece admin görebilir
     if st.session_state.get("rol", "") != "admin":
         st.warning("⛔ Bu sayfaya erişim yetkiniz yok.")
@@ -10086,127 +10100,129 @@ elif aktif == "islem_takip":
         _it_sirali = [(f,i) for f,i in _it_sirali if _it_ara.lower() in f.lower()]
     st.caption(f"{len(_it_sirali)} müşteri · toplam {sum(len(i) for _,i in _it_sirali)} işlem")
 
-    # ── MODEL 3: MÜŞTERİ BAZLI GRUPLU HTML ──────────────────────────────────
-    _css = """<style>
-.it3-wrap{font-family:sans-serif;font-size:11px;}
-.it3-grup{margin-bottom:14px;border:0.5px solid #e2e8f0;border-radius:10px;overflow:hidden;}
-.it3-firma-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f8fafc;border-bottom:0.5px solid #e2e8f0;}
-.it3-firma-sol{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
-.it3-firma-adi{font-size:12px;font-weight:600;color:#0f172a;}
-.it3-say{font-size:10px;padding:1px 7px;border-radius:10px;background:#dbeafe;color:#1d4ed8;}
-.it3-bek{font-size:10px;font-weight:500;color:#16a34a;}
-.it3-det{font-size:10px;color:#94a3b8;}
-.it3-asama{font-size:10px;font-weight:500;color:#0f172a;}
-.it3-islemler{padding:6px 0;}
-.it3-islem{display:flex;align-items:flex-start;gap:8px;padding:5px 12px;border-bottom:0.5px solid #f1f5f9;}
-.it3-islem:last-child{border-bottom:none;}
-.it3-islem:hover{background:#f8fafc;}
-.it3-tarih{font-size:10px;color:#94a3b8;white-space:nowrap;min-width:72px;}
-.it3-tur{font-size:10px;font-weight:500;color:#0f172a;white-space:nowrap;min-width:52px;}
-.it3-acik{font-size:10px;color:#475569;line-height:1.4;flex:1;}
-</style>"""
+    # ── EXCEL İNDİR ─────────────────────────────────────────────────────────
+    try:
+        import io as _io2
+        _xl_rows = []
+        for _fxl, _ixl in _it_sirali:
+            for _ism in _ixl:
+                _ci2 = _it_cari_map.get(_fxl, {})
+                _xl_rows.append({
+                    "Firma": _fxl,
+                    "Yetkili": _ci2.get("yetkili","") if isinstance(_ci2,dict) else "",
+                    "İl": _ci2.get("il","") if isinstance(_ci2,dict) else "",
+                    "Beklenen ₺": _ci2.get("beklenen",0) if isinstance(_ci2,dict) else 0,
+                    "Aşama": _it_asama(_fxl),
+                    "Tarih": _ism["tarih"],
+                    "İşlem Türü": _ism["tur"],
+                    "Açıklama": _ism["aciklama"],
+                    "Kullanıcı": _ism.get("kul",""),
+                })
+        _xl_df2 = pd.DataFrame(_xl_rows)
+        _xl_buf2 = _io2.BytesIO()
+        _xl_df2.to_excel(_xl_buf2, index=False, engine="openpyxl")
+        _xl_buf2.seek(0)
+        st.download_button("📥 Excel İndir", _xl_buf2, "islem_takip.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="it_excel_indir")
+    except: pass
 
-    _html = '<div class="it3-wrap">' + _css
+    # ── LİSTE RENDER ─────────────────────────────────────────────────────────
+    _sb_islem = get_sb_client()
     for _firma, _islemler in _it_sirali:
         _ci = _it_cari_map.get(_firma, {})
         _yt  = _ci.get("yetkili","") if isinstance(_ci,dict) else ""
         _il  = _ci.get("il","") if isinstance(_ci,dict) else ""
+        _ilc = _ci.get("ilce","") if isinstance(_ci,dict) else ""
         _bk  = _ci.get("beklenen",0) if isinstance(_ci,dict) else 0
         try: _bk_f = f"{int(float(_bk)):,}".replace(",",".") + " ₺" if float(_bk)>0 else ""
         except: _bk_f = ""
-        _as = _it_asama(_firma)
+        _as  = _it_asama(_firma)
         _bdg = _it_badge(_firma)
+        _loc = " · ".join(x for x in [_yt,_il,_ilc] if x and x not in ["nan","None",""])
 
-        _html += f'<div class="it3-grup">'
-        _html += f'<div class="it3-firma-hdr">'
-        _html += f'<div class="it3-firma-sol"><span class="it3-firma-adi">{_firma}</span>'
-        _html += f'<span class="it3-say">{len(_islemler)} işlem</span>'
-        if _bk_f: _html += f'<span class="it3-bek">{_bk_f}</span>'
-        if _bdg: _html += _bdg
-        _det = " · ".join(x for x in [_yt,_il] if x and x not in ["nan","None",""])
-        if _det: _html += f'<span class="it3-det">{_det}</span>'
-        _html += '</div>'
-        if _as: _html += f'<span class="it3-asama">{_as}</span>'
-        _html += '</div>'
+        # Mükerrer tespit
+        _muk_sayac = {}
+        for _ism in _islemler:
+            _mk = (_ism["tarih"], _ism["tur"])
+            _muk_sayac[_mk] = _muk_sayac.get(_mk, 0) + 1
 
-        _html += '</div>'  # firma header kapan
+        # Firma başlığı
+        _hdr_html = f"""<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+            padding:9px 14px;background:#f8fafc;border:0.5px solid #e2e8f0;
+            border-radius:10px 10px 0 0;margin-top:12px;">
+            <span style="font-size:13px;font-weight:600;color:#0f172a;">{_firma}</span>
+            <span style="font-size:9px;padding:2px 8px;border-radius:10px;background:#dbeafe;color:#1d4ed8;">{len(_islemler)} işlem</span>
+            {"<span style='font-size:11px;font-weight:500;color:#16a34a;'>"+_bk_f+"</span>" if _bk_f else ""}
+            {_bdg}
+            {"<span style='font-size:10px;color:#94a3b8;'>"+_loc+"</span>" if _loc else ""}
+            {"<span style='margin-left:auto;font-size:11px;font-weight:500;color:#334155;'>"+_as+"</span>" if _as else ""}
+        </div>
+        <div style="border:0.5px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;margin-bottom:0;">"""
+        st.markdown(_hdr_html, unsafe_allow_html=True)
 
-        # Firma header'ı HTML ile göster
-        st.markdown(_html, unsafe_allow_html=True)
-        _html = ""  # reset
-
-        # İşlemleri Streamlit ile göster — not ekle, arşivle, sil butonları
-        _sb_islem = get_sb_client()
+        # İşlem satırları
         for _ism in _islemler:
             _ikon = _it_ikon(_ism["tur"])
-            _acik = _ism["aciklama"][:120] + ("..." if len(_ism["aciklama"])>120 else "")
-            _arsiv = _ism.get("arsiv", False) or str(_ism.get("arsiv","")).lower() in ["1","true"]
-            _islem_stil = "opacity:0.4;" if _arsiv else ""
+            _acik = _ism["aciklama"][:150] + ("..." if len(_ism["aciklama"])>150 else "")
+            _arsiv = str(_ism.get("arsiv","")).lower() in ["1","true","yes"]
             _nid = str(_ism.get("id",""))
             _kaynak = _ism.get("kaynak","not")
-            # Hepsine sil göster
+            _is_muk = _muk_sayac.get((_ism["tarih"], _ism["tur"]),0) > 1
+            _row_bg = "background:rgba(251,191,36,0.07);" if _is_muk else ""
+            _opacity = "opacity:0.4;" if _arsiv else ""
+
             if _nid and _nid not in ["","None","nan"]:
-                _col1, _col2, _col3, _col4, _col5 = st.columns([1.2, 1, 5, 0.7, 0.7])
+                _c1,_c2,_c3,_c4,_c5 = st.columns([1.1,1,5.5,0.6,0.6])
             else:
-                _col1, _col2, _col3 = st.columns([1.2, 1, 6.4])
-                _col4 = _col5 = None
-            _col1.markdown(f"<span style='font-size:10px;color:#94a3b8;{_islem_stil}'>{_ism['tarih']}</span>", unsafe_allow_html=True)
-            _col2.markdown(f"<span style='font-size:10px;font-weight:500;color:#0f172a;{_islem_stil}'>{_ikon} {_ism['tur']}</span>", unsafe_allow_html=True)
-            _col3.markdown(f"<span style='font-size:10px;color:#475569;{_islem_stil}'>{_acik}</span>", unsafe_allow_html=True)
-            if _col4 and _col5:
-                if not _arsiv:
-                    if _col4.button("📦", key=f"it_arsiv_{_kaynak}_{_nid}_{_firma[:8]}", help="Arşivle"):
+                _c1,_c2,_c3 = st.columns([1.1,1,7.1])
+                _c4=_c5=None
+
+            _c1.markdown(f"<div style='font-size:10px;color:#94a3b8;padding:4px 0;{_opacity}{_row_bg}'>{_ism['tarih']}</div>", unsafe_allow_html=True)
+            _muk_tag = " <span style='font-size:8px;padding:1px 4px;background:#fef3c7;color:#92400e;border-radius:3px;'>mükerrer</span>" if _is_muk else ""
+            _c2.markdown(f"<div style='font-size:10px;font-weight:500;color:#1e293b;padding:4px 0;{_opacity}'>{_ikon} {_ism['tur']}{_muk_tag}</div>", unsafe_allow_html=True)
+            _c3.markdown(f"<div style='font-size:11px;color:#475569;padding:4px 0;line-height:1.5;{_opacity}'>{_acik}</div>", unsafe_allow_html=True)
+
+            if _c4 and _c5:
+                if not _arsiv and _kaynak == "not":
+                    if _c4.button("📦", key=f"it_arsiv_{_kaynak}_{_nid}_{_firma[:6]}", help="Arşivle"):
                         try:
                             if _sb_islem:
                                 _sb_islem.table("cari_aciklamalar").update({"arsiv": True}).eq("id", int(_nid)).execute()
-                                st.cache_data.clear()
-                                st.rerun()
+                                st.cache_data.clear(); st.rerun()
                         except: pass
-                if _col5.button("🗑", key=f"it_sil_{_kaynak}_{_nid}_{_firma[:8]}", help="Sil"):
+                if _c5.button("🗑", key=f"it_sil_{_kaynak}_{_nid}_{_firma[:6]}", help="Sil"):
                     try:
                         if _sb_islem:
-                            # Kaynağa göre doğru tablodan sil
-                            if _kaynak == "randevu":
-                                _sb_islem.table("randevular").delete().eq("id", int(_nid)).execute()
-                            elif _kaynak == "teklif":
-                                _sb_islem.table("teklifler").delete().eq("id", int(_nid)).execute()
-                            else:
-                                _sb_islem.table("cari_aciklamalar").delete().eq("id", int(_nid)).execute()
-                            st.cache_data.clear()
-                            st.rerun()
+                            _tbl = {"randevu":"randevular","teklif":"teklifler"}.get(_kaynak,"cari_aciklamalar")
+                            _sb_islem.table(_tbl).delete().eq("id", int(_nid)).execute()
+                            st.cache_data.clear(); st.rerun()
                     except: pass
 
-        # Not ekle — sade, küçük
-        _cid_firm = _islemler[0].get("cid","") if _islemler else ""
-        _not_key = f"it_not_ac_{_firma}"
-        _nc1, _nc2 = st.columns([8,2])
-        if _nc2.button("✏️ not ekle", key=f"it_not_btn_{_firma}", use_container_width=False):
-            st.session_state[_not_key] = not st.session_state.get(_not_key, False)
-        if st.session_state.get(_not_key, False):
-            _yeni_not = st.text_area("", key=f"it_not_{_firma}", placeholder="Not yaz...", height=60, label_visibility="collapsed")
-            if st.button("Kaydet", key=f"it_not_kaydet_{_firma}", type="primary"):
-                if _yeni_not and _yeni_not.strip():
+        # Not ekle butonu
+        _cid_f = _islemler[0].get("cid","") if _islemler else ""
+        _nk = f"it_not_ac_{_firma[:20]}"
+        _na1, _na2 = st.columns([8,2])
+        if _na2.button("✏️ not ekle", key=f"it_not_btn_{_firma[:20]}"):
+            st.session_state[_nk] = not st.session_state.get(_nk, False)
+        if st.session_state.get(_nk, False):
+            _yeni = st.text_area("", key=f"it_not_txt_{_firma[:20]}", placeholder="Not yaz...", height=60, label_visibility="collapsed")
+            if st.button("Kaydet", key=f"it_not_sv_{_firma[:20]}", type="primary"):
+                if _yeni and _yeni.strip():
                     try:
                         if _sb_islem:
                             _sb_islem.table("cari_aciklamalar").insert({
-                                "cari_id": int(_cid_firm) if _cid_firm and str(_cid_firm).isdigit() else 0,
+                                "cari_id": int(_cid_f) if str(_cid_f).isdigit() else 0,
                                 "cari_adi": _firma,
-                                "aciklama": _yeni_not.strip(),
+                                "aciklama": _yeni.strip(),
                                 "olusturan": st.session_state.get("kullanici",""),
                             }).execute()
                             st.success("✅ Eklendi!")
-                            st.session_state[_not_key] = False
-                            st.cache_data.clear()
-                            st.rerun()
-                    except Exception as _ne:
-                        st.error(f"Hata: {_ne}")
-                else:
-                    st.warning("Not boş!")
-        st.markdown("<div style='height:4px;border-top:0.5px solid #e2e8f0;margin:6px 0;'></div>", unsafe_allow_html=True)
+                            st.session_state[_nk] = False
+                            st.cache_data.clear(); st.rerun()
+                    except Exception as _ne: st.error(f"Hata: {_ne}")
+        st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
 
-    # Son HTML varsa render et (boş olabilir)
-    if _html and _html.strip() not in ["", "<div class=\"it3-wrap\">", "</div>"]:
-        st.markdown(_html + "</div>", unsafe_allow_html=True)
 
 
 elif aktif == "harita":
