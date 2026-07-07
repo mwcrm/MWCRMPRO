@@ -3060,6 +3060,14 @@ function kartSec(id){
             df_f = df_f.sort_values("_s", ascending=True).drop(columns=["_s"])
         df_f = df_f.reset_index(drop=True)
 
+    # ── Üst özet: o an filtrelenmiş görünümün toplamı (il seçimi, "Select all", vb. neyse) ──
+    _ml1, _ml2, _ml3 = st.columns(3)
+    _ml1.metric("Listelenen müşteri", len(df_f))
+    if "beklenen_ciro" in df_f.columns:
+        _ml2.metric("Hedef ciro (bu görünüm)", f"{pd.to_numeric(df_f['beklenen_ciro'], errors='coerce').fillna(0).sum():,.0f} ₺")
+    if "gerceklesen_ciro" in df_f.columns:
+        _ml3.metric("Gerçekleşen (bu görünüm)", f"{pd.to_numeric(df_f['gerceklesen_ciro'], errors='coerce').fillna(0).sum():,.0f} ₺")
+
     _aktif_fil_sayisi = sum([bool(ara_txt),bool(_asama_sec),bool(_durum_sec),filtre_seg!="Tümü",bool(_il_sec),bool(_ilce_sec),bool(_tem_sec)])
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
         try:
