@@ -10155,14 +10155,14 @@ elif aktif == "islem_takip":
             _col3.markdown(f"<span style='font-size:10px;color:#475569;{_islem_stil}'>{_acik}</span>", unsafe_allow_html=True)
             if _col4 and _col5:
                 if not _arsiv:
-                    if _col4.button("📦", key=f"it_arsiv_{_nid}", help="Arşivle"):
+                    if _col4.button("📦", key=f"it_arsiv_{_kaynak}_{_nid}_{_firma[:8]}", help="Arşivle"):
                         try:
                             if _sb_islem:
                                 _sb_islem.table("cari_aciklamalar").update({"arsiv": True}).eq("id", int(_nid)).execute()
                                 st.cache_data.clear()
                                 st.rerun()
                         except: pass
-                if _col5.button("🗑", key=f"it_sil_{_nid}", help="Sil"):
+                if _col5.button("🗑", key=f"it_sil_{_kaynak}_{_nid}_{_firma[:8]}", help="Sil"):
                     try:
                         if _sb_islem:
                             # Kaynağa göre doğru tablodan sil
