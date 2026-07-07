@@ -3108,7 +3108,9 @@ function kartSec(id){
     _KOL_VARSAYILAN = {
         "firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
         "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
-        "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50
+        "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50,
+        "beklenen_ciro":80,"gerceklesen_ciro":80,"✅ Analiz":80,
+        "asama1":100,"asama2":100,"asama3":100,"asama4":100,"sonuc":100
     }
     # Gizli kolonları DB'den yükle
     if "_kol_genislik_init" not in st.session_state:
@@ -3148,8 +3150,8 @@ function kartSec(id){
         "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
         "id":            st.column_config.NumberColumn("ID", disabled=True, width=_w("id")),
         "tarih":         None, "olusturan": None, "silindi": None,
-        "beklenen_ciro":    st.column_config.NumberColumn("Hedef ₺",  format="%,.0f ₺", width="small"),
-        "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width="small"),
+        "beklenen_ciro":    st.column_config.NumberColumn("Hedef ₺",  format="%,.0f ₺", width=_w("beklenen_ciro")),
+        "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width=_w("gerceklesen_ciro")),
         "firma":         st.column_config.TextColumn("Firma",     width=_w("firma")),
         "yetkili":       st.column_config.TextColumn("Yetkili",   width=_w("yetkili")),
         "gsm":           st.column_config.TextColumn("GSM",       width=_w("gsm")),
@@ -3164,19 +3166,21 @@ function kartSec(id){
         "aciklama":      st.column_config.TextColumn("Açıklama",  width=_w("aciklama")),
         "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
-        "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=True, width="small"),
-        "asama1":        st.column_config.TextColumn("Aşama 1", width="medium"),
-        "asama2":        st.column_config.TextColumn("Aşama 2", width="medium"),
-        "asama3":        st.column_config.TextColumn("Aşama 3", width="medium"),
-        "asama4":        st.column_config.TextColumn("Aşama 4", width="medium"),
-        "sonuc":         st.column_config.TextColumn("Sonuç",   width="medium"),
+        "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=True, width=_w("✅ Analiz")),
+        "asama1":        st.column_config.TextColumn("Aşama 1", width=_w("asama1")),
+        "asama2":        st.column_config.TextColumn("Aşama 2", width=_w("asama2")),
+        "asama3":        st.column_config.TextColumn("Aşama 3", width=_w("asama3")),
+        "asama4":        st.column_config.TextColumn("Aşama 4", width=_w("asama4")),
+        "sonuc":         st.column_config.TextColumn("Sonuç",   width=_w("sonuc")),
     }
     col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro","✅ Analiz","📅 Son Randevu","aciklama","📨 Notlar","asama1","asama2","asama3","asama4","sonuc"]
     # Gizli kolonları çıkar
     _kol_gizli_map = {"firma":"firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email",
                       "adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci",
                       "islem_asamasi":"islem_asamasi","aciklama":"aciklama",
-                      "📅 Son Randevu":"📅 Son Randevu","📨 Notlar":"📨 Notlar","id":"id"}
+                      "📅 Son Randevu":"📅 Son Randevu","📨 Notlar":"📨 Notlar","id":"id",
+                      "beklenen_ciro":"beklenen_ciro","gerceklesen_ciro":"gerceklesen_ciro","✅ Analiz":"✅ Analiz",
+                      "asama1":"asama1","asama2":"asama2","asama3":"asama3","asama4":"asama4","sonuc":"sonuc"}
     col_order = [c for c in col_order if not any(c == _kol_gizli_map.get(g,g) for g in _GIZLI_KOLONLAR)]
 
     # ── DATA EDITOR ─────────────────────────────────────────────────────────────
@@ -4272,14 +4276,16 @@ function updateBot(v){{
             "firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
             "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
             "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50,
-            "asama1":100,"asama2":100,"asama3":100,"asama4":100,"sonuc":100
+            "asama1":100,"asama2":100,"asama3":100,"asama4":100,"sonuc":100,
+            "beklenen_ciro":80,"gerceklesen_ciro":80,"✅ Analiz":80
         }
         _KG_UI_ETIKET = {
             "firma":"Firma","yetkili":"Yetkili","gsm":"GSM","sabit":"S.Tel",
             "email":"Email","adres":"Adres","il":"İl","ilce":"İlçe",
             "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"Aşama",
             "aciklama":"Açıklama","📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID",
-            "asama1":"Aşama 1","asama2":"Aşama 2","asama3":"Aşama 3","asama4":"Aşama 4","sonuc":"Sonuç"
+            "asama1":"Aşama 1","asama2":"Aşama 2","asama3":"Aşama 3","asama4":"Aşama 4","sonuc":"Sonuç",
+            "beklenen_ciro":"Hedef ₺","gerceklesen_ciro":"Gerçek ₺","✅ Analiz":"Analiz"
         }
         try:
             _sb_kg_ui = get_sb_client()
@@ -7804,8 +7810,8 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
             "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
             "id":            st.column_config.NumberColumn("ID", disabled=True, width=_w("id")),
             "tarih":         None, "olusturan": None, "silindi": None,
-            "beklenen_ciro": st.column_config.NumberColumn("Hedef ₺", format="%,.0f ₺", width="small"),
-            "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width="small"),
+            "beklenen_ciro": st.column_config.NumberColumn("Hedef ₺", format="%,.0f ₺", width=_w("beklenen_ciro")),
+            "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width=_w("gerceklesen_ciro")),
             "firma":         st.column_config.TextColumn("Firma",    width=_w("firma")),
             "yetkili":       st.column_config.TextColumn("Yetkili",  width=_w("yetkili")),
             "gsm":           st.column_config.TextColumn("GSM",      width=_w("gsm")),
@@ -7823,7 +7829,9 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
         }
         # Gizli kolonları col_order'dan çıkar
         _col_order_r = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","aciklama","beklenen_ciro","gerceklesen_ciro","📅 Son Randevu","📨 Notlar"]
-        _kol_gizli_map_r = {"firma":"firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email","adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci","islem_asamasi":"islem_asamasi","aciklama":"aciklama"}
+        _kol_gizli_map_r = {"firma":"firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email","adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci","islem_asamasi":"islem_asamasi","aciklama":"aciklama",
+                            "📅 Son Randevu":"📅 Son Randevu","📨 Notlar":"📨 Notlar","id":"id",
+                            "beklenen_ciro":"beklenen_ciro","gerceklesen_ciro":"gerceklesen_ciro"}
         _col_order_r = ["Seç"] + [c for c in _col_order_r[1:] if not any(c == _kol_gizli_map_r.get(g,g) for g in _GIZLI_KOLONLAR)]
 
         _secili_asama = st.selectbox("Aşama Seç:", _tum_asama_r, key="asama_sayfa_sec")
