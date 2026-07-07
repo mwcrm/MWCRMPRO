@@ -3003,6 +3003,19 @@ function kartSec(id){
     if _tem_sec:
         df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
 
+    # Bölgeler ekranından gelen gizli bölge filtresi (ilçe pill'leri taşmasın diye görünmez uygulanır)
+    if st.session_state.get("_bl_ilce_filtre") and "ilce" in df_f.columns:
+        _bl_hedef_ilceler = set(st.session_state["_bl_ilce_filtre"])
+        df_f = df_f[df_f["ilce"].astype(str).isin(_bl_hedef_ilceler)]
+        _bl_ad, _bl_c1, _bl_c2 = st.columns([5,1,10])
+        with _bl_ad:
+            st.info(f"📍 Bölge filtresi aktif: {st.session_state.get('_bl_ilce_filtre_ad','')}")
+        with _bl_c1:
+            if st.button("✕ Kaldır", key="_bl_ilce_filtre_kaldir"):
+                del st.session_state["_bl_ilce_filtre"]
+                st.session_state.pop("_bl_ilce_filtre_ad", None)
+                st.rerun()
+
     # ── HİÇ FİLTRE SEÇİLİ DEĞİLKEN — sadece işlem görmemiş (Özel Müşteri/Portföy) göster ──
     # Bir müşteriye durum atanınca (Randevu, Teklif, Tekrar Ara vb.) artık burada görünmesin,
     # sadece kendi durum filtresinde görünsün. Karışıklığı önler.
@@ -10704,13 +10717,16 @@ elif aktif == "bolgeler":
                 if "il" in _bl_secilen_df.columns:
                     st.session_state["_cl_fil_il_multi"] = sorted(
                         _bl_secilen_df["il"].dropna().astype(str).unique().tolist())
-                if "ilce" in _bl_secilen_df.columns:
-                    if _row["_bolge"] in ("İstanbul Anadolu", "İstanbul Avrupa"):
-                        # İstanbul bölge ayrımı ilçe bazlı olduğu için ilçe filtresi de gerekli
-                        st.session_state["_cl_fil_ilce_multi"] = sorted(
-                            _bl_secilen_df["ilce"].dropna().astype(str).unique().tolist())
-                    elif "_cl_fil_ilce_multi" in st.session_state:
-                        del st.session_state["_cl_fil_ilce_multi"]
+                if "_cl_fil_ilce_multi" in st.session_state:
+                    del st.session_state["_cl_fil_ilce_multi"]
+                if "ilce" in _bl_secilen_df.columns and _row["_bolge"] in ("İstanbul Anadolu", "İstanbul Avrupa"):
+                    # İstanbul bölge ayrımı ilçe bazlı — görünmez filtre kullanılır, pill taşmasın diye
+                    st.session_state["_bl_ilce_filtre"] = sorted(
+                        _bl_secilen_df["ilce"].dropna().astype(str).unique().tolist())
+                    st.session_state["_bl_ilce_filtre_ad"] = _row["_bolge"]
+                elif "_bl_ilce_filtre" in st.session_state:
+                    del st.session_state["_bl_ilce_filtre"]
+                    st.session_state.pop("_bl_ilce_filtre_ad", None)
                 st.session_state["aktif_tab"] = "liste"
                 st.rerun()
 
