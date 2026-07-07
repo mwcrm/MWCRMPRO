@@ -10623,6 +10623,21 @@ elif aktif == "bolgeler":
         )
         _bl_df["_bolge"] = _bl_df["_bolge"].fillna("Havuz (Bölgesiz)")
 
+        # ── Üst toplam: kullanıcının TÜM bölgeleri birlikte toplamı, admin için genel toplam ──
+        _bl_rol = str(st.session_state.get("rol","")).strip().lower()
+        _bl_toplam_baslik = "🌍 Genel toplam (tüm bölgeler, tüm kullanıcılar)" if _bl_rol == "admin" else "📊 Toplamım (tüm bölgelerim birlikte)"
+        st.markdown(f"#### {_bl_toplam_baslik}")
+        _t1, _t2, _t3 = st.columns(3)
+        _t1.metric("Müşteri sayısı", len(_bl_df))
+        if "beklenen_ciro" in _bl_df.columns:
+            _t2.metric("Hedef ciro", f"{pd.to_numeric(_bl_df['beklenen_ciro'], errors='coerce').fillna(0).sum():,.0f} ₺")
+        if "gerceklesen_ciro" in _bl_df.columns:
+            _t3.metric("Gerçekleşen", f"{pd.to_numeric(_bl_df['gerceklesen_ciro'], errors='coerce').fillna(0).sum():,.0f} ₺")
+        st.caption("Bu toplam, kaç bölgeye dağılmış olursa olsun senin (veya admin için herkesin) tüm müşterilerini kapsar." if _bl_rol != "admin"
+                   else "Bu toplam, tüm kullanıcıların tüm bölgelerdeki tüm müşterilerini kapsar.")
+        st.divider()
+        st.markdown("#### 📍 Bölge bölge kırılım")
+
         with st.expander("📤 Genel Excel indirme / yükleme"):
             _dl_kolon = [c for c in ["firma","yetkili","gsm","il","ilce","atanan_kullanici",
                                       "durum","beklenen_ciro","gerceklesen_ciro"] if c in _bl_df.columns]
