@@ -10121,15 +10121,69 @@ elif aktif == "islem_takip":
         if _as: _html += f'<span class="it3-asama">{_as}</span>'
         _html += '</div>'
 
-        _html += '<div class="it3-islemler">'
+        _html += '</div>'  # firma header kapan
+
+        # Firma header'ı HTML ile göster
+        st.markdown(_html, unsafe_allow_html=True)
+        _html = ""  # reset
+
+        # İşlemleri Streamlit ile göster — not ekle, arşivle, sil butonları
+        _sb_islem = get_sb_client()
         for _ism in _islemler:
             _ikon = _it_ikon(_ism["tur"])
-            _acik = _ism["aciklama"][:100] + ("..." if len(_ism["aciklama"])>100 else "")
-            _html += f'<div class="it3-islem"><span class="it3-tarih">{_ism["tarih"]}</span><span class="it3-tur">{_ikon} {_ism["tur"]}</span><span class="it3-acik">{_acik}</span></div>'
-        _html += '</div></div>'
+            _acik = _ism["aciklama"][:120] + ("..." if len(_ism["aciklama"])>120 else "")
+            _arsiv = _ism.get("arsiv", False) or str(_ism.get("arsiv","")).lower() in ["1","true"]
+            _islem_stil = "opacity:0.4;" if _arsiv else ""
+            _col1, _col2, _col3, _col4, _col5 = st.columns([1.2, 1, 5, 0.8, 0.8])
+            _col1.markdown(f"<span style='font-size:10px;color:#94a3b8;{_islem_stil}'>{_ism['tarih']}</span>", unsafe_allow_html=True)
+            _col2.markdown(f"<span style='font-size:10px;font-weight:500;color:#0f172a;{_islem_stil}'>{_ikon} {_ism['tur']}</span>", unsafe_allow_html=True)
+            _col3.markdown(f"<span style='font-size:10px;color:#475569;{_islem_stil}'>{_acik}</span>", unsafe_allow_html=True)
+            # Arşivle butonu
+            _nid = _ism.get("id","")
+            if _nid and not _arsiv:
+                if _col4.button("📦", key=f"it_arsiv_{_nid}", help="Arşivle"):
+                    try:
+                        if _sb_islem:
+                            _sb_islem.table("cari_aciklamalar").update({"arsiv": True}).eq("id", int(_nid)).execute()
+                            st.cache_data.clear()
+                            st.rerun()
+                    except: pass
+            # Sil butonu
+            if _nid:
+                if _col5.button("🗑", key=f"it_sil_{_nid}", help="Sil"):
+                    try:
+                        if _sb_islem:
+                            _sb_islem.table("cari_aciklamalar").delete().eq("id", int(_nid)).execute()
+                            st.cache_data.clear()
+                            st.rerun()
+                    except: pass
 
-    _html += '</div>'
-    st.markdown(_html, unsafe_allow_html=True)
+        # Not ekle — firma başına
+        _cid_firm = _islemler[0].get("cid","") if _islemler else ""
+        with st.expander(f"✏️ {_firma} — Not ekle", expanded=False):
+            _yeni_not = st.text_area("Not", key=f"it_not_{_firma}", placeholder="Yeni not yaz...", height=70, label_visibility="collapsed")
+            if st.button("💾 Kaydet", key=f"it_not_kaydet_{_firma}", type="primary"):
+                if _yeni_not and _yeni_not.strip():
+                    try:
+                        if _sb_islem:
+                            _sb_islem.table("cari_aciklamalar").insert({
+                                "cari_id": int(_cid_firm) if _cid_firm and _cid_firm.isdigit() else 0,
+                                "cari_adi": _firma,
+                                "aciklama": _yeni_not.strip(),
+                                "olusturan": st.session_state.get("kullanici",""),
+                            }).execute()
+                            st.success("✅ Not eklendi!")
+                            st.cache_data.clear()
+                            st.rerun()
+                    except Exception as _ne:
+                        st.error(f"Hata: {_ne}")
+                else:
+                    st.warning("Not boş olamaz!")
+        st.markdown("<hr style='margin:8px 0;border:none;border-top:0.5px solid #e2e8f0;'>", unsafe_allow_html=True)
+
+    # Son HTML varsa render et (boş olabilir)
+    if _html and _html.strip() not in ["", "<div class=\"it3-wrap\">", "</div>"]:
+        st.markdown(_html + "</div>", unsafe_allow_html=True)
 
 
 elif aktif == "harita":
