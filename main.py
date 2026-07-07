@@ -10013,7 +10013,7 @@ elif aktif == "islem_takip":
             _tarih = str(_r.get("tarih","") or "")[:10]
             _rdv_t = str(_r.get("randevu_tarihi","") or "")[:10]
             if _firma and _tarih and _tarih not in ["","nan","None"]:
-                _it_islemler.append({"id":"", "firma":_firma,"cid":_cid,"tarih":_tarih,"tur":"Randevu","aciklama":f"Randevu: {_rdv_t}","kul":_kul,"kaynak":"randevu"})
+                _it_islemler.append({"id":str(_r.get("id","")), "firma":_firma,"cid":_cid,"tarih":_tarih,"tur":"Randevu","aciklama":f"Randevu: {_rdv_t}","kul":_kul,"kaynak":"randevu"})
 
     # Teklifler — mükerrer önle
     _not_firma_tarih = {(_i["firma"],_i["tarih"]) for _i in _it_islemler if _i["tur"]=="Teklif"}
@@ -10024,7 +10024,7 @@ elif aktif == "islem_takip":
             _firma, _cid = _it_firma_bul(_r, "musteri_id", "musteri_adi")
             _tarih = str(_r.get("tarih","") or "")[:10]
             if _firma and _tarih and (_firma,_tarih) not in _not_firma_tarih and _tarih not in ["","nan","None"]:
-                _it_islemler.append({"id":"", "firma":_firma,"cid":_cid,"tarih":_tarih,"tur":"Teklif","aciklama":"Teklif oluşturuldu","kul":_kul,"kaynak":"teklif"})
+                _it_islemler.append({"id":str(_r.get("id","")), "firma":_firma,"cid":_cid,"tarih":_tarih,"tur":"Teklif","aciklama":"Teklif oluşturuldu","kul":_kul,"kaynak":"teklif"})
 
     if not _it_islemler:
         st.info("Henüz kayıtlı işlem bulunamadı.")
@@ -10039,7 +10039,15 @@ elif aktif == "islem_takip":
         _it_gruplu[_f].append(_ism)
 
     for _f in _it_gruplu:
-        _it_gruplu[_f] = sorted(_it_gruplu[_f], key=lambda x: x["tarih"])
+        # Mükerrer kaldır — aynı tarih+tur+aciklama
+        _seen = set()
+        _uniq = []
+        for _ism in _it_gruplu[_f]:
+            _key = (_ism["tarih"], _ism["tur"], _ism["aciklama"][:50])
+            if _key not in _seen:
+                _seen.add(_key)
+                _uniq.append(_ism)
+        _it_gruplu[_f] = sorted(_uniq, key=lambda x: x["tarih"])
 
     # En çok işlem yapılan üstte
     _it_sirali = sorted(_it_gruplu.items(), key=lambda x: len(x[1]), reverse=True)
@@ -10136,8 +10144,8 @@ elif aktif == "islem_takip":
             _islem_stil = "opacity:0.4;" if _arsiv else ""
             _nid = str(_ism.get("id",""))
             _kaynak = _ism.get("kaynak","not")
-            # Sadece notlar için sil/arşivle göster
-            if _kaynak == "not" and _nid and _nid not in ["","None","nan"]:
+            # Hepsine sil göster
+            if _nid and _nid not in ["","None","nan"]:
                 _col1, _col2, _col3, _col4, _col5 = st.columns([1.2, 1, 5, 0.7, 0.7])
             else:
                 _col1, _col2, _col3 = st.columns([1.2, 1, 6.4])
@@ -10157,7 +10165,13 @@ elif aktif == "islem_takip":
                 if _col5.button("🗑", key=f"it_sil_{_nid}", help="Sil"):
                     try:
                         if _sb_islem:
-                            _sb_islem.table("cari_aciklamalar").delete().eq("id", int(_nid)).execute()
+                            # Kaynağa göre doğru tablodan sil
+                            if _kaynak == "randevu":
+                                _sb_islem.table("randevular").delete().eq("id", int(_nid)).execute()
+                            elif _kaynak == "teklif":
+                                _sb_islem.table("teklifler").delete().eq("id", int(_nid)).execute()
+                            else:
+                                _sb_islem.table("cari_aciklamalar").delete().eq("id", int(_nid)).execute()
                             st.cache_data.clear()
                             st.rerun()
                     except: pass
