@@ -9931,6 +9931,10 @@ elif aktif == "operasyon":
 # ── İŞLEM TAKİP ───────────────────────────────────────────────────────────────
 elif aktif == "islem_takip":
     sayfa_log("islem_takip")
+    # Cache temizle — her açılışta taze veri
+    if not st.session_state.get("_it_cache_cleared"):
+        st.cache_data.clear()
+        st.session_state["_it_cache_cleared"] = True
 
     _it_kul   = st.session_state.get("kullanici","")
     _it_rol   = st.session_state.get("rol","")
@@ -9957,8 +9961,6 @@ elif aktif == "islem_takip":
     except: _df_tek3 = pd.DataFrame()
 
     _it_cariler = get_cari_listesi()
-
-    # Cari id/firma → bilgi map
     _it_cari_map = {}
     if not _it_cariler.empty:
         for _, _cr in _it_cariler.iterrows():
@@ -9966,14 +9968,13 @@ elif aktif == "islem_takip":
                 "firma":    str(_cr.get("firma","") or ""),
                 "yetkili":  str(_cr.get("yetkili","") or ""),
                 "gsm":      str(_cr.get("gsm","") or ""),
-                "email":    str(_cr.get("email","") or ""),
                 "il":       str(_cr.get("il","") or ""),
                 "ilce":     str(_cr.get("ilce","") or ""),
                 "durum":    str(_cr.get("durum","") or ""),
                 "asama":    str(_cr.get("islem_asamasi","") or ""),
                 "beklenen": _cr.get("beklenen_ciro", 0) or 0,
             }
-            _it_cari_map[str(_cr.get("id",""))]    = _info
+            _it_cari_map[str(_cr.get("id",""))] = _info
             _it_cari_map[str(_cr.get("firma",""))] = _info
 
     # ── İŞLEMLERİ TOPLA ──────────────────────────────────────────────────────
@@ -9982,32 +9983,28 @@ elif aktif == "islem_takip":
     def _it_firma_bul(row, id_col, ad_col):
         _cid = str(row.get(id_col,"") or "")
         _ad  = str(row.get(ad_col,"") or "")
-        if _ad and _ad not in ["nan","None",""]:
-            return _ad, _cid
-        if _cid and _cid in _it_cari_map:
-            return _it_cari_map[_cid]["firma"], _cid
+        if _ad and _ad not in ["nan","None",""]: return _ad, _cid
+        if _cid and _cid in _it_cari_map: return _it_cari_map[_cid]["firma"], _cid
         return "", _cid
 
-    # cari_aciklamalar
+    # Notlar
     if not _df_acik.empty:
         for _, _r in _df_acik.iterrows():
             _kul = str(_r.get("olusturan","") or "")
             if not _it_admin and _kul != _it_kul: continue
             _firma, _cid = _it_firma_bul(_r, "cari_id", "cari_adi")
             _tarih = str(_r.get("tarih","") or "")[:10]
-            _acik  = str(_r.get("aciklama","") or "")[:100]
+            _acik  = str(_r.get("aciklama","") or "")[:120]
             _a = _acik.lower()
             if "arama" in _a or "arandı" in _a: _tur = "Arama"
-            elif "mesaj" in _a or "whatsapp" in _a or "wa" in _a: _tur = "Mesaj"
+            elif "mesaj" in _a or "whatsapp" in _a: _tur = "Mesaj"
             elif "teklif" in _a: _tur = "Teklif"
             elif "randevu" in _a: _tur = "Randevu"
-            elif "email" in _a or "mail" in _a: _tur = "Email"
-            elif "analiz" in _a: _tur = "Analiz"
             else: _tur = "Not"
-            if _firma and _tarih and _tarih not in ["","nan","None","0000"]:
-                _it_islemler.append({"firma":_firma,"cari_id":_cid,"tarih":_tarih,"tur":_tur,"aciklama":_acik,"kullanici":_kul})
+            if _firma and _tarih and _tarih not in ["","nan","None"]:
+                _it_islemler.append({"firma":_firma,"cid":_cid,"tarih":_tarih,"tur":_tur,"aciklama":_acik,"kul":_kul})
 
-    # randevular
+    # Randevular
     if not _df_rdv.empty:
         for _, _r in _df_rdv.iterrows():
             _kul = str(_r.get("olusturan","") or _r.get("temsilci","") or "")
@@ -10015,45 +10012,39 @@ elif aktif == "islem_takip":
             _firma, _cid = _it_firma_bul(_r, "musteri_id", "musteri_adi")
             _tarih = str(_r.get("tarih","") or "")[:10]
             _rdv_t = str(_r.get("randevu_tarihi","") or "")[:10]
-            if _firma and _tarih and _tarih not in ["","nan","None","0000"]:
-                _it_islemler.append({"firma":_firma,"cari_id":_cid,"tarih":_tarih,"tur":"Randevu","aciklama":f"Randevu: {_rdv_t}","kullanici":_kul})
+            if _firma and _tarih and _tarih not in ["","nan","None"]:
+                _it_islemler.append({"firma":_firma,"cid":_cid,"tarih":_tarih,"tur":"Randevu","aciklama":f"Randevu: {_rdv_t}","kul":_kul})
 
-    # teklifler — sadece notlarda yoksa ekle (mükerrer önle)
-    _not_firma_tarih = set()
-    for _ism in _it_islemler:
-        if _ism["tur"] == "Teklif":
-            _not_firma_tarih.add((_ism["firma"], _ism["tarih"]))
-
+    # Teklifler — mükerrer önle
+    _not_firma_tarih = {(_i["firma"],_i["tarih"]) for _i in _it_islemler if _i["tur"]=="Teklif"}
     if not _df_tek3.empty:
         for _, _r in _df_tek3.iterrows():
             _kul = str(_r.get("olusturan","") or "")
             if not _it_admin and _kul != _it_kul: continue
             _firma, _cid = _it_firma_bul(_r, "musteri_id", "musteri_adi")
             _tarih = str(_r.get("tarih","") or "")[:10]
-            if _firma and _tarih and (_firma, _tarih) not in _not_firma_tarih and _tarih not in ["","nan","None","0000"]:
-                _it_islemler.append({"firma":_firma,"cari_id":_cid,"tarih":_tarih,"tur":"Teklif","aciklama":"Teklif oluşturuldu","kullanici":_kul})
+            if _firma and _tarih and (_firma,_tarih) not in _not_firma_tarih and _tarih not in ["","nan","None"]:
+                _it_islemler.append({"firma":_firma,"cid":_cid,"tarih":_tarih,"tur":"Teklif","aciklama":"Teklif oluşturuldu","kul":_kul})
 
     if not _it_islemler:
         st.info("Henüz kayıtlı işlem bulunamadı.")
         st.stop()
 
-    # ── MÜŞTERİ → GÜN → İŞLEM GRUPLA ────────────────────────────────────────
+    # ── MÜŞTERİ BAZINDA GRUPLA ────────────────────────────────────────────────
     _it_gruplu = {}
     for _ism in _it_islemler:
         _f = _ism["firma"]
-        _t = _ism["tarih"]
         if not _f or _f in ["","nan","None"]: continue
-        if _f not in _it_gruplu: _it_gruplu[_f] = {}
-        if _t not in _it_gruplu[_f]: _it_gruplu[_f][_t] = []
-        _it_gruplu[_f][_t].append(_ism)
+        if _f not in _it_gruplu: _it_gruplu[_f] = []
+        _it_gruplu[_f].append(_ism)
 
     for _f in _it_gruplu:
-        _it_gruplu[_f] = dict(sorted(_it_gruplu[_f].items()))
+        _it_gruplu[_f] = sorted(_it_gruplu[_f], key=lambda x: x["tarih"])
 
-    # En çok GÜN yapılan üstte
+    # En çok işlem yapılan üstte
     _it_sirali = sorted(_it_gruplu.items(), key=lambda x: len(x[1]), reverse=True)
 
-    # ── YARDIMCILAR ───────────────────────────────────────────────────────────
+    # ── YARDIMCILAR ──────────────────────────────────────────────────────────
     def _it_ikon(tur):
         t = str(tur).lower()
         if "arama" in t: return "📞"
@@ -10064,131 +10055,81 @@ elif aktif == "islem_takip":
         if "email" in t: return "✉️"
         return "📝"
 
-    def _it_asama(durum, asama):
-        _a = str(asama).strip() if asama and str(asama) not in ["","nan","None"] else str(durum).strip()
-        if not _a or _a in ["","nan","None"]: return ""
-        _em = {"İlk Temas":"👋","Teklif":"📄","Deneme":"🧪","Sözleşme":"📝",
-               "Kazanıldı":"🏆","Kaybedildi":"❌","Negatif Portföy":"👎",
-               "Gereksizler":"🗑️","Portföy":"💼","Hedef":"🎯","Aktif":"✅",
-               "Tekrar Ara":"📞","Pasif":"⚫","Takip":"👁️","Randevu":"📅",
-               "Fiyat Hazırla":"💰","NONE":"—"}.get(_a,"📌")
-        return f"{_em} {_a}"
+    def _it_asama(firma):
+        _ci = _it_cari_map.get(firma, {})
+        if not isinstance(_ci, dict): return ""
+        _as = _ci.get("asama","") or _ci.get("durum","")
+        return str(_as) if _as and str(_as) not in ["","nan","None"] else ""
 
-    def _it_badge(durum):
-        d = str(durum).lower()
-        if "özel" in d or "ozel" in d: return "<span style='font-size:9px;padding:1px 6px;border-radius:8px;background:#ede9fe;color:#6d28d9;display:inline-block;margin-top:2px;'>Özel Müşteri</span>"
-        if "portf" in d: return "<span style='font-size:9px;padding:1px 6px;border-radius:8px;background:#dbeafe;color:#1d4ed8;display:inline-block;margin-top:2px;'>Portföy</span>"
-        if "teklif" in d: return "<span style='font-size:9px;padding:1px 6px;border-radius:8px;background:#fef3c7;color:#92400e;display:inline-block;margin-top:2px;'>Teklif</span>"
-        if "kazan" in d: return "<span style='font-size:9px;padding:1px 6px;border-radius:8px;background:#dcfce7;color:#166534;display:inline-block;margin-top:2px;'>Kazanıldı</span>"
-        if "negatif" in d: return "<span style='font-size:9px;padding:1px 6px;border-radius:8px;background:#fee2e2;color:#991b1b;display:inline-block;margin-top:2px;'>Negatif</span>"
+    def _it_badge(firma):
+        _ci = _it_cari_map.get(firma, {})
+        if not isinstance(_ci, dict): return ""
+        _d = str(_ci.get("durum","")).lower()
+        if "özel" in _d or "ozel" in _d: return "<span style='font-size:9px;padding:1px 6px;border-radius:8px;background:#ede9fe;color:#6d28d9;'>Özel Müşteri</span>"
+        if "portf" in _d: return "<span style='font-size:9px;padding:1px 6px;border-radius:8px;background:#dbeafe;color:#1d4ed8;'>Portföy</span>"
+        if "teklif" in _d: return "<span style='font-size:9px;padding:1px 6px;border-radius:8px;background:#fef3c7;color:#92400e;'>Teklif</span>"
+        if "kazan" in _d: return "<span style='font-size:9px;padding:1px 6px;border-radius:8px;background:#dcfce7;color:#166534;'>Kazanıldı</span>"
+        if "negatif" in _d: return "<span style='font-size:9px;padding:1px 6px;border-radius:8px;background:#fee2e2;color:#991b1b;'>Negatif</span>"
         return ""
 
     # ── FİLTRE ───────────────────────────────────────────────────────────────
     _it_ara = st.text_input("", placeholder="🔍 Firma ara...", key="it_ara", label_visibility="collapsed")
     if _it_ara:
-        _it_sirali = [(f,g) for f,g in _it_sirali if _it_ara.lower() in f.lower()]
+        _it_sirali = [(f,i) for f,i in _it_sirali if _it_ara.lower() in f.lower()]
+    st.caption(f"{len(_it_sirali)} müşteri · toplam {sum(len(i) for _,i in _it_sirali)} işlem")
 
-    st.caption(f"{len(_it_sirali)} müşteri · toplam {sum(len(g) for _,g in _it_sirali)} işlem günü")
-
-    _max_gun = max((len(g) for _,g in _it_sirali), default=1)
-
-    # ── CSS ───────────────────────────────────────────────────────────────────
+    # ── MODEL 3: MÜŞTERİ BAZLI GRUPLU HTML ──────────────────────────────────
     _css = """<style>
-.it-wrap{overflow-x:auto;font-family:sans-serif;}
-.it-tbl{border-collapse:collapse;font-size:11px;}
-.it-tbl thead tr{background:#f8fafc;border-bottom:0.5px solid #e2e8f0;}
-.it-tbl thead th{padding:6px 10px;text-align:left;font-size:9px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;border-right:0.5px solid #e2e8f0;}
-.it-tbl thead th:last-child{border-right:none;}
-.it-tbl tbody tr{border-bottom:0.5px solid #e2e8f0;vertical-align:top;}
-.it-tbl tbody td{padding:8px 10px;border-right:0.5px solid #e2e8f0;background:white;}
-.it-tbl tbody td:last-child{border-right:none;}
-.it-tbl tbody tr:hover td{background:#f8fafc!important;}
-.td-f{width:190px;min-width:190px;max-width:190px;}
-.td-g{background:#f0f7ff!important;}
-.td-s{width:90px;min-width:90px;max-width:90px;}
-.it-tbl{width:100%;table-layout:fixed;}
-.f-adi{font-size:12px;font-weight:600;color:#0f172a;line-height:1.4;}
-.f-det{font-size:10px;color:#94a3b8;line-height:1.6;margin-top:2px;}
-.hedef{font-size:12px;font-weight:600;color:#16a34a;}
-.g-kutu{background:white;border:0.5px solid #e2e8f0;border-radius:8px;overflow:hidden;}
-.g-tarih{font-size:9px;font-weight:600;color:#1e293b;padding:5px 8px;background:#f8fafc;border-bottom:0.5px solid #e2e8f0;}
-.g-islemler{padding:6px 8px;display:flex;flex-direction:column;gap:5px;}
-.g-islem{display:flex;align-items:flex-start;gap:5px;}
-.g-ikon{font-size:12px;flex-shrink:0;line-height:1.4;}
-.g-tur{font-size:10px;font-weight:600;color:#0f172a;}
-.g-acik{font-size:10px;color:#64748b;line-height:1.3;}
-.g-alt{font-size:9px;color:#94a3b8;padding:3px 8px;border-top:0.5px solid #e2e8f0;}
-.bos{border:0.5px dashed #e2e8f0;border-radius:8px;min-height:50px;}
-.asama-txt{font-size:10px;font-weight:500;color:#0f172a;}
+.it3-wrap{font-family:sans-serif;font-size:11px;}
+.it3-grup{margin-bottom:14px;border:0.5px solid #e2e8f0;border-radius:10px;overflow:hidden;}
+.it3-firma-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#f8fafc;border-bottom:0.5px solid #e2e8f0;}
+.it3-firma-sol{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.it3-firma-adi{font-size:12px;font-weight:600;color:#0f172a;}
+.it3-say{font-size:10px;padding:1px 7px;border-radius:10px;background:#dbeafe;color:#1d4ed8;}
+.it3-bek{font-size:10px;font-weight:500;color:#16a34a;}
+.it3-det{font-size:10px;color:#94a3b8;}
+.it3-asama{font-size:10px;font-weight:500;color:#0f172a;}
+.it3-islemler{padding:6px 0;}
+.it3-islem{display:flex;align-items:flex-start;gap:8px;padding:5px 12px;border-bottom:0.5px solid #f1f5f9;}
+.it3-islem:last-child{border-bottom:none;}
+.it3-islem:hover{background:#f8fafc;}
+.it3-tarih{font-size:10px;color:#94a3b8;white-space:nowrap;min-width:72px;}
+.it3-tur{font-size:10px;font-weight:500;color:#0f172a;white-space:nowrap;min-width:52px;}
+.it3-acik{font-size:10px;color:#475569;line-height:1.4;flex:1;}
 </style>"""
 
-    # ── TABLO BAŞLIĞI ─────────────────────────────────────────────────────────
-    _h  = '<div class="it-wrap">' + _css
-    _h += '<table class="it-tbl"><thead><tr>'
-    _h += '<th class="td-f">Firma</th>'
-    for _n in range(1, _max_gun+1):
-        _h += f'<th class="td-g">Gün {_n}</th>'
-    _h += '<th class="td-s">Aşama</th>'
-    _h += '</tr></thead><tbody>'
-
-    # ── SATIRLAR ─────────────────────────────────────────────────────────────
-    _rows = ""
-    for _firma, _gunler in _it_sirali:
-        _ci   = _it_cari_map.get(_firma, {})
-        _yt   = _ci.get("yetkili","") if isinstance(_ci,dict) else ""
-        _gm   = _ci.get("gsm","")     if isinstance(_ci,dict) else ""
-        _em   = _ci.get("email","")   if isinstance(_ci,dict) else ""
-        _il   = _ci.get("il","")      if isinstance(_ci,dict) else ""
-        _ilc  = _ci.get("ilce","")    if isinstance(_ci,dict) else ""
-        _dr   = _ci.get("durum","")   if isinstance(_ci,dict) else ""
-        _as   = _ci.get("asama","")   if isinstance(_ci,dict) else ""
-        _bk   = _ci.get("beklenen",0) if isinstance(_ci,dict) else 0
-
+    _html = '<div class="it3-wrap">' + _css
+    for _firma, _islemler in _it_sirali:
+        _ci = _it_cari_map.get(_firma, {})
+        _yt  = _ci.get("yetkili","") if isinstance(_ci,dict) else ""
+        _il  = _ci.get("il","") if isinstance(_ci,dict) else ""
+        _bk  = _ci.get("beklenen",0) if isinstance(_ci,dict) else 0
         try: _bk_f = f"{int(float(_bk)):,}".replace(",",".") + " ₺" if float(_bk)>0 else ""
         except: _bk_f = ""
+        _as = _it_asama(_firma)
+        _bdg = _it_badge(_firma)
 
-        _rows += '<tr>'
+        _html += f'<div class="it3-grup">'
+        _html += f'<div class="it3-firma-hdr">'
+        _html += f'<div class="it3-firma-sol"><span class="it3-firma-adi">{_firma}</span>'
+        _html += f'<span class="it3-say">{len(_islemler)} işlem</span>'
+        if _bk_f: _html += f'<span class="it3-bek">{_bk_f}</span>'
+        if _bdg: _html += _bdg
+        _det = " · ".join(x for x in [_yt,_il] if x and x not in ["nan","None",""])
+        if _det: _html += f'<span class="it3-det">{_det}</span>'
+        _html += '</div>'
+        if _as: _html += f'<span class="it3-asama">{_as}</span>'
+        _html += '</div>'
 
-        # Firma kolonu
-        _rows += '<td class="td-f">'
-        _rows += f'<div class="f-adi">{_firma}</div>'
-        if _bk_f: _rows += f'<div style="font-size:11px;font-weight:600;color:#16a34a;margin:2px 0;">{_bk_f}</div>'
-        _rows += '<div class="f-det">'
-        if _yt and _yt not in ["nan","None",""]: _rows += f'{_yt}<br>'
-        if _gm and _gm not in ["nan","None",""]: _rows += f'{_gm}<br>'
-        if _em and _em not in ["nan","None",""]: _rows += f'{_em[:28]}<br>'
-        _loc = " · ".join(x for x in [_il, _ilc] if x and x not in ["nan","None",""])
-        if _loc: _rows += f'{_loc}'
-        _rows += f'</div>{_it_badge(_dr)}</td>'
+        _html += '<div class="it3-islemler">'
+        for _ism in _islemler:
+            _ikon = _it_ikon(_ism["tur"])
+            _acik = _ism["aciklama"][:100] + ("..." if len(_ism["aciklama"])>100 else "")
+            _html += f'<div class="it3-islem"><span class="it3-tarih">{_ism["tarih"]}</span><span class="it3-tur">{_ikon} {_ism["tur"]}</span><span class="it3-acik">{_acik}</span></div>'
+        _html += '</div></div>'
 
-
-
-        # Gün kolonları
-        _gun_listesi = list(_gunler.items())
-        for _gn in range(_max_gun):
-            if _gn < len(_gun_listesi):
-                _tarih, _islemler = _gun_listesi[_gn]
-                _rows += '<td class="td-g"><div class="g-kutu">'
-                _rows += f'<div class="g-tarih">📅 {_tarih}</div>'
-                _rows += '<div class="g-islemler">'
-                for _ism in _islemler:
-                    _rows += '<div class="g-islem">'
-                    _rows += f'<div class="g-ikon">{_it_ikon(_ism["tur"])}</div>'
-                    _rows += f'<div><div class="g-tur">{_ism["tur"]}</div>'
-                    _rows += f'<div class="g-acik">{_ism["aciklama"]}</div></div>'
-                    _rows += '</div>'
-                _rows += '</div>'
-                _rows += f'<div class="g-alt">Gün {_gn+1} · {len(_islemler)} işlem</div>'
-                _rows += '</div></td>'
-            else:
-                _rows += '<td class="td-g"><div class="bos"></div></td>'
-
-        # Aşama
-        _rows += f'<td class="td-s"><div class="asama-txt">{_it_asama(_dr,_as)}</div></td>'
-        _rows += '</tr>'
-
-    _html_full = _h + _rows + '</tbody></table></div>'
-    st.components.v1.html(_html_full, height=max(600, len(_it_sirali)*120), scrolling=True)
+    _html += '</div>'
+    st.markdown(_html, unsafe_allow_html=True)
 
 
 elif aktif == "harita":
