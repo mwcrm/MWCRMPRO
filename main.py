@@ -3797,6 +3797,18 @@ elif aktif == "kullanici":
 
             if st.form_submit_button("💾 Kaydet", use_container_width=True, type="primary"):
                 if yk_kadi and yk_sifre:
+                    _kadi_cakisiyor = False
+                    try:
+                        _df_mevcut = db_read("kullanicilar", extra_sql="")
+                        if not _df_mevcut.empty and "kullanici_adi" in _df_mevcut.columns:
+                            _kadi_cakisiyor = yk_kadi.strip().lower() in _df_mevcut["kullanici_adi"].astype(str).str.strip().str.lower().values
+                    except Exception:
+                        _kadi_cakisiyor = False
+
+                    if _kadi_cakisiyor:
+                        st.error(f"⚠️ '{yk_kadi}' kullanıcı adı zaten kayıtlı. Lütfen başka bir kullanıcı adı seçin.")
+                        st.stop()
+
                     yetki = "tam" if tam else json.dumps(secili_m)
                     # Önce temel kolonlarla dene
                     veri = {"kullanici_adi": yk_kadi, "sifre": yk_sifre, "rol": yk_rol}
@@ -3812,13 +3824,19 @@ elif aktif == "kullanici":
                             st.success(f"✅ '{yk_kadi}' eklendi!")
                             st.rerun()
                         except Exception as e1:
-                            try:
-                                # Sadece temel kolonlarla dene
-                                sb_k.table("kullanicilar").insert(veri).execute()
-                                st.success(f"✅ '{yk_kadi}' eklendi! (Ek bilgiler için Supabase'e kolon ekleyin)")
-                                st.rerun()
-                            except Exception as e2:
-                                st.error(f"Hata: {e2}")
+                            if "duplicate key" in str(e1).lower() or "23505" in str(e1):
+                                st.error(f"⚠️ '{yk_kadi}' kullanıcı adı zaten kayıtlı. Lütfen başka bir kullanıcı adı seçin.")
+                            else:
+                                try:
+                                    # Sadece temel kolonlarla dene
+                                    sb_k.table("kullanicilar").insert(veri).execute()
+                                    st.success(f"✅ '{yk_kadi}' eklendi! (Ek bilgiler için Supabase'e kolon ekleyin)")
+                                    st.rerun()
+                                except Exception as e2:
+                                    if "duplicate key" in str(e2).lower() or "23505" in str(e2):
+                                        st.error(f"⚠️ '{yk_kadi}' kullanıcı adı zaten kayıtlı. Lütfen başka bir kullanıcı adı seçin.")
+                                    else:
+                                        st.error(f"Hata: {e2}")
                     else:
                         try:
                             conn_k = get_conn()
@@ -3828,7 +3846,10 @@ elif aktif == "kullanici":
                             st.success(f"✅ '{yk_kadi}' eklendi!")
                             st.rerun()
                         except Exception as e3:
-                            st.error(f"Hata: {e3}")
+                            if "unique" in str(e3).lower() or "duplicate" in str(e3).lower():
+                                st.error(f"⚠️ '{yk_kadi}' kullanıcı adı zaten kayıtlı. Lütfen başka bir kullanıcı adı seçin.")
+                            else:
+                                st.error(f"Hata: {e3}")
                 else:
                     st.warning("Kullanıcı adı ve şifre zorunlu!")
 
