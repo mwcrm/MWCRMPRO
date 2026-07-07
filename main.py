@@ -1447,7 +1447,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "bolgeler"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -1468,7 +1468,6 @@ _TAB_ETIKETLER = {
     "operasyon": "🚛 Operasyon",
     "patron": "👑 Yönetim Paneli",
     "musteri_atama": "🎯 Müşteri Atama",
-    "bolgeler": "📍 Bölgeler",
     
 }
 
@@ -1872,7 +1871,6 @@ button[data-testid="manage-app-button"] { display: none !important; }
 
         _MENU_GRUPLARI = [
             ("Müşteri işlemleri",   ["yeni", "liste", "analiz", "islem_takip"]),
-            ("Bölgeler",            ["bolgeler"]),
             ("Randevu ve teklifler", ["randevu", "teklif", "ozel_teklif"]),
             ("Saha operasyonu",     ["rota_analiz", "operasyon", "harita"]),
             ("Raporlama",           ["rapor", "admin_rapor", "excel"]),
@@ -3789,7 +3787,7 @@ elif aktif == "kullanici":
     TUM_MENULER = {
         "yeni":"➕ Yeni Kart","liste":"📋 Cari Liste","randevu":"📅 Randevular",
         "teklif":"📄 Teklif","kisiler":"📞 Kişiler","rapor":"📊 Raporlar",
-        "excel":"📥 Excel","mesajlar":"💬 Mesajlar","bolgeler":"📍 Bölgeler",
+        "excel":"📥 Excel","mesajlar":"💬 Mesajlar",
         "admin_rapor":"📊 Rapor Tasarla","kullanici_log":"📊 Kullanıcı Log",
         "surum_yonetimi":"🚀 Sürüm Yönetimi"
     }
