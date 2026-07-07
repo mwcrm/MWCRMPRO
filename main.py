@@ -1826,7 +1826,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
                 st.session_state["aktif_tab"] = _tab_key
                 st.rerun()
     else:
-        # Birleşik açık görünüm: arama + sık kullanılanlar + hep açık gruplar (açık tema)
+        # Açılır grup menüsü (akordeon) — tıklanan grup açılır, altında sayfaları listeler
         st.markdown("""<style>
         section[data-testid='stSidebar'] { background-color:#ffffff; }
         section[data-testid='stSidebar'] hr { border-color:#eceae2; }
@@ -1840,74 +1840,67 @@ button[data-testid="manage-app-button"] { display: none !important; }
         </style>""", unsafe_allow_html=True)
 
         _MENU_GRUPLARI = [
-            ("SATIŞ",    ["yeni", "liste", "analiz", "islem_takip"]),
-            ("PLANLAMA", ["randevu", "teklif", "ozel_teklif"]),
-            ("SAHA",     ["rota_analiz", "operasyon", "harita"]),
-            ("RAPORLAR", ["rapor", "admin_rapor", "excel"]),
-            ("YÖNETİM",  ["kullanici", "patron", "musteri_atama", "kisiler", "mesajlar"]),
+            ("Müşteri işlemleri",   ["yeni", "liste", "analiz", "islem_takip"]),
+            ("Randevu ve teklifler", ["randevu", "teklif", "ozel_teklif"]),
+            ("Saha operasyonu",     ["rota_analiz", "operasyon", "harita"]),
+            ("Raporlama",           ["rapor", "admin_rapor", "excel"]),
+            ("Yönetim",             ["kullanici", "patron", "musteri_atama", "kisiler", "mesajlar"]),
         ]
 
-        if "_favori_sayfalar" not in st.session_state:
-            st.session_state["_favori_sayfalar"] = ["liste", "randevu"]
-
-        def _menu_butonu(_tab_key, _yer, _yildiz_goster=True):
-            _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
-            _aktif_mi = st.session_state["aktif_tab"] == _tab_key
-            if _yildiz_goster:
-                _c1, _c2 = st.columns([1, 7])
-                with _c1:
-                    _favori_mi = _tab_key in st.session_state["_favori_sayfalar"]
-                    if st.button("★" if _favori_mi else "☆", key=f"fav_{_yer}_{_tab_key}"):
-                        if _favori_mi:
-                            st.session_state["_favori_sayfalar"].remove(_tab_key)
-                        else:
-                            st.session_state["_favori_sayfalar"].append(_tab_key)
-                        st.rerun()
-                with _c2:
-                    if st.button(_etiket, use_container_width=True,
-                                 type="primary" if _aktif_mi else "secondary",
-                                 key=f"sb_{_yer}_{_tab_key}"):
-                        st.session_state["aktif_tab"] = _tab_key
-                        st.rerun()
-            else:
-                if st.button(_etiket, use_container_width=True,
-                             type="primary" if _aktif_mi else "secondary",
-                             key=f"sb_{_yer}_{_tab_key}"):
-                    st.session_state["aktif_tab"] = _tab_key
-                    st.rerun()
-
-        _arama = st.text_input("", placeholder="🔎 Sayfa ara…", key="_menu_arama", label_visibility="collapsed")
-
-        if _arama.strip():
-            _arama_kucuk = _arama.strip().lower()
-            _eslesen = [t for t in _sb_liste if _arama_kucuk in _TAB_ETIKETLER.get(t, t).lower()]
-            if _eslesen:
-                for _tab_key in _eslesen:
-                    _menu_butonu(_tab_key, "arama", _yildiz_goster=False)
-            else:
-                st.caption("Eşleşen sayfa yok")
-        else:
-            _favoriler_gecerli = [t for t in st.session_state["_favori_sayfalar"] if t in _sb_liste]
-            if _favoriler_gecerli:
-                st.markdown("<div style='font-size:10.5px;letter-spacing:1.2px;font-weight:600;color:#9a988f;padding:10px 4px 2px;'>SIK KULLANILAN</div>", unsafe_allow_html=True)
-                for _tab_key in _favoriler_gecerli:
-                    _menu_butonu(_tab_key, "fav")
-
-            _gruplanan = set()
+        if "_acik_grup" not in st.session_state:
+            _varsayilan_acik = None
             for _g_ad, _g_keys in _MENU_GRUPLARI:
-                _g_items = [t for t in _sb_liste if t in _g_keys]
-                if not _g_items:
-                    continue
-                st.markdown(f"<div style='font-size:10.5px;letter-spacing:1.2px;font-weight:600;color:#9a988f;padding:10px 4px 2px;'>{_g_ad}</div>", unsafe_allow_html=True)
-                for _tab_key in _g_items:
-                    _gruplanan.add(_tab_key)
-                    _menu_butonu(_tab_key, "grp")
+                if st.session_state["aktif_tab"] in _g_keys:
+                    _varsayilan_acik = _g_ad
+                    break
+            st.session_state["_acik_grup"] = _varsayilan_acik or (_MENU_GRUPLARI[0][0] if _MENU_GRUPLARI else None)
 
-            _kalanlar = [t for t in _sb_liste if t not in _gruplanan]
-            if _kalanlar:
-                st.markdown("<div style='font-size:10.5px;letter-spacing:1.2px;font-weight:600;color:#9a988f;padding:10px 4px 2px;'>DİĞER</div>", unsafe_allow_html=True)
+        _gruplanan = set()
+        for _g_ad, _g_keys in _MENU_GRUPLARI:
+            _g_items = [t for t in _sb_liste if t in _g_keys]
+            if not _g_items:
+                continue
+            _gruplanan.update(_g_items)
+            _acik_mi = st.session_state["_acik_grup"] == _g_ad
+            _ok = "▾" if _acik_mi else "▸"
+            if st.button(f"{_g_ad}   {_ok}", use_container_width=True,
+                         type="primary" if _acik_mi else "secondary",
+                         key=f"grphdr_{_g_ad}"):
+                st.session_state["_acik_grup"] = None if _acik_mi else _g_ad
+                st.rerun()
+            if _acik_mi:
+                for _tab_key in _g_items:
+                    _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
+                    _aktif_mi = st.session_state["aktif_tab"] == _tab_key
+                    _c1, _c2 = st.columns([1, 8])
+                    with _c2:
+                        if st.button(_etiket, use_container_width=True,
+                                     type="primary" if _aktif_mi else "secondary",
+                                     key=f"sb_{_g_ad}_{_tab_key}"):
+                            st.session_state["aktif_tab"] = _tab_key
+                            st.rerun()
+
+        _kalanlar = [t for t in _sb_liste if t not in _gruplanan]
+        if _kalanlar:
+            _acik_mi = st.session_state["_acik_grup"] == "DİĞER"
+            _ok = "▾" if _acik_mi else "▸"
+            if st.button(f"Diğer   {_ok}", use_container_width=True,
+                         type="primary" if _acik_mi else "secondary",
+                         key="grphdr_DIGER"):
+                st.session_state["_acik_grup"] = None if _acik_mi else "DİĞER"
+                st.rerun()
+            if _acik_mi:
                 for _tab_key in _kalanlar:
-                    _menu_butonu(_tab_key, "diger")
+                    _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
+                    _aktif_mi = st.session_state["aktif_tab"] == _tab_key
+                    _c1, _c2 = st.columns([1, 8])
+                    with _c2:
+                        if st.button(_etiket, use_container_width=True,
+                                     type="primary" if _aktif_mi else "secondary",
+                                     key=f"sb_diger_{_tab_key}"):
+                            st.session_state["aktif_tab"] = _tab_key
+                            st.rerun()
+
 
     # ── ALT BÖLÜM ─────────────────────────────────────────────────────────────
     st.divider()
