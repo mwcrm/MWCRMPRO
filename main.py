@@ -2939,7 +2939,7 @@ function kartSec(id){
             st.session_state.pop("kart_sec_reset", None)
             st.session_state.pop("kart_sec", None)
 
-        _fc = st.columns([2, 1.5, 1.2, 1.2, 0.7, 0.8, 0.8, 0.9, 0.8])
+        _fc = st.columns([2, 1.5, 1.2, 1.2, 0.7, 1.6, 0.8, 0.9])
 
         secili_kart_inline = _fc[0].selectbox("m", kart_opts_inline, key="kart_sec_inline", label_visibility="collapsed")
         ara_txt = _fc[1].text_input("a", placeholder="🔍 Firma, yetkili, il...", key="ara_liste", label_visibility="collapsed")
@@ -2970,7 +2970,7 @@ function kartSec(id){
         _tem_def  = [x for x in st.session_state.get("_cl_fil_temsilci_multi",[]) if x in _tem_opts]
         _tem_sec  = _fc[7].multiselect("t", _tem_opts, default=_tem_def, key="_cl_fil_temsilci_multi", placeholder="Temsilci...", label_visibility="collapsed")
 
-        siralama_kol = _fc[8].selectbox("sr", ["Tarih↓","Firma A-Z","Firma Z-A","İl A-Z","Temsilci A-Z","Hedef ₺↓","Hedef ₺↑","Gerçek ₺↓","Gerçek ₺↑"], key="siralama_kol", label_visibility="collapsed")
+        siralama_kol = "Tarih↓"  # Sıralama kutusu kaldırıldı, varsayılan sıralama sabit kaldı
 
         # Eski sistemle uyumluluk
         kart_opts = ["-- Müşteri Seçin --"] + [
