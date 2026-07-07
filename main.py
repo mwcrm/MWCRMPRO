@@ -1368,11 +1368,11 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
     # Model 5 — ultra minimal: tarih | metin | kim | 🗑
     _css5 = """<style>
-.np5-satir{display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:0.5px solid #e2e8f0;}
+.np5-satir{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:0.5px solid #e2e8f0;}
 .np5-satir:last-child{border-bottom:none;}
-.np5-tarih{font-size:9px;color:#94a3b8;min-width:58px;white-space:nowrap;}
-.np5-txt{font-size:11px;color:#0f172a;flex:1;line-height:1.4;}
-.np5-kim{font-size:9px;color:#94a3b8;white-space:nowrap;}
+.np5-tarih{font-size:11px;color:#64748b;min-width:68px;white-space:nowrap;}
+.np5-txt{font-size:13px;color:#0f172a;flex:1;line-height:1.5;}
+.np5-kim{font-size:11px;color:#94a3b8;white-space:nowrap;}
 </style>"""
     st.markdown(_css5, unsafe_allow_html=True)
 
@@ -1383,7 +1383,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
         _tar = fmt_tarih(str(_nn.get("created_at","") or _nn.get("tarih","") or ""))
         if not _txt: continue
 
-        _col1, _col2, _col3, _col4 = st.columns([0.8, 5, 1, 0.6])
+        _col1, _col2, _col3, _col4 = st.columns([0.9, 5, 1, 0.5])
         _col1.markdown(f"<div class='np5-tarih'>{_tar[:8]}</div>", unsafe_allow_html=True)
         _col2.markdown(f"<div class='np5-txt'>{_txt.replace('<','&lt;')}</div>", unsafe_allow_html=True)
         _col3.markdown(f"<div class='np5-kim'>{_kim}</div>", unsafe_allow_html=True)
@@ -3161,8 +3161,13 @@ function kartSec(id){
         "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
         "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=True, width="small"),
+        "asama1":        st.column_config.TextColumn("Aşama 1", width="medium"),
+        "asama2":        st.column_config.TextColumn("Aşama 2", width="medium"),
+        "asama3":        st.column_config.TextColumn("Aşama 3", width="medium"),
+        "asama4":        st.column_config.TextColumn("Aşama 4", width="medium"),
+        "sonuc":         st.column_config.TextColumn("Sonuç",   width="medium"),
     }
-    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro","✅ Analiz","📅 Son Randevu","aciklama","📨 Notlar"]
+    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro","✅ Analiz","📅 Son Randevu","aciklama","📨 Notlar","asama1","asama2","asama3","asama4","sonuc"]
     # Gizli kolonları çıkar
     _kol_gizli_map = {"firma":"firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email",
                       "adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci",
@@ -3197,10 +3202,12 @@ function kartSec(id){
                     _sc = str(_rj.get("sonuc","") or "")
                     _son_rand[_mn_norm] = f"📅 {_dt} {_st}" + (f" · {_bl}" if _bl else "") + (f" [{_sc}]" if _sc else "")
             df_edit["📅 Son Randevu"] = df_edit["firma"].apply(lambda x: _son_rand.get(_norm_rand(x),""))
-        else:
-            df_edit["📅 Son Randevu"] = ""
     except:
         df_edit["📅 Son Randevu"] = ""
+    # Aşama 1-4 ve Sonuç kolonları — yoksa boş ekle
+    for _ak in ["asama1","asama2","asama3","asama4","sonuc"]:
+        if _ak not in df_edit.columns:
+            df_edit[_ak] = ""
 
     # Ciro kolonlarını sayısal tut — başlığa tıklayınca doğru sıralar
     if "beklenen_ciro" in df_edit.columns:
@@ -3388,7 +3395,7 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
         if "aciklama" not in _kv.columns:
             _kv["aciklama"] = ""
         _kv["aciklama"] = _kv["aciklama"].fillna("").astype(str).replace("nan","")
-        _kayit_kolonlar = ["id","firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi","aciklama"]
+        _kayit_kolonlar = ["id","firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi","aciklama","asama1","asama2","asama3","asama4","sonuc"]
         _mevcut = [c for c in _kayit_kolonlar if c in _kv.columns]
         st.session_state["_ls_tablo"] = _kv[_mevcut].to_json(orient="records", force_ascii=False)
     except:
