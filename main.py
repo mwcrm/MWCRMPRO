@@ -3042,14 +3042,6 @@ function kartSec(id){
     if st.session_state.get("_bl_ilce_filtre") and "ilce" in df_f.columns:
         _bl_hedef_ilceler = set(st.session_state["_bl_ilce_filtre"])
         df_f = df_f[df_f["ilce"].astype(str).isin(_bl_hedef_ilceler)]
-        _bl_ad, _bl_c1, _bl_c2 = st.columns([5,1,10])
-        with _bl_ad:
-            st.info(f"📍 Bölge filtresi aktif: {st.session_state.get('_bl_ilce_filtre_ad','')}")
-        with _bl_c1:
-            if st.button("✕ Kaldır", key="_bl_ilce_filtre_kaldir"):
-                del st.session_state["_bl_ilce_filtre"]
-                st.session_state.pop("_bl_ilce_filtre_ad", None)
-                st.rerun()
 
     # ── HİÇ FİLTRE SEÇİLİ DEĞİLKEN — sadece işlem görmemiş (Özel Müşteri/Portföy) göster ──
     # Bir müşteriye durum atanınca (Randevu, Teklif, Tekrar Ara vb.) artık burada görünmesin,
