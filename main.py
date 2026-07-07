@@ -10689,52 +10689,7 @@ elif aktif == "bolgeler":
         st.divider()
         st.markdown("#### 📍 Bölge bölge kırılım")
 
-        with st.expander("📤 Genel Excel indirme / yükleme"):
-            _dl_kolon = [c for c in ["firma","yetkili","gsm","il","ilce","atanan_kullanici",
-                                      "durum","beklenen_ciro","gerceklesen_ciro"] if c in _bl_df.columns]
-            _dl_df = _bl_df[_dl_kolon + ["_bolge"]].rename(columns={"_bolge":"bolge"})
-            _dl_buf = _bl_io.BytesIO()
-            _dl_df.to_excel(_dl_buf, index=False)
-            _dl_buf.seek(0)
-            st.download_button("📥 Bölgeli listeyi indir (.xlsx)", data=_dl_buf,
-                                file_name="bolgeler_listesi.xlsx", key="bl_dl_btn")
-
-            st.caption("Yüklerken 'firma' sütunu zorunludur. il / ilçe / atanan_kullanici sütunları varsa güncellenir.")
-            _bl_yukl = st.file_uploader("Excel yükle (il / ilçe / kullanıcı atamasını topluca güncelle)",
-                                         type=["xlsx","xls"], key="bl_yukl")
-            if _bl_yukl is not None:
-                _bl_ydf = pd.read_excel(_bl_yukl)
-                _bl_ydf.columns = [str(c).strip().lower().replace(" ","_") for c in _bl_ydf.columns]
-                if "firma" not in _bl_ydf.columns:
-                    st.error("❌ Zorunlu sütun eksik: firma")
-                else:
-                    st.success(f"{len(_bl_ydf)} satır okundu.")
-                    if st.button("✅ Güncellemeleri uygula", type="primary", key="bl_uygula_btn"):
-                        _bl_basarili = 0
-                        _bl_hata = []
-                        for _, _r in _bl_ydf.iterrows():
-                            _f_ad = str(_r.get("firma","") or "").strip()
-                            if not _f_ad:
-                                continue
-                            _guncel = {}
-                            for _kol in ["il","ilce","atanan_kullanici"]:
-                                if _kol in _bl_ydf.columns:
-                                    _v = _r.get(_kol,"")
-                                    if pd.notna(_v) and str(_v).strip():
-                                        _guncel[_kol] = str(_v).strip()
-                            if not _guncel:
-                                continue
-                            try:
-                                db_update("cari_kartlar", _guncel, "firma", _f_ad)
-                                _bl_basarili += 1
-                            except Exception as _e:
-                                _bl_hata.append(f"{_f_ad}: {_e}")
-                        st.success(f"🎉 {_bl_basarili} kayıt güncellendi.")
-                        if _bl_hata:
-                            st.error(f"{len(_bl_hata)} kayıtta hata:")
-                            for _h in _bl_hata[:20]:
-                                st.code(_h)
-
+        st.caption("Yeni müşteri eklemek için mevcut 📥 Excel Aktar sayfasını kullanabilirsiniz — il/ilçe bilgisi girildiğinde bölgesi burada otomatik hesaplanır.")
         st.divider()
 
         _bl_ozet = (_bl_df.groupby("_bolge").size()
