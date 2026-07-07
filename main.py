@@ -2958,9 +2958,15 @@ function kartSec(id){
 
         filtre_seg = _fc[4].selectbox("s", ["Tümü","👑 A+","⭐ A","🔵 B","⚪ C"], key="fil_seg", label_visibility="collapsed")
 
-        _il_opts = sorted(df["il"].dropna().astype(str).unique().tolist()) if "il" in df.columns else []
+        _il_opts = ["🌍 Tümü / Hepsi"] + (sorted(df["il"].dropna().astype(str).unique().tolist()) if "il" in df.columns else [])
         _il_def  = [x for x in st.session_state.get("_cl_fil_il_multi",[]) if x in _il_opts]
-        _il_sec  = _fc[5].multiselect("i", _il_opts, default=_il_def, key="_cl_fil_il_multi", placeholder="İl...", label_visibility="collapsed")
+        _il_sec_raw = _fc[5].multiselect("i", _il_opts, default=_il_def, key="_cl_fil_il_multi", placeholder="İl...", label_visibility="collapsed")
+        if "🌍 Tümü / Hepsi" in _il_sec_raw:
+            for _fk3 in ["_cl_fil_il_multi", "_cl_fil_ilce_multi", "_bl_ilce_filtre"]:
+                if _fk3 in st.session_state: del st.session_state[_fk3]
+            st.session_state.pop("_bl_ilce_filtre_ad", None)
+            st.rerun()
+        _il_sec = _il_sec_raw
 
         _ilce_opts = sorted((df[df["il"].astype(str).isin(_il_sec)] if _il_sec else df)["ilce"].dropna().astype(str).unique().tolist()) if "ilce" in df.columns else []
         _ilce_opts = [x for x in _ilce_opts if x not in ["nan","None",""]]
@@ -3069,17 +3075,7 @@ function kartSec(id){
         _ml_kapsam = ", ".join(_il_sec)
     else:
         _ml_kapsam = "Tüm kayıtlar (il filtresi yok)"
-    _ml_bas1, _ml_bas2 = st.columns([5, 1])
-    with _ml_bas1:
-        st.markdown(f"#### 📍 {_ml_kapsam}")
-    with _ml_bas2:
-        if _il_sec or st.session_state.get("_bl_ilce_filtre"):
-            if st.button("🌍 Tümü / Hepsi", key="_ml_tumu_btn", use_container_width=True):
-                for _fk3 in ["_cl_fil_il_multi", "_cl_fil_ilce_multi", "_bl_ilce_filtre"]:
-                    if _fk3 in st.session_state:
-                        del st.session_state[_fk3]
-                st.session_state.pop("_bl_ilce_filtre_ad", None)
-                st.rerun()
+    st.markdown(f"#### 📍 {_ml_kapsam}")
     _ml1, _ml2, _ml3 = st.columns(3)
     _ml1.metric("Listelenen müşteri", len(df_f))
     if "beklenen_ciro" in df_f.columns:
