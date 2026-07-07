@@ -3387,13 +3387,17 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
     secili_sayi = len(secili_df)
     secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
 
-    secili_df = edited_df[edited_df["Seç"] == True]
-    secili_sayi = len(secili_df)
-    secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
-
-    # ── NOT DİALOG — satır seçince ekran ortasında açılır ────────────────────
+    # Seçili id'yi session_state'e kaydet — rerun'dan sonra da kalsın
     if secili_sayi == 1:
-        _sel_id = int(secili_idler[0])
+        st.session_state["_liste_secili_id"] = int(secili_idler[0])
+    elif secili_sayi == 0 and "cari_editor" in st.session_state:
+        pass  # Seçim kalmadıysa temizleme — kullanıcı checkbox'ı kaldırdı
+    
+    _aktif_sel_id = st.session_state.get("_liste_secili_id")
+
+    # ── NOT DİALOG + RANDEVU — satır seçince açılır ──────────────────────────
+    if secili_sayi == 1 or (secili_sayi == 0 and _aktif_sel_id):
+        _sel_id = int(secili_idler[0]) if secili_sayi == 1 else _aktif_sel_id
         _sel_rows = df_edit[df_edit["id"] == _sel_id]
         _sel_firma = str(_sel_rows.iloc[0].get("firma","")) if not _sel_rows.empty else ""
         not_dialog(_sel_id, _sel_firma)
