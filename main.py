@@ -3768,35 +3768,95 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                 st.rerun()
     with btn_a:
         if secili_sayi > 0:
-            if st.button(f"🗑️ Seçili {secili_sayi} → Arşive", use_container_width=True, key="liste_arsiv"):
-                for rid in secili_idler:
-                    try:
-                        if sb_liste: sb_liste.table("cari_kartlar").update({"silindi":1}).eq("id",int(rid)).execute()
-                        else: db_update("cari_kartlar",{"silindi":1},"id",int(rid))
+            _arsiv_onay_gerekli = secili_sayi > 3
+            if _arsiv_onay_gerekli and not st.session_state.get("_liste_arsiv_onay_bekliyor"):
+                if st.button(f"🗑️ Seçili {secili_sayi} → Arşive", use_container_width=True, key="liste_arsiv"):
+                    st.session_state["_liste_arsiv_onay_bekliyor"] = True
+                    st.rerun()
+            elif _arsiv_onay_gerekli:
+                st.warning(f"⚠️ {secili_sayi} kayıt (3'ten fazla) arşive gönderilecek. Emin misiniz?")
+                _aa1, _aa2 = st.columns(2)
+                with _aa1:
+                    if st.button(f"✅ Evet, {secili_sayi} kaydı arşive gönder", type="primary", use_container_width=True, key="liste_arsiv_onay"):
+                        for rid in secili_idler:
+                            try:
+                                if sb_liste: sb_liste.table("cari_kartlar").update({"silindi":1}).eq("id",int(rid)).execute()
+                                else: db_update("cari_kartlar",{"silindi":1},"id",int(rid))
+                            except: pass
+                        try: db_read.clear()
+                        except: pass
+                        try: get_cari_listesi.clear()
+                        except: pass
+                        st.session_state.pop("cari_editor", None)
+                        st.session_state.pop("_liste_arsiv_onay_bekliyor", None)
+                        st.success(f"✅ {secili_sayi} arşive gönderildi!"); st.rerun()
+                with _aa2:
+                    if st.button("❌ Vazgeç", use_container_width=True, key="liste_arsiv_vazgec"):
+                        st.session_state.pop("_liste_arsiv_onay_bekliyor", None)
+                        st.rerun()
+            else:
+                if st.button(f"🗑️ Seçili {secili_sayi} → Arşive", use_container_width=True, key="liste_arsiv"):
+                    for rid in secili_idler:
+                        try:
+                            if sb_liste: sb_liste.table("cari_kartlar").update({"silindi":1}).eq("id",int(rid)).execute()
+                            else: db_update("cari_kartlar",{"silindi":1},"id",int(rid))
+                        except: pass
+                    try: db_read.clear()
                     except: pass
-                try: db_read.clear()
-                except: pass
-                try: get_cari_listesi.clear()
-                except: pass
-                st.session_state.pop("cari_editor", None)
-                st.success(f"✅ {secili_sayi} arşive gönderildi!"); st.rerun()
+                    try: get_cari_listesi.clear()
+                    except: pass
+                    st.session_state.pop("cari_editor", None)
+                    st.success(f"✅ {secili_sayi} arşive gönderildi!"); st.rerun()
         else:
             st.caption("Seçmek için Seç kolonunu işaretleyin")
 
     with btn_s:
         if secili_sayi > 0:
-            if st.button(f"❌ Seçili {secili_sayi} → Sil", use_container_width=True, key="liste_sil"):
-                for rid in secili_idler:
-                    try:
-                        if sb_liste: sb_liste.table("cari_kartlar").delete().eq("id",int(rid)).execute()
-                        else:
-                            conn_s = get_conn()
-                            conn_s.execute("DELETE FROM cari_kartlar WHERE id=?", (int(rid),))
-                            conn_s.commit(); conn_s.close()
+            _sil_onay_gerekli = secili_sayi > 3
+            if _sil_onay_gerekli and not st.session_state.get("_liste_sil_onay_bekliyor"):
+                if st.button(f"❌ Seçili {secili_sayi} → Sil", use_container_width=True, key="liste_sil"):
+                    st.session_state["_liste_sil_onay_bekliyor"] = True
+                    st.rerun()
+            elif _sil_onay_gerekli:
+                st.warning(f"⚠️ {secili_sayi} kayıt (3'ten fazla) KALICI olarak silinecek, geri alınamaz! Emin misiniz?")
+                _sa1, _sa2 = st.columns(2)
+                with _sa1:
+                    if st.button(f"✅ Evet, {secili_sayi} kaydı kalıcı sil", type="primary", use_container_width=True, key="liste_sil_onay"):
+                        for rid in secili_idler:
+                            try:
+                                if sb_liste: sb_liste.table("cari_kartlar").delete().eq("id",int(rid)).execute()
+                                else:
+                                    conn_s = get_conn()
+                                    conn_s.execute("DELETE FROM cari_kartlar WHERE id=?", (int(rid),))
+                                    conn_s.commit(); conn_s.close()
+                            except: pass
+                        try: db_read.clear()
+                        except: pass
+                        try: get_cari_listesi.clear()
+                        except: pass
+                        st.session_state.pop("cari_editor", None)
+                        st.session_state.pop("_liste_sil_onay_bekliyor", None)
+                        st.success("✅ Silindi!"); st.rerun()
+                with _sa2:
+                    if st.button("❌ Vazgeç", use_container_width=True, key="liste_sil_vazgec"):
+                        st.session_state.pop("_liste_sil_onay_bekliyor", None)
+                        st.rerun()
+            else:
+                if st.button(f"❌ Seçili {secili_sayi} → Sil", use_container_width=True, key="liste_sil"):
+                    for rid in secili_idler:
+                        try:
+                            if sb_liste: sb_liste.table("cari_kartlar").delete().eq("id",int(rid)).execute()
+                            else:
+                                conn_s = get_conn()
+                                conn_s.execute("DELETE FROM cari_kartlar WHERE id=?", (int(rid),))
+                                conn_s.commit(); conn_s.close()
+                        except: pass
+                    try: db_read.clear()
                     except: pass
-                try: db_read.clear()
-                except: pass
-                st.success("✅ Silindi!"); st.rerun()
+                    try: get_cari_listesi.clear()
+                    except: pass
+                    st.session_state.pop("cari_editor", None)
+                    st.success("✅ Silindi!"); st.rerun()
 
 
 
