@@ -159,7 +159,7 @@ _BL_ISTANBUL_ANADOLU = {"adalar","atasehir","beykoz","cekmekoy","kadikoy","karta
 _BL_ISTANBUL_AVRUPA = {"arnavutkoy","avcilar","bagcilar","bahcelievler","bakirkoy",
     "basaksehir","bayrampasa","besiktas","beylikduzu","beyoglu","buyukcekmece",
     "catalca","esenler","esenyurt","eyupsultan","fatih","gaziosmanpasa","gungoren",
-    "kagithane","kucukcekmece","sariyer","silivri","sisli","zeytinburnu"}
+    "kagithane","kucukcekmece","sariyer","silivri","sisli","zeytinburnu","sultangazi"}
 _BL_IL_ADI = {
     "tekirdag":"Tekirdağ","kocaeli":"Kocaeli","bursa":"Bursa","manisa":"Manisa",
     "ankara":"Ankara","konya":"Konya","eskisehir":"Eskişehir","denizli":"Denizli","aydin":"Aydın",
@@ -172,19 +172,24 @@ def _bl_sadelestir(s):
     return s
 
 def il_ilce_bolge_bul(il, ilce):
-    """il+ilçe bilgisinden bölge adı üretir. Sadece tanımlı 11 bölgeden biriyse eşleşir,
-    diğer her şey (tanımsız il, İstanbul'un tanımsız ilçesi, boş veri) Havuz'a düşer."""
+    """il+ilçe bilgisinden bölge adı üretir. İl doluysa MUTLAKA bir bölge olur —
+    tanımlı 11 bölgeden biriyse o isimle, değilse ilin kendi adıyla. Sadece il
+    tamamen BOŞSA — veya İstanbul'un ilçesi Anadolu/Avrupa listesinde yoksa (manuel
+    toplu atama için) — Havuz'a düşer."""
     _il = _bl_sadelestir(il)
     _ilce = _bl_sadelestir(ilce)
     if not _il:
-        return None
+        return None  # il tamamen boşsa Havuz
     if "istanbul" in _il:
         if _ilce in _BL_ISTANBUL_ANADOLU:
             return "İstanbul Anadolu"
         if _ilce in _BL_ISTANBUL_AVRUPA:
             return "İstanbul Avrupa"
-        return None
-    return _BL_IL_ADI.get(_il)
+        return None  # ilçe eşleşmiyor — Havuz'da kalır, manuel toplu atama için
+    if _il in _BL_IL_ADI:
+        return _BL_IL_ADI[_il]
+    # Tanımlı 11 bölgeden biri değil ama il doluysa — ilin kendi adı bölge olur
+    return str(il).strip().title()
 
 @st.cache_data(ttl=60)
 def get_cari_listesi():
