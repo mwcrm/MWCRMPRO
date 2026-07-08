@@ -2690,60 +2690,220 @@ section[data-testid="stSidebar"] { display: none !important; }
                 st.caption("Mükerrer müşteri bulunamadı.")
             else:
                 st.warning(f"{len(_mukerrerler)} mükerrer firma adı bulundu.")
-                _mr_tab1, _mr_tab2 = st.tabs(["📋 Toplu Karşılaştırma (hepsi)", "🔎 Tek Seçerek Karşılaştır"])
 
-                with _mr_tab1:
-                    st.caption("Her grupta iki kayıt gösterilir. Hangisini silmek istediğinize siz karar verin. Silinen kayıt listeden kalkar, diğeri kalır.")
-                    _silinen_t = 0
-                    _goster_kolon = [c for c in ["id","firma","gsm","il","ilce","temsilci","segment","notlar"] if c in df.columns]
-                    for _fname, _fids in list(_mukerrerler.items()):
-                        st.markdown("---")
-                        st.markdown(f"**{_fname}** — {len(_fids)} kayıt")
-                        for _did in _fids:
-                            _satir = df[df["id"] == _did]
-                            if _satir.empty:
-                                continue
-                            _s = _satir.iloc[0]
-                            _kc1, _kc2 = st.columns([5,1])
-                            with _kc1:
-                                _detay = " | ".join([f"**{c}:** {_s.get(c,'')}" for c in _goster_kolon if str(_s.get(c,"")).strip() not in ["","nan","None"]])
-                                st.markdown(f"🔹 {_detay}")
-                            with _kc2:
-                                if st.button("🗑 Sil", key=f"mr_sil_{_did}", use_container_width=True):
-                                    try:
-                                        _sb_mr = get_sb_client()
-                                        if _sb_mr:
-                                            _sb_mr.table("cari_kartlar").update({"silindi":1}).eq("id", int(_did)).execute()
-                                            _silinen_t += 1
-                                    except: pass
-                    if _silinen_t:
+                _MR_ALANLAR = [
+                    ("firma","Firma adı"), ("yetkili","Yetkili"), ("gsm","GSM"), ("sabit","Sabit"),
+                    ("email","Email"), ("adres","Adres"), ("il","İl"), ("ilce","İlçe"),
+                    ("durum","Durum"), ("islem_asamasi","Süreç (aşama)"), ("segment","Segment"),
+                    ("beklenen_ciro","Hedef ciro"), ("temsilci","Temsilci"),
+                ]
+
+                def _mr_aktivite_say(_idler):
+                    """Her id için not/randevu/teklif sayısını döndürür"""
+                    _sb_a = get_sb_client()
+                    _sonuc = {int(i): {"not":0,"randevu":0,"teklif":0} for i in _idler}
+                    if not _sb_a:
+                        return _sonuc
+                    try:
+                        _nd = _sb_a.table("cari_aciklamalar").select("cari_id").in_("cari_id", [int(i) for i in _idler]).execute().data or []
+                        for _r in _nd:
+                            _cid = int(_r.get("cari_id", 0))
+                            if _cid in _sonuc: _sonuc[_cid]["not"] += 1
+                    except: pass
+                    try:
+                        _rd = _sb_a.table("randevular").select("musteri_id").in_("musteri_id", [int(i) for i in _idler]).execute().data or []
+                        for _r in _rd:
+                            _cid = int(_r.get("musteri_id", 0) or 0)
+                            if _cid in _sonuc: _sonuc[_cid]["randevu"] += 1
+                    except: pass
+                    try:
+                        _td = _sb_a.table("teklifler").select("cari_id").in_("cari_id", [int(i) for i in _idler]).execute().data or []
+                        for _r in _td:
+                            _cid = int(_r.get("cari_id", 0) or 0)
+                            if _cid in _sonuc: _sonuc[_cid]["teklif"] += 1
+                    except: pass
+                    return _sonuc
+
+                def _mr_birlestir(_grup_idler, _ana_id, _secim_degerleri):
+                    """Seçilen alan değerlerini ana kayda yazar, diğer kayıtların
+                    not/randevu/teklifini ana kayda taşır, diğerlerini arşive alır."""
+                    _sb_b = get_sb_client()
+                    _diger_idler = [int(i) for i in _grup_idler if int(i) != int(_ana_id)]
+                    try:
+                        if _secim_degerleri:
+                            if _sb_b:
+                                _sb_b.table("cari_kartlar").update(_secim_degerleri).eq("id", int(_ana_id)).execute()
+                            else:
+                                db_update("cari_kartlar", _secim_degerleri, "id", int(_ana_id))
+                        for _did in _diger_idler:
+                            try:
+                                if _sb_b:
+                                    _sb_b.table("cari_aciklamalar").update({"cari_id": int(_ana_id)}).eq("cari_id", _did).execute()
+                                    _sb_b.table("randevular").update({"musteri_id": int(_ana_id)}).eq("musteri_id", _did).execute()
+                                    _sb_b.table("teklifler").update({"cari_id": int(_ana_id)}).eq("cari_id", _did).execute()
+                                    _sb_b.table("cari_kartlar").update({"silindi": 1}).eq("id", _did).execute()
+                                else:
+                                    db_update("cari_kartlar", {"silindi": 1}, "id", _did)
+                            except Exception:
+                                pass
                         try: get_cari_listesi.clear()
                         except: pass
-                        st.success(f"✅ {_silinen_t} kayıt silindi!")
-                        st.rerun()
+                        try: db_read.clear()
+                        except: pass
+                        return True
+                    except Exception as _mre:
+                        st.error(f"Hata: {_mre}")
+                        return False
 
+                _mr_gruplar_liste = list(_mukerrerler.items())
+                if "_mr_grup_idx" not in st.session_state:
+                    st.session_state["_mr_grup_idx"] = 0
+                if "_mr_son_mesaj" not in st.session_state:
+                    st.session_state["_mr_son_mesaj"] = ""
+
+                _mr_tab1, _mr_tab2 = st.tabs(["🔎 Tekli — grup grup", "📋 Toplu — tüm grup listesi"])
+
+                # ── TEKLİ MOD ────────────────────────────────────────────────
+                with _mr_tab1:
+                    if st.session_state["_mr_son_mesaj"]:
+                        st.success(st.session_state["_mr_son_mesaj"])
+                        st.session_state["_mr_son_mesaj"] = ""
+
+                    _idx = st.session_state["_mr_grup_idx"] % len(_mr_gruplar_liste)
+                    _fname, _fids = _mr_gruplar_liste[_idx]
+                    st.caption(f"Grup {_idx+1}/{len(_mr_gruplar_liste)} — **{_fname}** — {len(_fids)} kayıt")
+
+                    _grup_satirlar = df[df["id"].isin(_fids)].copy()
+                    _aktivite = _mr_aktivite_say(_fids)
+
+                    _ana_secenekleri = [int(i) for i in _fids]
+                    _ana_id = st.radio("Ana kayıt (kalacak kayıt — siz seçin)", _ana_secenekleri,
+                                        format_func=lambda x: f"id {x}", horizontal=True, key=f"mr_ana_{_idx}")
+
+                    st.markdown("---")
+                    _secim_degerleri = {}
+                    for _acol, _abaslik in _MR_ALANLAR:
+                        if _acol not in _grup_satirlar.columns:
+                            continue
+                        _degerler = {}
+                        for _fid in _fids:
+                            _sat = _grup_satirlar[_grup_satirlar["id"] == _fid]
+                            if _sat.empty: continue
+                            _v = _sat.iloc[0].get(_acol, "")
+                            _v = "" if str(_v) in ["nan","None","NaT"] else str(_v).strip()
+                            if _v:
+                                _degerler[int(_fid)] = _v
+                        if not _degerler:
+                            continue
+                        _tekil_degerler = set(_degerler.values())
+                        _c1, _c2 = st.columns([1, 3])
+                        with _c1:
+                            st.markdown(f"**{_abaslik}**")
+                        with _c2:
+                            if len(_tekil_degerler) == 1:
+                                st.caption(f"{list(_tekil_degerler)[0]}  *(tüm kayıtlarda aynı)*")
+                                _secim_degerleri[_acol] = list(_tekil_degerler)[0]
+                            else:
+                                _opsiyonlar = list(_degerler.keys())
+                                _varsayilan_idx = _opsiyonlar.index(_ana_id) if _ana_id in _opsiyonlar else 0
+                                _sec = st.radio(_acol, _opsiyonlar,
+                                                 format_func=lambda x, _d=_degerler: f"id {x}: {_d[x]}",
+                                                 index=_varsayilan_idx, horizontal=False,
+                                                 key=f"mr_f_{_acol}_{_idx}", label_visibility="collapsed")
+                                _secim_degerleri[_acol] = _degerler[_sec]
+
+                    st.markdown("---")
+                    _toplam_not = sum(_aktivite.get(int(i),{}).get("not",0) for i in _fids)
+                    _toplam_rand = sum(_aktivite.get(int(i),{}).get("randevu",0) for i in _fids)
+                    _toplam_tek = sum(_aktivite.get(int(i),{}).get("teklif",0) for i in _fids)
+                    st.caption(f"📌 Not, randevu ve teklifler hangi kayıtta olursa olsun otomatik ana kayda taşınır, hiçbiri kaybolmaz. "
+                               f"Toplamda: {_toplam_not} not · {_toplam_rand} randevu · {_toplam_tek} teklif ana kayda ({_ana_id}) aktarılacak.")
+
+                    _bc1, _bc2 = st.columns([2,1])
+                    with _bc1:
+                        if st.button("✅ Seçtiklerimle birleştir, gerisini sil", type="primary",
+                                     use_container_width=True, key=f"mr_birles_{_idx}"):
+                            if _mr_birlestir(_fids, _ana_id, _secim_degerleri):
+                                st.session_state["_mr_son_mesaj"] = (
+                                    f"✅ '{_fname}' birleştirildi — {len(_fids)-1} kayıt silindi, "
+                                    f"{_toplam_not} not · {_toplam_rand} randevu · {_toplam_tek} teklif ana kayda taşındı."
+                                )
+                                st.session_state["_mr_grup_idx"] = _idx
+                                st.rerun()
+                    with _bc2:
+                        if st.button("⏭️ Atla, sonraki", use_container_width=True, key=f"mr_atla_{_idx}"):
+                            st.session_state["_mr_grup_idx"] = _idx + 1
+                            st.rerun()
+
+                # ── TOPLU MOD ────────────────────────────────────────────────
                 with _mr_tab2:
-                    _mukerrer_opts = [f"{k} ({len(v)} kayıt)" for k, v in _mukerrerler.items()]
-                    _secilen_grup = st.selectbox("İncelenecek grup", ["-- Seçin --"] + _mukerrer_opts, key="dc_mukerrer_grup_sec")
-                    if _secilen_grup != "-- Seçin --":
-                        _grup_adi = list(_mukerrerler.keys())[_mukerrer_opts.index(_secilen_grup)]
-                        _grup_idler = _mukerrerler[_grup_adi]
-                        _grup_satirlar = df[df["id"].isin(_grup_idler)]
-                        st.dataframe(_grup_satirlar[["id","firma","yetkili","gsm","il","durum"]].reset_index(drop=True), use_container_width=True)
-                        _birles_hedef = st.selectbox("Ana kayıt (diğerleri silinecek)", _grup_idler, key="mr_birles_hedef")
-                        if st.button("🔗 Birleştir — diğerlerini sil", type="primary", use_container_width=True, key="mr_birles_btn"):
-                            try:
-                                _sb_br = get_sb_client()
-                                if _sb_br:
-                                    for _bid in _grup_idler:
-                                        if int(_bid) != int(_birles_hedef):
-                                            _sb_br.table("cari_kartlar").update({"silindi":1}).eq("id", int(_bid)).execute()
-                                    try: get_cari_listesi.clear()
-                                    except: pass
-                                    st.success("✅ Birleştirildi!")
-                                    st.rerun()
-                            except Exception as _bre:
-                                st.error(f"❌ {_bre}")
+                    st.caption("İşaretlediğiniz gruplar toplu birleştirilir — her grupta en çok işlem geçmişi (not+randevu+teklif) olan kayıt otomatik ana kayıt seçilir, diğer alanlarda ana kaydın kendi değeri boşsa diğerinden doldurulur.")
+                    _mr_secili_gruplar = []
+                    for _gi, (_gname, _gids) in enumerate(_mr_gruplar_liste):
+                        _gakt = _mr_aktivite_say(_gids)
+                        _gtoplam_islem = sum(sum(v.values()) for v in _gakt.values())
+                        _isaretli = st.checkbox(
+                            f"{_gname} — {len(_gids)} kayıt" + (f"  ·  {_gtoplam_islem} işlem var" if _gtoplam_islem else "  ·  işlem yok"),
+                            key=f"mr_top_chk_{_gi}")
+                        if _isaretli:
+                            _mr_secili_gruplar.append((_gname, _gids))
+
+                    _tc1, _tc2 = st.columns(2)
+                    with _tc1:
+                        if st.button(f"✅ İşaretlenenleri birleştir ({len(_mr_secili_gruplar)})",
+                                     type="primary", use_container_width=True, key="mr_toplu_isaretli",
+                                     disabled=(len(_mr_secili_gruplar)==0)):
+                            _basarili_g = 0
+                            with st.spinner("Birleştiriliyor..."):
+                                for _gname, _gids in _mr_secili_gruplar:
+                                    _gakt = _mr_aktivite_say(_gids)
+                                    _ana = max(_gids, key=lambda i: sum(_gakt.get(int(i),{}).values()))
+                                    _gdf = df[df["id"].isin(_gids)]
+                                    _gsec = {}
+                                    for _acol, _ in _MR_ALANLAR:
+                                        if _acol not in _gdf.columns: continue
+                                        _ana_v = _gdf[_gdf["id"]==_ana].iloc[0].get(_acol,"")
+                                        _ana_v = "" if str(_ana_v) in ["nan","None","NaT"] else str(_ana_v).strip()
+                                        if _ana_v:
+                                            _gsec[_acol] = _ana_v
+                                        else:
+                                            for _fid in _gids:
+                                                _v2 = _gdf[_gdf["id"]==_fid].iloc[0].get(_acol,"")
+                                                _v2 = "" if str(_v2) in ["nan","None","NaT"] else str(_v2).strip()
+                                                if _v2:
+                                                    _gsec[_acol] = _v2
+                                                    break
+                                    if _mr_birlestir(_gids, _ana, _gsec):
+                                        _basarili_g += 1
+                            st.session_state["_mr_son_mesaj"] = f"✅ {_basarili_g}/{len(_mr_secili_gruplar)} grup toplu birleştirildi."
+                            st.rerun()
+                    with _tc2:
+                        if st.button("🧹 İşlemsiz grupları otomatik temizle", use_container_width=True, key="mr_toplu_islemsiz"):
+                            _islemsiz_gruplar = []
+                            for _gname, _gids in _mr_gruplar_liste:
+                                _gakt = _mr_aktivite_say(_gids)
+                                if sum(sum(v.values()) for v in _gakt.values()) == 0:
+                                    _islemsiz_gruplar.append((_gname, _gids))
+                            _basarili_g2 = 0
+                            with st.spinner(f"{len(_islemsiz_gruplar)} işlemsiz grup temizleniyor..."):
+                                for _gname, _gids in _islemsiz_gruplar:
+                                    _gdf = df[df["id"].isin(_gids)]
+                                    _doluluk = {int(i): _gdf[_gdf["id"]==i].iloc[0].notna().sum() for i in _gids}
+                                    _ana = max(_gids, key=lambda i: _doluluk.get(int(i),0))
+                                    _gsec = {}
+                                    for _acol, _ in _MR_ALANLAR:
+                                        if _acol not in _gdf.columns: continue
+                                        for _fid in [_ana] + [i for i in _gids if i != _ana]:
+                                            _v2 = _gdf[_gdf["id"]==_fid].iloc[0].get(_acol,"")
+                                            _v2 = "" if str(_v2) in ["nan","None","NaT"] else str(_v2).strip()
+                                            if _v2:
+                                                _gsec[_acol] = _v2
+                                                break
+                                    if _mr_birlestir(_gids, _ana, _gsec):
+                                        _basarili_g2 += 1
+                            st.session_state["_mr_son_mesaj"] = f"✅ {_basarili_g2} işlemsiz grup otomatik temizlendi."
+                            st.rerun()
+
 
     for _kol in ["aciklama","adres","notlar"]:
         if _kol not in df.columns: df[_kol] = ""
