@@ -2548,19 +2548,32 @@ section[data-testid="stSidebar"] { display: none !important; }
                     _bl_etiket = f"{_bl_ic} {_bl_kisa} {_bl_adet}"
                     with _bl_chip_cols[_ci % len(_bl_chip_cols)]:
                         if st.button(_bl_etiket, key=f"cl_bolge_chip_{_bl_ad}", use_container_width=True):
-                            _bl_chip_df = df[_bl_chip_bolge == _bl_ad]
-                            if "il" in _bl_chip_df.columns:
-                                st.session_state["_cl_fil_il_multi"] = sorted(
-                                    _bl_chip_df["il"].dropna().astype(str).unique().tolist())
-                            if "_cl_fil_ilce_multi" in st.session_state:
-                                del st.session_state["_cl_fil_ilce_multi"]
-                            if _bl_ilce_kol_cl and _bl_ad in ("İstanbul Anadolu", "İstanbul Avrupa"):
-                                st.session_state["_bl_ilce_filtre"] = sorted(
-                                    _bl_chip_df["ilce"].dropna().astype(str).unique().tolist())
-                                st.session_state["_bl_ilce_filtre_ad"] = _bl_ad
-                            elif "_bl_ilce_filtre" in st.session_state:
-                                del st.session_state["_bl_ilce_filtre"]
+                            if _bl_ad == "Havuz (Bölgesiz)":
+                                # Havuz'daki kayıtların çoğu boş/tanımsız il içerebilir — gerçek il
+                                # değerlerine dayanmayan, "hiçbir tanımlı bölgeye uymayanlar" filtresi kullanılır.
+                                st.session_state["_bl_havuz_filtre"] = True
+                                if "_cl_fil_il_multi" in st.session_state:
+                                    del st.session_state["_cl_fil_il_multi"]
+                                if "_cl_fil_ilce_multi" in st.session_state:
+                                    del st.session_state["_cl_fil_ilce_multi"]
+                                if "_bl_ilce_filtre" in st.session_state:
+                                    del st.session_state["_bl_ilce_filtre"]
                                 st.session_state.pop("_bl_ilce_filtre_ad", None)
+                            else:
+                                st.session_state.pop("_bl_havuz_filtre", None)
+                                _bl_chip_df = df[_bl_chip_bolge == _bl_ad]
+                                if "il" in _bl_chip_df.columns:
+                                    st.session_state["_cl_fil_il_multi"] = sorted(
+                                        _bl_chip_df["il"].dropna().astype(str).unique().tolist())
+                                if "_cl_fil_ilce_multi" in st.session_state:
+                                    del st.session_state["_cl_fil_ilce_multi"]
+                                if _bl_ilce_kol_cl and _bl_ad in ("İstanbul Anadolu", "İstanbul Avrupa"):
+                                    st.session_state["_bl_ilce_filtre"] = sorted(
+                                        _bl_chip_df["ilce"].dropna().astype(str).unique().tolist())
+                                    st.session_state["_bl_ilce_filtre_ad"] = _bl_ad
+                                elif "_bl_ilce_filtre" in st.session_state:
+                                    del st.session_state["_bl_ilce_filtre"]
+                                    st.session_state.pop("_bl_ilce_filtre_ad", None)
                             st.rerun()
 
     with st.expander("🔍 Mükerrer (Aynı İsimli) Müşterileri Bul ve Birleştir"):
@@ -3031,7 +3044,7 @@ function kartSec(id){
         _il_def  = [x for x in st.session_state.get("_cl_fil_il_multi",[]) if x in _il_opts]
         _il_sec_raw = _fc[5].multiselect("i", _il_opts, default=_il_def, key="_cl_fil_il_multi", placeholder="İl...", label_visibility="collapsed")
         if "🌍 Tümü / Hepsi" in _il_sec_raw:
-            for _fk3 in ["_cl_fil_il_multi", "_cl_fil_ilce_multi", "_bl_ilce_filtre"]:
+            for _fk3 in ["_cl_fil_il_multi", "_cl_fil_ilce_multi", "_bl_ilce_filtre", "_bl_havuz_filtre"]:
                 if _fk3 in st.session_state: del st.session_state[_fk3]
             st.session_state.pop("_bl_ilce_filtre_ad", None)
             st.rerun()
@@ -3083,11 +3096,19 @@ function kartSec(id){
         _bl_hedef_ilceler = set(st.session_state["_bl_ilce_filtre"])
         df_f = df_f[df_f["ilce"].astype(str).isin(_bl_hedef_ilceler)]
 
+    # Havuz (Bölgesiz) filtresi — hiçbir tanımlı bölgeye uymayan (il boş veya tanımsız) kayıtlar
+    if st.session_state.get("_bl_havuz_filtre") and not df_f.empty:
+        _hv_ilce_kol = "ilce" if "ilce" in df_f.columns else None
+        df_f = df_f[df_f.apply(
+            lambda r: il_ilce_bolge_bul(r.get("il",""), r.get(_hv_ilce_kol,"") if _hv_ilce_kol else "") is None,
+            axis=1)]
+        st.info(f"📦 Havuz (Bölgesiz) — hiçbir tanımlı bölgeye uymayan {len(df_f)} kayıt")
+
     # ── HİÇ FİLTRE SEÇİLİ DEĞİLKEN — sadece işlem görmemiş (Özel Müşteri/Portföy) göster ──
     # Bir müşteriye durum atanınca (Randevu, Teklif, Tekrar Ara vb.) artık burada görünmesin,
     # sadece kendi durum filtresinde görünsün. Karışıklığı önler.
     # NOT: Bir İl/Bölge seçiliyken bu gizleme devre dışı — o zaman amaç "oradaki HERKESİ göster".
-    _bl_bolge_secili = bool(_il_sec) or bool(st.session_state.get("_bl_ilce_filtre"))
+    _bl_bolge_secili = bool(_il_sec) or bool(st.session_state.get("_bl_ilce_filtre")) or bool(st.session_state.get("_bl_havuz_filtre"))
     if not _durum_sec and not _asama_sec and not _bl_bolge_secili and "durum" in df_f.columns:
         _varsayilan_durumlar = ["Özel Müşteri", "Portföy"]
         df_f = df_f[df_f["durum"].isin(_varsayilan_durumlar)]
