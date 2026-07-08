@@ -172,16 +172,21 @@ def _bl_sadelestir(s):
     return s
 
 def il_ilce_bolge_bul(il, ilce):
-    """il+ilçe bilgisinden bölge adı üretir. Eşleşme yoksa None döner (havuza düşer)."""
+    """il+ilçe bilgisinden bölge adı üretir. Tanımlı özel bölge yoksa, ilin kendi adı bölge olur (kaybolmaz)."""
     _il = _bl_sadelestir(il)
     _ilce = _bl_sadelestir(ilce)
+    if not _il:
+        return None  # il bilgisi tamamen boşsa Havuz'a düşer
     if "istanbul" in _il:
         if _ilce in _BL_ISTANBUL_ANADOLU:
             return "İstanbul Anadolu"
         if _ilce in _BL_ISTANBUL_AVRUPA:
             return "İstanbul Avrupa"
-        return None
-    return _BL_IL_ADI.get(_il)
+        return "İstanbul (diğer)"
+    if _il in _BL_IL_ADI:
+        return _BL_IL_ADI[_il]
+    # Tanımlı özel bölge yok — ilin kendi adını (orijinal yazımıyla) bölge olarak kullan
+    return str(il).strip().title()
 
 @st.cache_data(ttl=60)
 def get_cari_listesi():
@@ -2505,6 +2510,12 @@ section[data-testid="stSidebar"] { display: none !important; }
     # ── BÖLGELER — açılır/kapanır, kısa etiketli kutucuklar, il/ilçe'den otomatik hesaplanır ──
     if not df.empty and "il" in df.columns:
         _bl_kisa_ad = {"İstanbul Anadolu": "İst And", "İstanbul Avrupa": "İst Avr"}
+        _bl_ikon = {
+            "İstanbul Anadolu": "🌉", "İstanbul Avrupa": "🕌",
+            "Ankara": "🏛️", "Bursa": "🏔️", "Kocaeli": "⚓",
+            "Konya": "🌀", "Eskişehir": "🎓", "Manisa": "🍇",
+            "Tekirdağ": "🍷", "Aydın": "🍈", "Denizli": "🐓",
+        }
         _bl_ilce_kol_cl = "ilce" if "ilce" in df.columns else None
         _bl_chip_bolge = df.apply(
             lambda r: il_ilce_bolge_bul(r.get("il",""), r.get(_bl_ilce_kol_cl,"") if _bl_ilce_kol_cl else ""), axis=1)
@@ -2514,8 +2525,9 @@ section[data-testid="stSidebar"] { display: none !important; }
                 _bl_chip_cols = st.columns(min(len(_bl_chip_sayim), 8) or 1)
                 for _ci, (_bl_ad, _bl_adet) in enumerate(_bl_chip_sayim.items()):
                     _bl_kisa = _bl_kisa_ad.get(_bl_ad, _bl_ad)
+                    _bl_ic = _bl_ikon.get(_bl_ad, "📍")
                     with _bl_chip_cols[_ci % len(_bl_chip_cols)]:
-                        if st.button(f"{_bl_kisa} {_bl_adet}", key=f"cl_bolge_chip_{_bl_ad}", use_container_width=True):
+                        if st.button(f"{_bl_ic} {_bl_kisa} {_bl_adet}", key=f"cl_bolge_chip_{_bl_ad}", use_container_width=True):
                             _bl_chip_df = df[_bl_chip_bolge == _bl_ad]
                             if "il" in _bl_chip_df.columns:
                                 st.session_state["_cl_fil_il_multi"] = sorted(
