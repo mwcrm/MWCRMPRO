@@ -2785,65 +2785,70 @@ section[data-testid="stSidebar"] { display: none !important; }
 
                     _ncols = len(_fids) + 1
                     _col_oranlar = [1.3] + [1] * len(_fids)
+                    _kutu = st.container(border=True)
 
-                    # ── ANA KAYIT SATIRI ──
-                    _hc = st.columns(_col_oranlar)
-                    _hc[0].markdown("**Ana kayıt**")
-                    for _ci, _fid in enumerate(_fids):
-                        with _hc[_ci + 1]:
-                            _secili_mi = _mr_durum["ana"] == _fid
-                            if st.button(f"id {_fid}" + (" ✓" if _secili_mi else ""),
-                                         key=f"mr_anabtn_{_idx}_{_fid}", use_container_width=True,
-                                         type="primary" if _secili_mi else "secondary"):
-                                _mr_durum["ana"] = _fid
-                                st.rerun()
-
-                    st.markdown("<hr style='margin:4px 0'>", unsafe_allow_html=True)
-
-                    # ── ALAN SATIRLARI — her kayıt kendi sütununda, tıklanan hücre seçilir ──
-                    _secim_degerleri = {}
-                    for _acol, _abaslik in _MR_ALANLAR:
-                        if _acol not in _grup_satirlar.columns:
-                            continue
-                        _degerler = {}
-                        for _fid in _fids:
-                            _sat = _grup_satirlar[_grup_satirlar["id"] == _fid]
-                            if _sat.empty: continue
-                            _v = _sat.iloc[0].get(_acol, "")
-                            _v = "" if str(_v) in ["nan","None","NaT"] else str(_v).strip()
-                            if _v:
-                                _degerler[_fid] = _v
-                        if not _degerler:
-                            continue
-                        _tekil_degerler = set(_degerler.values())
-
-                        if len(_tekil_degerler) == 1:
-                            # Herkes aynı — seçime gerek yok, tek satırda göster
-                            _secim_degerleri[_acol] = list(_tekil_degerler)[0]
-                            _rc = st.columns(_col_oranlar)
-                            _rc[0].markdown(f"**{_abaslik}**")
-                            _rc[1].caption(f"{list(_tekil_degerler)[0]}  *(hepsinde aynı)*")
-                            continue
-
-                        # Farklı değerler var — hangi kaydın sütununda tıklanırsa o seçilir
-                        if _acol not in _mr_durum["alanlar"] or _mr_durum["alanlar"][_acol] not in _degerler:
-                            # Varsayılan: ana kaydın kendi değeri varsa o, yoksa ilk dolu değer
-                            _mr_durum["alanlar"][_acol] = _degerler.get(_mr_durum["ana"], list(_degerler.keys())[0])
-
-                        _rc = st.columns(_col_oranlar)
-                        _rc[0].markdown(f"**{_abaslik}**")
+                    with _kutu:
+                        # ── ANA KAYIT SATIRI ──
+                        _hc = st.columns(_col_oranlar, gap="small")
+                        _hc[0].markdown("**ALAN**")
                         for _ci, _fid in enumerate(_fids):
-                            with _rc[_ci + 1]:
-                                if _fid in _degerler:
-                                    _secili_mi = _mr_durum["alanlar"][_acol] == _degerler[_fid]
-                                    if st.button(_degerler[_fid], key=f"mr_fbtn_{_idx}_{_acol}_{_fid}",
-                                                 use_container_width=True,
-                                                 type="primary" if _secili_mi else "secondary"):
-                                        _mr_durum["alanlar"][_acol] = _degerler[_fid]
-                                        st.rerun()
-                                else:
-                                    st.caption("—")
-                        _secim_degerleri[_acol] = _mr_durum["alanlar"][_acol]
+                            with _hc[_ci + 1]:
+                                _secili_mi = _mr_durum["ana"] == _fid
+                                _isaret = "◉ " if _secili_mi else "○ "
+                                if st.button(f"{_isaret}id {_fid}",
+                                             key=f"mr_anabtn_{_idx}_{_fid}", use_container_width=True,
+                                             type="primary" if _secili_mi else "secondary"):
+                                    _mr_durum["ana"] = _fid
+                                    st.rerun()
+
+                        st.markdown("<hr style='margin:2px 0 6px;opacity:0.4'>", unsafe_allow_html=True)
+
+                        # ── ALAN SATIRLARI — her kayıt kendi sütununda, tıklanan hücre seçilir ──
+                        _secim_degerleri = {}
+                        for _acol, _abaslik in _MR_ALANLAR:
+                            if _acol not in _grup_satirlar.columns:
+                                continue
+                            _degerler = {}
+                            for _fid in _fids:
+                                _sat = _grup_satirlar[_grup_satirlar["id"] == _fid]
+                                if _sat.empty: continue
+                                _v = _sat.iloc[0].get(_acol, "")
+                                _v = "" if str(_v) in ["nan","None","NaT"] else str(_v).strip()
+                                if _v:
+                                    _degerler[_fid] = _v
+                            if not _degerler:
+                                continue
+                            _tekil_degerler = set(_degerler.values())
+
+                            if len(_tekil_degerler) == 1:
+                                # Herkes aynı — seçime gerek yok, tek satırda göster
+                                _secim_degerleri[_acol] = list(_tekil_degerler)[0]
+                                _rc = st.columns(_col_oranlar, gap="small")
+                                _rc[0].markdown(f"**{_abaslik}**")
+                                with _rc[1]:
+                                    st.caption(f"↔ {list(_tekil_degerler)[0]}  *(hepsinde aynı)*")
+                                continue
+
+                            # Farklı değerler var — hangi kaydın sütununda tıklanırsa o seçilir
+                            if _acol not in _mr_durum["alanlar"] or _mr_durum["alanlar"][_acol] not in _degerler:
+                                # Varsayılan: ana kaydın kendi değeri varsa o, yoksa ilk dolu değer
+                                _mr_durum["alanlar"][_acol] = _degerler.get(_mr_durum["ana"], list(_degerler.keys())[0])
+
+                            _rc = st.columns(_col_oranlar, gap="small")
+                            _rc[0].markdown(f"**{_abaslik}**")
+                            for _ci, _fid in enumerate(_fids):
+                                with _rc[_ci + 1]:
+                                    if _fid in _degerler:
+                                        _secili_mi = _mr_durum["alanlar"][_acol] == _degerler[_fid]
+                                        _isaret2 = "◉ " if _secili_mi else "○ "
+                                        if st.button(f"{_isaret2}{_degerler[_fid]}", key=f"mr_fbtn_{_idx}_{_acol}_{_fid}",
+                                                     use_container_width=True,
+                                                     type="primary" if _secili_mi else "secondary"):
+                                            _mr_durum["alanlar"][_acol] = _degerler[_fid]
+                                            st.rerun()
+                                    else:
+                                        st.caption("—")
+                            _secim_degerleri[_acol] = _mr_durum["alanlar"][_acol]
 
                     _ana_id = _mr_durum["ana"]
                     st.markdown("---")
