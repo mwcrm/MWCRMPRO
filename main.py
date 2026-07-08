@@ -194,13 +194,25 @@ def il_ilce_bolge_bul(il, ilce):
     if not _il:
         return None  # il tamamen boşsa Havuz
     if "istanbul" in _il:
-        if _ilce in _BL_ISTANBUL_MAHALLE_ILCE:
-            _ilce = _BL_ISTANBUL_MAHALLE_ILCE[_ilce]  # mahalle yazılmışsa resmi ilçesine çevir
-        if _ilce in _BL_ISTANBUL_ANADOLU:
+        # Önce birebir eşleşme dene (hızlı ve kesin)
+        _ilce_eslesen = _BL_ISTANBUL_MAHALLE_ILCE.get(_ilce, _ilce)
+        if _ilce_eslesen in _BL_ISTANBUL_ANADOLU:
             return "İstanbul Anadolu"
-        if _ilce in _BL_ISTANBUL_AVRUPA:
+        if _ilce_eslesen in _BL_ISTANBUL_AVRUPA:
             return "İstanbul Avrupa"
-        return None  # ilçe eşleşmiyor — Havuz'da kalır, manuel toplu atama için
+        # Birebir eşleşmediyse — hücrede ilçe adı GEÇİYOR mu diye bak
+        # ("Sultanbeyli Mah.", "Sultanbeyli/İstanbul" gibi ekstra kelimeli hücreler için)
+        if _ilce:
+            for _resmi_ilce in _BL_ISTANBUL_ANADOLU:
+                if _resmi_ilce in _ilce:
+                    return "İstanbul Anadolu"
+            for _resmi_ilce in _BL_ISTANBUL_AVRUPA:
+                if _resmi_ilce in _ilce:
+                    return "İstanbul Avrupa"
+            for _mahalle, _resmi_ilce in _BL_ISTANBUL_MAHALLE_ILCE.items():
+                if _mahalle in _ilce:
+                    return "İstanbul Anadolu" if _resmi_ilce in _BL_ISTANBUL_ANADOLU else "İstanbul Avrupa"
+        return None  # ilçe hiçbir şekilde eşleşmiyor — Havuz'da kalır, manuel toplu atama için
     if _il in _BL_IL_ADI:
         return _BL_IL_ADI[_il]
     # Tanımlı 11 bölgeden biri değil ama il doluysa — ilin kendi adı bölge olur
