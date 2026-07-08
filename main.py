@@ -1845,9 +1845,16 @@ button[data-testid="manage-app-button"] { display: none !important; }
 """, unsafe_allow_html=True)
 
     st.markdown(
-        "<div style='display:flex;align-items:center;gap:9px;font-size:15px;font-weight:700;color:#1a4f9e;"
-        "padding:14px 10px 14px;letter-spacing:0.4px;border-bottom:2px solid #2568c7;margin-bottom:10px;'>"
-        "🏢 MWCRMPRO</div>",
+        "<div style='display:flex;align-items:center;gap:11px;font-size:17px;font-weight:700;color:#1a4f9e;"
+        "padding:16px 10px 16px;letter-spacing:0.4px;border-bottom:2px solid #2568c7;margin-bottom:10px;'>"
+        "<svg width='30' height='30' viewBox='0 0 100 100' style='flex:none'>"
+        "<rect width='100' height='100' rx='22' fill='#1D4ED8'/>"
+        "<rect x='20' y='20' width='26' height='26' rx='6' fill='#97AEED'/>"
+        "<rect x='54' y='20' width='26' height='26' rx='6' fill='#97AEED'/>"
+        "<rect x='20' y='54' width='26' height='26' rx='6' fill='#97AEED'/>"
+        "<rect x='54' y='54' width='26' height='26' rx='6' fill='#97AEED'/>"
+        "</svg>"
+        "MWCRMPRO</div>",
         unsafe_allow_html=True
     )
 
