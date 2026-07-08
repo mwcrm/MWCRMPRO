@@ -3232,12 +3232,6 @@ function kartSec(id){
         siralama_kol = "Tarih↓"  # Sıralama kutusu kaldırıldı, varsayılan sıralama sabit kaldı
 
         # ── Çoklu firma seçimi (karşılaştırma/düzeltme için) — seçilenler varsa tablo sadece onları gösterir ──
-        st.markdown(
-            "<div style='background:#eef4fc;border:1.5px solid #2568c7;border-radius:8px;"
-            "padding:8px 12px;margin:10px 0 4px;font-size:13px;color:#1a4f9e;font-weight:600;'>"
-            "👇 BİRDEN FAZLA FİRMA SEÇMEK İÇİN BURAYI KULLANIN — yazın, tıklayın, "
-            "birden fazlasını seçebilirsiniz (yukarıdaki kutu tekli, bu kutu ÇOKLU seçim)"
-            "</div>", unsafe_allow_html=True)
         _cok_sec_opts = [f"[{int(r['id'])}] {r.get('firma','')}" for _, r in df.iterrows()]
         _cok_secili_ham = st.multiselect(
             "🔍 Çoklu firma seçimi",
