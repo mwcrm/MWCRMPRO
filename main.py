@@ -1541,7 +1541,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -1562,6 +1562,7 @@ _TAB_ETIKETLER = {
     "operasyon": "🚛 Operasyon",
     "patron": "👑 Yönetim Paneli",
     "musteri_atama": "🎯 Müşteri Atama",
+    "mukerrer": "🔍 Mükerrer Bul",
     
 }
 
@@ -1954,7 +1955,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
     </style>""", unsafe_allow_html=True)
 
     _MENU_GRUPLARI = [
-        ("Cari işlemleri",    ["yeni", "liste", "excel"]),
+        ("Cari işlemleri",    ["yeni", "liste", "excel", "mukerrer"]),
         ("Analiz ve takip",   ["analiz", "islem_takip"]),
         ("Randevu ve teklif", ["randevu", "teklif", "ozel_teklif"]),
         ("Saha",              ["rota_analiz", "operasyon", "harita"]),
@@ -2372,6 +2373,33 @@ if aktif == "yeni":
             st.rerun()
 
 # ── CARİ LİSTE ───────────────────────────────────────────────────────────────
+elif aktif == "mukerrer":
+    sayfa_log("mukerrer")
+    st.markdown("## 🔍 Mükerrer (Aynı İsimli) Müşterileri Bul ve Birleştir")
+
+    _mk_df = get_cari_listesi()
+    if not _mk_df.empty and "silindi" in _mk_df.columns:
+        _mk_df = _mk_df[~(_mk_df["silindi"].astype(str).str.strip().isin(["1","True","true","1.0"]))]
+    _mk_df = _atama_filtresi_uygula(_mk_df)
+
+    if _mk_df.empty or "firma" not in _mk_df.columns:
+        st.caption("Veri yok.")
+    else:
+        _mk_firma_gruplari = _mk_df.groupby(_mk_df["firma"].astype(str).str.strip().str.upper())["id"].apply(list)
+        _mk_mukerrerler = {k: v for k, v in _mk_firma_gruplari.items() if len(v) > 1 and k not in ["", "NAN", "NONE"]}
+        if not _mk_mukerrerler:
+            st.success("✅ Mükerrer müşteri bulunamadı.")
+        else:
+            _mk_tum_idler = [i for _v in _mk_mukerrerler.values() for i in _v]
+            st.warning(f"{len(_mk_mukerrerler)} mükerrer firma adı bulundu — toplam {len(_mk_tum_idler)} kayıt.")
+            st.caption("Aşağıdaki butona basınca Cari Liste ekranı tüm mükerrer kayıtlara filtrelenmiş olarak açılır. "
+                       "Hücrelere tıklayıp elle düzenleyebilir, \"Değişiklikleri Kaydet\" ile kaydedebilir, "
+                       "\"Seç\" kutusunu işaretleyip istediğinizi silebilirsiniz — tıpkı normal Cari Liste'de çalıştığı gibi.")
+            if st.button("🔍 Tüm mükerrer kayıtları Cari Liste'de göster", type="primary", use_container_width=True, key="mk_liste_goster_btn"):
+                st.session_state["_mr_liste_filtre"] = [int(i) for i in _mk_tum_idler]
+                st.session_state["aktif_tab"] = "liste"
+                st.rerun()
+
 elif aktif == "liste":
     sayfa_log("liste")
 
@@ -2671,25 +2699,6 @@ section[data-testid="stSidebar"] { display: none !important; }
                                     del st.session_state["_bl_ilce_filtre"]
                                     st.session_state.pop("_bl_ilce_filtre_ad", None)
                             st.rerun()
-
-    with st.expander("🔍 Mükerrer (Aynı İsimli) Müşterileri Bul ve Birleştir"):
-        if df.empty or "firma" not in df.columns:
-            st.caption("Veri yok.")
-        else:
-            _firma_gruplari = df.groupby(df["firma"].str.strip().str.upper())["id"].apply(list)
-            _mukerrerler = {k: v for k, v in _firma_gruplari.items() if len(v) > 1}
-            if not _mukerrerler:
-                st.caption("Mükerrer müşteri bulunamadı.")
-            else:
-                _tum_mukerrer_idler = [i for _v in _mukerrerler.values() for i in _v]
-                st.warning(f"{len(_mukerrerler)} mükerrer firma adı bulundu — toplam {len(_tum_mukerrer_idler)} kayıt.")
-                st.caption("Aşağıdaki tabloda tüm mükerrer kayıtlar listelenir. Hücrelere tıklayıp elle düzenleyebilir, "
-                           "\"Değişiklikleri Kaydet\" ile kaydedebilir, \"Seç\" kutusunu işaretleyip istediğinizi silebilirsiniz — "
-                           "tıpkı normal Cari Liste'de çalıştığı gibi.")
-                if st.button("🔍 Tüm mükerrer kayıtları tabloda göster", type="primary", use_container_width=True, key="mr_liste_goster_btn"):
-                    st.session_state["_mr_liste_filtre"] = [int(i) for i in _tum_mukerrer_idler]
-                    st.rerun()
-
 
     for _kol in ["aciklama","adres","notlar"]:
         if _kol not in df.columns: df[_kol] = ""
