@@ -3102,7 +3102,13 @@ function kartSec(id){
         df_f = df_f[df_f.apply(
             lambda r: il_ilce_bolge_bul(r.get("il",""), r.get(_hv_ilce_kol,"") if _hv_ilce_kol else "") is None,
             axis=1)]
-        st.info(f"📦 Havuz (Bölgesiz) — hiçbir tanımlı bölgeye uymayan {len(df_f)} kayıt")
+        st.info(f"📦 Havuz (Bölgesiz) — hiçbir tanımlı bölgeye uymayan {len(df_f)} kayıt. "
+                "Bu kayıtların İl/İlçe bilgisini aşağıdaki tablodan düzeltirseniz, otomatik doğru bölgeye geçerler.")
+        if not df_f.empty:
+            _hv_onizleme_kol = [c for c in ["firma","il","ilce","durum"] if c in df_f.columns]
+            with st.expander(f"👁️ Bu {len(df_f)} kaydı hemen gör (kaydırmadan)", expanded=True):
+                st.dataframe(df_f[_hv_onizleme_kol].reset_index(drop=True),
+                             use_container_width=True, hide_index=True, height=300)
 
     # ── HİÇ FİLTRE SEÇİLİ DEĞİLKEN — sadece işlem görmemiş (Özel Müşteri/Portföy) göster ──
     # Bir müşteriye durum atanınca (Randevu, Teklif, Tekrar Ara vb.) artık burada görünmesin,
