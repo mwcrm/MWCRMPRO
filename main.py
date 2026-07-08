@@ -3105,9 +3105,15 @@ function kartSec(id){
         st.info(f"📦 Havuz (Bölgesiz) — hiçbir tanımlı bölgeye uymayan {len(df_f)} kayıt. "
                 "Bu kayıtların İl/İlçe bilgisini aşağıdaki tablodan düzeltirseniz, otomatik doğru bölgeye geçerler.")
         if not df_f.empty:
-            _hv_onizleme_kol = [c for c in ["firma","il","ilce","durum"] if c in df_f.columns]
+            _hv_onizleme_kol = [c for c in ["firma","il","ilce"] if c in df_f.columns]
+            _hv_onizleme = df_f[_hv_onizleme_kol].copy()
+            _hv_onizleme["neden_havuzda"] = df_f.apply(
+                lambda r: "İl boş" if not str(r.get("il","")).strip()
+                          else ("İstanbul — ilçe tanımlı değil" if "istanbul" in _bl_sadelestir(r.get("il",""))
+                                else f"'{r.get('il','')}' tanımlı bölge listesinde yok"),
+                axis=1)
             with st.expander(f"👁️ Bu {len(df_f)} kaydı hemen gör (kaydırmadan)", expanded=True):
-                st.dataframe(df_f[_hv_onizleme_kol].reset_index(drop=True),
+                st.dataframe(_hv_onizleme.reset_index(drop=True),
                              use_container_width=True, hide_index=True, height=300)
 
     # ── HİÇ FİLTRE SEÇİLİ DEĞİLKEN — sadece işlem görmemiş (Özel Müşteri/Portföy) göster ──
