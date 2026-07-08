@@ -2698,60 +2698,35 @@ section[data-testid="stSidebar"] { display: none !important; }
                     st.session_state["_mr_liste_filtre"] = [int(i) for i in _tum_mukerrer_idler]
                     st.rerun()
 
-                _mr_tab1, _mr_tab2 = st.tabs(["📋 Toplu Karşılaştırma (hepsi)", "🔎 Tek Seçerek Karşılaştır"])
-
-                with _mr_tab1:
-                    st.caption("Her grupta iki kayıt gösterilir. Hangisini silmek istediğinize siz karar verin. Silinen kayıt listeden kalkar, diğeri kalır.")
-                    _silinen_t = 0
-                    _goster_kolon = [c for c in ["id","firma","gsm","il","ilce","temsilci","segment","notlar"] if c in df.columns]
-                    for _fname, _fids in list(_mukerrerler.items()):
-                        st.markdown("---")
-                        st.markdown(f"**{_fname}** — {len(_fids)} kayıt")
-                        for _did in _fids:
-                            _satir = df[df["id"] == _did]
-                            if _satir.empty:
-                                continue
-                            _s = _satir.iloc[0]
-                            _kc1, _kc2 = st.columns([5,1])
-                            with _kc1:
-                                _detay = " | ".join([f"**{c}:** {_s.get(c,'')}" for c in _goster_kolon if str(_s.get(c,"")).strip() not in ["","nan","None"]])
-                                st.markdown(f"🔹 {_detay}")
-                            with _kc2:
-                                if st.button("🗑 Sil", key=f"mr_sil_{_did}", use_container_width=True):
-                                    try:
-                                        _sb_mr = get_sb_client()
-                                        if _sb_mr:
-                                            _sb_mr.table("cari_kartlar").update({"silindi":1}).eq("id", int(_did)).execute()
-                                            _silinen_t += 1
-                                    except: pass
-                    if _silinen_t:
-                        try: get_cari_listesi.clear()
-                        except: pass
-                        st.success(f"✅ {_silinen_t} kayıt silindi!")
-                        st.rerun()
-
-                with _mr_tab2:
-                    _mukerrer_opts = [f"{k} ({len(v)} kayıt)" for k, v in _mukerrerler.items()]
-                    _secilen_grup = st.selectbox("İncelenecek grup", ["-- Seçin --"] + _mukerrer_opts, key="dc_mukerrer_grup_sec")
-                    if _secilen_grup != "-- Seçin --":
-                        _grup_adi = list(_mukerrerler.keys())[_mukerrer_opts.index(_secilen_grup)]
-                        _grup_idler = _mukerrerler[_grup_adi]
-                        _grup_satirlar = df[df["id"].isin(_grup_idler)]
-                        st.dataframe(_grup_satirlar[["id","firma","yetkili","gsm","il","durum"]].reset_index(drop=True), use_container_width=True)
-                        _birles_hedef = st.selectbox("Ana kayıt (diğerleri silinecek)", _grup_idler, key="mr_birles_hedef")
-                        if st.button("🔗 Birleştir — diğerlerini sil", type="primary", use_container_width=True, key="mr_birles_btn"):
-                            try:
-                                _sb_br = get_sb_client()
-                                if _sb_br:
-                                    for _bid in _grup_idler:
-                                        if int(_bid) != int(_birles_hedef):
-                                            _sb_br.table("cari_kartlar").update({"silindi":1}).eq("id", int(_bid)).execute()
-                                    try: get_cari_listesi.clear()
-                                    except: pass
-                                    st.success("✅ Birleştirildi!")
-                                    st.rerun()
-                            except Exception as _bre:
-                                st.error(f"❌ {_bre}")
+                st.markdown("---")
+                st.caption("Her grupta iki kayıt gösterilir. Hangisini silmek istediğinize siz karar verin. Silinen kayıt listeden kalkar, diğeri kalır.")
+                _silinen_t = 0
+                _goster_kolon = [c for c in ["id","firma","gsm","il","ilce","temsilci","segment","notlar"] if c in df.columns]
+                for _fname, _fids in list(_mukerrerler.items()):
+                    st.markdown("---")
+                    st.markdown(f"**{_fname}** — {len(_fids)} kayıt")
+                    for _did in _fids:
+                        _satir = df[df["id"] == _did]
+                        if _satir.empty:
+                            continue
+                        _s = _satir.iloc[0]
+                        _kc1, _kc2 = st.columns([5,1])
+                        with _kc1:
+                            _detay = " | ".join([f"**{c}:** {_s.get(c,'')}" for c in _goster_kolon if str(_s.get(c,"")).strip() not in ["","nan","None"]])
+                            st.markdown(f"🔹 {_detay}")
+                        with _kc2:
+                            if st.button("🗑 Sil", key=f"mr_sil_{_did}", use_container_width=True):
+                                try:
+                                    _sb_mr = get_sb_client()
+                                    if _sb_mr:
+                                        _sb_mr.table("cari_kartlar").update({"silindi":1}).eq("id", int(_did)).execute()
+                                        _silinen_t += 1
+                                except: pass
+                if _silinen_t:
+                    try: get_cari_listesi.clear()
+                    except: pass
+                    st.success(f"✅ {_silinen_t} kayıt silindi!")
+                    st.rerun()
 
 
 
@@ -9587,8 +9562,127 @@ elif aktif == "patron":
         if _nt:
             _p_notlar.append({"cari_id": _nn.get("cari_id",""), "tarih": _nt})
 
-    # Periyot seçimi
-    _periyot = st.session_state.get("patron_periyot", "ay")
+    # ── SİSTEM SAĞLIK KONTROLÜ ───────────────────────────────────────────────
+    with st.expander("🩺 Sistem Sağlık Kontrolü — bozuk/eksik kayıtları bul"):
+        st.caption("Sistemde dikkat gerektiren kayıtları tarar. Bir sorunun yanındaki butona basınca, o kayıtlar Cari Liste'de açılır, düzeltebilir ya da silebilirsiniz.")
+
+        def _sk_listede_goster(_idler, _key):
+            if st.button(f"🔍 Bu {len(_idler)} kaydı listede göster", key=_key, use_container_width=True):
+                st.session_state["_mr_liste_filtre"] = [int(i) for i in _idler]
+                st.session_state["aktif_tab"] = "liste"
+                st.rerun()
+
+        _sk_sorun_sayisi = 0
+
+        # 1) Boş firma adı
+        if "firma" in _p_cari.columns:
+            _sk_bos_firma = _p_cari[_p_cari["firma"].astype(str).str.strip().isin(["", "nan", "None"])]
+            if not _sk_bos_firma.empty:
+                _sk_sorun_sayisi += 1
+                st.error(f"❌ **Firma adı boş olan kayıt:** {len(_sk_bos_firma)} adet — bunlar ciddi veri hatası, mutlaka düzeltilmeli.")
+                _sk_listede_goster(_sk_bos_firma["id"].tolist(), "sk_bosfirma")
+
+        # 2) Hiç iletişim bilgisi olmayan (GSM + Sabit + Email hepsi boş)
+        _sk_ilt_kol = [c for c in ["gsm","sabit","email"] if c in _p_cari.columns]
+        if _sk_ilt_kol:
+            _sk_mask = _p_cari[_sk_ilt_kol].apply(
+                lambda r: all(str(v).strip() in ["", "nan", "None"] for v in r), axis=1)
+            _sk_iletisimsiz = _p_cari[_sk_mask]
+            if not _sk_iletisimsiz.empty:
+                _sk_sorun_sayisi += 1
+                st.warning(f"⚠️ **Hiç iletişim bilgisi olmayan (GSM/Sabit/Email hepsi boş):** {len(_sk_iletisimsiz)} adet")
+                _sk_listede_goster(_sk_iletisimsiz["id"].tolist(), "sk_iletisimsiz")
+
+        # 3) Tanımsız durum kullanan kayıtlar
+        if "durum" in _p_cari.columns:
+            _sk_gecerli_durumlar = set(_tanimlar_yukle("durum") or [])
+            _sk_durum_deger = _p_cari["durum"].astype(str).str.strip()
+            _sk_tanimsiz_durum = _p_cari[(_sk_durum_deger != "") & (~_sk_durum_deger.isin(_sk_gecerli_durumlar)) & (~_sk_durum_deger.isin(["nan","None"]))]
+            if not _sk_tanimsiz_durum.empty:
+                _sk_sorun_sayisi += 1
+                _sk_liste_ornek = ", ".join(sorted(_sk_tanimsiz_durum["durum"].astype(str).unique())[:5])
+                st.warning(f"⚠️ **Tanımlı olmayan Durum değeri kullanan kayıt:** {len(_sk_tanimsiz_durum)} adet — örnek değerler: {_sk_liste_ornek}")
+                _sk_listede_goster(_sk_tanimsiz_durum["id"].tolist(), "sk_tanimsizdurum")
+
+        # 4) Tanımsız aşama kullanan kayıtlar
+        if "islem_asamasi" in _p_cari.columns:
+            _sk_gecerli_asama = set(_tanimlar_yukle("asama") or [])
+            _sk_asama_deger = _p_cari["islem_asamasi"].astype(str).str.strip()
+            _sk_tanimsiz_asama = _p_cari[(_sk_asama_deger != "") & (~_sk_asama_deger.isin(_sk_gecerli_asama)) & (~_sk_asama_deger.isin(["nan","None"]))]
+            if not _sk_tanimsiz_asama.empty:
+                _sk_sorun_sayisi += 1
+                _sk_liste_ornek2 = ", ".join(sorted(_sk_tanimsiz_asama["islem_asamasi"].astype(str).unique())[:5])
+                st.warning(f"⚠️ **Tanımlı olmayan Süreç/Aşama değeri kullanan kayıt:** {len(_sk_tanimsiz_asama)} adet — örnek değerler: {_sk_liste_ornek2}")
+                _sk_listede_goster(_sk_tanimsiz_asama["id"].tolist(), "sk_tanimsizasama")
+
+        # 5) Negatif ciro değerleri
+        for _sk_ciro_kol, _sk_ciro_ad in [("beklenen_ciro","Hedef ciro"), ("gerceklesen_ciro","Gerçekleşen ciro")]:
+            if _sk_ciro_kol in _p_cari.columns:
+                _sk_ciro_sayi = pd.to_numeric(_p_cari[_sk_ciro_kol], errors="coerce")
+                _sk_negatif = _p_cari[_sk_ciro_sayi < 0]
+                if not _sk_negatif.empty:
+                    _sk_sorun_sayisi += 1
+                    st.warning(f"⚠️ **Negatif {_sk_ciro_ad} değeri olan kayıt:** {len(_sk_negatif)} adet")
+                    _sk_listede_goster(_sk_negatif["id"].tolist(), f"sk_negatif_{_sk_ciro_kol}")
+
+        # 6) Yetim kayıtlar — geçerli bir cari_id'ye bağlı olmayan not/randevu/teklif
+        _sk_gecerli_idler = set(_p_cari["id"].astype(int).tolist()) if "id" in _p_cari.columns else set()
+        try:
+            _sk_yetim_not = [n for n in _p_notlar_raw if n.get("cari_id") and int(n.get("cari_id")) not in _sk_gecerli_idler]
+            if _sk_yetim_not:
+                _sk_sorun_sayisi += 1
+                st.warning(f"⚠️ **Silinmiş bir müşteriye bağlı kalmış not (yetim kayıt):** {len(_sk_yetim_not)} adet — bu notlar artık hiçbir müşteride görünmüyor.")
+        except Exception:
+            pass
+        try:
+            if not _p_rand.empty and "musteri_id" in _p_rand.columns:
+                _sk_yetim_rand = _p_rand[_p_rand["musteri_id"].apply(
+                    lambda x: str(x).strip() not in ["", "nan", "None"] and int(float(x)) not in _sk_gecerli_idler
+                    if str(x).strip() not in ["", "nan", "None"] else False)]
+                if not _sk_yetim_rand.empty:
+                    _sk_sorun_sayisi += 1
+                    st.warning(f"⚠️ **Silinmiş bir müşteriye bağlı kalmış randevu (yetim kayıt):** {len(_sk_yetim_rand)} adet")
+        except Exception:
+            pass
+        try:
+            if not _p_tek.empty and "cari_id" in _p_tek.columns:
+                _sk_yetim_tek = _p_tek[_p_tek["cari_id"].apply(
+                    lambda x: str(x).strip() not in ["", "nan", "None"] and int(float(x)) not in _sk_gecerli_idler
+                    if str(x).strip() not in ["", "nan", "None"] else False)]
+                if not _sk_yetim_tek.empty:
+                    _sk_sorun_sayisi += 1
+                    st.warning(f"⚠️ **Silinmiş bir müşteriye bağlı kalmış teklif (yetim kayıt):** {len(_sk_yetim_tek)} adet")
+        except Exception:
+            pass
+
+        # 7) Mükerrer firma (mevcut mükerrer bulma mantığıyla aynı)
+        if "firma" in _p_cari.columns:
+            _sk_fgrup = _p_cari.groupby(_p_cari["firma"].astype(str).str.strip().str.upper())["id"].apply(list)
+            _sk_mukerrer = {k: v for k, v in _sk_fgrup.items() if len(v) > 1 and k not in ["", "NAN", "NONE"]}
+            if _sk_mukerrer:
+                _sk_sorun_sayisi += 1
+                _sk_mukerrer_idler = [i for v in _sk_mukerrer.values() for i in v]
+                st.warning(f"⚠️ **Mükerrer (aynı isimli) firma:** {len(_sk_mukerrer)} grup, {len(_sk_mukerrer_idler)} kayıt — "
+                           "Cari Liste'nin en üstündeki \"🔍 Mükerrer\" bölümünden birleştirebilirsiniz.")
+                _sk_listede_goster(_sk_mukerrer_idler, "sk_mukerrer")
+
+        # 8) Havuz (Bölgesiz) — tanımlı bölgeye uymayan iller
+        if "il" in _p_cari.columns:
+            _sk_havuz_mask = _p_cari.apply(
+                lambda r: il_ilce_bolge_bul(r.get("il",""), r.get("ilce","") if "ilce" in _p_cari.columns else "") is None,
+                axis=1)
+            _sk_havuz = _p_cari[_sk_havuz_mask]
+            if not _sk_havuz.empty:
+                _sk_sorun_sayisi += 1
+                st.info(f"📦 **Havuz (Bölgesiz) — tanımlı bölgeye uymayan il/ilçe:** {len(_sk_havuz)} adet — "
+                        "Cari Liste'nin üstündeki 📍 Bölgeler kutucuklarından \"Havuz\"a tıklayıp düzeltebilirsiniz.")
+
+        if _sk_sorun_sayisi == 0:
+            st.success("✅ Herhangi bir sorun tespit edilmedi — sisteminiz temiz görünüyor.")
+
+    st.divider()
+
+
     _pc1,_pc2,_pc3 = st.columns(3)
     if _pc1.button("Bugün", key="pp1", use_container_width=True, type="primary" if _periyot=="bugun" else "secondary"):
         st.session_state["patron_periyot"]="bugun"; st.rerun()
