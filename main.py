@@ -160,6 +160,19 @@ _BL_ISTANBUL_AVRUPA = {"arnavutkoy","avcilar","bagcilar","bahcelievler","bakirko
     "basaksehir","bayrampasa","besiktas","beylikduzu","beyoglu","buyukcekmece",
     "catalca","esenler","esenyurt","eyupsultan","fatih","gaziosmanpasa","gungoren",
     "kagithane","kucukcekmece","sariyer","silivri","sisli","zeytinburnu","sultangazi"}
+# Yaygın mahalle/semt isimleri → resmi ilçe (kişiler genelde resmi ilçe yerine
+# bilindik semt adını yazar, bunları da tanıyalım ki Havuz'da takılı kalmasınlar)
+_BL_ISTANBUL_MAHALLE_ILCE = {
+    "yenibosna":"bahcelievler","bahcesehir":"basaksehir","atakoy":"bakirkoy",
+    "florya":"bakirkoy","yesilkoy":"bakirkoy","halkali":"kucukcekmece",
+    "levent":"besiktas","etiler":"besiktas","ortakoy":"besiktas","bebek":"besiktas",
+    "nisantasi":"sisli","mecidiyekoy":"sisli","maslak":"sariyer",
+    "taksim":"beyoglu","karakoy":"beyoglu","cihangir":"beyoglu","galata":"beyoglu",
+    "balat":"fatih","sultanahmet":"fatih","aksaray":"fatih","topkapi":"fatih",
+    "merter":"gungoren","bostanci":"kadikoy","suadiye":"kadikoy",
+    "fenerbahce":"kadikoy","kozyatagi":"kadikoy","acibadem":"uskudar",
+    "camlica":"uskudar","kisikli":"uskudar","kavacik":"beykoz",
+}
 _BL_IL_ADI = {
     "tekirdag":"Tekirdağ","kocaeli":"Kocaeli","bursa":"Bursa","manisa":"Manisa",
     "ankara":"Ankara","konya":"Konya","eskisehir":"Eskişehir","denizli":"Denizli","aydin":"Aydın",
@@ -181,6 +194,8 @@ def il_ilce_bolge_bul(il, ilce):
     if not _il:
         return None  # il tamamen boşsa Havuz
     if "istanbul" in _il:
+        if _ilce in _BL_ISTANBUL_MAHALLE_ILCE:
+            _ilce = _BL_ISTANBUL_MAHALLE_ILCE[_ilce]  # mahalle yazılmışsa resmi ilçesine çevir
         if _ilce in _BL_ISTANBUL_ANADOLU:
             return "İstanbul Anadolu"
         if _ilce in _BL_ISTANBUL_AVRUPA:
@@ -3109,61 +3124,61 @@ function kartSec(id){
             lambda r: il_ilce_bolge_bul(r.get("il",""), r.get(_hv_ilce_kol,"") if _hv_ilce_kol else "") is None,
             axis=1)]
         st.error(f"📦 ⚠️ Havuz (Bölgesiz) — hiçbir tanımlı bölgeye uymayan **{len(df_f)} kayıt**. "
-                 "Aşağıdaki tabloya İl/İlçe yazın, hangi bölgeye gideceği yanda görünür — Kaydet'e basınca otomatik oraya taşınır.")
+                 "Aşağıdaki tabloya İl/İlçe yazın, Kaydet'e basınca otomatik doğru bölgeye taşınır.")
         if not df_f.empty and "id" in df_f.columns:
             _hv_kolonlar = [c for c in ["id","firma","il","ilce"] if c in df_f.columns]
             _hv_edit_df = df_f[_hv_kolonlar].copy().reset_index(drop=True)
 
-            # Önceki (henüz kaydedilmemiş) düzenlemeleri geri uygula — sayfa yeniden çizilse de kaybolmasın
-            _hv_onceki = st.session_state.get("hv_editor", {}).get("edited_rows", {})
-            for _hv_idx, _hv_degisiklik in _hv_onceki.items():
-                _hv_idx = int(_hv_idx)
-                if _hv_idx < len(_hv_edit_df):
-                    for _hv_kol, _hv_val in _hv_degisiklik.items():
-                        if _hv_kol in _hv_edit_df.columns:
-                            _hv_edit_df.at[_hv_idx, _hv_kol] = _hv_val
-
-            _hv_edit_df["→ gidecek_bölge"] = _hv_edit_df.apply(
-                lambda r: il_ilce_bolge_bul(r.get("il",""), r.get("ilce","")) or "— hâlâ Havuz'da —", axis=1)
-
             _hv_col_config = {
-                "id":              st.column_config.NumberColumn("ID", disabled=True, width="small"),
-                "firma":           st.column_config.TextColumn("Firma", disabled=True, width="medium"),
-                "il":              st.column_config.TextColumn("İl (yazın)", width="small"),
-                "ilce":            st.column_config.TextColumn("İlçe (yazın)", width="small"),
-                "→ gidecek_bölge": st.column_config.TextColumn("→ Gidecek Bölge", disabled=True, width="medium"),
+                "id":     st.column_config.NumberColumn("ID", disabled=True, width="small"),
+                "firma":  st.column_config.TextColumn("Firma", disabled=True, width="medium"),
+                "il":     st.column_config.TextColumn("İl (yazın)", width="small"),
+                "ilce":   st.column_config.TextColumn("İlçe (yazın)", width="small"),
             }
             with st.expander(f"✏️ Bu {len(df_f)} kaydı düzelt (kaydırmadan)", expanded=True):
-                _hv_edited = st.data_editor(
-                    _hv_edit_df, use_container_width=True, hide_index=True,
-                    column_config=_hv_col_config, key="hv_editor", height=300,
-                    column_order=["firma","il","ilce","→ gidecek_bölge","id"])
-                if st.button("💾 Kaydet ve Bölgelere Dağıt", key="hv_kaydet_btn", type="primary", use_container_width=True):
+                # Form içinde — siz "Kaydet"e basana kadar sayfa hiç yeniden hesaplanmaz,
+                # yazarken ekran oynayıp durmaz.
+                with st.form(key="hv_form", clear_on_submit=False):
+                    _hv_edited = st.data_editor(
+                        _hv_edit_df, use_container_width=True, hide_index=True,
+                        column_config=_hv_col_config, key="hv_editor", height=300,
+                        column_order=["firma","il","ilce","id"])
+                    _hv_submit = st.form_submit_button("💾 Kaydet ve Bölgelere Dağıt",
+                                                        type="primary", use_container_width=True)
+
+                if _hv_submit:
                     _hv_basarili = 0
+                    _hv_hala_havuzda = 0
                     _sb_hv = get_sb_client()
-                    for _, _hv_row in _hv_edited.iterrows():
-                        _hv_orig_satir = df_f[df_f["id"] == _hv_row["id"]]
-                        if _hv_orig_satir.empty:
-                            continue
-                        _hv_orig = _hv_orig_satir.iloc[0]
-                        _hv_yeni_il = str(_hv_row.get("il","")).strip()
-                        _hv_yeni_ilce = str(_hv_row.get("ilce","")).strip()
-                        if _hv_yeni_il != str(_hv_orig.get("il","") or "").strip() or _hv_yeni_ilce != str(_hv_orig.get("ilce","") or "").strip():
-                            try:
-                                if _sb_hv:
-                                    _sb_hv.table("cari_kartlar").update({"il": _hv_yeni_il, "ilce": _hv_yeni_ilce}).eq("id", int(_hv_row["id"])).execute()
-                                else:
-                                    db_update("cari_kartlar", {"il": _hv_yeni_il, "ilce": _hv_yeni_ilce}, "id", int(_hv_row["id"]))
-                                _hv_basarili += 1
-                            except Exception:
-                                pass
+                    with st.spinner("Kaydediliyor ve bölgelere dağıtılıyor..."):
+                        for _, _hv_row in _hv_edited.iterrows():
+                            _hv_orig_satir = df_f[df_f["id"] == _hv_row["id"]]
+                            if _hv_orig_satir.empty:
+                                continue
+                            _hv_orig = _hv_orig_satir.iloc[0]
+                            _hv_yeni_il = str(_hv_row.get("il","")).strip()
+                            _hv_yeni_ilce = str(_hv_row.get("ilce","")).strip()
+                            if _hv_yeni_il != str(_hv_orig.get("il","") or "").strip() or _hv_yeni_ilce != str(_hv_orig.get("ilce","") or "").strip():
+                                try:
+                                    if _sb_hv:
+                                        _sb_hv.table("cari_kartlar").update({"il": _hv_yeni_il, "ilce": _hv_yeni_ilce}).eq("id", int(_hv_row["id"])).execute()
+                                    else:
+                                        db_update("cari_kartlar", {"il": _hv_yeni_il, "ilce": _hv_yeni_ilce}, "id", int(_hv_row["id"]))
+                                    _hv_basarili += 1
+                                    if il_ilce_bolge_bul(_hv_yeni_il, _hv_yeni_ilce) is None:
+                                        _hv_hala_havuzda += 1
+                                except Exception:
+                                    pass
                     if _hv_basarili:
                         try: get_cari_listesi.clear()
                         except: pass
                         try: db_read.clear()
                         except: pass
                         st.session_state.pop("hv_editor", None)
-                        st.toast(f"✅ {_hv_basarili} kayıt güncellendi ve bölgesine dağıtıldı!", icon="✅")
+                        _hv_ozet = f"✅ {_hv_basarili} kayıt güncellendi."
+                        if _hv_hala_havuzda:
+                            _hv_ozet += f" ({_hv_hala_havuzda} tanesi yazdığınız il/ilçeyle hâlâ eşleşmedi, Havuz'da kaldı — kontrol edin.)"
+                        st.toast(_hv_ozet, icon="✅")
                         st.rerun()
                     else:
                         st.info("Hiçbir değişiklik yapılmadı.")
