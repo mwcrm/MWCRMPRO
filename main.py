@@ -1410,8 +1410,8 @@ def _notlar_yukle(cari_id):
 
 @st.dialog("📋 Notlar & Randevu", width="large")
 def not_dialog(cari_id, firma_adi=""):
-    """Ekran ortasında açılan not + randevu + silme penceresi"""
-    _tab_not, _tab_rdv, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "🗑️ Cari Sil"])
+    """Ekran ortasında açılan not + randevu + silme + düzenleme penceresi"""
+    _tab_not, _tab_rdv, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
     with _tab_not:
         not_paneli(cari_id, firma_adi, key_prefix="dlg")
     with _tab_rdv:
@@ -1439,6 +1439,29 @@ def not_dialog(cari_id, firma_adi=""):
                     st.cache_data.clear()
             except Exception as _re:
                 st.error(f"Hata: {_re}")
+    with _tab_duz:
+        st.caption(f"**{firma_adi}** — kayıtlı tüm bilgilerle eksiksiz düzenleme ekranı açılır.")
+        if st.button("✏️ Cari Kartı Düzenle", key=f"dlg_cari_duzenle_{cari_id}", type="primary", use_container_width=True):
+            try:
+                _df_duz = get_cari_listesi()
+                _satir_duz = _df_duz[_df_duz["id"] == int(cari_id)]
+                if _satir_duz.empty:
+                    st.error("⚠️ Kayıt bulunamadı.")
+                else:
+                    kart_row = _satir_duz.iloc[0]
+                    d2 = {str(k):(None if str(v) in ["nan","None","NaT"] else v) for k,v in kart_row.items()}
+                    for _k in ["firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","aciklama"]:
+                        if _k in d2: d2[_k] = "" if d2[_k] is None else str(d2[_k])
+                    if not d2.get("gsm"):
+                        d2["gsm"] = str(kart_row.get("telefon") or kart_row.get("tel") or "")
+                    if not d2.get("sabit"):
+                        d2["sabit"] = str(kart_row.get("sabit_hat") or "")
+                    _duzenleme_form_key_temizle(str(cari_id))
+                    st.session_state["duzenle_musteri"] = d2
+                    st.session_state["aktif_tab"] = "yeni"
+                    st.rerun()
+            except Exception as _de:
+                st.error(f"Hata: {_de}")
     with _tab_sil:
         st.caption(f"**{firma_adi}** kaydını komple sil — tıklayınca anında silinir, onay istenmez.")
         if st.button("🗑️ Cari Komple Sil", key=f"dlg_cari_sil_{cari_id}", type="primary", use_container_width=True):
