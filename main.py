@@ -177,12 +177,26 @@ _BL_IL_ADI = {
     "tekirdag":"Tekirdağ","kocaeli":"Kocaeli","bursa":"Bursa","manisa":"Manisa",
     "ankara":"Ankara","konya":"Konya","eskisehir":"Eskişehir","denizli":"Denizli","aydin":"Aydın",
 }
+# 81 ilin TAMAMININ doğru yazımı — Türkçe .title() İ/I sorunu yüzünden yanlış
+# yazılmasın (ör. "İZMİR".title() bozuk çıkar) diye .title() yerine bu kaynaktan okunur.
+_BL_TUM_ILLER_DOGRU_YAZIM = ["Adana","Adıyaman","Afyonkarahisar","Ağrı","Amasya","Ankara",
+    "Antalya","Artvin","Aydın","Balıkesir","Bilecik","Bingöl","Bitlis","Bolu","Burdur",
+    "Bursa","Çanakkale","Çankırı","Çorum","Denizli","Diyarbakır","Edirne","Elazığ",
+    "Erzincan","Erzurum","Eskişehir","Gaziantep","Giresun","Gümüşhane","Hakkari","Hatay",
+    "Isparta","Mersin","İstanbul","İzmir","Kars","Kastamonu","Kayseri","Kırklareli",
+    "Kırşehir","Kocaeli","Konya","Kütahya","Malatya","Manisa","Kahramanmaraş","Mardin",
+    "Muğla","Muş","Nevşehir","Niğde","Ordu","Rize","Sakarya","Samsun","Siirt","Sinop",
+    "Sivas","Tekirdağ","Tokat","Trabzon","Tunceli","Şanlıurfa","Uşak","Van","Yozgat",
+    "Zonguldak","Aksaray","Bayburt","Karaman","Kırıkkale","Batman","Şırnak","Bartın",
+    "Ardahan","Iğdır","Yalova","Karabük","Kilis","Osmaniye","Düzce"]
 
 def _bl_sadelestir(s):
     s = str(s or "").strip().lower()
     for _k,_v in {"ı":"i","i̇":"i","ş":"s","ğ":"g","ü":"u","ö":"o","ç":"c"}.items():
         s = s.replace(_k,_v)
     return s
+
+_BL_TUM_ILLER_ADI = {_bl_sadelestir(_ad): _ad for _ad in _BL_TUM_ILLER_DOGRU_YAZIM}
 
 def il_ilce_bolge_bul(il, ilce):
     """il+ilçe bilgisinden bölge adı üretir. İl doluysa MUTLAKA bir bölge olur —
@@ -215,7 +229,10 @@ def il_ilce_bolge_bul(il, ilce):
         return None  # ilçe hiçbir şekilde eşleşmiyor — Havuz'da kalır, manuel toplu atama için
     if _il in _BL_IL_ADI:
         return _BL_IL_ADI[_il]
-    # Tanımlı 11 bölgeden biri değil ama il doluysa — ilin kendi adı bölge olur
+    # Tanımlı 11 bölgeden biri değil ama il doluysa — ilin kendi adı bölge olur.
+    # 81 il listesindeyse doğru yazımıyla (ikon eşleşsin diye), değilse .title() ile.
+    if _il in _BL_TUM_ILLER_ADI:
+        return _BL_TUM_ILLER_ADI[_il]
     return str(il).strip().title()
 
 @st.cache_data(ttl=60)
@@ -2543,7 +2560,8 @@ section[data-testid="stSidebar"] { display: none !important; }
         _bl_ikon = {
             "İstanbul Anadolu": "🌉", "İstanbul Avrupa": "🕌", "Havuz (Bölgesiz)": "📦",
             "Adana": "🌶️", "Adıyaman": "🏔️", "Afyonkarahisar": "🍬", "Ağrı": "🏔️",
-            "Amasya": "🍎", "Ankara": "🏛️", "Antalya": "🏖️", "Artvin": "🌲",
+            "Aksaray": "🐎", "Amasya": "🍎", "Ankara": "🏛️", "Antalya": "🏖️",
+            "Ardahan": "🐄", "Artvin": "🌲",
             "Aydın": "🍈", "Balıkesir": "🫒", "Bartın": "🌲", "Batman": "🛢️",
             "Bayburt": "🏔️", "Bilecik": "🏭", "Bingöl": "🏔️", "Bitlis": "🏔️",
             "Bolu": "🌲", "Burdur": "🌸", "Bursa": "🏔️", "Çanakkale": "🐎",
