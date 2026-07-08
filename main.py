@@ -2771,16 +2771,36 @@ section[data-testid="stSidebar"] { display: none !important; }
 
                     _idx = st.session_state["_mr_grup_idx"] % len(_mr_gruplar_liste)
                     _fname, _fids = _mr_gruplar_liste[_idx]
+                    _fids = [int(i) for i in _fids]
                     st.caption(f"Grup {_idx+1}/{len(_mr_gruplar_liste)} — **{_fname}** — {len(_fids)} kayıt")
 
                     _grup_satirlar = df[df["id"].isin(_fids)].copy()
                     _aktivite = _mr_aktivite_say(_fids)
 
-                    _ana_secenekleri = [int(i) for i in _fids]
-                    _ana_id = st.radio("Ana kayıt (kalacak kayıt — siz seçin)", _ana_secenekleri,
-                                        format_func=lambda x: f"id {x}", horizontal=True, key=f"mr_ana_{_idx}")
+                    # Bu grup için seçim durumlarını session_state'te tut (grup değişince sıfırlanır)
+                    _durum_key = f"_mr_durum_{_idx}"
+                    if _durum_key not in st.session_state:
+                        st.session_state[_durum_key] = {"ana": _fids[0], "alanlar": {}}
+                    _mr_durum = st.session_state[_durum_key]
 
-                    st.markdown("---")
+                    _ncols = len(_fids) + 1
+                    _col_oranlar = [1.3] + [1] * len(_fids)
+
+                    # ── ANA KAYIT SATIRI ──
+                    _hc = st.columns(_col_oranlar)
+                    _hc[0].markdown("**Ana kayıt**")
+                    for _ci, _fid in enumerate(_fids):
+                        with _hc[_ci + 1]:
+                            _secili_mi = _mr_durum["ana"] == _fid
+                            if st.button(f"id {_fid}" + (" ✓" if _secili_mi else ""),
+                                         key=f"mr_anabtn_{_idx}_{_fid}", use_container_width=True,
+                                         type="primary" if _secili_mi else "secondary"):
+                                _mr_durum["ana"] = _fid
+                                st.rerun()
+
+                    st.markdown("<hr style='margin:4px 0'>", unsafe_allow_html=True)
+
+                    # ── ALAN SATIRLARI — her kayıt kendi sütununda, tıklanan hücre seçilir ──
                     _secim_degerleri = {}
                     for _acol, _abaslik in _MR_ALANLAR:
                         if _acol not in _grup_satirlar.columns:
@@ -2792,26 +2812,40 @@ section[data-testid="stSidebar"] { display: none !important; }
                             _v = _sat.iloc[0].get(_acol, "")
                             _v = "" if str(_v) in ["nan","None","NaT"] else str(_v).strip()
                             if _v:
-                                _degerler[int(_fid)] = _v
+                                _degerler[_fid] = _v
                         if not _degerler:
                             continue
                         _tekil_degerler = set(_degerler.values())
-                        _c1, _c2 = st.columns([1, 3])
-                        with _c1:
-                            st.markdown(f"**{_abaslik}**")
-                        with _c2:
-                            if len(_tekil_degerler) == 1:
-                                st.caption(f"{list(_tekil_degerler)[0]}  *(tüm kayıtlarda aynı)*")
-                                _secim_degerleri[_acol] = list(_tekil_degerler)[0]
-                            else:
-                                _opsiyonlar = list(_degerler.keys())
-                                _varsayilan_idx = _opsiyonlar.index(_ana_id) if _ana_id in _opsiyonlar else 0
-                                _sec = st.radio(_acol, _opsiyonlar,
-                                                 format_func=lambda x, _d=_degerler: f"id {x}: {_d[x]}",
-                                                 index=_varsayilan_idx, horizontal=False,
-                                                 key=f"mr_f_{_acol}_{_idx}", label_visibility="collapsed")
-                                _secim_degerleri[_acol] = _degerler[_sec]
 
+                        if len(_tekil_degerler) == 1:
+                            # Herkes aynı — seçime gerek yok, tek satırda göster
+                            _secim_degerleri[_acol] = list(_tekil_degerler)[0]
+                            _rc = st.columns(_col_oranlar)
+                            _rc[0].markdown(f"**{_abaslik}**")
+                            _rc[1].caption(f"{list(_tekil_degerler)[0]}  *(hepsinde aynı)*")
+                            continue
+
+                        # Farklı değerler var — hangi kaydın sütununda tıklanırsa o seçilir
+                        if _acol not in _mr_durum["alanlar"] or _mr_durum["alanlar"][_acol] not in _degerler:
+                            # Varsayılan: ana kaydın kendi değeri varsa o, yoksa ilk dolu değer
+                            _mr_durum["alanlar"][_acol] = _degerler.get(_mr_durum["ana"], list(_degerler.keys())[0])
+
+                        _rc = st.columns(_col_oranlar)
+                        _rc[0].markdown(f"**{_abaslik}**")
+                        for _ci, _fid in enumerate(_fids):
+                            with _rc[_ci + 1]:
+                                if _fid in _degerler:
+                                    _secili_mi = _mr_durum["alanlar"][_acol] == _degerler[_fid]
+                                    if st.button(_degerler[_fid], key=f"mr_fbtn_{_idx}_{_acol}_{_fid}",
+                                                 use_container_width=True,
+                                                 type="primary" if _secili_mi else "secondary"):
+                                        _mr_durum["alanlar"][_acol] = _degerler[_fid]
+                                        st.rerun()
+                                else:
+                                    st.caption("—")
+                        _secim_degerleri[_acol] = _mr_durum["alanlar"][_acol]
+
+                    _ana_id = _mr_durum["ana"]
                     st.markdown("---")
                     _toplam_not = sum(_aktivite.get(int(i),{}).get("not",0) for i in _fids)
                     _toplam_rand = sum(_aktivite.get(int(i),{}).get("randevu",0) for i in _fids)
@@ -2828,10 +2862,12 @@ section[data-testid="stSidebar"] { display: none !important; }
                                     f"✅ '{_fname}' birleştirildi — {len(_fids)-1} kayıt silindi, "
                                     f"{_toplam_not} not · {_toplam_rand} randevu · {_toplam_tek} teklif ana kayda taşındı."
                                 )
+                                st.session_state.pop(_durum_key, None)
                                 st.session_state["_mr_grup_idx"] = _idx
                                 st.rerun()
                     with _bc2:
                         if st.button("⏭️ Atla, sonraki", use_container_width=True, key=f"mr_atla_{_idx}"):
+                            st.session_state.pop(_durum_key, None)
                             st.session_state["_mr_grup_idx"] = _idx + 1
                             st.rerun()
 
