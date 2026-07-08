@@ -2511,23 +2511,50 @@ section[data-testid="stSidebar"] { display: none !important; }
     if not df.empty and "il" in df.columns:
         _bl_kisa_ad = {"İstanbul Anadolu": "İst And", "İstanbul Avrupa": "İst Avr"}
         _bl_ikon = {
-            "İstanbul Anadolu": "🌉", "İstanbul Avrupa": "🕌",
-            "Ankara": "🏛️", "Bursa": "🏔️", "Kocaeli": "⚓",
-            "Konya": "🌀", "Eskişehir": "🎓", "Manisa": "🍇",
-            "Tekirdağ": "🍷", "Aydın": "🍈", "Denizli": "🐓",
+            "İstanbul Anadolu": "🌉", "İstanbul Avrupa": "🕌", "İstanbul (diğer)": "🕌",
+            "Adana": "🌶️", "Adıyaman": "🏔️", "Afyonkarahisar": "🍬", "Ağrı": "🏔️",
+            "Amasya": "🍎", "Ankara": "🏛️", "Antalya": "🏖️", "Artvin": "🌲",
+            "Aydın": "🍈", "Balıkesir": "🫒", "Bartın": "🌲", "Batman": "🛢️",
+            "Bayburt": "🏔️", "Bilecik": "🏭", "Bingöl": "🏔️", "Bitlis": "🏔️",
+            "Bolu": "🌲", "Burdur": "🌸", "Bursa": "🏔️", "Çanakkale": "🐎",
+            "Çankırı": "🧂", "Çorum": "🫘", "Denizli": "🐓", "Diyarbakır": "🍉",
+            "Düzce": "🌲", "Edirne": "🕌", "Elazığ": "🍒", "Erzincan": "🏔️",
+            "Erzurum": "❄️", "Eskişehir": "🎓", "Gaziantep": "🥙", "Giresun": "🌰",
+            "Gümüşhane": "⛏️", "Hakkari": "🏔️", "Hatay": "🍊", "Iğdır": "🏔️",
+            "Isparta": "🌹", "İzmir": "🌊", "Kahramanmaraş": "🍦", "Karabük": "⚒️",
+            "Karaman": "🐑", "Kars": "🧀", "Kastamonu": "🌲", "Kayseri": "🌋",
+            "Kırıkkale": "🏭", "Kırklareli": "🌾", "Kırşehir": "🌾", "Kilis": "🕌",
+            "Kocaeli": "⚓", "Konya": "🌀", "Kütahya": "🍇", "Malatya": "🍑",
+            "Manisa": "🍇", "Mardin": "🕌", "Mersin": "🍋", "Muğla": "🏖️",
+            "Muş": "🏔️", "Nevşehir": "🎈", "Niğde": "🥔", "Ordu": "🌰",
+            "Osmaniye": "🌶️", "Rize": "🍵", "Sakarya": "🌲", "Samsun": "⚓",
+            "Siirt": "🐐", "Sinop": "⚓", "Sivas": "🏔️", "Şanlıurfa": "🍆",
+            "Şırnak": "🏔️", "Tekirdağ": "🍷", "Tokat": "🍎", "Trabzon": "🌊",
+            "Tunceli": "🏔️", "Uşak": "🧵", "Van": "🐈", "Yalova": "🌡️",
+            "Yozgat": "🌾", "Zonguldak": "⛏️",
         }
         _bl_ilce_kol_cl = "ilce" if "ilce" in df.columns else None
         _bl_chip_bolge = df.apply(
             lambda r: il_ilce_bolge_bul(r.get("il",""), r.get(_bl_ilce_kol_cl,"") if _bl_ilce_kol_cl else ""), axis=1)
         _bl_chip_sayim = _bl_chip_bolge.dropna().value_counts()
         if not _bl_chip_sayim.empty:
+            _bl_hedef_var_cl = "beklenen_ciro" in df.columns
+            if _bl_hedef_var_cl:
+                _bl_hedef_map_cl = df.groupby(_bl_chip_bolge)["beklenen_ciro"].apply(
+                    lambda s: pd.to_numeric(s, errors="coerce").fillna(0).sum())
             with st.expander(f"📍 Bölgeler  ·  {len(_bl_chip_sayim)} bölge", expanded=False):
                 _bl_chip_cols = st.columns(min(len(_bl_chip_sayim), 8) or 1)
                 for _ci, (_bl_ad, _bl_adet) in enumerate(_bl_chip_sayim.items()):
+                    if _bl_adet <= 0:
+                        continue  # müşterisi olmayan bölge asla gösterilmez
                     _bl_kisa = _bl_kisa_ad.get(_bl_ad, _bl_ad)
                     _bl_ic = _bl_ikon.get(_bl_ad, "📍")
+                    _bl_etiket = f"{_bl_ic} {_bl_kisa} {_bl_adet}"
+                    if _bl_hedef_var_cl:
+                        _bl_hedef_deger = _bl_hedef_map_cl.get(_bl_ad, 0)
+                        _bl_etiket += f"\n{_bl_hedef_deger:,.0f} ₺"
                     with _bl_chip_cols[_ci % len(_bl_chip_cols)]:
-                        if st.button(f"{_bl_ic} {_bl_kisa} {_bl_adet}", key=f"cl_bolge_chip_{_bl_ad}", use_container_width=True):
+                        if st.button(_bl_etiket, key=f"cl_bolge_chip_{_bl_ad}", use_container_width=True):
                             _bl_chip_df = df[_bl_chip_bolge == _bl_ad]
                             if "il" in _bl_chip_df.columns:
                                 st.session_state["_cl_fil_il_multi"] = sorted(
