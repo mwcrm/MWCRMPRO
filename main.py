@@ -2552,7 +2552,8 @@ section[data-testid="stSidebar"] { display: none !important; }
                     _bl_ic = _bl_ikon.get(_bl_ad, "📍")
                     _bl_etiket = f"{_bl_ic} {_bl_kisa} {_bl_adet}"
                     with _bl_chip_cols[_ci % len(_bl_chip_cols)]:
-                        if st.button(_bl_etiket, key=f"cl_bolge_chip_{_bl_ad}", use_container_width=True):
+                        if st.button(_bl_etiket, key=f"cl_bolge_chip_{_bl_ad}", use_container_width=True,
+                                     type="primary" if _bl_ad == "Havuz (Bölgesiz)" else "secondary"):
                             if _bl_ad == "Havuz (Bölgesiz)":
                                 # Havuz'daki kayıtların çoğu boş/tanımsız il içerebilir — gerçek il
                                 # değerlerine dayanmayan, "hiçbir tanımlı bölgeye uymayanlar" filtresi kullanılır.
@@ -3107,19 +3108,65 @@ function kartSec(id){
         df_f = df_f[df_f.apply(
             lambda r: il_ilce_bolge_bul(r.get("il",""), r.get(_hv_ilce_kol,"") if _hv_ilce_kol else "") is None,
             axis=1)]
-        st.info(f"📦 Havuz (Bölgesiz) — hiçbir tanımlı bölgeye uymayan {len(df_f)} kayıt. "
-                "Bu kayıtların İl/İlçe bilgisini aşağıdaki tablodan düzeltirseniz, otomatik doğru bölgeye geçerler.")
-        if not df_f.empty:
-            _hv_onizleme_kol = [c for c in ["firma","il","ilce"] if c in df_f.columns]
-            _hv_onizleme = df_f[_hv_onizleme_kol].copy()
-            _hv_onizleme["neden_havuzda"] = df_f.apply(
-                lambda r: "İl boş" if not str(r.get("il","")).strip()
-                          else ("İstanbul — ilçe tanımlı değil" if "istanbul" in _bl_sadelestir(r.get("il",""))
-                                else f"'{r.get('il','')}' tanımlı bölge listesinde yok"),
-                axis=1)
-            with st.expander(f"👁️ Bu {len(df_f)} kaydı hemen gör (kaydırmadan)", expanded=True):
-                st.dataframe(_hv_onizleme.reset_index(drop=True),
-                             use_container_width=True, hide_index=True, height=300)
+        st.error(f"📦 ⚠️ Havuz (Bölgesiz) — hiçbir tanımlı bölgeye uymayan **{len(df_f)} kayıt**. "
+                 "Aşağıdaki tabloya İl/İlçe yazın, hangi bölgeye gideceği yanda görünür — Kaydet'e basınca otomatik oraya taşınır.")
+        if not df_f.empty and "id" in df_f.columns:
+            _hv_kolonlar = [c for c in ["id","firma","il","ilce"] if c in df_f.columns]
+            _hv_edit_df = df_f[_hv_kolonlar].copy().reset_index(drop=True)
+
+            # Önceki (henüz kaydedilmemiş) düzenlemeleri geri uygula — sayfa yeniden çizilse de kaybolmasın
+            _hv_onceki = st.session_state.get("hv_editor", {}).get("edited_rows", {})
+            for _hv_idx, _hv_degisiklik in _hv_onceki.items():
+                _hv_idx = int(_hv_idx)
+                if _hv_idx < len(_hv_edit_df):
+                    for _hv_kol, _hv_val in _hv_degisiklik.items():
+                        if _hv_kol in _hv_edit_df.columns:
+                            _hv_edit_df.at[_hv_idx, _hv_kol] = _hv_val
+
+            _hv_edit_df["→ gidecek_bölge"] = _hv_edit_df.apply(
+                lambda r: il_ilce_bolge_bul(r.get("il",""), r.get("ilce","")) or "— hâlâ Havuz'da —", axis=1)
+
+            _hv_col_config = {
+                "id":              st.column_config.NumberColumn("ID", disabled=True, width="small"),
+                "firma":           st.column_config.TextColumn("Firma", disabled=True, width="medium"),
+                "il":              st.column_config.TextColumn("İl (yazın)", width="small"),
+                "ilce":            st.column_config.TextColumn("İlçe (yazın)", width="small"),
+                "→ gidecek_bölge": st.column_config.TextColumn("→ Gidecek Bölge", disabled=True, width="medium"),
+            }
+            with st.expander(f"✏️ Bu {len(df_f)} kaydı düzelt (kaydırmadan)", expanded=True):
+                _hv_edited = st.data_editor(
+                    _hv_edit_df, use_container_width=True, hide_index=True,
+                    column_config=_hv_col_config, key="hv_editor", height=300,
+                    column_order=["firma","il","ilce","→ gidecek_bölge","id"])
+                if st.button("💾 Kaydet ve Bölgelere Dağıt", key="hv_kaydet_btn", type="primary", use_container_width=True):
+                    _hv_basarili = 0
+                    _sb_hv = get_sb_client()
+                    for _, _hv_row in _hv_edited.iterrows():
+                        _hv_orig_satir = df_f[df_f["id"] == _hv_row["id"]]
+                        if _hv_orig_satir.empty:
+                            continue
+                        _hv_orig = _hv_orig_satir.iloc[0]
+                        _hv_yeni_il = str(_hv_row.get("il","")).strip()
+                        _hv_yeni_ilce = str(_hv_row.get("ilce","")).strip()
+                        if _hv_yeni_il != str(_hv_orig.get("il","") or "").strip() or _hv_yeni_ilce != str(_hv_orig.get("ilce","") or "").strip():
+                            try:
+                                if _sb_hv:
+                                    _sb_hv.table("cari_kartlar").update({"il": _hv_yeni_il, "ilce": _hv_yeni_ilce}).eq("id", int(_hv_row["id"])).execute()
+                                else:
+                                    db_update("cari_kartlar", {"il": _hv_yeni_il, "ilce": _hv_yeni_ilce}, "id", int(_hv_row["id"]))
+                                _hv_basarili += 1
+                            except Exception:
+                                pass
+                    if _hv_basarili:
+                        try: get_cari_listesi.clear()
+                        except: pass
+                        try: db_read.clear()
+                        except: pass
+                        st.session_state.pop("hv_editor", None)
+                        st.toast(f"✅ {_hv_basarili} kayıt güncellendi ve bölgesine dağıtıldı!", icon="✅")
+                        st.rerun()
+                    else:
+                        st.info("Hiçbir değişiklik yapılmadı.")
 
     # ── HİÇ FİLTRE SEÇİLİ DEĞİLKEN — sadece işlem görmemiş (Özel Müşteri/Portföy) göster ──
     # Bir müşteriye durum atanınca (Randevu, Teklif, Tekrar Ara vb.) artık burada görünmesin,
