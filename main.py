@@ -1396,6 +1396,8 @@ def not_dialog(cari_id, firma_adi=""):
                     _sb_cs.table("cari_kartlar").update({"silindi": 1}).eq("id", int(cari_id)).execute()
                 else:
                     db_update("cari_kartlar", {"silindi": 1}, "id", int(cari_id))
+                get_cari_listesi.clear()
+                st.cache_data.clear()
                 st.session_state.pop("cari_editor", None)
                 st.toast(f"🗑️ '{firma_adi}' silindi", icon="🗑️")
                 st.rerun()
@@ -3704,6 +3706,9 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                     except: pass
                 try: db_read.clear()
                 except: pass
+                try: get_cari_listesi.clear()
+                except: pass
+                st.session_state.pop("cari_editor", None)
                 st.success(f"✅ {secili_sayi} arşive gönderildi!"); st.rerun()
         else:
             st.caption("Seçmek için Seç kolonunu işaretleyin")
