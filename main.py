@@ -172,21 +172,19 @@ def _bl_sadelestir(s):
     return s
 
 def il_ilce_bolge_bul(il, ilce):
-    """il+ilçe bilgisinden bölge adı üretir. Tanımlı özel bölge yoksa, ilin kendi adı bölge olur (kaybolmaz)."""
+    """il+ilçe bilgisinden bölge adı üretir. Sadece tanımlı 11 bölgeden biriyse eşleşir,
+    diğer her şey (tanımsız il, İstanbul'un tanımsız ilçesi, boş veri) Havuz'a düşer."""
     _il = _bl_sadelestir(il)
     _ilce = _bl_sadelestir(ilce)
     if not _il:
-        return None  # il bilgisi tamamen boşsa Havuz'a düşer
+        return None
     if "istanbul" in _il:
         if _ilce in _BL_ISTANBUL_ANADOLU:
             return "İstanbul Anadolu"
         if _ilce in _BL_ISTANBUL_AVRUPA:
             return "İstanbul Avrupa"
-        return "İstanbul (diğer)"
-    if _il in _BL_IL_ADI:
-        return _BL_IL_ADI[_il]
-    # Tanımlı özel bölge yok — ilin kendi adını (orijinal yazımıyla) bölge olarak kullan
-    return str(il).strip().title()
+        return None
+    return _BL_IL_ADI.get(_il)
 
 @st.cache_data(ttl=60)
 def get_cari_listesi():
@@ -2511,7 +2509,7 @@ section[data-testid="stSidebar"] { display: none !important; }
     if not df.empty and "il" in df.columns:
         _bl_kisa_ad = {"İstanbul Anadolu": "İst And", "İstanbul Avrupa": "İst Avr"}
         _bl_ikon = {
-            "İstanbul Anadolu": "🌉", "İstanbul Avrupa": "🕌", "İstanbul (diğer)": "🕌",
+            "İstanbul Anadolu": "🌉", "İstanbul Avrupa": "🕌", "Havuz (Bölgesiz)": "📦",
             "Adana": "🌶️", "Adıyaman": "🏔️", "Afyonkarahisar": "🍬", "Ağrı": "🏔️",
             "Amasya": "🍎", "Ankara": "🏛️", "Antalya": "🏖️", "Artvin": "🌲",
             "Aydın": "🍈", "Balıkesir": "🫒", "Bartın": "🌲", "Batman": "🛢️",
@@ -2534,9 +2532,11 @@ section[data-testid="stSidebar"] { display: none !important; }
             "Yozgat": "🌾", "Zonguldak": "⛏️",
         }
         _bl_ilce_kol_cl = "ilce" if "ilce" in df.columns else None
-        _bl_chip_bolge = df.apply(
+        _bl_chip_bolge_ham = df.apply(
             lambda r: il_ilce_bolge_bul(r.get("il",""), r.get(_bl_ilce_kol_cl,"") if _bl_ilce_kol_cl else ""), axis=1)
-        _bl_chip_sayim = _bl_chip_bolge.dropna().value_counts()
+        # Tanımsız il/ilçe'ler tek tek kutucuk olmaz, hepsi "Havuz (Bölgesiz)" altında toplanır
+        _bl_chip_bolge = _bl_chip_bolge_ham.fillna("Havuz (Bölgesiz)")
+        _bl_chip_sayim = _bl_chip_bolge.value_counts()
         if not _bl_chip_sayim.empty:
             _bl_hedef_var_cl = "beklenen_ciro" in df.columns
             if _bl_hedef_var_cl:
