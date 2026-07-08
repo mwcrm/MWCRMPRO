@@ -1940,14 +1940,21 @@ button[data-testid="manage-app-button"] { display: none !important; }
     </style>""", unsafe_allow_html=True)
 
     _MENU_GRUPLARI = [
-        ("Cari işlemleri",    ["yeni", "liste", "excel"]),
-        ("Analiz ve takip",   ["analiz", "islem_takip"]),
-        ("Randevu ve teklif", ["randevu", "teklif", "ozel_teklif"]),
-        ("Saha",              ["rota_analiz", "operasyon", "harita"]),
-        ("Yönetim",           ["kullanici", "patron", "musteri_atama"]),
-        ("Raporlar",          ["admin_rapor", "rapor"]),
-        ("Telefon Kişiler",   ["kisiler"]),
+        ("🧾 Cari işlemleri",    ["yeni", "liste", "excel"]),
+        ("📈 Analiz ve takip",   ["analiz", "islem_takip"]),
+        ("📅 Randevu ve teklif", ["randevu", "teklif", "ozel_teklif"]),
+        ("🚚 Saha",              ["rota_analiz", "operasyon", "harita"]),
+        ("⚙️ Yönetim",           ["kullanici", "patron", "musteri_atama"]),
+        ("📊 Raporlar",          ["admin_rapor", "rapor"]),
+        ("📞 Telefon Kişiler",   ["kisiler"]),
     ]
+
+    # Randevu ve teklif grubunun yanında rozet — bekleyen randevu sayısı
+    try:
+        _mg_rand_df = db_read("randevular", extra_sql="")
+        _mg_rand_sayi = len(_mg_rand_df) if not _mg_rand_df.empty else 0
+    except Exception:
+        _mg_rand_sayi = 0
 
     if "_acik_grup" not in st.session_state:
         _varsayilan_acik = None
@@ -1978,7 +1985,8 @@ button[data-testid="manage-app-button"] { display: none !important; }
 
         _acik_mi = st.session_state["_acik_grup"] == _g_ad
         _ok = "▾" if _acik_mi else "▸"
-        if st.button(f"{_g_ad}   {_ok}", use_container_width=True,
+        _rozet = f"  ·  {_mg_rand_sayi}" if _g_ad == "📅 Randevu ve teklif" and _mg_rand_sayi else ""
+        if st.button(f"{_g_ad}{_rozet}   {_ok}", use_container_width=True,
                      type="primary" if _acik_mi else "secondary",
                      key=f"grphdr_{_g_ad}"):
             st.session_state["_acik_grup"] = None if _acik_mi else _g_ad
@@ -2122,11 +2130,16 @@ button[data-testid="manage-app-button"] { display: none !important; }
 
     # ── KULLANICI + ÇIKIŞ ─────────────────────────────────────────────────────
     _kc1, _kc2 = st.columns([3, 1])
+    _kul_ad = st.session_state.get('kullanici','')
+    _kul_bas_harf = (_kul_ad[:2].upper() if _kul_ad else "AD")
     _kc1.markdown(
-        f"<div style='padding:2px 4px;line-height:1.5;'>"
-        f"<span style='font-size:12px;font-weight:500;'>👤 {st.session_state.get('kullanici','')}</span>"
-        f" <span style='font-size:11px;color:#64748b;'>· {st.session_state.get('rol','')}</span>"
-        f"</div>",
+        f"<div style='padding:4px 4px;display:flex;align-items:center;gap:9px;'>"
+        f"<div style='width:26px;height:26px;border-radius:50%;background:#eef4fc;color:#1a4f9e;"
+        f"display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;flex:none;'>{_kul_bas_harf}</div>"
+        f"<div style='line-height:1.4;'>"
+        f"<div style='font-size:12.5px;font-weight:500;color:#2c2c2a;'>{_kul_ad}</div>"
+        f"<div style='font-size:11px;color:#8a8880;'>{st.session_state.get('rol','')}</div>"
+        f"</div></div>",
         unsafe_allow_html=True
     )
     if _kc2.button("🚪", key="sidebar_cikis", use_container_width=True, help="Çıkış"):
