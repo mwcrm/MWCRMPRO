@@ -2538,10 +2538,6 @@ section[data-testid="stSidebar"] { display: none !important; }
         _bl_chip_bolge = _bl_chip_bolge_ham.fillna("Havuz (Bölgesiz)")
         _bl_chip_sayim = _bl_chip_bolge.value_counts()
         if not _bl_chip_sayim.empty:
-            _bl_hedef_var_cl = "beklenen_ciro" in df.columns
-            if _bl_hedef_var_cl:
-                _bl_hedef_map_cl = df.groupby(_bl_chip_bolge)["beklenen_ciro"].apply(
-                    lambda s: pd.to_numeric(s, errors="coerce").fillna(0).sum())
             with st.expander(f"📍 Bölgeler  ·  {len(_bl_chip_sayim)} bölge", expanded=False):
                 _bl_chip_cols = st.columns(min(len(_bl_chip_sayim), 8) or 1)
                 for _ci, (_bl_ad, _bl_adet) in enumerate(_bl_chip_sayim.items()):
@@ -2550,9 +2546,6 @@ section[data-testid="stSidebar"] { display: none !important; }
                     _bl_kisa = _bl_kisa_ad.get(_bl_ad, _bl_ad)
                     _bl_ic = _bl_ikon.get(_bl_ad, "📍")
                     _bl_etiket = f"{_bl_ic} {_bl_kisa} {_bl_adet}"
-                    if _bl_hedef_var_cl:
-                        _bl_hedef_deger = _bl_hedef_map_cl.get(_bl_ad, 0)
-                        _bl_etiket += f"\n{_bl_hedef_deger:,.0f} ₺"
                     with _bl_chip_cols[_ci % len(_bl_chip_cols)]:
                         if st.button(_bl_etiket, key=f"cl_bolge_chip_{_bl_ad}", use_container_width=True):
                             _bl_chip_df = df[_bl_chip_bolge == _bl_ad]
