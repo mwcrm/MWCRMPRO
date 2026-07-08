@@ -3320,8 +3320,9 @@ function kartSec(id){
         "asama3":        st.column_config.TextColumn("Aşama 3", width=_w("asama3")),
         "asama4":        st.column_config.TextColumn("Aşama 4", width=_w("asama4")),
         "sonuc":         st.column_config.TextColumn("Sonuç",   width=_w("sonuc")),
+        "🗑️ Sil":        st.column_config.CheckboxColumn("🗑️ Sil", default=False, width="small"),
     }
-    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro","✅ Analiz","📅 Son Randevu","aciklama","📨 Notlar","asama1","asama2","asama3","asama4","sonuc"]
+    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro","✅ Analiz","📅 Son Randevu","aciklama","📨 Notlar","asama1","asama2","asama3","asama4","sonuc","🗑️ Sil"]
     # Gizli kolonları çıkar
     _kol_gizli_map = {"firma":"firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email",
                       "adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci",
@@ -3454,6 +3455,7 @@ function kartSec(id){
         df_edit["📨 Notlar"] = ""
 
     df_edit.insert(0, "Seç", False)
+    df_edit["🗑️ Sil"] = False
 
     import json as _json_ls
 
@@ -3513,6 +3515,25 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
             height=max(500, min(len(df_edit) * 35 + 80, 1800)),
             key="cari_editor"
         )
+
+    # ── "🗑️ Sil" işaretlenen satırlar — anında arşive alınır, filtre/sıralama bozulmaz ──
+    if "🗑️ Sil" in edited_df.columns and "id" in edited_df.columns:
+        _sil_isaretli = edited_df[edited_df["🗑️ Sil"] == True]
+        if not _sil_isaretli.empty:
+            _sb_hizli_sil = get_sb_client()
+            _silinen_sayi = 0
+            for _sid in _sil_isaretli["id"].tolist():
+                try:
+                    if _sb_hizli_sil:
+                        _sb_hizli_sil.table("cari_kartlar").update({"silindi": 1}).eq("id", int(_sid)).execute()
+                    else:
+                        db_update("cari_kartlar", {"silindi": 1}, "id", int(_sid))
+                    _silinen_sayi += 1
+                except Exception:
+                    pass
+            if _silinen_sayi:
+                st.toast(f"🗑️ {_silinen_sayi} kayıt silindi", icon="🗑️")
+                st.rerun()
 
     # (not paneli artık tablonun altında expander olarak açılıyor)
 
@@ -3615,7 +3636,7 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                         if not rid: continue
                         guncelle = {}
                         for k, v in degisiklikler.items():
-                            if k == "Seç": continue
+                            if k in ("Seç", "🗑️ Sil"): continue
                             if k in ("beklenen_ciro", "gerceklesen_ciro"):
                                 try: guncelle[k] = float(v or 0)
                                 except: guncelle[k] = 0
