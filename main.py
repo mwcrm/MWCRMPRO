@@ -721,12 +721,15 @@ def _tanimlar_yukle(tip):
     except: pass
 
     if _liste:
+        if tip == "durum":
+            _gizli_durumlar = {"aktif", "pasif", "hedef"}
+            _liste = [x for x in _liste if x.strip().lower() not in _gizli_durumlar]
         return _liste
 
     # Fallback
     if tip == "asama":
         return ["İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"]
-    return ["Aktif","Hedef","Pasif"]
+    return []
 
 def _tanim_ekle(tip, deger):
     try:
@@ -5118,7 +5121,7 @@ elif aktif == "teklif":
             st.session_state.pop("son_secili_id", None)  # force update
 
     _tr = st.columns([1, 2.5, 0.3, 1.5, 1, 1, 1])
-    _t_fil = _tr[0].selectbox("", ["Tümü","Aktif","Hedef","Pasif"], key="teklif_fil", label_visibility="collapsed")
+    _t_fil = _tr[0].selectbox("", ["Tümü"], key="teklif_fil", label_visibility="collapsed")
     _df_mf = _df_m if _t_fil == "Tümü" else _df_m[_df_m["durum"] == _t_fil]
     _m_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['firma']} ({r['durum']})" for _,r in _df_mf.iterrows()]
     _secim  = _tr[1].selectbox("", _m_opts, key="teklif_musteri", label_visibility="collapsed")
@@ -5499,7 +5502,7 @@ elif aktif == "ozel_teklif":
         st.session_state.pop("oz2_son_sec", None)
 
     _ozr = st.columns([1, 2.5, 0.3, 1.5, 1, 1, 1, 1])
-    _oz_fil = _ozr[0].selectbox("", ["Tümü","Aktif","Hedef","Pasif"], key="oz2_fil", label_visibility="collapsed")
+    _oz_fil = _ozr[0].selectbox("", ["Tümü"], key="oz2_fil", label_visibility="collapsed")
     _oz_mf  = _oz_dfm if _oz_fil=="Tümü" else _oz_dfm[_oz_dfm["durum"]==_oz_fil]
     _oz_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['firma']} ({r['durum']})" for _,r in _oz_mf.iterrows()]
     _oz_sec  = _ozr[1].selectbox("", _oz_opts, key="oz2_musteri", label_visibility="collapsed")
@@ -6871,7 +6874,7 @@ elif aktif == "whatsapp":
         st.markdown("### 👥 Toplu Mesaj Gönder")
         st.warning("⚠️ Spam yapmayın — WhatsApp toplu mesaj için kısıtlama uygulayabilir.")
 
-        filtre_durum_wa = st.selectbox("Müşteri Filtresi:", ["Tümü","Aktif","Hedef","Pasif"], key="toplu_filtre")
+        filtre_durum_wa = st.selectbox("Müşteri Filtresi:", ["Tümü"], key="toplu_filtre")
         df_toplu = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
         if filtre_durum_wa != "Tümü":
             df_toplu = df_toplu[df_toplu["durum"] == filtre_durum_wa]
