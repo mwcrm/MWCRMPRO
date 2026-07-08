@@ -1954,21 +1954,14 @@ button[data-testid="manage-app-button"] { display: none !important; }
     </style>""", unsafe_allow_html=True)
 
     _MENU_GRUPLARI = [
-        ("🧾 Cari işlemleri",    ["yeni", "liste", "excel"]),
-        ("📈 Analiz ve takip",   ["analiz", "islem_takip"]),
-        ("📅 Randevu ve teklif", ["randevu", "teklif", "ozel_teklif"]),
-        ("🚚 Saha",              ["rota_analiz", "operasyon", "harita"]),
-        ("⚙️ Yönetim",           ["kullanici", "patron", "musteri_atama"]),
-        ("📊 Raporlar",          ["admin_rapor", "rapor"]),
-        ("📞 Telefon Kişiler",   ["kisiler"]),
+        ("Cari işlemleri",    ["yeni", "liste", "excel"]),
+        ("Analiz ve takip",   ["analiz", "islem_takip"]),
+        ("Randevu ve teklif", ["randevu", "teklif", "ozel_teklif"]),
+        ("Saha",              ["rota_analiz", "operasyon", "harita"]),
+        ("Yönetim",           ["kullanici", "patron", "musteri_atama"]),
+        ("Raporlar",          ["admin_rapor", "rapor"]),
+        ("Telefon Kişiler",   ["kisiler"]),
     ]
-
-    # Randevu ve teklif grubunun yanında rozet — bekleyen randevu sayısı
-    try:
-        _mg_rand_df = db_read("randevular", extra_sql="")
-        _mg_rand_sayi = len(_mg_rand_df) if not _mg_rand_df.empty else 0
-    except Exception:
-        _mg_rand_sayi = 0
 
     if "_acik_grup" not in st.session_state:
         _varsayilan_acik = None
@@ -1999,8 +1992,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
 
         _acik_mi = st.session_state["_acik_grup"] == _g_ad
         _ok = "▾" if _acik_mi else "▸"
-        _rozet = f"  ·  {_mg_rand_sayi}" if _g_ad == "📅 Randevu ve teklif" and _mg_rand_sayi else ""
-        if st.button(f"{_g_ad}{_rozet}   {_ok}", use_container_width=True,
+        if st.button(f"{_g_ad}   {_ok}", use_container_width=True,
                      type="primary" if _acik_mi else "secondary",
                      key=f"grphdr_{_g_ad}"):
             st.session_state["_acik_grup"] = None if _acik_mi else _g_ad
