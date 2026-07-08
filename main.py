@@ -2390,15 +2390,92 @@ elif aktif == "mukerrer":
         if not _mk_mukerrerler:
             st.success("✅ Mükerrer müşteri bulunamadı.")
         else:
-            _mk_tum_idler = [i for _v in _mk_mukerrerler.values() for i in _v]
+            _mk_tum_idler = [int(i) for _v in _mk_mukerrerler.values() for i in _v]
             st.warning(f"{len(_mk_mukerrerler)} mükerrer firma adı bulundu — toplam {len(_mk_tum_idler)} kayıt.")
-            st.caption("Aşağıdaki butona basınca Cari Liste ekranı tüm mükerrer kayıtlara filtrelenmiş olarak açılır. "
-                       "Hücrelere tıklayıp elle düzenleyebilir, \"Değişiklikleri Kaydet\" ile kaydedebilir, "
-                       "\"Seç\" kutusunu işaretleyip istediğinizi silebilirsiniz — tıpkı normal Cari Liste'de çalıştığı gibi.")
-            if st.button("🔍 Tüm mükerrer kayıtları Cari Liste'de göster", type="primary", use_container_width=True, key="mk_liste_goster_btn"):
-                st.session_state["_mr_liste_filtre"] = [int(i) for i in _mk_tum_idler]
-                st.session_state["aktif_tab"] = "liste"
-                st.rerun()
+            st.caption("Hücrelere tıklayıp elle düzenleyin, \"💾 Kaydet\" ile kaydedin. "
+                       "Silmek istediklerinizi \"Seç\" kutusuyla işaretleyip \"🗑️ Seçilenleri Sil\"e basın.")
+
+            _mk_kolonlar = [c for c in ["id","firma","yetkili","gsm","sabit","email","il","ilce",
+                                         "durum","islem_asamasi","beklenen_ciro","gerceklesen_ciro"]
+                             if c in _mk_df.columns]
+            _mk_tablo = _mk_df[_mk_df["id"].astype(int).isin(_mk_tum_idler)][_mk_kolonlar].copy()
+            _mk_tablo = _mk_tablo.sort_values("firma").reset_index(drop=True)
+            _mk_tablo.insert(0, "Seç", False)
+
+            _mk_col_config = {
+                "Seç": st.column_config.CheckboxColumn("Seç", default=False, width="small"),
+                "id": st.column_config.NumberColumn("ID", disabled=True, width="small"),
+                "firma": st.column_config.TextColumn("Firma", width="medium"),
+                "yetkili": st.column_config.TextColumn("Yetkili", width="medium"),
+                "gsm": st.column_config.TextColumn("GSM", width="medium"),
+                "sabit": st.column_config.TextColumn("Sabit", width="medium"),
+                "email": st.column_config.TextColumn("Email", width="medium"),
+                "il": st.column_config.TextColumn("İl", width="small"),
+                "ilce": st.column_config.TextColumn("İlçe", width="small"),
+                "durum": st.column_config.TextColumn("Durum", width="small"),
+                "islem_asamasi": st.column_config.TextColumn("Aşama", width="small"),
+                "beklenen_ciro": st.column_config.NumberColumn("Hedef ₺", format="%,.0f ₺", width="small"),
+                "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width="small"),
+            }
+
+            _mk_edited = st.data_editor(
+                _mk_tablo, use_container_width=True, hide_index=True,
+                column_config=_mk_col_config, key="mk_editor",
+                height=min(600, 80 + 35 * len(_mk_tablo)))
+
+            _mkc1, _mkc2 = st.columns([2,1])
+            with _mkc1:
+                if st.button("💾 Kaydet", type="primary", use_container_width=True, key="mk_kaydet_btn"):
+                    _mk_sb = get_sb_client()
+                    _mk_kaydedilen = 0
+                    for _, _mkr in _mk_edited.iterrows():
+                        _mk_id = int(_mkr["id"])
+                        _mk_orig = _mk_tablo[_mk_tablo["id"] == _mk_id].iloc[0]
+                        _mk_guncel = {}
+                        for _mkk in _mk_kolonlar:
+                            if _mkk == "id": continue
+                            _yeni_v = _mkr.get(_mkk, "")
+                            _eski_v = _mk_orig.get(_mkk, "")
+                            if str(_yeni_v) != str(_eski_v):
+                                _mk_guncel[_mkk] = _yeni_v
+                        if _mk_guncel:
+                            try:
+                                if _mk_sb:
+                                    _mk_sb.table("cari_kartlar").update(_mk_guncel).eq("id", _mk_id).execute()
+                                else:
+                                    db_update("cari_kartlar", _mk_guncel, "id", _mk_id)
+                                _mk_kaydedilen += 1
+                            except Exception:
+                                pass
+                    if _mk_kaydedilen:
+                        try: get_cari_listesi.clear()
+                        except: pass
+                        st.session_state.pop("mk_editor", None)
+                        st.toast(f"✅ {_mk_kaydedilen} kayıt güncellendi", icon="✅")
+                        st.rerun()
+                    else:
+                        st.info("Değişiklik yok.")
+            with _mkc2:
+                _mk_secili = _mk_edited[_mk_edited["Seç"] == True]
+                if st.button(f"🗑️ Seçilenleri Sil ({len(_mk_secili)})", use_container_width=True,
+                             key="mk_sil_btn", disabled=(len(_mk_secili) == 0)):
+                    _mk_sb2 = get_sb_client()
+                    _mk_silinen = 0
+                    for _mid in _mk_secili["id"].tolist():
+                        try:
+                            if _mk_sb2:
+                                _mk_sb2.table("cari_kartlar").update({"silindi": 1}).eq("id", int(_mid)).execute()
+                            else:
+                                db_update("cari_kartlar", {"silindi": 1}, "id", int(_mid))
+                            _mk_silinen += 1
+                        except Exception:
+                            pass
+                    if _mk_silinen:
+                        try: get_cari_listesi.clear()
+                        except: pass
+                        st.session_state.pop("mk_editor", None)
+                        st.toast(f"🗑️ {_mk_silinen} kayıt silindi", icon="🗑️")
+                        st.rerun()
 
 elif aktif == "liste":
     sayfa_log("liste")
