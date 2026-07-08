@@ -2214,7 +2214,13 @@ if aktif == "yeni":
         st.markdown("### ➕ Yeni Cari Kart")
 
     il_listesi = sorted(ILLER_ILCELER.keys())
-    mevcut_il   = duzenle.get("il","") if duzenle and duzenle.get("il","") in il_listesi else il_listesi[0]
+    _il_normalize_harita = {_bl_sadelestir(_ad): _ad for _ad in il_listesi}
+    _kayitli_il_ham = duzenle.get("il","") if duzenle else ""
+    # Büyük/küçük harf, yazım farkı toleranslı eşleştirme — kayıtlı değer varsa ASLA sessizce sıfırlanmaz
+    mevcut_il = _il_normalize_harita.get(_bl_sadelestir(_kayitli_il_ham), il_listesi[0])
+    if _kayitli_il_ham and _bl_sadelestir(_kayitli_il_ham) not in _il_normalize_harita:
+        st.warning(f"⚠️ Kayıtlı il '{_kayitli_il_ham}' tanımlı 81 il listesinde bulunamadı — "
+                   f"geçici olarak '{il_listesi[0]}' gösteriliyor. Doğru ili siz seçin, kaydedince güncellenir.")
     # Eski session key'lerini temizle — her durumda temizle ki eski değer yapışmasın
     for _dk in ["yeni_il_sec","yeni_ilce_sec","yeni_il_form","yeni_ilce_form",
                 f"yeni_il_dis_{_form_id}", f"yeni_ilce_dis_{_form_id}"]:
@@ -2234,8 +2240,9 @@ if aktif == "yeni":
     il_idx  = il_listesi.index(mevcut_il) if mevcut_il in il_listesi else 0
     il      = r2c1.selectbox("İl", il_listesi, index=il_idx, key=f"yeni_il_dis_{_form_id}")
     ilce_list = ILLER_ILCELER.get(il, [""])
-    mevcut_ilce = duzenle.get("ilce","") if duzenle else ""
-    if mevcut_ilce not in ilce_list: mevcut_ilce = ilce_list[0] if ilce_list else ""
+    _ilce_normalize_harita = {_bl_sadelestir(_ad): _ad for _ad in ilce_list}
+    _kayitli_ilce_ham = duzenle.get("ilce","") if duzenle else ""
+    mevcut_ilce = _ilce_normalize_harita.get(_bl_sadelestir(_kayitli_ilce_ham), ilce_list[0] if ilce_list else "")
     ilce_idx = ilce_list.index(mevcut_ilce) if mevcut_ilce in ilce_list else 0
     ilce    = r2c2.selectbox("İlçe", ilce_list, index=ilce_idx, key=f"yeni_ilce_dis_{_form_id}")
     durum_opts = ["Aktif","Hedef","Pasif"]
