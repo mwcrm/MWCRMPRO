@@ -3520,18 +3520,25 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
     if "🗑️ Sil" in edited_df.columns and "id" in edited_df.columns:
         _sil_isaretli = edited_df[edited_df["🗑️ Sil"] == True]
         if not _sil_isaretli.empty:
-            _sb_hizli_sil = get_sb_client()
-            _silinen_sayi = 0
-            for _sid in _sil_isaretli["id"].tolist():
+            with st.spinner(f"🗑️ {len(_sil_isaretli)} kayıt siliniyor..."):
+                _sil_id_listesi = [int(x) for x in _sil_isaretli["id"].tolist()]
+                _sb_hizli_sil = get_sb_client()
+                _silinen_sayi = 0
                 try:
                     if _sb_hizli_sil:
-                        _sb_hizli_sil.table("cari_kartlar").update({"silindi": 1}).eq("id", int(_sid)).execute()
+                        # Tek sorguda toplu silme — satır satır dönmekten çok daha hızlı
+                        _sb_hizli_sil.table("cari_kartlar").update({"silindi": 1}).in_("id", _sil_id_listesi).execute()
+                        _silinen_sayi = len(_sil_id_listesi)
                     else:
-                        db_update("cari_kartlar", {"silindi": 1}, "id", int(_sid))
-                    _silinen_sayi += 1
-                except Exception:
-                    pass
+                        for _sid in _sil_id_listesi:
+                            db_update("cari_kartlar", {"silindi": 1}, "id", _sid)
+                            _silinen_sayi += 1
+                except Exception as _sil_hata:
+                    st.error(f"Silme hatası: {_sil_hata}")
             if _silinen_sayi:
+                # data_editor'ın satır-index bazlı hafızasını temizle — yoksa silinen satır
+                # sonrası kayan satırlar yanlışlıkla "işaretli" görünüp art arda silinmeye devam eder.
+                st.session_state.pop("cari_editor", None)
                 st.toast(f"🗑️ {_silinen_sayi} kayıt silindi", icon="🗑️")
                 st.rerun()
 
