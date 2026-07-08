@@ -6279,55 +6279,86 @@ elif aktif == "excel":
                            "Bulunamazsa tüm satırlar 0 ₺ hedef ile eklenir.")
             st.success(f"{len(df_yukl)} satır okundu.")
 
-            if st.button("✅ Sisteme Aktar", type="primary", key="excel_aktar_btn_v2"):
+            def _ex_temiz_str(v):
+                if v is None or (isinstance(v, float) and pd.isna(v)):
+                    return ""
+                return str(v)
+
+            def _ex_temiz_tel(v):
+                if v is None or (isinstance(v, float) and pd.isna(v)):
+                    return ""
+                s = str(v).strip()
+                if s.endswith(".0"):
+                    s = s[:-2]
+                return s
+
+            def _ex_temiz_float(v):
+                try:
+                    if v is None or (isinstance(v, float) and pd.isna(v)):
+                        return 0.0
+                    return float(v)
+                except:
+                    return 0.0
+
+            # ── ID ALMADAN ÖNCE MÜKERRER TESPİTİ ──────────────────────────────
+            # Her müşterinin ID'si kalıcıdır, asla değişmez — bu yüzden sisteme
+            # ID vererek eklemeden önce, firma adı hâlihazırda var mı diye bakılır.
+            _ex_mevcut_df = get_cari_listesi()
+            _ex_mevcut_isimler = {}
+            if not _ex_mevcut_df.empty and "firma" in _ex_mevcut_df.columns:
+                for _, _mr in _ex_mevcut_df.iterrows():
+                    _ex_ad = str(_mr.get("firma","")).strip().upper()
+                    if _ex_ad:
+                        _ex_mevcut_isimler.setdefault(_ex_ad, []).append(_mr.to_dict())
+
+            _ex_temiz_kayitlar = []
+            _ex_taslak_kayitlar = []
+            _ex_dosya_icinde_gorulen = set()
+
+            for _ei, _row in df_yukl.iterrows():
+                _ex_firma = str(_row.get("firma","") or "").strip()
+                if not _ex_firma:
+                    continue
+                _ex_kayit = {
+                    "firma": _ex_firma,
+                    "yetkili": _ex_temiz_str(_row.get("yetkili","")),
+                    "gsm": _ex_temiz_tel(_row.get("gsm","")),
+                    "sabit": _ex_temiz_tel(_row.get("sabit","")),
+                    "email": _ex_temiz_str(_row.get("email","")),
+                    "adres": _ex_temiz_str(_row.get("adres","")),
+                    "ilce": _ex_temiz_str(_row.get("ilce","")),
+                    "il": _ex_temiz_str(_row.get("il","")),
+                    "durum": _ex_temiz_str(_row.get("durum","Hedef")) or "Hedef",
+                    "temsilci": _ex_temiz_str(_row.get("temsilci","")),
+                    "islem_asamasi": _ex_temiz_str(_row.get("islem_asamasi","İlk Temas")) or "İlk Temas",
+                    "beklenen_ciro": _ex_temiz_float(_row.get("beklenen_ciro",0)),
+                    "gerceklesen_ciro": _ex_temiz_float(_row.get("gerceklesen_ciro",0)),
+                    "olusturan": st.session_state.get("kullanici",""),
+                    "silindi": 0,
+                }
+                _ex_ad_norm = _ex_firma.upper()
+                if _ex_ad_norm in _ex_mevcut_isimler:
+                    _ex_taslak_kayitlar.append({**_ex_kayit, "_sebep": "Sistemde zaten var",
+                                                 "_eslesen": _ex_mevcut_isimler[_ex_ad_norm]})
+                elif _ex_ad_norm in _ex_dosya_icinde_gorulen:
+                    _ex_taslak_kayitlar.append({**_ex_kayit, "_sebep": "Excel dosyasında tekrar ediyor",
+                                                 "_eslesen": []})
+                else:
+                    _ex_dosya_icinde_gorulen.add(_ex_ad_norm)
+                    _ex_temiz_kayitlar.append(_ex_kayit)
+
+            _ex_c1, _ex_c2 = st.columns(2)
+            _ex_c1.metric("✅ Temiz (yeni) kayıt", len(_ex_temiz_kayitlar))
+            _ex_c2.metric("⚠️ Şüpheli mükerrer (taslakta bekliyor)", len(_ex_taslak_kayitlar))
+
+            if st.button("✅ Temiz Olanları Sisteme Aktar", type="primary", key="excel_aktar_btn_v2"):
                 sb = get_sb_client()
                 if not sb:
                     st.error("Supabase bağlantısı yok!")
+                elif not _ex_temiz_kayitlar:
+                    st.info("Aktarılacak temiz (yeni) kayıt yok.")
                 else:
-                    kayitlar = []
-                    for _, row in df_yukl.iterrows():
-                        firma = str(row.get("firma","") or "").strip()
-                        if not firma:
-                            continue
-
-                        def _temiz_str(v):
-                            if v is None or (isinstance(v, float) and pd.isna(v)):
-                                return ""
-                            return str(v)
-
-                        def _temiz_tel(v):
-                            if v is None or (isinstance(v, float) and pd.isna(v)):
-                                return ""
-                            s = str(v).strip()
-                            if s.endswith(".0"):
-                                s = s[:-2]
-                            return s
-
-                        def _temiz_float(v):
-                            try:
-                                if v is None or (isinstance(v, float) and pd.isna(v)):
-                                    return 0.0
-                                return float(v)
-                            except:
-                                return 0.0
-
-                        kayitlar.append({
-                            "firma": firma,
-                            "yetkili": _temiz_str(row.get("yetkili","")),
-                            "gsm": _temiz_tel(row.get("gsm","")),
-                            "sabit": _temiz_tel(row.get("sabit","")),
-                            "email": _temiz_str(row.get("email","")),
-                            "adres": _temiz_str(row.get("adres","")),
-                            "ilce": _temiz_str(row.get("ilce","")),
-                            "il": _temiz_str(row.get("il","")),
-                            "durum": _temiz_str(row.get("durum","Hedef")) or "Hedef",
-                            "temsilci": _temiz_str(row.get("temsilci","")),
-                            "islem_asamasi": _temiz_str(row.get("islem_asamasi","İlk Temas")) or "İlk Temas",
-                            "beklenen_ciro": _temiz_float(row.get("beklenen_ciro",0)),
-                            "gerceklesen_ciro": _temiz_float(row.get("gerceklesen_ciro",0)),
-                            "olusturan": st.session_state.get("kullanici",""),
-                            "silindi": 0
-                        })
+                    kayitlar = _ex_temiz_kayitlar
 
                     toplam = len(kayitlar)
                     basarili = 0
@@ -6351,6 +6382,49 @@ elif aktif == "excel":
                         st.error(f"❌ {len(hatalar)} grup hata verdi:")
                         for h in hatalar:
                             st.code(h)
+
+            # ── TASLAK: Şüpheli Mükerrer Kayıtlar — henüz sisteme ID almadılar ──
+            if _ex_taslak_kayitlar:
+                st.divider()
+                st.warning(f"⚠️ {len(_ex_taslak_kayitlar)} kayıt taslakta bekliyor — bunlara henüz ID verilmedi, sisteme eklenmedi. "
+                           "Aşağıda mevcut kayıtla karşılaştırıp siz karar verin.")
+                with st.expander(f"🔍 Taslaktaki {len(_ex_taslak_kayitlar)} şüpheli kaydı incele", expanded=True):
+                    for _ti, _tk in enumerate(_ex_taslak_kayitlar):
+                        st.markdown(f"**{_tk['firma']}** — *{_tk['_sebep']}*")
+                        _tc1, _tc2 = st.columns(2)
+                        with _tc1:
+                            st.caption("📄 Excel'den gelen (henüz ID yok)")
+                            st.text(f"Yetkili: {_tk.get('yetkili','—')}\n"
+                                    f"GSM: {_tk.get('gsm','—')}\n"
+                                    f"İl/İlçe: {_tk.get('il','—')} / {_tk.get('ilce','—')}\n"
+                                    f"Hedef ciro: {_tk.get('beklenen_ciro',0):,.0f} ₺")
+                        with _tc2:
+                            if _tk["_eslesen"]:
+                                _es = _tk["_eslesen"][0]
+                                st.caption(f"💾 Sistemde kayıtlı (id {_es.get('id')})")
+                                st.text(f"Yetkili: {_es.get('yetkili') or '—'}\n"
+                                        f"GSM: {_es.get('gsm') or '—'}\n"
+                                        f"İl/İlçe: {_es.get('il') or '—'} / {_es.get('ilce') or '—'}\n"
+                                        f"Hedef ciro: {float(_es.get('beklenen_ciro') or 0):,.0f} ₺")
+                            else:
+                                st.caption("💾 Excel dosyasının kendi içinde tekrar ediyor")
+                        _tb1, _tb2 = st.columns(2)
+                        with _tb1:
+                            if st.button("✅ Yine de yeni kayıt olarak ekle", key=f"ex_tas_ekle_{_ti}", use_container_width=True):
+                                _sb_tas = get_sb_client()
+                                if _sb_tas:
+                                    try:
+                                        _tk_temiz = {k: v for k, v in _tk.items() if not k.startswith("_")}
+                                        _sb_tas.table("cari_kartlar").insert(_tk_temiz).execute()
+                                        try: get_cari_listesi.clear()
+                                        except: pass
+                                        st.toast(f"✅ '{_tk['firma']}' yeni kayıt olarak eklendi (yeni ID verildi)", icon="✅")
+                                        st.rerun()
+                                    except Exception as _tase:
+                                        st.error(f"Hata: {_tase}")
+                        with _tb2:
+                            st.caption("Hiçbir şey yapmazsanız bu kayıt sisteme eklenmez, taslakta kalır.")
+                        st.markdown("---")
 
 
 elif aktif == "analiz":
