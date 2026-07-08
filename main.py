@@ -2268,8 +2268,8 @@ if aktif == "yeni":
     mevcut_ilce = _ilce_normalize_harita.get(_bl_sadelestir(_kayitli_ilce_ham), ilce_list[0] if ilce_list else "")
     ilce_idx = ilce_list.index(mevcut_ilce) if mevcut_ilce in ilce_list else 0
     ilce    = r2c2.selectbox("İlçe", ilce_list, index=ilce_idx, key=f"yeni_ilce_dis_{_form_id}")
-    durum_opts = ["Aktif","Hedef","Pasif"]
-    durum_idx  = durum_opts.index(duzenle.get("durum","Aktif")) if duzenle and duzenle.get("durum","") in durum_opts else 0
+    durum_opts = _tanimlar_yukle("durum") or ["Özel Müşteri","Portföy"]
+    durum_idx  = durum_opts.index(duzenle.get("durum","")) if duzenle and duzenle.get("durum","") in durum_opts else 0
     durum   = r2c3.selectbox("Durum", durum_opts, index=durum_idx, key=f"yeni_durum_dis_{_form_id}")
     temsilci_dis = r2c4.text_input("Temsilci", value=duzenle.get("temsilci","") if duzenle else "", key=f"yeni_temsilci_dis_{_form_id}", placeholder="Temsilci adı")
     seg_opts = ["--","👑 A+","⭐ A","🔵 B","⚪ C"]
@@ -3486,7 +3486,8 @@ function kartSec(id){
         except: pass
         return []
     _ekstra_d = _durum_listesi_yukle()
-    _tum_durumlar = ["Aktif","Hedef","Pasif"] + [d for d in _ekstra_d if d not in ["Aktif","Hedef","Pasif"]]
+    _durum_temel = _tanimlar_yukle("durum") or ["Özel Müşteri","Portföy"]
+    _tum_durumlar = _durum_temel + [d for d in _ekstra_d if d not in _durum_temel]
 
     # ── KOLON AYARLARI ──────────────────────────────────────────────────────────
     # ── KOLON GENİŞLİKLERİ — DB'den oku ─────────────────────────────────────
@@ -8691,7 +8692,7 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
                 except: pass
 
             _ekstra_durumlar = _durum_yukle()
-            _varsayilan = ["Aktif","Hedef","Pasif"]
+            _varsayilan = _tanimlar_yukle("durum") or ["Özel Müşteri","Portföy"]
             _tum_durumlar = _varsayilan.copy()
             for _d in _ekstra_durumlar:
                 if _d not in _tum_durumlar:
