@@ -1358,8 +1358,8 @@ def _notlar_yukle(cari_id):
 
 @st.dialog("📋 Notlar & Randevu", width="large")
 def not_dialog(cari_id, firma_adi=""):
-    """Ekran ortasında açılan not + randevu penceresi"""
-    _tab_not, _tab_rdv = st.tabs(["📝 Notlar", "📅 Randevu Ekle"])
+    """Ekran ortasında açılan not + randevu + silme penceresi"""
+    _tab_not, _tab_rdv, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "🗑️ Cari Sil"])
     with _tab_not:
         not_paneli(cari_id, firma_adi, key_prefix="dlg")
     with _tab_rdv:
@@ -1387,6 +1387,20 @@ def not_dialog(cari_id, firma_adi=""):
                     st.cache_data.clear()
             except Exception as _re:
                 st.error(f"Hata: {_re}")
+    with _tab_sil:
+        st.caption(f"**{firma_adi}** kaydını komple sil — tıklayınca anında silinir, onay istenmez.")
+        if st.button("🗑️ Cari Komple Sil", key=f"dlg_cari_sil_{cari_id}", type="primary", use_container_width=True):
+            try:
+                _sb_cs = get_sb_client()
+                if _sb_cs:
+                    _sb_cs.table("cari_kartlar").update({"silindi": 1}).eq("id", int(cari_id)).execute()
+                else:
+                    db_update("cari_kartlar", {"silindi": 1}, "id", int(cari_id))
+                st.session_state.pop("cari_editor", None)
+                st.toast(f"🗑️ '{firma_adi}' silindi", icon="🗑️")
+                st.rerun()
+            except Exception as _cse:
+                st.error(f"Silme hatası: {_cse}")
 
 def not_paneli(cari_id, firma_adi="", key_prefix="np"):
     """Her yerde kullanılan ortak not paneli — Model 5: ultra minimal"""
@@ -3323,9 +3337,8 @@ function kartSec(id){
         "asama3":        st.column_config.TextColumn("Aşama 3", width=_w("asama3")),
         "asama4":        st.column_config.TextColumn("Aşama 4", width=_w("asama4")),
         "sonuc":         st.column_config.TextColumn("Sonuç",   width=_w("sonuc")),
-        "🗑️ Sil":        st.column_config.CheckboxColumn("🗑️ Sil", default=False, width="small"),
     }
-    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro","✅ Analiz","📅 Son Randevu","aciklama","📨 Notlar","asama1","asama2","asama3","asama4","sonuc","🗑️ Sil"]
+    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro","✅ Analiz","📅 Son Randevu","aciklama","📨 Notlar","asama1","asama2","asama3","asama4","sonuc"]
     # Gizli kolonları çıkar
     _kol_gizli_map = {"firma":"firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email",
                       "adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci",
@@ -3458,7 +3471,6 @@ function kartSec(id){
         df_edit["📨 Notlar"] = ""
 
     df_edit.insert(0, "Seç", False)
-    df_edit["🗑️ Sil"] = False
 
     import json as _json_ls
 
@@ -3518,42 +3530,6 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
             height=max(500, min(len(df_edit) * 35 + 80, 1800)),
             key="cari_editor"
         )
-
-    # ── "🗑️ Sil" işaretlenen satırlar — önce onay ister, "Seç" akışını engellemez ──
-    if "🗑️ Sil" in edited_df.columns and "id" in edited_df.columns:
-        _sil_isaretli = edited_df[edited_df["🗑️ Sil"] == True]
-        if not _sil_isaretli.empty:
-            _sil_id_listesi = [int(x) for x in _sil_isaretli["id"].tolist()]
-            _sil_firma_adlari = _sil_isaretli["firma"].astype(str).tolist() if "firma" in _sil_isaretli.columns else []
-            st.warning(f"⚠️ {len(_sil_id_listesi)} kayıt silinecek: " + ", ".join(_sil_firma_adlari[:5]) +
-                       (f" +{len(_sil_firma_adlari)-5} daha" if len(_sil_firma_adlari) > 5 else ""))
-            _sc1, _sc2 = st.columns([1, 1])
-            with _sc1:
-                if st.button(f"✅ Evet, {len(_sil_id_listesi)} kaydı sil", type="primary", key="cl_sil_onay", use_container_width=True):
-                    with st.spinner("🗑️ Siliniyor..."):
-                        _sb_hizli_sil = get_sb_client()
-                        _silinen_sayi = 0
-                        try:
-                            if _sb_hizli_sil:
-                                for _sid in _sil_id_listesi:
-                                    _sb_hizli_sil.table("cari_kartlar").update({"silindi": 1}).eq("id", _sid).execute()
-                                    _silinen_sayi += 1
-                            else:
-                                for _sid in _sil_id_listesi:
-                                    db_update("cari_kartlar", {"silindi": 1}, "id", _sid)
-                                    _silinen_sayi += 1
-                        except Exception as _sil_hata:
-                            st.error(f"Silme hatası: {_sil_hata}")
-                    if _silinen_sayi:
-                        # data_editor'ın satır-index bazlı hafızasını temizle — yoksa silinen satır
-                        # sonrası kayan satırlar yanlışlıkla "işaretli" görünüp art arda silinmeye devam eder.
-                        st.session_state.pop("cari_editor", None)
-                        st.toast(f"🗑️ {_silinen_sayi} kayıt silindi", icon="🗑️")
-                        st.rerun()
-            with _sc2:
-                if st.button("❌ Vazgeç", key="cl_sil_vazgec", use_container_width=True):
-                    st.session_state.pop("cari_editor", None)
-                    st.rerun()
 
     # (not paneli artık tablonun altında expander olarak açılıyor)
 
