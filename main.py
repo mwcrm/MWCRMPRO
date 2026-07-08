@@ -5942,9 +5942,30 @@ elif aktif == "excel":
         df_yukl = pd.read_excel(yukl_dosya)
         df_yukl.columns = [str(c).strip().lower().replace(" ","_") for c in df_yukl.columns]
 
+        # Hedef/Gerçek ciro sütunları farklı isimlerle gelebilir — hepsini "beklenen_ciro" /
+        # "gerceklesen_ciro" olarak tanı, ilk eşleşen sütunu kullan (sessizce 0 atmasın diye).
+        _hedef_takma_adlar = ["beklenen_ciro","hedef","hedef_ciro","hedef_₺","hedefciro",
+                               "hedef_tl","target","hedef_tutar"]
+        _gercek_takma_adlar = ["gerceklesen_ciro","gerçekleşen_ciro","gerçek","gercek",
+                                "gerçek_ciro","gercek_ciro","gerçek_₺","gerceklesen"]
+        for _hedef_ad in _hedef_takma_adlar:
+            if _hedef_ad in df_yukl.columns:
+                if _hedef_ad != "beklenen_ciro":
+                    df_yukl["beklenen_ciro"] = df_yukl[_hedef_ad]
+                break
+        for _gercek_ad in _gercek_takma_adlar:
+            if _gercek_ad in df_yukl.columns:
+                if _gercek_ad != "gerceklesen_ciro":
+                    df_yukl["gerceklesen_ciro"] = df_yukl[_gercek_ad]
+                break
+
         if "firma" not in df_yukl.columns:
             st.error("❌ Zorunlu sütun eksik: firma")
         else:
+            if "beklenen_ciro" not in df_yukl.columns:
+                st.warning("⚠️ Hedef ciro sütunu bulunamadı — dosyanızdaki sütun başlığını "
+                           f"şunlardan biri yapın: {', '.join(_hedef_takma_adlar)}. "
+                           "Bulunamazsa tüm satırlar 0 ₺ hedef ile eklenir.")
             st.success(f"{len(df_yukl)} satır okundu.")
 
             if st.button("✅ Sisteme Aktar", type="primary", key="excel_aktar_btn_v2"):
