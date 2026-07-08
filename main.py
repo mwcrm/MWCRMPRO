@@ -3519,31 +3519,41 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
             key="cari_editor"
         )
 
-    # ── "🗑️ Sil" işaretlenen satırlar — anında arşive alınır, filtre/sıralama bozulmaz ──
+    # ── "🗑️ Sil" işaretlenen satırlar — önce onay ister, "Seç" akışını engellemez ──
     if "🗑️ Sil" in edited_df.columns and "id" in edited_df.columns:
         _sil_isaretli = edited_df[edited_df["🗑️ Sil"] == True]
         if not _sil_isaretli.empty:
-            with st.spinner(f"🗑️ {len(_sil_isaretli)} kayıt siliniyor..."):
-                _sil_id_listesi = [int(x) for x in _sil_isaretli["id"].tolist()]
-                _sb_hizli_sil = get_sb_client()
-                _silinen_sayi = 0
-                try:
-                    if _sb_hizli_sil:
-                        # Tek sorguda toplu silme — satır satır dönmekten çok daha hızlı
-                        _sb_hizli_sil.table("cari_kartlar").update({"silindi": 1}).in_("id", _sil_id_listesi).execute()
-                        _silinen_sayi = len(_sil_id_listesi)
-                    else:
-                        for _sid in _sil_id_listesi:
-                            db_update("cari_kartlar", {"silindi": 1}, "id", _sid)
-                            _silinen_sayi += 1
-                except Exception as _sil_hata:
-                    st.error(f"Silme hatası: {_sil_hata}")
-            if _silinen_sayi:
-                # data_editor'ın satır-index bazlı hafızasını temizle — yoksa silinen satır
-                # sonrası kayan satırlar yanlışlıkla "işaretli" görünüp art arda silinmeye devam eder.
-                st.session_state.pop("cari_editor", None)
-                st.toast(f"🗑️ {_silinen_sayi} kayıt silindi", icon="🗑️")
-                st.rerun()
+            _sil_id_listesi = [int(x) for x in _sil_isaretli["id"].tolist()]
+            _sil_firma_adlari = _sil_isaretli["firma"].astype(str).tolist() if "firma" in _sil_isaretli.columns else []
+            st.warning(f"⚠️ {len(_sil_id_listesi)} kayıt silinecek: " + ", ".join(_sil_firma_adlari[:5]) +
+                       (f" +{len(_sil_firma_adlari)-5} daha" if len(_sil_firma_adlari) > 5 else ""))
+            _sc1, _sc2 = st.columns([1, 1])
+            with _sc1:
+                if st.button(f"✅ Evet, {len(_sil_id_listesi)} kaydı sil", type="primary", key="cl_sil_onay", use_container_width=True):
+                    with st.spinner("🗑️ Siliniyor..."):
+                        _sb_hizli_sil = get_sb_client()
+                        _silinen_sayi = 0
+                        try:
+                            if _sb_hizli_sil:
+                                for _sid in _sil_id_listesi:
+                                    _sb_hizli_sil.table("cari_kartlar").update({"silindi": 1}).eq("id", _sid).execute()
+                                    _silinen_sayi += 1
+                            else:
+                                for _sid in _sil_id_listesi:
+                                    db_update("cari_kartlar", {"silindi": 1}, "id", _sid)
+                                    _silinen_sayi += 1
+                        except Exception as _sil_hata:
+                            st.error(f"Silme hatası: {_sil_hata}")
+                    if _silinen_sayi:
+                        # data_editor'ın satır-index bazlı hafızasını temizle — yoksa silinen satır
+                        # sonrası kayan satırlar yanlışlıkla "işaretli" görünüp art arda silinmeye devam eder.
+                        st.session_state.pop("cari_editor", None)
+                        st.toast(f"🗑️ {_silinen_sayi} kayıt silindi", icon="🗑️")
+                        st.rerun()
+            with _sc2:
+                if st.button("❌ Vazgeç", key="cl_sil_vazgec", use_container_width=True):
+                    st.session_state.pop("cari_editor", None)
+                    st.rerun()
 
     # (not paneli artık tablonun altında expander olarak açılıyor)
 
