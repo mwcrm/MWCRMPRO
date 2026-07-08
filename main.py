@@ -3058,6 +3058,7 @@ function kartSec(id){
         st.stop()
 
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
+    _cok_secili_idler = set()
     with st.expander("🔍 Filtreler & Arama", expanded=st.session_state.get("_cl_fil_acik", True)):
         st.session_state["_cl_fil_acik"] = True  # expander açık kalsın
         # ── TEK SATIR FİLTRE ───────────────────────────────────────────────────
@@ -3110,6 +3111,18 @@ function kartSec(id){
         _tem_sec  = _fc[7].multiselect("t", _tem_opts, default=_tem_def, key="_cl_fil_temsilci_multi", placeholder="Temsilci...", label_visibility="collapsed")
 
         siralama_kol = "Tarih↓"  # Sıralama kutusu kaldırıldı, varsayılan sıralama sabit kaldı
+
+        # ── Çoklu firma seçimi (karşılaştırma/düzeltme için) — seçilenler varsa tablo sadece onları gösterir ──
+        _cok_sec_opts = [f"[{int(r['id'])}] {r.get('firma','')}" for _, r in df.iterrows()]
+        _cok_secili_ham = st.multiselect(
+            "🔍 Birden fazla firma seç (karşılaştır / düzelt / sil)",
+            _cok_sec_opts, key="_cl_cok_secim", placeholder="Arayıp birden fazla firma seçin — sadece seçtikleriniz listelenir...")
+        _cok_secili_idler = set()
+        for _cs in _cok_secili_ham:
+            try:
+                _cok_secili_idler.add(int(_cs.split("]")[0].replace("[","").strip()))
+            except Exception:
+                pass
 
         # Eski sistemle uyumluluk
         kart_opts = ["-- Müşteri Seçin --"] + [
@@ -3258,6 +3271,12 @@ function kartSec(id){
             df_f = df_f.copy(); df_f["_s"] = pd.to_numeric(df_f["gerceklesen_ciro"], errors="coerce").fillna(0)
             df_f = df_f.sort_values("_s", ascending=True).drop(columns=["_s"])
         df_f = df_f.reset_index(drop=True)
+
+    # Çoklu firma seçimi yapıldıysa — diğer filtreler ne olursa olsun sadece seçilenler gösterilir
+    if _cok_secili_idler and "id" in df_f.columns:
+        df_f = df.copy()  # tüm listeden (mevcut il/durum filtrelerinden bağımsız) seçilenleri bul
+        df_f = df_f[df_f["id"].isin(_cok_secili_idler)].reset_index(drop=True)
+        st.info(f"🔍 {len(df_f)} firma karşılaştırma için seçili — temizlemek için yukarıdaki kutudan kaldırın.")
 
     _aktif_fil_sayisi = sum([bool(ara_txt),bool(_asama_sec),bool(_durum_sec),filtre_seg!="Tümü",bool(_il_sec),bool(_ilce_sec),bool(_tem_sec)])
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
