@@ -2400,6 +2400,37 @@ elif aktif == "mukerrer":
                              if c in _mk_df.columns]
             _mk_tablo = _mk_df[_mk_df["id"].astype(int).isin(_mk_tum_idler)][_mk_kolonlar].copy()
             _mk_tablo = _mk_tablo.sort_values("firma").reset_index(drop=True)
+
+            # ── Not / Analiz / Randevu bilgisi — diğer tablolardan hesaplanır (salt okunur) ──
+            _mk_sb_ek = get_sb_client()
+            _mk_not_sayac, _mk_rand_sayac, _mk_analiz_set = {}, {}, set()
+            if _mk_sb_ek:
+                try:
+                    _mk_not_ham = _mk_sb_ek.table("cari_aciklamalar").select("cari_id").in_(
+                        "cari_id", _mk_tum_idler).execute().data or []
+                    for _r in _mk_not_ham:
+                        _cid = int(_r.get("cari_id", 0) or 0)
+                        _mk_not_sayac[_cid] = _mk_not_sayac.get(_cid, 0) + 1
+                except Exception: pass
+                try:
+                    _mk_rand_ham = _mk_sb_ek.table("randevular").select("musteri_id").in_(
+                        "musteri_id", _mk_tum_idler).execute().data or []
+                    for _r in _mk_rand_ham:
+                        _cid = int(_r.get("musteri_id", 0) or 0)
+                        _mk_rand_sayac[_cid] = _mk_rand_sayac.get(_cid, 0) + 1
+                except Exception: pass
+                try:
+                    _mk_firmalar_upper = set(_mk_tablo["firma"].astype(str).str.strip().str.upper())
+                    _mk_analiz_ham = _mk_sb_ek.table("musteri_analiz").select("firma").execute().data or []
+                    _mk_analiz_set = {str(a.get("firma","")).strip().upper() for a in _mk_analiz_ham
+                                       if str(a.get("firma","")).strip().upper() in _mk_firmalar_upper}
+                except Exception: pass
+
+            _mk_tablo["Notlar"] = _mk_tablo["id"].apply(lambda x: _mk_not_sayac.get(int(x), 0))
+            _mk_tablo["Randevu"] = _mk_tablo["id"].apply(lambda x: _mk_rand_sayac.get(int(x), 0))
+            _mk_tablo["Analiz"] = _mk_tablo["firma"].apply(
+                lambda x: "✅" if str(x).strip().upper() in _mk_analiz_set else "")
+
             _mk_tablo.insert(0, "Seç", False)
 
             _mk_col_config = {
@@ -2416,6 +2447,9 @@ elif aktif == "mukerrer":
                 "islem_asamasi": st.column_config.TextColumn("Aşama", width="small"),
                 "beklenen_ciro": st.column_config.NumberColumn("Hedef ₺", format="%,.0f ₺", width="small"),
                 "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width="small"),
+                "Notlar": st.column_config.NumberColumn("📨 Notlar", disabled=True, width="small"),
+                "Randevu": st.column_config.NumberColumn("📅 Randevu", disabled=True, width="small"),
+                "Analiz": st.column_config.TextColumn("✅ Analiz", disabled=True, width="small"),
             }
 
             _mk_edited = st.data_editor(
