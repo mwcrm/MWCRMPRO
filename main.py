@@ -3596,7 +3596,7 @@ function kartSec(id){
         "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
         "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50,
         "beklenen_ciro":80,"gerceklesen_ciro":80,"✅ Analiz":80,
-        "asama1":100,"asama2":100,"asama3":100,"asama4":100,"sonuc":100
+        "asama1":100,"asama2":100,"asama3":100,"sonuc":100
     }
     # Gizli kolonları DB'den yükle
     if "_kol_genislik_init" not in st.session_state:
@@ -3653,20 +3653,19 @@ function kartSec(id){
         "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
         "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=True, width=_w("✅ Analiz")),
-        "asama1":        st.column_config.TextColumn("Aşama 1", width=_w("asama1")),
-        "asama2":        st.column_config.TextColumn("Aşama 2", width=_w("asama2")),
-        "asama3":        st.column_config.TextColumn("Aşama 3", width=_w("asama3")),
-        "asama4":        st.column_config.TextColumn("Aşama 4", width=_w("asama4")),
+        "asama1":        st.column_config.TextColumn("1. Aşama", width=_w("asama1")),
+        "asama2":        st.column_config.TextColumn("2. Aşama", width=_w("asama2")),
+        "asama3":        st.column_config.TextColumn("3. Aşama", width=_w("asama3")),
         "sonuc":         st.column_config.TextColumn("Sonuç",   width=_w("sonuc")),
     }
-    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro","✅ Analiz","📅 Son Randevu","aciklama","📨 Notlar","asama1","asama2","asama3","asama4","sonuc"]
+    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro","✅ Analiz","📅 Son Randevu","aciklama","📨 Notlar","asama1","asama2","asama3","sonuc"]
     # Gizli kolonları çıkar
     _kol_gizli_map = {"firma":"firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email",
                       "adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci",
                       "islem_asamasi":"islem_asamasi","aciklama":"aciklama",
                       "📅 Son Randevu":"📅 Son Randevu","📨 Notlar":"📨 Notlar","id":"id",
                       "beklenen_ciro":"beklenen_ciro","gerceklesen_ciro":"gerceklesen_ciro","✅ Analiz":"✅ Analiz",
-                      "asama1":"asama1","asama2":"asama2","asama3":"asama3","asama4":"asama4","sonuc":"sonuc"}
+                      "asama1":"asama1","asama2":"asama2","asama3":"asama3","sonuc":"sonuc"}
     col_order = [c for c in col_order if not any(c == _kol_gizli_map.get(g,g) for g in _GIZLI_KOLONLAR)]
 
     # ── DATA EDITOR ─────────────────────────────────────────────────────────────
@@ -3699,7 +3698,7 @@ function kartSec(id){
     except:
         df_edit["📅 Son Randevu"] = ""
     # Aşama 1-4 ve Sonuç kolonları — yoksa boş ekle
-    for _ak in ["asama1","asama2","asama3","asama4","sonuc"]:
+    for _ak in ["asama1","asama2","asama3","sonuc"]:
         if _ak not in df_edit.columns:
             df_edit[_ak] = ""
 
@@ -3889,7 +3888,7 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
         if "aciklama" not in _kv.columns:
             _kv["aciklama"] = ""
         _kv["aciklama"] = _kv["aciklama"].fillna("").astype(str).replace("nan","")
-        _kayit_kolonlar = ["id","firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi","aciklama","asama1","asama2","asama3","asama4","sonuc"]
+        _kayit_kolonlar = ["id","firma","yetkili","gsm","sabit","email","il","ilce","durum","temsilci","islem_asamasi","aciklama","asama1","asama2","asama3","sonuc"]
         _mevcut = [c for c in _kayit_kolonlar if c in _kv.columns]
         st.session_state["_ls_tablo"] = _kv[_mevcut].to_json(orient="records", force_ascii=False)
     except:
@@ -4846,7 +4845,7 @@ function updateBot(v){{
             "firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
             "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
             "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50,
-            "asama1":100,"asama2":100,"asama3":100,"asama4":100,"sonuc":100,
+            "asama1":100,"asama2":100,"asama3":100,"sonuc":100,
             "beklenen_ciro":80,"gerceklesen_ciro":80,"✅ Analiz":80
         }
         _KG_UI_ETIKET = {
@@ -4854,7 +4853,7 @@ function updateBot(v){{
             "email":"Email","adres":"Adres","il":"İl","ilce":"İlçe",
             "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"Aşama",
             "aciklama":"Açıklama","📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID",
-            "asama1":"Aşama 1","asama2":"Aşama 2","asama3":"Aşama 3","asama4":"Aşama 4","sonuc":"Sonuç",
+            "asama1":"1. Aşama","asama2":"2. Aşama","asama3":"3. Aşama","sonuc":"Sonuç",
             "beklenen_ciro":"Hedef ₺","gerceklesen_ciro":"Gerçek ₺","✅ Analiz":"Analiz"
         }
         try:
