@@ -8499,6 +8499,7 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
         _kol_gizli_map_r = {"firma":"firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email","adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci","islem_asamasi":"islem_asamasi","aciklama":"aciklama",
                             "📅 Son Randevu":"📅 Son Randevu","📨 Notlar":"📨 Notlar","id":"id",
                             "beklenen_ciro":"beklenen_ciro","gerceklesen_ciro":"gerceklesen_ciro"}
+        _GIZLI_KOLONLAR = set(st.session_state.get("_kol_gizli", []))
         _col_order_r = ["Seç"] + [c for c in _col_order_r[1:] if not any(c == _kol_gizli_map_r.get(g,g) for g in _GIZLI_KOLONLAR)]
 
         _secili_asama = st.selectbox("Aşama Seç:", _tum_asama_r, key="asama_sayfa_sec")
