@@ -8359,11 +8359,11 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
                 "Tarih", value=_td_deger,
                 key="rand_tarih_secim", label_visibility="collapsed"
             )
-            st.markdown(f"""<div style="
-                position:relative; margin-top:-38px; pointer-events:none;
-                font-size:13px; color:#0f172a; padding:9px 14px;
-                background:transparent; text-align:left;
-            ">📅 {_tarih_okunur}</div>""", unsafe_allow_html=True)
+            st.markdown(
+                f'<div style="position:relative;margin-top:-38px;pointer-events:none;'
+                f'font-size:13px;color:#0f172a;padding:9px 14px;'
+                f'background:transparent;text-align:left;">📅 {_tarih_okunur}</div>',
+                unsafe_allow_html=True)
             if _secilen_tarih != _td_deger:
                 st.session_state["rand_tarih_deger"] = _secilen_tarih
                 st.rerun()
@@ -9835,7 +9835,7 @@ elif aktif == "patron":
 
     st.divider()
 
-
+    _periyot = st.session_state.get("patron_periyot", "ay")
     _pc1,_pc2,_pc3 = st.columns(3)
     if _pc1.button("Bugün", key="pp1", use_container_width=True, type="primary" if _periyot=="bugun" else "secondary"):
         st.session_state["patron_periyot"]="bugun"; st.rerun()
@@ -10945,17 +10945,19 @@ elif aktif == "islem_takip":
             _muk_sayac[_mk] = _muk_sayac.get(_mk, 0) + 1
 
         # Firma başlığı
-        _hdr_html = f"""<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-            padding:9px 14px;background:#f8fafc;border:0.5px solid #e2e8f0;
-            border-radius:10px 10px 0 0;margin-top:12px;">
-            <span style="font-size:13px;font-weight:600;color:#0f172a;">{_firma}</span>
-            <span style="font-size:9px;padding:2px 8px;border-radius:10px;background:#dbeafe;color:#1d4ed8;">{len(_islemler)} işlem</span>
-            {"<span style='font-size:11px;font-weight:500;color:#16a34a;'>"+_bk_f+"</span>" if _bk_f else ""}
-            {_bdg}
-            {"<span style='font-size:10px;color:#94a3b8;'>"+_loc+"</span>" if _loc else ""}
-            {"<span style='margin-left:auto;font-size:11px;font-weight:500;color:#334155;'>"+_as+"</span>" if _as else ""}
-        </div>
-        <div style="border:0.5px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;margin-bottom:0;">"""
+        _hdr_html = (
+            f'<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;'
+            f'padding:9px 14px;background:#f8fafc;border:0.5px solid #e2e8f0;'
+            f'border-radius:10px 10px 0 0;margin-top:12px;">'
+            f'<span style="font-size:13px;font-weight:600;color:#0f172a;">{_firma}</span>'
+            f'<span style="font-size:9px;padding:2px 8px;border-radius:10px;background:#dbeafe;color:#1d4ed8;">{len(_islemler)} işlem</span>'
+            + (f"<span style='font-size:11px;font-weight:500;color:#16a34a;'>{_bk_f}</span>" if _bk_f else "")
+            + _bdg
+            + (f"<span style='font-size:10px;color:#94a3b8;'>{_loc}</span>" if _loc else "")
+            + (f"<span style='margin-left:auto;font-size:11px;font-weight:500;color:#334155;'>{_as}</span>" if _as else "")
+            + '</div>'
+            + '<div style="border:0.5px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;margin-bottom:0;">'
+        )
         st.markdown(_hdr_html, unsafe_allow_html=True)
 
         # İşlem satırları
