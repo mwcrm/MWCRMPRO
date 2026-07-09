@@ -8007,19 +8007,9 @@ elif aktif == "randevu":
                 df_rand = df_rand[df_rand["randevu_tarihi"] < bugun_str]
             st.caption(f"{len(df_rand)} randevu gösteriliyor")
 
-            # Sıralama hafızası
-            if "rand_sort_col" not in st.session_state:
-                st.session_state["rand_sort_col"] = "Tarih"
-                st.session_state["rand_sort_asc"] = True
-            _rs1,_rs2 = st.columns([2,1])
-            _sort_col = _rs1.selectbox("Sırala:", ["ID","Tarih","Saat","Müşteri","İl","Bölge","Görev","Sonuç","Temsilci"],
-                index=["ID","Tarih","Saat","Müşteri","İl","Bölge","Görev","Sonuç","Temsilci"].index(st.session_state.get("rand_sort_col","Tarih")) if st.session_state.get("rand_sort_col","Tarih") in ["ID","Tarih","Saat","Müşteri","İl","Bölge","Görev","Sonuç","Temsilci"] else 1,
-                key="rand_sort_sel",
-                help="ID hiçbir zaman değişmez — her randevu ilk oluşturulduğu numarayı korur. Listeyi farklı sütuna göre sıralamak sadece görüntü sırasını değiştirir, ID'leri değiştirmez.")
-            _sort_asc = _rs2.checkbox("Artan", value=st.session_state.get("rand_sort_asc",True), key="rand_sort_asc_cb")
-            # Hafızaya kaydet
-            st.session_state["rand_sort_col"] = _sort_col
-            st.session_state["rand_sort_asc"] = _sort_asc
+            # Sıralama artık sabit: Tarih'e göre artan (yakından uzağa) — seçim kutusuna gerek yok
+            _sort_col = "Tarih"
+            _sort_asc = True
             _row_h_px = 35  # her zaman kompakt
 
             _df_goster = pd.DataFrame([{
@@ -8470,6 +8460,18 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
             for _da in _df_as["islem_asamasi"].dropna().unique():
                 if str(_da).strip() and str(_da) not in ["nan",""] and _da not in _tum_asama_r:
                     _tum_asama_r.append(str(_da))
+
+        _KOL_VARSAYILAN_R = {
+            "id":50,"firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
+            "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
+            "islem_asamasi":90,"beklenen_ciro":80,"gerceklesen_ciro":80,
+        }
+        _KG_R = st.session_state.get("_kol_genislik", _KOL_VARSAYILAN_R)
+        def _w(k):
+            px = int(_KG_R.get(k, _KOL_VARSAYILAN_R.get(k, 100)))
+            if px <= 80:    return "small"
+            elif px <= 150: return "medium"
+            else:           return "large"
 
         _col_config_r = {
             "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
