@@ -1936,7 +1936,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
     }
     section[data-testid='stSidebar'] .stButton>button[kind='secondary'] div[data-testid='stMarkdownContainer'] { width:100%; text-align:left !important; }
     section[data-testid='stSidebar'] .stButton>button[kind='secondary'] p {
-        color:#1a1a1a !important; font-weight:700 !important; text-align:left !important;
+        color:#2c2c2a !important; font-weight:500 !important; text-align:left !important;
         width:100%; transition:color .15s ease;
     }
     section[data-testid='stSidebar'] .stButton>button[kind='secondary']:hover { background:#f6f8fb; }
@@ -1948,20 +1948,20 @@ button[data-testid="manage-app-button"] { display: none !important; }
     }
     section[data-testid='stSidebar'] .stButton>button[kind='primary'] div[data-testid='stMarkdownContainer'] { width:100%; text-align:left !important; }
     section[data-testid='stSidebar'] .stButton>button[kind='primary'] p {
-        color:#0c2f70 !important; font-weight:800 !important; text-align:left !important; width:100%;
+        color:#1a4f9e !important; font-weight:600 !important; text-align:left !important; width:100%;
     }
-    section[data-testid='stSidebar'] label p, section[data-testid='stSidebar'] .stMarkdown p { color:#1a1a1a; }
-    section[data-testid='stSidebar'] summary p, section[data-testid='stSidebar'] summary span { color:#1a1a1a !important; }
+    section[data-testid='stSidebar'] label p, section[data-testid='stSidebar'] .stMarkdown p { color:#3d3d3a; }
+    section[data-testid='stSidebar'] summary p, section[data-testid='stSidebar'] summary span { color:#3d3d3a !important; }
     </style>""", unsafe_allow_html=True)
 
     _MENU_GRUPLARI = [
-        ("Cari işlemleri",    ["yeni", "liste", "excel", "mukerrer"]),
-        ("Analiz ve takip",   ["analiz", "islem_takip"]),
-        ("Randevu ve teklif", ["randevu", "teklif", "ozel_teklif"]),
-        ("Saha",              ["rota_analiz", "operasyon", "harita"]),
-        ("Yönetim",           ["kullanici", "patron", "musteri_atama"]),
-        ("Raporlar",          ["admin_rapor", "rapor"]),
-        ("Telefon Kişiler",   ["kisiler"]),
+        ("🧾 Cari işlemleri",    ["yeni", "liste", "excel", "mukerrer"]),
+        ("🔎 Analiz ve takip",   ["analiz", "islem_takip"]),
+        ("📅 Randevu ve teklif", ["randevu", "teklif", "ozel_teklif"]),
+        ("🚚 Saha",              ["rota_analiz", "operasyon", "harita"]),
+        ("⚙️ Yönetim",          ["kullanici", "patron", "musteri_atama"]),
+        ("📊 Raporlar",          ["admin_rapor", "rapor"]),
+        ("📞 Telefon Kişiler",   ["kisiler"]),
     ]
 
     if "_acik_grup" not in st.session_state:
@@ -2000,13 +2000,15 @@ button[data-testid="manage-app-button"] { display: none !important; }
             st.rerun()
         if _acik_mi:
             for _tab_key in _g_items:
-                _etiket = "›  " + _TAB_ETIKETLER.get(_tab_key, _tab_key)
+                _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
                 _aktif_mi = st.session_state["aktif_tab"] == _tab_key
-                if st.button(_etiket, use_container_width=True,
-                             type="primary" if _aktif_mi else "secondary",
-                             key=f"sb_{_g_ad}_{_tab_key}"):
-                    st.session_state["aktif_tab"] = _tab_key
-                    st.rerun()
+                _c1, _c2 = st.columns([1, 6])
+                with _c2:
+                    if st.button(_etiket, use_container_width=True,
+                                 type="primary" if _aktif_mi else "secondary",
+                                 key=f"sb_{_g_ad}_{_tab_key}"):
+                        st.session_state["aktif_tab"] = _tab_key
+                        st.rerun()
 
     _kalanlar = [t for t in _sb_liste if t not in _gruplanan]
     if _kalanlar:
@@ -2019,13 +2021,15 @@ button[data-testid="manage-app-button"] { display: none !important; }
             st.rerun()
         if _acik_mi:
             for _tab_key in _kalanlar:
-                _etiket = "›  " + _TAB_ETIKETLER.get(_tab_key, _tab_key)
+                _etiket = _TAB_ETIKETLER.get(_tab_key, _tab_key)
                 _aktif_mi = st.session_state["aktif_tab"] == _tab_key
-                if st.button(_etiket, use_container_width=True,
-                             type="primary" if _aktif_mi else "secondary",
-                             key=f"sb_diger_{_tab_key}"):
-                    st.session_state["aktif_tab"] = _tab_key
-                    st.rerun()
+                _c1, _c2 = st.columns([1, 6])
+                with _c2:
+                    if st.button(_etiket, use_container_width=True,
+                                 type="primary" if _aktif_mi else "secondary",
+                                 key=f"sb_diger_{_tab_key}"):
+                        st.session_state["aktif_tab"] = _tab_key
+                        st.rerun()
 
 
     # ── ALT BÖLÜM ─────────────────────────────────────────────────────────────
