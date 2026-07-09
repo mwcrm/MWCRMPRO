@@ -3632,6 +3632,17 @@ function kartSec(id){
         elif px <= 150: return "medium"
         else:           return "large"
 
+    # Asama1/2/3 sabit seçenek listeleri — mevcut veride bu listede olmayan bir
+    # değer varsa açılır kutu bozulmasın diye otomatik listeye eklenir.
+    def _asama_secenek_guvenli(_kol, _sabit_liste):
+        _liste = list(_sabit_liste)
+        if _kol in df.columns:
+            for _v in df[_kol].dropna().astype(str).unique():
+                _v = _v.strip()
+                if _v and _v not in _liste and _v.lower() not in ["nan","none"]:
+                    _liste.append(_v)
+        return _liste
+
     col_config = {
         "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
         "tarih":         st.column_config.TextColumn("İşlem Tarih", disabled=True, width=_w("tarih") if "tarih" in _KOL_VARSAYILAN else "small"),
@@ -3656,9 +3667,9 @@ function kartSec(id){
         "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=True, width=_w("✅ Analiz")),
         "🧾 Teklif":     st.column_config.TextColumn("🧾 Teklif", disabled=True, width="small"),
         "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=True, width="small"),
-        "asama1":        st.column_config.TextColumn("1. Aşama", width=_w("asama1")),
-        "asama2":        st.column_config.TextColumn("2. Aşama", width=_w("asama2")),
-        "asama3":        st.column_config.TextColumn("3. Aşama", width=_w("asama3")),
+        "asama1":        st.column_config.SelectboxColumn("1. Aşama", options=_asama_secenek_guvenli("asama1", ["", "Randevu"]), width=_w("asama1")),
+        "asama2":        st.column_config.SelectboxColumn("2. Aşama", options=_asama_secenek_guvenli("asama2", ["", "Teklif"]), width=_w("asama2")),
+        "asama3":        st.column_config.SelectboxColumn("3. Aşama", options=_asama_secenek_guvenli("asama3", ["Tümü", "Deneme", "Takip", "Fiyat Hazırla", "Sözleşme"]), width=_w("asama3")),
         "sonuc":         st.column_config.TextColumn("Sonuç",   width=_w("sonuc")),
     }
     # Sütun sırası — sizin verdiğiniz şablonla birebir: Seç, İşlem Tarih, Id, Firma, Yetkili,
