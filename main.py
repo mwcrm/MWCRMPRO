@@ -1,14 +1,6 @@
 import streamlit as st
 import sqlite3
 import pandas as pd
-
-# Kartvizit OCR — kurulu değilse uygulama çökmesin, sadece o sayfa uyarı verir
-try:
-    import pytesseract
-    from PIL import Image
-    _OCR_HAZIR = True
-except ImportError:
-    _OCR_HAZIR = False
 import shutil
 import os
 import io
@@ -1425,45 +1417,6 @@ def fmt_tarih_saat(v):
     except:
         return s[:16]
 
-def _kv_alan_ayikla(ham_metin):
-    """Kartvizit OCR metninden Firma/Yetkili/GSM/Sabit/Email/Adres'i desenine göre ayıklar.
-    Konum (nerede yazdığı) önemli değil, sadece deseni önemli — düzensiz kartvizitler için."""
-    import re as _kvre
-    satirlar = [s.strip() for s in ham_metin.split("\n") if s.strip()]
-    email, gsm, sabit = "", "", ""
-    adres_parcalari, kalan_satirlar = [], []
-    _email_regex = _kvre.compile(r'[\w\.\-]+@[\w\.\-]+\.\w+')
-    _adres_anahtar = ["mah", "mh.", "sok", "cad", "no:", "no.", "blv", "bulvar", "apt", "kat", "/"]
-
-    for satir in satirlar:
-        s_lower = satir.lower()
-        _email_bul = _email_regex.search(satir)
-        if _email_bul and not email:
-            email = _email_bul.group()
-            continue
-        _rakamlar = _kvre.sub(r'[^\d]', '', satir)
-        if len(_rakamlar) >= 10:
-            _son10 = _rakamlar[-10:]
-            if _son10.startswith("5") and not gsm:
-                gsm = "0" + _son10
-                continue
-            elif not _son10.startswith("5") and not sabit:
-                sabit = "0" + _son10
-                continue
-        if any(k in s_lower for k in _adres_anahtar):
-            adres_parcalari.append(satir)
-            continue
-        kalan_satirlar.append(satir)
-
-    adres = " ".join(adres_parcalari)
-    firma = max(kalan_satirlar, key=lambda s: sum(1 for c in s if c.isupper())) if kalan_satirlar else ""
-    yetkili = ""
-    for s in kalan_satirlar:
-        if s != firma and len(s.split()) <= 4:
-            yetkili = s
-            break
-    return {"firma": firma, "yetkili": yetkili, "gsm": gsm, "sabit": sabit, "email": email, "adres": adres}
-
 @st.cache_data(ttl=30, show_spinner=False)
 def _notlar_yukle(cari_id):
     try:
@@ -1607,7 +1560,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer", "kartvizit"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -1629,7 +1582,6 @@ _TAB_ETIKETLER = {
     "patron": "👑 Yönetim Paneli",
     "musteri_atama": "🎯 Müşteri Atama",
     "mukerrer": "🔍 Mükerrer Bul",
-    "kartvizit": "📸 Kartvizit Yükle",
     
 }
 
@@ -2022,7 +1974,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
     </style>""", unsafe_allow_html=True)
 
     _MENU_GRUPLARI = [
-        ("🧾 Cari işlemleri",    ["yeni", "liste", "excel", "mukerrer", "kartvizit"]),
+        ("🧾 Cari işlemleri",    ["yeni", "liste", "excel", "mukerrer"]),
         ("🔎 Analiz ve takip",   ["analiz", "islem_takip"]),
         ("📅 Randevu ve teklif", ["randevu", "teklif", "ozel_teklif"]),
         ("🚚 Saha",              ["rota_analiz", "operasyon", "harita"]),
@@ -2581,114 +2533,6 @@ elif aktif == "mukerrer":
                         st.session_state.pop("mk_editor", None)
                         st.toast(f"🗑️ {_mk_silinen} kayıt silindi", icon="🗑️")
                         st.rerun()
-
-elif aktif == "kartvizit":
-    sayfa_log("kartvizit")
-    st.markdown("## 📸 Kartvizit Yükle")
-    st.caption("Kartvizit fotoğraflarını yükleyin, sistem otomatik okuyup taslağa hazırlar. "
-               "Fotoğraflar sistemde saklanmaz — sadece içindeki bilgi (Firma, Yetkili, GSM, "
-               "Sabit, Email, Adres) çekilir. Onaylamadan hiçbir kayıt sisteme eklenmez.")
-
-    if not _OCR_HAZIR:
-        st.error("⚠️ OCR kütüphanesi kurulu değil. Bu özelliğin çalışması için projeye şu eklemeler gerekiyor:\n\n"
-                  "**requirements.txt** dosyasına: `pytesseract` ve `Pillow`\n\n"
-                  "**packages.txt** dosyasına (yoksa oluşturun): `tesseract-ocr` ve `tesseract-ocr-tur`\n\n"
-                  "Bunları ekleyip deploy ettikten sonra bu sayfa çalışmaya başlar.")
-    else:
-        _kv_dosyalar = st.file_uploader("Kartvizit fotoğrafları (birden fazla seçebilirsiniz)",
-                                          type=["jpg","jpeg","png"], accept_multiple_files=True, key="kv_yukle")
-        if _kv_dosyalar:
-            st.info(f"{len(_kv_dosyalar)} fotoğraf seçildi.")
-            if st.button("🔍 Oku ve Taslağa Hazırla", type="primary", use_container_width=True, key="kv_oku_btn"):
-                _kv_taslak = []
-                _kv_prog = st.progress(0, text="Okunuyor...")
-                for _kvi, _kvdosya in enumerate(_kv_dosyalar):
-                    try:
-                        _kvimg = Image.open(_kvdosya)
-                        _kvham = pytesseract.image_to_string(_kvimg, lang="tur")
-                        _kvalanlar = _kv_alan_ayikla(_kvham)
-                        _kvalanlar["_dosya_adi"] = _kvdosya.name
-                        _kv_taslak.append(_kvalanlar)
-                    except Exception as _kve:
-                        _kv_taslak.append({"firma":"", "yetkili":"", "gsm":"", "sabit":"", "email":"",
-                                            "adres":"", "_dosya_adi": _kvdosya.name})
-                    _kv_prog.progress((_kvi+1)/len(_kv_dosyalar), text=f"{_kvi+1}/{len(_kv_dosyalar)} okundu...")
-                st.session_state["_kv_taslak_veri"] = _kv_taslak
-                st.rerun()
-
-        if st.session_state.get("_kv_taslak_veri"):
-            _kv_taslak = st.session_state["_kv_taslak_veri"]
-            st.success(f"{len(_kv_taslak)} kartvizit okundu — kontrol edip gerekirse düzeltin (özellikle Firma adı):")
-            _kv_df = pd.DataFrame(_kv_taslak)
-            _kv_edit_kolon = [c for c in ["_dosya_adi","firma","yetkili","gsm","sabit","email","adres"] if c in _kv_df.columns]
-            _kv_edited = st.data_editor(
-                _kv_df[_kv_edit_kolon], use_container_width=True, key="kv_taslak_editor",
-                column_config={
-                    "_dosya_adi": st.column_config.TextColumn("Dosya", disabled=True, width="small"),
-                    "firma": st.column_config.TextColumn("Firma"),
-                    "yetkili": st.column_config.TextColumn("Yetkili"),
-                    "gsm": st.column_config.TextColumn("GSM"),
-                    "sabit": st.column_config.TextColumn("Sabit"),
-                    "email": st.column_config.TextColumn("Email"),
-                    "adres": st.column_config.TextColumn("Adres"),
-                })
-
-            _kv_mevcut = get_cari_listesi()
-            _kv_mevcut_isimler = (set(_kv_mevcut["firma"].astype(str).str.strip().str.upper())
-                                   if not _kv_mevcut.empty and "firma" in _kv_mevcut.columns else set())
-            _kv_mukerrer_sayi = sum(1 for _, _r in _kv_edited.iterrows()
-                                     if str(_r.get("firma","")).strip().upper() in _kv_mevcut_isimler
-                                     and str(_r.get("firma","")).strip())
-            if _kv_mukerrer_sayi:
-                st.warning(f"⚠️ {_kv_mukerrer_sayi} kaydın firma adı sistemde zaten var — bunlar atlanacak, "
-                           "eklenmeyecek (mükerrer oluşmasın diye).")
-
-            _kvc1, _kvc2 = st.columns([2,1])
-            with _kvc1:
-                if st.button(f"✅ Uygun olanları sisteme aktar", type="primary", use_container_width=True, key="kv_aktar_btn"):
-                    _kv_basarili, _kv_atlanan = 0, 0
-                    _sb_kv = get_sb_client()
-                    for _, _kvrow in _kv_edited.iterrows():
-                        _kv_firma = str(_kvrow.get("firma","")).strip()
-                        if not _kv_firma:
-                            continue
-                        if _kv_firma.upper() in _kv_mevcut_isimler:
-                            _kv_atlanan += 1
-                            continue
-                        try:
-                            _kv_kayit = {
-                                "firma": _kv_firma,
-                                "yetkili": str(_kvrow.get("yetkili","") or ""),
-                                "gsm": str(_kvrow.get("gsm","") or ""),
-                                "sabit": str(_kvrow.get("sabit","") or ""),
-                                "email": str(_kvrow.get("email","") or ""),
-                                "adres": str(_kvrow.get("adres","") or ""),
-                                "durum": "Hedef",
-                                "islem_asamasi": "İlk Temas",
-                                "beklenen_ciro": 0,
-                                "gerceklesen_ciro": 0,
-                                "olusturan": st.session_state.get("kullanici",""),
-                                "silindi": 0,
-                            }
-                            if _sb_kv:
-                                _sb_kv.table("cari_kartlar").insert(_kv_kayit).execute()
-                            else:
-                                db_insert("cari_kartlar", _kv_kayit)
-                            _kv_basarili += 1
-                        except Exception:
-                            pass
-                    try: get_cari_listesi.clear()
-                    except: pass
-                    st.session_state.pop("_kv_taslak_veri", None)
-                    _kv_ozet = f"🎉 {_kv_basarili} kayıt eklendi."
-                    if _kv_atlanan:
-                        _kv_ozet += f" {_kv_atlanan} kayıt zaten sistemde olduğu için atlandı."
-                    st.success(_kv_ozet)
-                    st.rerun()
-            with _kvc2:
-                if st.button("🗑️ Taslağı temizle", use_container_width=True, key="kv_temizle_btn"):
-                    st.session_state.pop("_kv_taslak_veri", None)
-                    st.rerun()
 
 elif aktif == "liste":
     sayfa_log("liste")
