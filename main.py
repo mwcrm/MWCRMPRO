@@ -1398,6 +1398,25 @@ def fmt_tarih(v):
         pass
     return s[:10]
 
+def fmt_tarih_saat(v):
+    """Herhangi bir tarih-saat string'ini '22.06.2026 14:23' formatına çevirir (sadece tarih+saat, başka bilgi yok)"""
+    if not v: return ""
+    s = str(v).strip()
+    if not s or s in ["nan","None",""]: return ""
+    try:
+        _tarih_kismi = fmt_tarih(s)
+        _saat_kismi = ""
+        _ayrac = "T" if "T" in s else (" " if " " in s else None)
+        if _ayrac:
+            _saat_ham = s.split(_ayrac, 1)[1].strip()
+            if len(_saat_ham) >= 5:
+                _saat_kismi = _saat_ham[:5]
+        if _tarih_kismi and _saat_kismi:
+            return f"{_tarih_kismi} {_saat_kismi}"
+        return _tarih_kismi or s[:16]
+    except:
+        return s[:16]
+
 @st.cache_data(ttl=30, show_spinner=False)
 def _notlar_yukle(cari_id):
     try:
@@ -3839,6 +3858,10 @@ function kartSec(id){
         df_edit["💬 Mesaj"] = df_edit["wa_gonderildi"].apply(lambda x: "💬" if str(x) in ["1","True","true"] else "")
     else:
         df_edit["💬 Mesaj"] = ""
+
+    # ── İşlem Tarih — sadece tarih+saat gösterir, ham/karışık format değil ──
+    if "tarih" in df_edit.columns:
+        df_edit["tarih"] = df_edit["tarih"].apply(fmt_tarih_saat)
 
     df_edit.insert(0, "Seç", False)
 
