@@ -3689,7 +3689,7 @@ function kartSec(id){
         "asama1":        st.column_config.SelectboxColumn("1. Aşama", options=_asama_secenek_guvenli("asama1", ["", "Randevu"]), width=_w("asama1")),
         "asama2":        st.column_config.SelectboxColumn("2. Aşama", options=_asama_secenek_guvenli("asama2", ["", "Teklif"]), width=_w("asama2")),
         "asama3":        st.column_config.SelectboxColumn("3. Aşama", options=_asama_secenek_guvenli("asama3", ["Tümü", "Deneme", "Takip", "Fiyat Hazırla", "Sözleşme"]), width=_w("asama3")),
-        "sonuc":         st.column_config.TextColumn("Sonuç",   width=_w("sonuc")),
+        "sonuc":         st.column_config.SelectboxColumn("Sonuç", options=_asama_secenek_guvenli("sonuc", ["Tümü", "Kazanıldı", "Kaybedildi", "Devam Ediyor"]), width=_w("sonuc")),
     }
     # Sütun sırası — sizin verdiğiniz şablonla birebir: Seç, İşlem Tarih, Id, Firma, Yetkili,
     # Gsm, S.Tel, E-Mail, Adres, İlçe, İl, Hedef(+Gerçek), Durum, Analiz, Aşama, 1-2-3.Aşama,
@@ -3852,10 +3852,27 @@ function kartSec(id){
     else:
         df_edit["🧾 Teklif"] = ""
 
-    # ── Mesaj (yeni sütun) — ayrı bir mesaj-log tablosu yok, sadece WhatsApp
-    # gönderildi bayrağı (wa_gonderildi) var; sayı yerine gönderildi işareti gösterir ──
-    if "wa_gonderildi" in df_edit.columns:
-        df_edit["💬 Mesaj"] = df_edit["wa_gonderildi"].apply(lambda x: "💬" if str(x) in ["1","True","true"] else "")
+    # ── Mesaj (yeni sütun) — gerçek WhatsApp/Email gönderim kayıtları (islem_kaydi
+    # tablosu, musteri_id ile bağlı) — WhatsApp Teklif ve Email Teklif türleri sayılır ──
+    _mesaj_sayac_cl = {}
+    if sb_liste:
+        try:
+            @st.cache_data(ttl=60, show_spinner=False)
+            def _tum_mesaj_sayac_yukle():
+                _sb4 = get_sb_client()
+                if _sb4:
+                    _r4 = _sb4.table("islem_kaydi").select("musteri_id,islem_turu").in_(
+                        "islem_turu", ["WhatsApp Teklif", "Email Teklif"]).execute()
+                    return _r4.data or []
+                return []
+            _res_mesaj_data_cl = _tum_mesaj_sayac_yukle()
+            if _res_mesaj_data_cl:
+                import collections as _colmsg_cl
+                _mesaj_sayac_cl = _colmsg_cl.Counter([str(r.get("musteri_id","")) for r in _res_mesaj_data_cl])
+        except Exception:
+            _mesaj_sayac_cl = {}
+    if "id" in df_edit.columns:
+        df_edit["💬 Mesaj"] = df_edit["id"].apply(lambda x: f"💬 {_mesaj_sayac_cl.get(str(int(x)),0)}" if _mesaj_sayac_cl.get(str(int(x)),0) > 0 else "")
     else:
         df_edit["💬 Mesaj"] = ""
 
