@@ -3634,8 +3634,9 @@ function kartSec(id){
 
     col_config = {
         "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
+        "tarih":         st.column_config.TextColumn("İşlem Tarih", disabled=True, width=_w("tarih") if "tarih" in _KOL_VARSAYILAN else "small"),
         "id":            st.column_config.NumberColumn("ID", disabled=True, width=_w("id")),
-        "tarih":         None, "olusturan": None, "silindi": None,
+        "olusturan": None, "silindi": None,
         "beklenen_ciro":    st.column_config.NumberColumn("Hedef ₺",  format="%,.0f ₺", width=_w("beklenen_ciro")),
         "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width=_w("gerceklesen_ciro")),
         "firma":         st.column_config.TextColumn("Firma",     width=_w("firma")),
@@ -3653,18 +3654,27 @@ function kartSec(id){
         "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
         "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=True, width=_w("✅ Analiz")),
+        "🧾 Teklif":     st.column_config.TextColumn("🧾 Teklif", disabled=True, width="small"),
+        "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=True, width="small"),
         "asama1":        st.column_config.TextColumn("1. Aşama", width=_w("asama1")),
         "asama2":        st.column_config.TextColumn("2. Aşama", width=_w("asama2")),
         "asama3":        st.column_config.TextColumn("3. Aşama", width=_w("asama3")),
         "sonuc":         st.column_config.TextColumn("Sonuç",   width=_w("sonuc")),
     }
-    col_order = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro","✅ Analiz","📅 Son Randevu","aciklama","📨 Notlar","asama1","asama2","asama3","sonuc"]
+    # Sütun sırası — sizin verdiğiniz şablonla birebir: Seç, İşlem Tarih, Id, Firma, Yetkili,
+    # Gsm, S.Tel, E-Mail, Adres, İlçe, İl, Hedef(+Gerçek), Durum, Analiz, Aşama, 1-2-3.Aşama,
+    # Açıklama, Notlar, Son Randevu, Teklif, Mesaj, Sonuç. Temsilci silinmedi, en sona eklendi.
+    col_order = ["Seç","tarih","id","firma","yetkili","gsm","sabit","email","adres","ilce","il",
+                 "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","islem_asamasi",
+                 "asama1","asama2","asama3","aciklama","📨 Notlar","📅 Son Randevu",
+                 "🧾 Teklif","💬 Mesaj","sonuc","temsilci"]
     # Gizli kolonları çıkar
     _kol_gizli_map = {"firma":"firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email",
                       "adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci",
-                      "islem_asamasi":"islem_asamasi","aciklama":"aciklama",
+                      "islem_asamasi":"islem_asamasi","aciklama":"aciklama","tarih":"tarih",
                       "📅 Son Randevu":"📅 Son Randevu","📨 Notlar":"📨 Notlar","id":"id",
                       "beklenen_ciro":"beklenen_ciro","gerceklesen_ciro":"gerceklesen_ciro","✅ Analiz":"✅ Analiz",
+                      "🧾 Teklif":"🧾 Teklif","💬 Mesaj":"💬 Mesaj",
                       "asama1":"asama1","asama2":"asama2","asama3":"asama3","sonuc":"sonuc"}
     col_order = [c for c in col_order if not any(c == _kol_gizli_map.get(g,g) for g in _GIZLI_KOLONLAR)]
 
@@ -3789,6 +3799,35 @@ function kartSec(id){
             st.warning(f"Not yükleme hatası: {_not_err}")
     else:
         df_edit["📨 Notlar"] = ""
+
+    # ── Teklif sayısı (yeni sütun, Notlar ile aynı mantık) ──
+    _tek_sayac_cl = {}
+    if sb_liste:
+        try:
+            @st.cache_data(ttl=60, show_spinner=False)
+            def _tum_teklif_sayac_yukle():
+                _sb3 = get_sb_client()
+                if _sb3:
+                    _r3 = _sb3.table("teklifler").select("cari_id").execute()
+                    return _r3.data or []
+                return []
+            _res_tek_data_cl = _tum_teklif_sayac_yukle()
+            if _res_tek_data_cl:
+                import collections as _coltek_cl
+                _tek_sayac_cl = _coltek_cl.Counter([str(r.get("cari_id","")) for r in _res_tek_data_cl])
+        except Exception:
+            _tek_sayac_cl = {}
+    if "id" in df_edit.columns:
+        df_edit["🧾 Teklif"] = df_edit["id"].apply(lambda x: f"🧾 {_tek_sayac_cl.get(str(int(x)),0)}" if _tek_sayac_cl.get(str(int(x)),0) > 0 else "")
+    else:
+        df_edit["🧾 Teklif"] = ""
+
+    # ── Mesaj (yeni sütun) — ayrı bir mesaj-log tablosu yok, sadece WhatsApp
+    # gönderildi bayrağı (wa_gonderildi) var; sayı yerine gönderildi işareti gösterir ──
+    if "wa_gonderildi" in df_edit.columns:
+        df_edit["💬 Mesaj"] = df_edit["wa_gonderildi"].apply(lambda x: "💬" if str(x) in ["1","True","true"] else "")
+    else:
+        df_edit["💬 Mesaj"] = ""
 
     df_edit.insert(0, "Seç", False)
 
