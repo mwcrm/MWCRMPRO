@@ -11245,31 +11245,31 @@ Object.entries(rnk).forEach(function(e){
         _hcomp.html(_harita_html, height=590, scrolling=False)
         if _il_col and not _hdf_f.empty:
             st.divider()
-            st.markdown("**📊 İl / İlçe Bazlı Özet**")
-            _grp_cols = [c for c in [_il_col, "ilce"] if c in _hdf_f.columns]
-            _il_g = (_hdf_f.groupby(_grp_cols).size()
-                     .reset_index(name="Müşteri Sayısı")
-                     .sort_values(["Müşteri Sayısı"] + _grp_cols[:1], ascending=[False, True])
-                     .head(50))
-            st.markdown("""<style>
-            .mh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:8px;}
-            .mh-kart{background:#ffffff;border:0.5px solid #e2e8f0;border-radius:10px;padding:12px 14px;}
-            .mh-il{font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:.3px;text-transform:uppercase;}
-            .mh-ilce{font-size:14px;color:#0f172a;font-weight:600;margin:2px 0 6px;}
-            .mh-sayi{font-size:20px;font-weight:700;color:#1d4ed8;}
-            .mh-etiket{font-size:10.5px;color:#64748b;margin-left:4px;}
-            </style>""", unsafe_allow_html=True)
-            _mh_kartlar = ""
-            for _, _mhr in _il_g.iterrows():
-                _mh_il = str(_mhr.get(_il_col, ""))
-                _mh_ilce = str(_mhr.get("ilce", "")) if "ilce" in _il_g.columns else ""
-                _mh_sayi = int(_mhr["Müşteri Sayısı"])
-                _mh_kartlar += (
-                    f'<div class="mh-kart"><div class="mh-il">{_mh_il}</div>'
-                    f'<div class="mh-ilce">{_mh_ilce}</div>'
-                    f'<span class="mh-sayi">{_mh_sayi}</span><span class="mh-etiket">müşteri</span></div>'
-                )
-            st.markdown(f'<div class="mh-grid">{_mh_kartlar}</div>', unsafe_allow_html=True)
+            with st.expander("📊 İl / İlçe Bazlı Özet", expanded=False):
+                _grp_cols = [c for c in [_il_col, "ilce"] if c in _hdf_f.columns]
+                _il_g = (_hdf_f.groupby(_grp_cols).size()
+                         .reset_index(name="Müşteri Sayısı")
+                         .sort_values(["Müşteri Sayısı"] + _grp_cols[:1], ascending=[False, True])
+                         .head(50))
+                st.markdown("""<style>
+                .mh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:6px;margin-top:6px;}
+                .mh-kart{background:#ffffff;border:0.5px solid #e2e8f0;border-radius:8px;padding:7px 9px;}
+                .mh-il{font-size:9px;color:#94a3b8;font-weight:600;letter-spacing:.2px;text-transform:uppercase;}
+                .mh-ilce{font-size:11.5px;color:#0f172a;font-weight:600;margin:1px 0 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+                .mh-sayi{font-size:14px;font-weight:700;color:#1d4ed8;}
+                .mh-etiket{font-size:9px;color:#64748b;margin-left:3px;}
+                </style>""", unsafe_allow_html=True)
+                _mh_kartlar = ""
+                for _, _mhr in _il_g.iterrows():
+                    _mh_il = str(_mhr.get(_il_col, ""))
+                    _mh_ilce = str(_mhr.get("ilce", "")) if "ilce" in _il_g.columns else ""
+                    _mh_sayi = int(_mhr["Müşteri Sayısı"])
+                    _mh_kartlar += (
+                        f'<div class="mh-kart"><div class="mh-il">{_mh_il}</div>'
+                        f'<div class="mh-ilce">{_mh_ilce}</div>'
+                        f'<span class="mh-sayi">{_mh_sayi}</span><span class="mh-etiket">müşteri</span></div>'
+                    )
+                st.markdown(f'<div class="mh-grid">{_mh_kartlar}</div>', unsafe_allow_html=True)
 
 elif aktif == "bolgeler":
     sayfa_log("bolgeler")
