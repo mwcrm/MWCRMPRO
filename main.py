@@ -10963,26 +10963,28 @@ elif aktif == "islem_takip":
         st.markdown(_hdr_html, unsafe_allow_html=True)
 
         # İşlem satırları
-        for _ism in _islemler:
+        for _isi, _ism in enumerate(_islemler):
             _ikon = _it_ikon(_ism["tur"])
             _acik = _ism["aciklama"][:150] + ("..." if len(_ism["aciklama"])>150 else "")
             _arsiv = str(_ism.get("arsiv","")).lower() in ["1","true","yes"]
             _nid = str(_ism.get("id",""))
             _kaynak = _ism.get("kaynak","not")
             _is_muk = _muk_sayac.get((_ism["tarih"], _ism["tur"]),0) > 1
-            _row_bg = "background:rgba(251,191,36,0.07);" if _is_muk else ""
-            _opacity = "opacity:0.4;" if _arsiv else ""
+            _row_bg = "background:#fffbeb;" if _is_muk else ("background:#ffffff;" if _isi % 2 == 0 else "background:#fafafa;")
+            _opacity = "opacity:0.45;" if _arsiv else ""
+            _ust_cizgi = "border-top:0.5px solid #eef0f3;" if _isi > 0 else ""
+            _hucre_stil = f"{_row_bg}{_ust_cizgi}{_opacity}padding:9px 8px;"
 
             if _nid and _nid not in ["","None","nan"]:
-                _c1,_c2,_c3,_c4,_c5 = st.columns([1.1,1,5.5,0.6,0.6])
+                _c1,_c2,_c3,_c4,_c5 = st.columns([1.3,1.3,5,0.6,0.6])
             else:
-                _c1,_c2,_c3 = st.columns([1.1,1,7.1])
+                _c1,_c2,_c3 = st.columns([1.3,1.3,6.2])
                 _c4=_c5=None
 
-            _c1.markdown(f"<div style='font-size:10px;color:#94a3b8;padding:4px 0;{_opacity}{_row_bg}'>{_ism['tarih']}</div>", unsafe_allow_html=True)
-            _muk_tag = " <span style='font-size:8px;padding:1px 4px;background:#fef3c7;color:#92400e;border-radius:3px;'>mükerrer</span>" if _is_muk else ""
-            _c2.markdown(f"<div style='font-size:10px;font-weight:500;color:#1e293b;padding:4px 0;{_opacity}'>{_ikon} {_ism['tur']}{_muk_tag}</div>", unsafe_allow_html=True)
-            _c3.markdown(f"<div style='font-size:11px;color:#475569;padding:4px 0;line-height:1.5;{_opacity}'>{_acik}</div>", unsafe_allow_html=True)
+            _c1.markdown(f"<div style='font-size:12px;color:#64748b;{_hucre_stil}'>{_ism['tarih']}</div>", unsafe_allow_html=True)
+            _muk_tag = " <span style='font-size:9px;padding:2px 6px;background:#fde68a;color:#78350f;border-radius:4px;font-weight:600;'>mükerrer</span>" if _is_muk else ""
+            _c2.markdown(f"<div style='font-size:12.5px;font-weight:600;color:#1e293b;{_hucre_stil}'>{_ikon} {_ism['tur']}{_muk_tag}</div>", unsafe_allow_html=True)
+            _c3.markdown(f"<div style='font-size:13px;color:#334155;line-height:1.6;{_hucre_stil}'>{_acik}</div>", unsafe_allow_html=True)
 
             if _c4 and _c5:
                 if not _arsiv and _kaynak == "not":
@@ -11003,6 +11005,7 @@ elif aktif == "islem_takip":
         # Not ekle butonu
         _cid_f = _islemler[0].get("cid","") if _islemler else ""
         _nk = f"it_not_ac_{_firma[:20]}"
+        st.markdown("<div style='margin-top:6px'></div>", unsafe_allow_html=True)
         _na1, _na2 = st.columns([8,2])
         if _na2.button("✏️ not ekle", key=f"it_not_btn_{_firma[:20]}"):
             st.session_state[_nk] = not st.session_state.get(_nk, False)
@@ -11247,7 +11250,25 @@ Object.entries(rnk).forEach(function(e){
                      .reset_index(name="Müşteri Sayısı")
                      .sort_values(["Müşteri Sayısı"] + _grp_cols[:1], ascending=[False, True])
                      .head(50))
-            st.dataframe(_il_g, use_container_width=True, hide_index=True)
+            st.markdown("""<style>
+            .mh-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:8px;}
+            .mh-kart{background:#ffffff;border:0.5px solid #e2e8f0;border-radius:10px;padding:12px 14px;}
+            .mh-il{font-size:11px;color:#94a3b8;font-weight:600;letter-spacing:.3px;text-transform:uppercase;}
+            .mh-ilce{font-size:14px;color:#0f172a;font-weight:600;margin:2px 0 6px;}
+            .mh-sayi{font-size:20px;font-weight:700;color:#1d4ed8;}
+            .mh-etiket{font-size:10.5px;color:#64748b;margin-left:4px;}
+            </style>""", unsafe_allow_html=True)
+            _mh_kartlar = ""
+            for _, _mhr in _il_g.iterrows():
+                _mh_il = str(_mhr.get(_il_col, ""))
+                _mh_ilce = str(_mhr.get("ilce", "")) if "ilce" in _il_g.columns else ""
+                _mh_sayi = int(_mhr["Müşteri Sayısı"])
+                _mh_kartlar += (
+                    f'<div class="mh-kart"><div class="mh-il">{_mh_il}</div>'
+                    f'<div class="mh-ilce">{_mh_ilce}</div>'
+                    f'<span class="mh-sayi">{_mh_sayi}</span><span class="mh-etiket">müşteri</span></div>'
+                )
+            st.markdown(f'<div class="mh-grid">{_mh_kartlar}</div>', unsafe_allow_html=True)
 
 elif aktif == "bolgeler":
     sayfa_log("bolgeler")
