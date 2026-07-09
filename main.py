@@ -3660,7 +3660,7 @@ function kartSec(id){
         "ilce":          st.column_config.TextColumn("İlçe",      width=_w("ilce")),
         "durum":         st.column_config.SelectboxColumn("Durum", options=["Tümü"] + [x for x in tum_durum_opts if str(x).upper() not in ["NONE","NAN",""]], width=_w("durum")),
         "temsilci":      st.column_config.TextColumn("Temsilci",  width=_w("temsilci")),
-        "islem_asamasi": st.column_config.SelectboxColumn("Aşama", options=_asama_secenek_guvenli("islem_asamasi", ["Tümü", "Arama", "Tekrar Ara", "Mesaj", "E-Mail"]), width=_w("islem_asamasi")),
+        "islem_asamasi": st.column_config.SelectboxColumn("Aşama", options=["Tümü", "Arama", "Tekrar Ara", "Mesaj", "E-Mail"], width=_w("islem_asamasi")),
         "aciklama":      st.column_config.TextColumn("Açıklama",  width=_w("aciklama")),
         "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
