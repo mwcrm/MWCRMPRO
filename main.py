@@ -3733,7 +3733,7 @@ function kartSec(id){
                     _st = str(_rj.get("randevu_saati","") or "")[:5]
                     _bl = str(_rj.get("bolge","") or "")
                     _sc = str(_rj.get("sonuc","") or "")
-                    _son_rand[_mn_norm] = f"📅 {_dt} {_st}" + (f" · {_bl}" if _bl else "") + (f" [{_sc}]" if _sc else "")
+                    _son_rand[_mn_norm] = f"📅 {_dt} {_st}"
             df_edit["📅 Son Randevu"] = df_edit["firma"].apply(lambda x: _son_rand.get(_norm_rand(x),""))
     except:
         df_edit["📅 Son Randevu"] = ""
