@@ -3501,12 +3501,11 @@ function kartSec(id){
         ]
         if secili_kart_inline == "🔵 Tüm Firmalar":
             secili_kart = "-- Müşteri Seçin --"
-            if not st.session_state.get("_toplam_aktif"):
-                st.session_state["_toplam_aktif"] = True
-                for _fk in ["_cl_fil_durum_multi","_cl_fil_asama_multi","_cl_fil_il_multi","_cl_fil_ilce_multi","_cl_fil_temsilci_multi"]:
-                    st.session_state.pop(_fk, None)
-                st.session_state["_filtre_reset_sayac"] = st.session_state.get("_filtre_reset_sayac",0)+1
-                st.rerun()
+            # Query param ile tam sıfırlama — widget değerleri de temizlenir
+            _u = st.query_params.to_dict()
+            _u["_rfil"] = "toplam"
+            st.query_params.update(_u)
+            st.rerun()
         elif secili_kart_inline != "-- Müşteri Seçin --":
             _id_str = secili_kart_inline.split("]")[0].replace("[","").strip()
             _esles = [o for o in kart_opts if f"[{_id_str}]" in o]
@@ -3514,8 +3513,12 @@ function kartSec(id){
         else:
             secili_kart = "-- Müşteri Seçin --"
 
-    # Filtre uygula
-    df_f = df.copy()
+    # Varsayılan: hiçbir filtre seçilmemişse tüm liste gelsin
+    if not st.session_state.get("_toplam_aktif") and \
+       not st.session_state.get("_cl_fil_durum_multi") and \
+       not st.session_state.get("_cl_fil_asama_multi") and \
+       not st.session_state.get("_asamasiz_aktif"):
+        st.session_state["_toplam_aktif"] = True
     # Aşamasız filtresi
     if st.session_state.get("_asamasiz_aktif", False):
         _tum_asama_set = set(_grp1_asama + _grp2_asama + _grp3_asama + _grp4_asama + _grp5_asama)
