@@ -3093,8 +3093,14 @@ section[data-testid="stSidebar"] { display: none !important; }
         return {"Portföy":"📦","Özel Müşteri":"⭐","Aşamasız":"📋","Toplam":"📊"}.get(d,"🔹")
 
     def _asama_sayi(ad):
+        """islem_asamasi kolonundan say — AŞAMA grubu (Arama vs.)"""
         if "islem_asamasi" not in df.columns: return 0
-        return len(df[df["islem_asamasi"]==ad])
+        return len(df[df["islem_asamasi"].astype(str).str.strip() == ad])
+
+    def _kolon_sayi(kolon, ad):
+        """Belirtilen kolonda değeri say"""
+        if kolon not in df.columns: return 0
+        return len(df[df[kolon].astype(str).str.strip() == ad])
 
     def _durum_sayi(ad):
         if ad == "Toplam": return len(df)
@@ -3102,16 +3108,23 @@ section[data-testid="stSidebar"] { display: none !important; }
         return len(df[df["durum"]==ad])
 
     def _asamasiz_sayi():
-        if "islem_asamasi" not in df.columns: return 0
-        # İlk Temas + NULL + gruplara girmeyen = Aşamasız
-        _asamasiz_degerleri = list(_tum_grp)
-        return len(df[df["islem_asamasi"].isna() | df["islem_asamasi"].isin(["İlk Temas"]) | ~df["islem_asamasi"].isin(_asamasiz_degerleri)])
+        if df.empty: return 0
+        _mask = pd.Series([True]*len(df), index=df.index)
+        for _k in ["islem_asamasi","asama1","asama2","asama3"]:
+            if _k in df.columns:
+                _mask = _mask & (df[_k].isna() | df[_k].astype(str).str.strip().isin(["","None","nan"]))
+        return int(_mask.sum())
 
+    # grp1 = islem_asamasi (Arama, Tekrar Ara, E-Mail)
     _grp1_toplam = sum(_asama_sayi(a) for a in _grp1_asama)
-    _grp2_toplam = sum(_asama_sayi(a) for a in _grp2_asama)
-    _grp3_toplam = sum(_asama_sayi(a) for a in _grp3_asama)
-    _grp4_toplam = sum(_asama_sayi(a) for a in _grp4_asama)
-    _grp5_toplam = sum(_asama_sayi(a) for a in _grp5_asama)
+    # grp2 = asama1 (Randevu)
+    _grp2_toplam = sum(_kolon_sayi("asama1", a) for a in _grp2_asama)
+    # grp3 = asama2 (Teklif)
+    _grp3_toplam = sum(_kolon_sayi("asama2", a) for a in _grp3_asama)
+    # grp4 = asama3 (Takip, Fiyat Hazırla, Deneme, Sözleşme)
+    _grp4_toplam = sum(_kolon_sayi("asama3", a) for a in _grp4_asama)
+    # grp5 = sonuc (Kazanıldı, Kaybedildi, Devam Ediyor)
+    _grp5_toplam = sum(_kolon_sayi("sonuc", a) for a in _grp5_asama)
 
     # Genel grup
     _genel_items = [
@@ -3126,12 +3139,12 @@ section[data-testid="stSidebar"] { display: none !important; }
 
     _grp_data = {
         "genel":    ("📊","GENEL",    None, _genel_items),
+        "genel":    ("📊","GENEL",    None, _genel_items),
         "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama]),
-        "asama1":   ("📅","1. AŞAMA", None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp2_asama]),
-        "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp3_asama]),
-        "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp4_asama]),
-
-        "sonuc":    ("🏆","SONUÇ",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp5_asama]),
+        "asama1":   ("📅","1. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama1",a),f"asama1_{a}",False)) for a in _grp2_asama]),
+        "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama2",a),f"asama2_{a}",False)) for a in _grp3_asama]),
+        "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama3",a),f"asama3_{a}",False)) for a in _grp4_asama]),
+        "sonuc":    ("🏆","SONUÇ",    None, [((_asama_ikon(a),a,_kolon_sayi("sonuc",a),f"sonuc_{a}",False)) for a in _grp5_asama]),
     }
     # asama3 guncelle
     if _grp4_asama:
@@ -3259,6 +3272,18 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
             st.session_state["_cl_fil_durum_multi"] = []
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
+        elif _qp_rfil.startswith("asama1_"):
+            st.session_state["_cl_fil_asama1"] = _qp_rfil[7:]
+            st.session_state["_toplam_aktif"] = False
+        elif _qp_rfil.startswith("asama2_"):
+            st.session_state["_cl_fil_asama2"] = _qp_rfil[7:]
+            st.session_state["_toplam_aktif"] = False
+        elif _qp_rfil.startswith("asama3_"):
+            st.session_state["_cl_fil_asama3"] = _qp_rfil[7:]
+            st.session_state["_toplam_aktif"] = False
+        elif _qp_rfil.startswith("sonuc_"):
+            st.session_state["_cl_fil_sonuc"] = _qp_rfil[6:]
+            st.session_state["_toplam_aktif"] = False
         st.rerun()
 
     # Kanban view
@@ -3536,6 +3561,8 @@ function kartSec(id){
     # Toplam aktifse tüm filtreleri zorla sıfırla
     if st.session_state.get("_toplam_aktif", False):
         ara_txt = ""; _asama_sec = []; _durum_sec = []; _il_sec = []; _ilce_sec = []; _tem_sec = []; filtre_seg = "Tümü"
+        for _fk in ["_cl_fil_asama1","_cl_fil_asama2","_cl_fil_asama3","_cl_fil_sonuc"]:
+            st.session_state.pop(_fk, None)
     # Aşamasız filtresi
     if st.session_state.get("_asamasiz_aktif", False):
         _tum_asama_set = set(_grp1_asama + _grp2_asama + _grp3_asama + _grp4_asama + _grp5_asama)
@@ -3547,6 +3574,15 @@ function kartSec(id){
             df_f = df_f[df_f.apply(lambda r: ara_txt.lower() in str(r).lower(), axis=1)]
         if _asama_sec:
             df_f = df_f[df_f["islem_asamasi"].isin(_asama_sec)]
+        # asama1/2/3/sonuc filtresi
+        if st.session_state.get("_cl_fil_asama1") and "asama1" in df_f.columns:
+            df_f = df_f[df_f["asama1"].astype(str).str.strip() == st.session_state["_cl_fil_asama1"]]
+        if st.session_state.get("_cl_fil_asama2") and "asama2" in df_f.columns:
+            df_f = df_f[df_f["asama2"].astype(str).str.strip() == st.session_state["_cl_fil_asama2"]]
+        if st.session_state.get("_cl_fil_asama3") and "asama3" in df_f.columns:
+            df_f = df_f[df_f["asama3"].astype(str).str.strip() == st.session_state["_cl_fil_asama3"]]
+        if st.session_state.get("_cl_fil_sonuc") and "sonuc" in df_f.columns:
+            df_f = df_f[df_f["sonuc"].astype(str).str.strip() == st.session_state["_cl_fil_sonuc"]]
         if _durum_sec:
             df_f = df_f[df_f["durum"].isin(_durum_sec)]
         if filtre_seg != "Tümü":
