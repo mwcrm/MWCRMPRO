@@ -3222,9 +3222,14 @@ function kartSec(id){
         secili_kart_inline = _fc[0].selectbox("m", kart_opts_inline, key="kart_sec_inline", label_visibility="collapsed")
         ara_txt = _fc[1].text_input("a", placeholder="🔍 Firma, yetkili, il...", key="ara_liste", label_visibility="collapsed")
 
-        _fk_sfx = st.session_state.get("_filtre_reset_sayac", 0)
         _asama_def = [x for x in st.session_state.get("_cl_fil_asama_multi",[]) if x in tum_asama_opts]
-        _asama_sec = _fc[2].multiselect("a", tum_asama_opts, default=_asama_def, key=f"_cl_fil_asama_multi_{_fk_sfx}", placeholder="Aşama...", label_visibility="collapsed")
+        _asama_sec_raw = _fc[2].multiselect("a", ["🔵 Tümü"] + tum_asama_opts, default=_asama_def, key=f"_cl_fil_asama_multi_{st.session_state.get('_filtre_reset_sayac',0)}", placeholder="Aşama...", label_visibility="collapsed")
+        if "🔵 Tümü" in _asama_sec_raw:
+            st.session_state["_toplam_aktif"] = True
+            for _fk in ["_cl_fil_durum_multi","_cl_fil_asama_multi","_cl_fil_il_multi","_cl_fil_ilce_multi","_cl_fil_temsilci_multi"]:
+                if _fk in st.session_state: del st.session_state[_fk]
+            st.rerun()
+        _asama_sec = _asama_sec_raw
         st.session_state["_cl_fil_asama_multi"] = _asama_sec
 
         _durum_opts_tumu = ["Tümü"] + [x for x in tum_durum_opts if str(x).upper() not in ["NONE","NAN",""]]
