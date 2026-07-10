@@ -3012,10 +3012,11 @@ section[data-testid="stSidebar"] { display: none !important; }
     # ── AŞAMA GRUPLARI — gerçek aşama adlarına göre ──────────────────────────
     # Gruplama — Supabase'deki GERÇEK değerler
     _grp1_asama = [a for a in tum_asama_opts if a in ["Arama","Tekrar Ara","Mesaj","E-Mail","Mail","Whatsapp Mesaj","TAKİP"]]
-    _grp2_asama = [a for a in tum_asama_opts if a in ["Randevu","İlk Temas"]]
+    _grp2_asama = [a for a in tum_asama_opts if a in ["Randevu"]]
     _grp3_asama = [a for a in tum_asama_opts if a in ["Teklif","Fiyat Hazırla"]]
     _grp4_asama = [a for a in tum_asama_opts if a in ["Deneme","Sözleşme"]]
     _grp5_asama = [a for a in tum_asama_opts if a in ["Kazanıldı","Kaybedildi","Devam Ediyor","Negatif Portföy"]]
+    # İlk Temas = Aşamasız sayılır — gruplara dahil edilmez
     # Diğer grubu YOK
     _tum_grp = set(_grp1_asama+_grp2_asama+_grp3_asama+_grp4_asama+_grp5_asama)
 
@@ -3076,7 +3077,9 @@ section[data-testid="stSidebar"] { display: none !important; }
 
     def _asamasiz_sayi():
         if "islem_asamasi" not in df.columns: return 0
-        return len(df[df["islem_asamasi"].isna() | ~df["islem_asamasi"].isin(_tum_grp)])
+        # İlk Temas + NULL + gruplara girmeyen = Aşamasız
+        _asamasiz_degerleri = list(_tum_grp)
+        return len(df[df["islem_asamasi"].isna() | df["islem_asamasi"].isin(["İlk Temas"]) | ~df["islem_asamasi"].isin(_asamasiz_degerleri)])
 
     _grp1_toplam = sum(_asama_sayi(a) for a in _grp1_asama)
     _grp2_toplam = sum(_asama_sayi(a) for a in _grp2_asama)
