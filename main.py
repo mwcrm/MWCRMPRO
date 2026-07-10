@@ -3253,6 +3253,17 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
     _qp_rfil = st.query_params.get("_rfil", "")
     if _qp_rfil:
         st.query_params.clear()
+        _fk_sfx_now = st.session_state.get("_filtre_reset_sayac", 0)
+
+        def _rapor_kutuya_ekle(_hedef_key, _deger):
+            """Üst rapor rozetine tıklanınca değeri ilgili filtre kutusuna (Aşama.../Durum...) ekler.
+            Kutuda zaten varsa tekrar eklemez — hem tek tek hem toplu tıklama birikerek çalışır."""
+            _cur = list(st.session_state.get(_hedef_key, []))
+            if _deger not in _cur:
+                _cur.append(_deger)
+            st.session_state[_hedef_key] = _cur
+            st.session_state[f"{_hedef_key}_{_fk_sfx_now}"] = _cur
+
         if _qp_rfil == "toplam":
             st.session_state["_toplam_aktif"] = True
             st.session_state["_asamasiz_aktif"] = False
@@ -3266,40 +3277,34 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
             st.session_state["_cl_fil_asama_multi"] = []
         elif _qp_rfil.startswith("durum_"):
             _d = _qp_rfil[6:]
-            st.session_state["_cl_fil_durum_multi"] = [_d]
-            st.session_state["_cl_fil_asama_multi"] = []
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
+            _rapor_kutuya_ekle("_cl_fil_durum_multi", _d)
         elif _qp_rfil.startswith("asama_"):
             _a = _qp_rfil[6:]
-            st.session_state["_cl_fil_asama_multi"] = [_a]
-            st.session_state["_cl_fil_durum_multi"] = []
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
+            _rapor_kutuya_ekle("_cl_fil_asama_multi", _a)
         elif _qp_rfil.startswith("asama1_"):
-            st.session_state["_cl_fil_asama1"] = _qp_rfil[7:]
+            _a = _qp_rfil[7:]
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
-            for _fk in ["_cl_fil_asama2","_cl_fil_asama3","_cl_fil_sonuc","_cl_fil_asama_multi","_cl_fil_durum_multi"]:
-                st.session_state.pop(_fk, None)
+            _rapor_kutuya_ekle("_cl_fil_asama_multi", _a)
         elif _qp_rfil.startswith("asama2_"):
-            st.session_state["_cl_fil_asama2"] = _qp_rfil[7:]
+            _a = _qp_rfil[7:]
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
-            for _fk in ["_cl_fil_asama1","_cl_fil_asama3","_cl_fil_sonuc","_cl_fil_asama_multi","_cl_fil_durum_multi"]:
-                st.session_state.pop(_fk, None)
+            _rapor_kutuya_ekle("_cl_fil_asama_multi", _a)
         elif _qp_rfil.startswith("asama3_"):
-            st.session_state["_cl_fil_asama3"] = _qp_rfil[7:]
+            _a = _qp_rfil[7:]
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
-            for _fk in ["_cl_fil_asama1","_cl_fil_asama2","_cl_fil_sonuc","_cl_fil_asama_multi","_cl_fil_durum_multi"]:
-                st.session_state.pop(_fk, None)
+            _rapor_kutuya_ekle("_cl_fil_asama_multi", _a)
         elif _qp_rfil.startswith("sonuc_"):
-            st.session_state["_cl_fil_sonuc"] = _qp_rfil[6:]
+            _a = _qp_rfil[6:]
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
-            for _fk in ["_cl_fil_asama1","_cl_fil_asama2","_cl_fil_asama3","_cl_fil_asama_multi","_cl_fil_durum_multi"]:
-                st.session_state.pop(_fk, None)
+            _rapor_kutuya_ekle("_cl_fil_asama_multi", _a)
         st.rerun()
 
     # Kanban view
