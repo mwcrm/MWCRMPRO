@@ -3152,7 +3152,7 @@ section[data-testid="stSidebar"] { display: none !important; }
             _h += f'<span onclick="gg(\'{_gid}\')" style="font-size:11px;cursor:pointer;">🙈</span>'
             _h += '</div></th>'
         else:
-            _h = f'<th colspan="{_span}" style="border:0.5px solid #e2e8f0;{_border_l}padding:3px 8px;background:#f8fafc;text-align:center;font-size:10px;font-weight:600;color:#374151;white-space:nowrap;">{_ikon} {_lbl}{_top_txt}</th>'
+            _h = f'<th colspan="{_span}" style="border:0.5px solid #e2e8f0;{_border_l}padding:4px 10px;background:#f8fafc;text-align:center;font-size:12px;font-weight:700;color:#374151;white-space:nowrap;">{_ikon} {_lbl}{_top_txt}</th>'
         _html += _h
 
     # Gizli gruplar için ayar modunda göster
