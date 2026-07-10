@@ -3432,7 +3432,7 @@ function kartSec(id){
             st.session_state.pop("kart_sec_reset", None)
             st.session_state.pop("kart_sec", None)
 
-        kart_opts_inline = ["-- Müşteri Seçin --"] + [
+        kart_opts_inline = ["-- Müşteri Seçin --", "🔵 Tüm Firmalar"] + [
             f"[{int(r['id'])}] {r.get('firma','')}" for _, r in df.iterrows()
         ]
         if st.session_state.get("kart_sec_reset"):
@@ -3499,7 +3499,10 @@ function kartSec(id){
             f"[{int(r['id'])}] {r.get('firma','')} | {r.get('il','')} | {r.get('islem_asamasi','')}"
             for _, r in df.iterrows()
         ]
-        if secili_kart_inline != "-- Müşteri Seçin --":
+        if secili_kart_inline == "🔵 Tüm Firmalar":
+            secili_kart = "-- Müşteri Seçin --"
+            st.session_state["_toplam_aktif"] = True
+        elif secili_kart_inline != "-- Müşteri Seçin --":
             _id_str = secili_kart_inline.split("]")[0].replace("[","").strip()
             _esles = [o for o in kart_opts if f"[{_id_str}]" in o]
             secili_kart = _esles[0] if _esles else "-- Müşteri Seçin --"
