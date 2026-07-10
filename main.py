@@ -3206,27 +3206,6 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
 </script>"""
     st.markdown(_html, unsafe_allow_html=True)
 
-    # ⚙️ ve Kanban — üst raporun sağına hizalı, margin-top ile yukarı çek
-    st.markdown("""<style>
-div[data-testid="stHorizontalBlock"]:has(#rbar_btns_marker) {
-    margin-top: -78px !important;
-    display: flex;
-    justify-content: flex-end;
-}
-</style>
-<span id="rbar_btns_marker"></span>""", unsafe_allow_html=True)
-
-    _col_bos, _col_g, _col_k = st.columns([10, 0.4, 0.6])
-    with _col_g:
-        if st.button("⚙️", key="rbar_ayar_btn", help="Grup Ayarları", use_container_width=True):
-            st.session_state["_rbar_ayar_modu"] = not _ayar_modu
-            st.rerun()
-    with _col_k:
-        _kb_type = "primary" if _cl_view2 == "kanban" else "secondary"
-        if st.button("📋 Kanban", key="rbar_kanban_btn", help="Kanban", type=_kb_type, use_container_width=True):
-            st.session_state["_cl_view"] = "kanban" if _cl_view2 == "liste" else "liste"
-            st.rerun()
-
     # Grup ayar param
     _qp_grp_gizli = st.query_params.get("_grp_gizli","")
     _qp_grp_sira  = st.query_params.get("_grp_sira","")
