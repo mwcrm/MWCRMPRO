@@ -3083,8 +3083,9 @@ section[data-testid="stSidebar"] { display: none !important; }
     def _td(lbl, sayi, key, aktif):
         _bg = "background:#dbeafe;" if aktif else "background:#fff;"
         _tc = "color:#1d4ed8;font-weight:600;" if aktif else "color:#0f172a;"
-        return (f'<td onclick="sf(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:5px 10px;text-align:center;cursor:pointer;white-space:nowrap;{_bg}vertical-align:middle;">' +
-                f'<span style="font-size:12px;font-weight:500;{_tc}">{sayi} {lbl}</span></td>')
+        _h  = f'<td onclick="sf(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:5px 10px;text-align:center;cursor:pointer;white-space:nowrap;{_bg}vertical-align:middle;">'
+        _h += f'<span style="font-size:12px;font-weight:500;{_tc}">{sayi} {lbl}</span></td>'
+        return _h
 
     def _th_grp(ikon, lbl, toplam, grp_id, span):
         _idx = _grp_sira.index(grp_id) if grp_id in _grp_sira else 0
@@ -3093,13 +3094,14 @@ section[data-testid="stSidebar"] { display: none !important; }
         _sag = "opacity:.25;pointer-events:none;" if _idx>=_n-1 else "cursor:pointer;"
         _giz_ic = "👁" if grp_id in _grp_gizli else "🙈"
         _top_txt = f" · {toplam}" if toplam is not None else ""
-        return (f'<th colspan="{span}" style="border:0.5px solid #e2e8f0;padding:0;text-align:center;background:#f8fafc;white-space:nowrap;">' +
-                f'<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 5px;gap:2px;">' +
-                f'<span onclick="gs(\'{grp_id}\','l')" style="font-size:10px;user-select:none;{_sol}">◀</span>' +
-                f'<span style="font-size:10px;font-weight:600;color:#374151;">{ikon} {lbl}{_top_txt}</span>' +
-                f'<span onclick="gs(\'{grp_id}\','r')" style="font-size:10px;user-select:none;{_sag}">▶</span>' +
-                f'<span onclick="gg(\'{grp_id}\')" style="font-size:11px;cursor:pointer;margin-left:2px;">{_giz_ic}</span>' +
-                '</div></th>')
+        _h  = f'<th colspan="{span}" style="border:0.5px solid #e2e8f0;padding:0;text-align:center;background:#f8fafc;white-space:nowrap;">'
+        _h += f'<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 5px;gap:2px;">'
+        _h += f'<span onclick="gs(\'{grp_id}\',\'l\')" style="font-size:10px;user-select:none;{_sol}">◀</span>'
+        _h += f'<span style="font-size:10px;font-weight:600;color:#374151;">{ikon} {lbl}{_top_txt}</span>'
+        _h += f'<span onclick="gs(\'{grp_id}\',\'r\')" style="font-size:10px;user-select:none;{_sag}">▶</span>'
+        _h += f'<span onclick="gg(\'{grp_id}\')" style="font-size:11px;cursor:pointer;margin-left:2px;">{_giz_ic}</span>'
+        _h += '</div></th>'
+        return _h
 
     _genel_items = [("📊 Toplam", len(df), "toplam", _toplam_aktif_flag)]
     for _dn in tum_durum_opts:
@@ -3138,9 +3140,7 @@ section[data-testid="stSidebar"] { display: none !important; }
                 _html += _td(lbl,sayi,key,aktif)
     _cl_view2 = st.session_state.get("_cl_view","liste")
     _kb_bg = "background:#dbeafe;" if _cl_view2=="kanban" else "background:#fff;"
-    _html += (f'<td onclick="sf('kanban')" style="border:0.5px solid #e2e8f0;padding:4px 9px;' +
-              f'text-align:center;cursor:pointer;{_kb_bg}">' +
-              '<i class="ti ti-layout-kanban" style="font-size:16px;color:#64748b;"></i></td>')
+    _html += f'<td onclick="sf(\'kanban\')" style="border:0.5px solid #e2e8f0;padding:4px 9px;text-align:center;cursor:pointer;{_kb_bg}"><i class="ti ti-layout-kanban" style="font-size:16px;color:#64748b;"></i></td>'
     _html += '</tr></tbody></table></div>'
     import json as _rjson2
     _sira_js = _rjson2.dumps(_grp_sira)
