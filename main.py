@@ -3162,6 +3162,7 @@ section[data-testid="stSidebar"] { display: none !important; }
                 _ikon,_lbl,_top,_items = _grp_data[_gid]
                 _html += "<th onclick=\"gg('" + _gid + "')\" style=\"border:0.5px solid #e2e8f0;padding:3px 5px;background:#fee2e2;cursor:pointer;font-size:9px;white-space:nowrap;\">👁 " + _lbl + "</th>"
 
+    _cl_view2 = st.session_state.get("_cl_view","liste")
     _gear_bg = "#fef9c3" if _ayar_modu else "#f8fafc"
     _kb_bg3 = "#dbeafe" if _cl_view2=="kanban" else "#f8fafc"
     _html += f'<th rowspan="2" onclick="sf(\'_ayar_toggle\')" style="border:0.5px solid #e2e8f0;padding:4px 6px;cursor:pointer;background:{_gear_bg};vertical-align:middle;text-align:center;" title="Grup Ayarları"><span style="font-size:13px;">⚙️</span></th>'
