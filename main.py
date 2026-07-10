@@ -3637,24 +3637,6 @@ function kartSec(id){
 
     # ── HİÇ FİLTRE SEÇİLİ DEĞİLKEN — sadece işlem görmemiş (Özel Müşteri/Portföy) göster ──
     # Bir müşteriye durum atanınca (Randevu, Teklif, Tekrar Ara vb.) artık burada görünmesin,
-    # sadece kendi durum filtresinde görünsün. Karışıklığı önler.
-    # NOT: Bir İl/Bölge seçiliyken bu gizleme devre dışı — o zaman amaç "oradaki HERKESİ göster".
-    _bl_bolge_secili = bool(_il_sec) or bool(st.session_state.get("_bl_ilce_filtre")) or bool(st.session_state.get("_bl_havuz_filtre")) or bool(st.session_state.get("_mr_liste_filtre"))
-    if not _durum_sec and not _asama_sec and not _bl_bolge_secili and "durum" in df_f.columns:
-        _varsayilan_durumlar = ["Özel Müşteri", "Portföy"]
-        df_f = df_f[df_f["durum"].isin(_varsayilan_durumlar)]
-
-    # ── AŞAMA İÇİN AYNI MANTIK — sadece "İlk Temas" (varsayılan) aşamasındakiler kalsın ──
-    # Aşaması değişen (Teklif, Sözleşme, Kazanıldı, Negatif Portföy vb.) müşteriler
-    # ana listeden çıkıp sadece kendi aşama filtresinde görünür.
-    if not _durum_sec and not _asama_sec and not _bl_bolge_secili and "islem_asamasi" in df_f.columns:
-        _varsayilan_asama = "Arama"
-        df_f = df_f[
-            (df_f["islem_asamasi"] == _varsayilan_asama) |
-            (df_f["islem_asamasi"].isna()) |
-            (df_f["islem_asamasi"].astype(str).str.strip() == "")
-        ]
-
     # Segment hesapla ve sırala
     if df_f.empty or "firma" not in df_f.columns:
         df_f = pd.DataFrame()
