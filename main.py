@@ -3528,6 +3528,11 @@ function kartSec(id){
         _tem_sec = []
         siralama_kol = "Tarih↓"
 
+        # Manuel filtre kutularından biri (Aşama, Durum, Arama, İl, İlçe) kullanıldıysa
+        # 'Toplam' modu otomatik kapanır — aksi halde seçim görünür ama uygulanmaz
+        if ara_txt or _asama_sec or _durum_sec or _il_sec or _ilce_sec:
+            st.session_state["_toplam_aktif"] = False
+
         # Çoklu firma seçimi — filtre satırında son sütun
         _cok_sec_opts = [f"[{int(i)}] {f}" for i, f in zip(df["id"], df["firma"]) if str(f) not in ["","nan","None"]] if not df.empty and "firma" in df.columns else []
         _cok_secili_ham = _fc[6].multiselect("c", _cok_sec_opts, key="_cl_cok_secim", placeholder="🔍 Çoklu firma...", label_visibility="collapsed")
@@ -3590,7 +3595,7 @@ function kartSec(id){
             df_f = df_f[df_f.apply(lambda r: ara_txt.lower() in str(r).lower(), axis=1)]
         if _asama_sec:
             _asama_mask = df_f["islem_asamasi"].isin(_asama_sec) if "islem_asamasi" in df_f.columns else pd.Series([False] * len(df_f), index=df_f.index)
-            for _acol in ["asama1", "asama2", "asama3"]:
+            for _acol in ["asama1", "asama2", "asama3", "sonuc"]:
                 if _acol in df_f.columns:
                     _asama_mask = _asama_mask | df_f[_acol].astype(str).str.strip().isin(_asama_sec)
             df_f = df_f[_asama_mask]
