@@ -3442,8 +3442,7 @@ function kartSec(id){
 
         kart_opts_inline = ["-- Müşteri Seçin --", "🔵 Tüm Firmalar"]
         if not df.empty and "firma" in df.columns and "id" in df.columns:
-            _ko_df = df[["id","firma"]].dropna(subset=["firma"]).head(2000)
-            kart_opts_inline += [f"[{int(r['id'])}] {r['firma']}" for _, r in _ko_df.iterrows()]
+            kart_opts_inline += [f"[{int(i)}] {f}" for i, f in zip(df["id"], df["firma"]) if str(f) not in ["","nan","None"]]
         if st.session_state.get("kart_sec_reset"):
             st.session_state.pop("kart_sec_reset", None)
             st.session_state.pop("kart_sec", None)
@@ -3491,8 +3490,7 @@ function kartSec(id){
         siralama_kol = "Tarih↓"  # Sıralama kutusu kaldırıldı, varsayılan sıralama sabit kaldı
 
         # ── Çoklu firma seçimi (karşılaştırma/düzeltme için) — seçilenler varsa tablo sadece onları gösterir ──
-        _cok_sec_df = df[["id","firma"]].dropna(subset=["firma"]).head(2000) if not df.empty and "firma" in df.columns else pd.DataFrame()
-        _cok_sec_opts = [f"[{int(r['id'])}] {r['firma']}" for _, r in _cok_sec_df.iterrows()]
+        _cok_sec_opts = [f"[{int(i)}] {f}" for i, f in zip(df["id"], df["firma"]) if str(f) not in ["","nan","None"]] if not df.empty and "firma" in df.columns else []
         _cok_secili_ham = st.multiselect(
             "🔍 Çoklu firma seçimi",
             _cok_sec_opts, key="_cl_cok_secim",
@@ -3506,9 +3504,13 @@ function kartSec(id){
 
         # Eski sistemle uyumluluk
         kart_opts = ["-- Müşteri Seçin --"] + [
-            f"[{int(r['id'])}] {r.get('firma','')} | {r.get('il','')} | {r.get('islem_asamasi','')}"
-            for _, r in df.iterrows()
-        ]
+            f"[{int(i)}] {f} | {il} | {a}"
+            for i, f, il, a in zip(
+                df["id"], df["firma"],
+                df.get("il", pd.Series([""] * len(df))),
+                df.get("islem_asamasi", pd.Series([""] * len(df)))
+            ) if str(f) not in ["","nan","None"]
+        ] if not df.empty else ["-- Müşteri Seçin --"]
         if secili_kart_inline == "🔵 Tüm Firmalar":
             secili_kart = "-- Müşteri Seçin --"
             # Query param ile tam sıfırlama — widget değerleri de temizlenir
