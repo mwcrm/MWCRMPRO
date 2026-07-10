@@ -3594,13 +3594,16 @@ function kartSec(id){
                 if _acol in df_f.columns:
                     _asama_mask = _asama_mask | df_f[_acol].astype(str).str.strip().isin(_asama_sec)
             df_f = df_f[_asama_mask]
-        # asama1/2/3/sonuc filtresi
-        if st.session_state.get("_cl_fil_asama1") and "asama1" in df_f.columns:
-            df_f = df_f[df_f["asama1"].astype(str).str.strip() == st.session_state["_cl_fil_asama1"]]
-        if st.session_state.get("_cl_fil_asama2") and "asama2" in df_f.columns:
-            df_f = df_f[df_f["asama2"].astype(str).str.strip() == st.session_state["_cl_fil_asama2"]]
-        if st.session_state.get("_cl_fil_asama3") and "asama3" in df_f.columns:
-            df_f = df_f[df_f["asama3"].astype(str).str.strip() == st.session_state["_cl_fil_asama3"]]
+        # asama1/2/3/sonuc filtresi — hangi kolonda olduğuna bakılmaksızın eşleşeni yakalar
+        _tekli_asama_hedef = (st.session_state.get("_cl_fil_asama1") or
+                               st.session_state.get("_cl_fil_asama2") or
+                               st.session_state.get("_cl_fil_asama3"))
+        if _tekli_asama_hedef:
+            _tek_mask = pd.Series([False] * len(df_f), index=df_f.index)
+            for _acol in ["islem_asamasi", "asama1", "asama2", "asama3"]:
+                if _acol in df_f.columns:
+                    _tek_mask = _tek_mask | (df_f[_acol].astype(str).str.strip() == _tekli_asama_hedef)
+            df_f = df_f[_tek_mask]
         if st.session_state.get("_cl_fil_sonuc") and "sonuc" in df_f.columns:
             df_f = df_f[df_f["sonuc"].astype(str).str.strip() == st.session_state["_cl_fil_sonuc"]]
         if _durum_sec:
