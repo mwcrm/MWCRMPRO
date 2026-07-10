@@ -3016,6 +3016,8 @@ section[data-testid="stSidebar"] { display: none !important; }
     _grp3_asama = [a for a in tum_asama_opts if a in ["Teklif"]]
     _grp4_asama = [a for a in tum_asama_opts if a in ["Takip","TAKİP","takip","Fiyat Hazırla","Deneme","Sözleşme"]]
     _grp5_asama = [a for a in tum_asama_opts if a in ["Kazanıldı","Kaybedildi","Devam Ediyor"]]
+    # Devam Ediyor sistemde yoksa da göster
+    if "Devam Ediyor" not in _grp5_asama: _grp5_asama.append("Devam Ediyor")
     # İlk Temas = Aşamasız sayılır — gruplara dahil edilmez
     # Diğer grubu YOK
     _tum_grp = set(_grp1_asama+_grp2_asama+_grp3_asama+_grp4_asama+_grp5_asama)
