@@ -2753,6 +2753,9 @@ section[data-testid="stSidebar"] { display: none !important; }
 
     # ── VERİ YÜKLE ──────────────────────────────────────────────────────────────
     sb_liste = get_sb_client()
+    # Cache'i temizle — her zaman taze veri gelsin
+    try: get_cari_listesi.clear()
+    except: pass
     df = get_cari_listesi()
     if not df.empty and "tarih" in df.columns:
         df = df.sort_values("tarih", ascending=False).reset_index(drop=True)
@@ -3527,6 +3530,9 @@ function kartSec(id){
 
     # Filtre uygula
     df_f = df.copy()
+    # Toplam aktifse tüm filtreleri zorla sıfırla
+    if st.session_state.get("_toplam_aktif", False):
+        ara_txt = ""; _asama_sec = []; _durum_sec = []; _il_sec = []; _ilce_sec = []; _tem_sec = []; filtre_seg = "Tümü"
     # Aşamasız filtresi
     if st.session_state.get("_asamasiz_aktif", False):
         _tum_asama_set = set(_grp1_asama + _grp2_asama + _grp3_asama + _grp4_asama + _grp5_asama)
@@ -3942,6 +3948,9 @@ function kartSec(id){
                       "🧾 Teklif":"🧾 Teklif","💬 Mesaj":"💬 Mesaj",
                       "asama1":"asama1","asama2":"asama2","asama3":"asama3","sonuc":"sonuc"}
     col_order = [c for c in col_order if not any(c == _kol_gizli_map.get(g,g) for g in _GIZLI_KOLONLAR)]
+
+    # DEBUG
+    st.caption(f"🔍 df:{len(df)} df_f:{len(df_f)} toplam_aktif:{st.session_state.get('_toplam_aktif')} asama:{_asama_sec} durum:{_durum_sec}")
 
     # ── DATA EDITOR ─────────────────────────────────────────────────────────────
     df_edit = df_f.copy()
