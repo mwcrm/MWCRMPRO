@@ -3207,9 +3207,9 @@ section[data-testid="stSidebar"] { display: none !important; }
             _border_l2 = ("border-left:2px solid #cbd5e1;" if not _ilk2 and _grp_ilk else "")
             _td_onclick = f"sf('{_key}')"
             _html += f'<td onclick="{_td_onclick}" style="border:0.5px solid #f1f5f9;{_border_l2}padding:4px 7px;text-align:center;cursor:pointer;white-space:nowrap;{_bg}vertical-align:middle;min-width:50px;">'
-            _html += f'<div style="font-size:16px;line-height:1;">{_ic}</div>'
-            _html += f'<div style="font-size:15px;font-weight:700;{_tc};line-height:1.2;">{_sayi}</div>'
-            _html += f'<div style="font-size:9px;color:#64748b;">{_ad}</div>'
+            _html += f'<div style="font-size:20px;line-height:1;margin-bottom:4px;">{_ic}</div>'
+            _html += f'<div style="font-size:20px;font-weight:600;{_tc};line-height:1;">{_sayi}</div>'
+            _html += f'<div style="font-size:20px;font-weight:500;color:#374151;line-height:1;">{_ad}</div>'
             _html += '</td>'
             _grp_ilk = False
             _ilk2 = False
