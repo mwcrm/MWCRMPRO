@@ -3501,7 +3501,12 @@ function kartSec(id){
         ]
         if secili_kart_inline == "🔵 Tüm Firmalar":
             secili_kart = "-- Müşteri Seçin --"
-            st.session_state["_toplam_aktif"] = True
+            if not st.session_state.get("_toplam_aktif"):
+                st.session_state["_toplam_aktif"] = True
+                for _fk in ["_cl_fil_durum_multi","_cl_fil_asama_multi","_cl_fil_il_multi","_cl_fil_ilce_multi","_cl_fil_temsilci_multi"]:
+                    st.session_state.pop(_fk, None)
+                st.session_state["_filtre_reset_sayac"] = st.session_state.get("_filtre_reset_sayac",0)+1
+                st.rerun()
         elif secili_kart_inline != "-- Müşteri Seçin --":
             _id_str = secili_kart_inline.split("]")[0].replace("[","").strip()
             _esles = [o for o in kart_opts if f"[{_id_str}]" in o]
