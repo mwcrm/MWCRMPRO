@@ -3092,15 +3092,23 @@ section[data-testid="stSidebar"] { display: none !important; }
     def _durum_ikon(d):
         return {"Portföy":"📦","Özel Müşteri":"⭐","Aşamasız":"📋","Toplam":"📊"}.get(d,"🔹")
 
+    def _asama_norm(s):
+        """Büyük/küçük harf ve Türkçe karakter farkını yok sayarak karşılaştırma için normalize eder"""
+        return (str(s or "").strip().upper()
+                .replace("İ","I").replace("Ş","S").replace("Ğ","G")
+                .replace("Ü","U").replace("Ö","O").replace("Ç","C"))
+
     def _asama_sayi(ad):
         """islem_asamasi kolonundan say — AŞAMA grubu (Arama vs.)"""
         if "islem_asamasi" not in df.columns: return 0
-        return len(df[df["islem_asamasi"].astype(str).str.strip() == ad])
+        _ad_n = _asama_norm(ad)
+        return len(df[df["islem_asamasi"].apply(_asama_norm) == _ad_n])
 
     def _kolon_sayi(kolon, ad):
-        """Belirtilen kolonda değeri say"""
+        """Belirtilen kolonda değeri say (büyük/küçük harf farkı yok sayılır)"""
         if kolon not in df.columns: return 0
-        return len(df[df[kolon].astype(str).str.strip() == ad])
+        _ad_n = _asama_norm(ad)
+        return len(df[df[kolon].apply(_asama_norm) == _ad_n])
 
     def _durum_sayi(ad):
         if ad == "Toplam": return len(df)
@@ -3590,23 +3598,25 @@ function kartSec(id){
         if ara_txt:
             df_f = df_f[df_f.apply(lambda r: ara_txt.lower() in str(r).lower(), axis=1)]
         if _asama_sec:
-            _asama_mask = df_f["islem_asamasi"].isin(_asama_sec) if "islem_asamasi" in df_f.columns else pd.Series([False] * len(df_f), index=df_f.index)
+            _asama_sec_n = [_asama_norm(x) for x in _asama_sec]
+            _asama_mask = df_f["islem_asamasi"].apply(_asama_norm).isin(_asama_sec_n) if "islem_asamasi" in df_f.columns else pd.Series([False] * len(df_f), index=df_f.index)
             for _acol in ["asama1", "asama2", "asama3", "sonuc"]:
                 if _acol in df_f.columns:
-                    _asama_mask = _asama_mask | df_f[_acol].astype(str).str.strip().isin(_asama_sec)
+                    _asama_mask = _asama_mask | df_f[_acol].apply(_asama_norm).isin(_asama_sec_n)
             df_f = df_f[_asama_mask]
-        # asama1/2/3/sonuc filtresi — hangi kolonda olduğuna bakılmaksızın eşleşeni yakalar
+        # asama1/2/3/sonuc filtresi — hangi kolonda olduğuna bakılmaksızın, büyük/küçük harf farkı yok sayılarak eşleşeni yakalar
         _tekli_asama_hedef = (st.session_state.get("_cl_fil_asama1") or
                                st.session_state.get("_cl_fil_asama2") or
                                st.session_state.get("_cl_fil_asama3"))
         if _tekli_asama_hedef:
+            _tekli_hedef_n = _asama_norm(_tekli_asama_hedef)
             _tek_mask = pd.Series([False] * len(df_f), index=df_f.index)
             for _acol in ["islem_asamasi", "asama1", "asama2", "asama3"]:
                 if _acol in df_f.columns:
-                    _tek_mask = _tek_mask | (df_f[_acol].astype(str).str.strip() == _tekli_asama_hedef)
+                    _tek_mask = _tek_mask | (df_f[_acol].apply(_asama_norm) == _tekli_hedef_n)
             df_f = df_f[_tek_mask]
         if st.session_state.get("_cl_fil_sonuc") and "sonuc" in df_f.columns:
-            df_f = df_f[df_f["sonuc"].astype(str).str.strip() == st.session_state["_cl_fil_sonuc"]]
+            df_f = df_f[df_f["sonuc"].apply(_asama_norm) == _asama_norm(st.session_state["_cl_fil_sonuc"])]
         if _durum_sec:
             df_f = df_f[df_f["durum"].isin(_durum_sec)]
         if filtre_seg != "Tümü":
@@ -3992,7 +4002,7 @@ function kartSec(id){
         "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=True, width="small"),
         "asama1":        st.column_config.SelectboxColumn("1. Aşama", options=_asama_secenek_guvenli("asama1", ["", "Randevu"]), width=_w("asama1")),
         "asama2":        st.column_config.SelectboxColumn("2. Aşama", options=_asama_secenek_guvenli("asama2", ["", "Teklif"]), width=_w("asama2")),
-        "asama3":        st.column_config.SelectboxColumn("3. Aşama", options=_asama_secenek_guvenli("asama3", ["Tümü", "Deneme", "Takip", "Fiyat Hazırla", "Sözleşme"]), width=_w("asama3")),
+        "asama3":        st.column_config.SelectboxColumn("3. Aşama", options=_asama_secenek_guvenli("asama3", ["Tümü", "Deneme", "TAKİP", "Fiyat Hazırla", "Sözleşme"]), width=_w("asama3")),
         "sonuc":         st.column_config.SelectboxColumn("Sonuç", options=_asama_secenek_guvenli("sonuc", ["Tümü", "Kazanıldı", "Kaybedildi", "Devam Ediyor"]), width=_w("sonuc")),
     }
     # Sütun sırası — sizin verdiğiniz şablonla birebir: Seç, İşlem Tarih, Id, Firma, Yetkili,
