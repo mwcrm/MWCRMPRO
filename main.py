@@ -3010,11 +3010,12 @@ section[data-testid="stSidebar"] { display: none !important; }
     _d_adlar = {x[0] for x in _d_veri}
 
     # ── AŞAMA GRUPLARI — gerçek aşama adlarına göre ──────────────────────────
-    _grp1_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["arama","tekrar ara","mesaj","mail","e-mail","whatsapp","takip"])]
-    _grp2_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["randevu"])]
-    _grp3_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["teklif","fiyat hazırla","fiyat hazirlا"])]
-    _grp4_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["deneme","sözleşme","sozlesme","takip"])]
-    _grp5_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["kazanıldı","kazanildi","kaybedildi","devam ediyor"])]
+    # Gruplama — sistemdeki gerçek aşama adlarına tam eşleşme
+    _grp1_asama = [a for a in tum_asama_opts if a.lower() in ["arama","tekrar ara","mesaj","e-mail","mail","whatsapp mesaj","takip"]]
+    _grp2_asama = [a for a in tum_asama_opts if a.lower() in ["randevu"]]
+    _grp3_asama = [a for a in tum_asama_opts if a.lower() in ["teklif","fiyat hazırla","fiyat hazirlا"]]
+    _grp4_asama = [a for a in tum_asama_opts if a.lower() in ["deneme","sözleşme","sozlesme"]]
+    _grp5_asama = [a for a in tum_asama_opts if a.lower() in ["kazanıldı","kazanildi","kaybedildi","devam ediyor"]]
     # Diğer grubu YOK
     _tum_grp = set(_grp1_asama+_grp2_asama+_grp3_asama+_grp4_asama+_grp5_asama)
 
@@ -3111,22 +3112,26 @@ section[data-testid="stSidebar"] { display: none !important; }
 
     # HTML oluştur - 2 satırlı tablo
     _html = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">'
-    _html += '<div style="overflow-x:auto;margin-bottom:4px;"><table style="border-collapse:collapse;font-family:inherit;font-size:12px;">'
+    _html += '<div style="overflow-x:auto;margin-bottom:4px;"><table style="border-collapse:separate;border-spacing:0;font-family:inherit;font-size:12px;">'
 
     # 1. SATIR — grup başlıkları
     _html += '<thead><tr>'
+    _ilk = True
     for _gid in _grp_sira:
         if _gid not in _grp_data or _gid in _grp_gizli: continue
         _ikon,_lbl,_top,_items = _grp_data[_gid]
         if not _items: continue
         _span = len(_items)
         _top_txt = f" {_top}" if _top is not None else ""
+        # Grup arası boşluk
+        _border_l = "border-left:2px solid #cbd5e1;" if not _ilk else ""
+        _ilk = False
         if _ayar_modu:
             _idx = _grp_sira.index(_gid)
             _n = len([g for g in _grp_sira if g in _grp_data and _grp_data[g][3] and g not in _grp_gizli])
             _sol = "opacity:.3;" if _idx==0 else "cursor:pointer;"
             _sag = "opacity:.3;" if _idx>=_n-1 else "cursor:pointer;"
-            _h  = f'<th colspan="{_span}" style="border:0.5px solid #e2e8f0;padding:0;background:#fef9c3;text-align:center;">'
+            _h  = f'<th colspan="{_span}" style="border:0.5px solid #e2e8f0;{_border_l}padding:0;background:#fef9c3;text-align:center;">'
             _h += f'<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 4px;">'
             _h += f'<span onclick="gs(\'{_gid}\',\'l\')" style="font-size:10px;{_sol}">◀</span>'
             _h += f'<b style="font-size:10px;color:#374151;">{_ikon} {_lbl}{_top_txt}</b>'
@@ -3134,7 +3139,7 @@ section[data-testid="stSidebar"] { display: none !important; }
             _h += f'<span onclick="gg(\'{_gid}\')" style="font-size:11px;cursor:pointer;">🙈</span>'
             _h += '</div></th>'
         else:
-            _h = f'<th colspan="{_span}" style="border:0.5px solid #e2e8f0;padding:3px 8px;background:#f8fafc;text-align:center;font-size:10px;font-weight:600;color:#374151;white-space:nowrap;">{_ikon} {_lbl}{_top_txt}</th>'
+            _h = f'<th colspan="{_span}" style="border:0.5px solid #e2e8f0;{_border_l}padding:3px 8px;background:#f8fafc;text-align:center;font-size:10px;font-weight:600;color:#374151;white-space:nowrap;">{_ikon} {_lbl}{_top_txt}</th>'
         _html += _h
 
     # Gizli gruplar için ayar modunda göster
@@ -3150,19 +3155,24 @@ section[data-testid="stSidebar"] { display: none !important; }
 
     # 2. SATIR — sayılar
     _html += '<tbody><tr>'
+    _ilk2 = True
     for _gid in _grp_sira:
         if _gid not in _grp_data or _gid in _grp_gizli: continue
         _ikon,_lbl,_top,_items = _grp_data[_gid]
         if not _items: continue
+        _grp_ilk = True
         for _ic, _ad, _sayi, _key, _aktif in _items:
             _bg = "background:#dbeafe;" if _aktif else "background:#fff;"
             _tc = "color:#1d4ed8;font-weight:700;" if _aktif else "color:#0f172a;"
+            _border_l2 = ("border-left:2px solid #cbd5e1;" if not _ilk2 and _grp_ilk else "")
             _td_onclick = f"sf('{_key}')"
-            _html += f'<td onclick="{_td_onclick}" style="border:0.5px solid #e2e8f0;padding:5px 8px;text-align:center;cursor:pointer;white-space:nowrap;{_bg}vertical-align:middle;">'
-            _html += f'<div style="font-size:11px;color:#94a3b8;margin-bottom:1px;">{_ic}</div>'
-            _html += f'<div style="font-size:13px;font-weight:600;{_tc}">{_sayi}</div>'
+            _html += f'<td onclick="{_td_onclick}" style="border:0.5px solid #f1f5f9;{_border_l2}padding:4px 7px;text-align:center;cursor:pointer;white-space:nowrap;{_bg}vertical-align:middle;min-width:50px;">'
+            _html += f'<div style="font-size:16px;line-height:1;">{_ic}</div>'
+            _html += f'<div style="font-size:15px;font-weight:700;{_tc};line-height:1.2;">{_sayi}</div>'
             _html += f'<div style="font-size:9px;color:#64748b;">{_ad}</div>'
             _html += '</td>'
+            _grp_ilk = False
+            _ilk2 = False
 
     _cl_view2 = st.session_state.get("_cl_view","liste")
     _kb_bg = "background:#dbeafe;" if _cl_view2=="kanban" else "background:#f8fafc;"
