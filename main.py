@@ -3146,10 +3146,6 @@ section[data-testid="stSidebar"] { display: none !important; }
         "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama3",a),f"asama3_{a}",False)) for a in _grp4_asama]),
         "sonuc":    ("🏆","SONUÇ",    None, [((_asama_ikon(a),a,_kolon_sayi("sonuc",a),f"sonuc_{a}",False)) for a in _grp5_asama]),
     }
-    # asama3 guncelle
-    if _grp4_asama:
-        _grp_data["asama3"] = ("🧪","3. AŞAMA", None,
-            [(_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama) for a in _grp4_asama])
     # HTML oluştur - 2 satırlı tablo
     _html = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">'
     _html += '<div style="overflow-x:auto;margin-bottom:4px;"><table style="border-collapse:separate;border-spacing:0;font-family:inherit;font-size:12px;width:100%;">'
