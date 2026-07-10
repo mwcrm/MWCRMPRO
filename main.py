@@ -780,7 +780,7 @@ def _tanimlar_yukle(tip):
 
     # Fallback
     if tip == "asama":
-        return ["İlk Temas","Teklif","Sözleşme","Kazanıldı","Kaybedildi"]
+        return ["Arama","Tekrar Ara","Randevu","Teklif","Fiyat Hazırla","Deneme","Sözleşme","Kazanıldı","Kaybedildi","Devam Ediyor"]
     return []
 
 def _tanim_ekle(tip, deger):
@@ -2626,7 +2626,6 @@ section[data-testid="stSidebar"] { display: none !important; }
             "Fiyat Hazırla":   ("#ede9fe","#5b21b6"),
             "Teklif":          ("#fef3c7","#92400e"),
             "Pasif":           ("#f1f5f9","#475569"),
-            "Negatif Portföy": ("#fee2e2","#991b1b"),
             "Kazanıldı":       ("#dcfce7","#14532d"),
         }
 
@@ -2866,14 +2865,12 @@ section[data-testid="stSidebar"] { display: none !important; }
     }
     # Aşama emoji haritası
     _ASAMA_EMOJI = {
-        "İlk Temas":        "👋",
-        "Teklif":           "📄",
+                "Teklif":           "📄",
         "Deneme":           "🧪",
         "Sözleşme":         "📝",
         "Kazanıldı":        "🏆",
         "Kaybedildi":       "❌",
-        "Negatif Portföy":  "👎",
-        "Gereksizler":      "🗑️",
+                "Gereksizler":      "🗑️",
     }
 
     # Durum butonu sırası — hafızada tut
@@ -3632,7 +3629,7 @@ function kartSec(id){
     # Aşaması değişen (Teklif, Sözleşme, Kazanıldı, Negatif Portföy vb.) müşteriler
     # ana listeden çıkıp sadece kendi aşama filtresinde görünür.
     if not _durum_sec and not _asama_sec and not _bl_bolge_secili and "islem_asamasi" in df_f.columns:
-        _varsayilan_asama = "İlk Temas"
+        _varsayilan_asama = "Arama"
         df_f = df_f[
             (df_f["islem_asamasi"] == _varsayilan_asama) |
             (df_f["islem_asamasi"].isna()) |
@@ -6654,7 +6651,7 @@ elif aktif == "excel":
                     "il": _ex_temiz_str(_row.get("il","")),
                     "durum": _ex_temiz_str(_row.get("durum","Hedef")) or "Hedef",
                     "temsilci": _ex_temiz_str(_row.get("temsilci","")),
-                    "islem_asamasi": _ex_temiz_str(_row.get("islem_asamasi","İlk Temas")) or "İlk Temas",
+                    "islem_asamasi": _ex_temiz_str(_row.get("islem_asamasi","")) or "",
                     "beklenen_ciro": _ex_temiz_float(_row.get("beklenen_ciro",0)),
                     "gerceklesen_ciro": _ex_temiz_float(_row.get("gerceklesen_ciro",0)),
                     "olusturan": st.session_state.get("kullanici",""),
@@ -11458,7 +11455,7 @@ elif aktif == "harita":
         _DURUM_RENK = {
             "Portföy":"#1d4ed8","Hedef":"#15803d","Tekrar Ara":"#d97706",
             "İlk Temas":"#0891b2","Pasif":"#6b7280","Teklif":"#7c3aed",
-            "Aktif":"#15803d","Negatif Portföy":"#dc2626","Kazanıldı":"#16a34a",
+            "Aktif":"#15803d","Kaybedildi":"#dc2626","Kazanıldı":"#16a34a",
         }
         def _tr_lower(s):
             """Türkçe karakterleri doğru küçült"""
