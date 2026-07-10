@@ -3020,14 +3020,28 @@ section[data-testid="stSidebar"] { display: none !important; }
     _d_adlar = {x[0] for x in _d_veri}
 
     # ── AŞAMA GRUPLARI — gerçek aşama adlarına göre ──────────────────────────
-    # Gruplama — Supabase'deki GERÇEK değerler
-    _grp1_asama = [a for a in tum_asama_opts if a in ["Arama","Tekrar Ara","Mesaj","E-Mail","Mail","Whatsapp Mesaj"]]
+    # ── AŞAMA GRUPLARI — Supabase'deki GERÇEK değerler ──────────────────────
+    # islem_asamasi kolonundaki tam değerler:
+    # Arama, Tekrar Ara, E-Mail, Randevu, Teklif, Fiyat Hazırla, Deneme, Sözleşme, TAKİP
+    # Kazanıldı, Kaybedildi, Devam Ediyor
+
+    # AŞAMA grubu — iletişim aşamaları
+    _grp1_asama = [a for a in tum_asama_opts if a in ["Arama","Tekrar Ara","E-Mail","Mail","Mesaj","Whatsapp Mesaj"]]
+
+    # 1. AŞAMA — Randevu
     _grp2_asama = [a for a in tum_asama_opts if a in ["Randevu"]]
+
+    # 2. AŞAMA — Teklif
     _grp3_asama = [a for a in tum_asama_opts if a in ["Teklif"]]
-    _grp4_asama = [a for a in tum_asama_opts if a in ["Takip","TAKİP","takip","Fiyat Hazırla","Deneme","Sözleşme"]]
+
+    # 3. AŞAMA — Deneme, TAKİP, Sözleşme, Fiyat Hazırla
+    _grp4_asama = [a for a in tum_asama_opts if a in ["Deneme","TAKİP","Sözleşme","Fiyat Hazırla"]]
+
+    # SONUÇ
     _grp5_asama = [a for a in tum_asama_opts if a in ["Kazanıldı","Kaybedildi","Devam Ediyor"]]
-    # Devam Ediyor sistemde yoksa da göster
     if "Devam Ediyor" not in _grp5_asama: _grp5_asama.append("Devam Ediyor")
+
+    _tum_grp = set(_grp1_asama+_grp2_asama+_grp3_asama+_grp4_asama+_grp5_asama)
     # İlk Temas = Aşamasız sayılır — gruplara dahil edilmez
     # Diğer grubu YOK
     _tum_grp = set(_grp1_asama+_grp2_asama+_grp3_asama+_grp4_asama+_grp5_asama)
