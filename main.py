@@ -4184,7 +4184,7 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
             num_rows="fixed",
             column_config=col_config,
             column_order=_aktif_col_order,
-            height=max(500, min(len(df_edit) * 35 + 80, 40000)),
+            height=800,
             key="cari_editor"
         )
 
