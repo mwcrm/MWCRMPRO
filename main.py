@@ -3519,6 +3519,9 @@ function kartSec(id){
        not st.session_state.get("_cl_fil_asama_multi") and \
        not st.session_state.get("_asamasiz_aktif"):
         st.session_state["_toplam_aktif"] = True
+
+    # Filtre uygula
+    df_f = df.copy()
     # Aşamasız filtresi
     if st.session_state.get("_asamasiz_aktif", False):
         _tum_asama_set = set(_grp1_asama + _grp2_asama + _grp3_asama + _grp4_asama + _grp5_asama)
