@@ -3164,9 +3164,6 @@ section[data-testid="stSidebar"] { display: none !important; }
 
     _cl_view2 = st.session_state.get("_cl_view","liste")
     _gear_bg = "#fef9c3" if _ayar_modu else "#f8fafc"
-    _kb_bg3 = "#dbeafe" if _cl_view2=="kanban" else "#f8fafc"
-    _html += f'<th rowspan="2" onclick="sf(\'_ayar_toggle\')" style="border:0.5px solid #e2e8f0;padding:4px 6px;cursor:pointer;background:{_gear_bg};vertical-align:middle;text-align:center;" title="Grup Ayarları"><span style="font-size:13px;">⚙️</span></th>'
-    _html += f'<th rowspan="2" onclick="sf(\'kanban\')" style="border:0.5px solid #e2e8f0;padding:4px 6px;cursor:pointer;background:{_kb_bg3};vertical-align:middle;text-align:center;"><div style="font-size:13px;">📋</div><div style="font-size:9px;color:#64748b;">Kanban</div></th>'
     _html += '</tr></thead>'
 
     # 2. SATIR — sayılar
@@ -3209,16 +3206,16 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
 </script>"""
     st.markdown(_html, unsafe_allow_html=True)
 
-    # Ayar ve Kanban toggle — query param ile
-    _qp_rfil_check = st.query_params.get("_rfil","")
-    if _qp_rfil_check == "_ayar_toggle":
-        st.session_state["_rbar_ayar_modu"] = not _ayar_modu
-        st.query_params.clear()
-        st.rerun()
-    elif _qp_rfil_check == "kanban":
-        st.session_state["_cl_view"] = "kanban" if _cl_view2 == "liste" else "liste"
-        st.query_params.clear()
-        st.rerun()
+    # ⚙️ ve Kanban — sağda alt alta Streamlit butonu
+    _col_rapor, _col_butonlar = st.columns([11, 1])
+    with _col_butonlar:
+        if st.button("⚙️", key="rbar_ayar_btn", help="Grup Ayarları", use_container_width=True):
+            st.session_state["_rbar_ayar_modu"] = not _ayar_modu
+            st.rerun()
+        _kb_type = "primary" if _cl_view2 == "kanban" else "secondary"
+        if st.button("📋", key="rbar_kanban_btn", help="Kanban", type=_kb_type, use_container_width=True):
+            st.session_state["_cl_view"] = "kanban" if _cl_view2 == "liste" else "liste"
+            st.rerun()
 
     # Grup ayar param
     _qp_grp_gizli = st.query_params.get("_grp_gizli","")
