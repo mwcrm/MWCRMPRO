@@ -3198,15 +3198,16 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
 </script>"""
     st.markdown(_html, unsafe_allow_html=True)
 
-    # ⚙️ ve Kanban butonları — Streamlit butonu olarak
-    _btn1, _btn2, _btn3 = st.columns([8, 1, 1])
-    if _btn2.button("⚙️", key="rbar_ayar_btn", help="Grup Ayarları", use_container_width=True):
-        st.session_state["_rbar_ayar_modu"] = not _ayar_modu
-        st.rerun()
-    _kb_type = "primary" if _cl_view2 == "kanban" else "secondary"
-    if _btn3.button("📋 Kanban", key="rbar_kanban_btn", type=_kb_type, use_container_width=True):
-        st.session_state["_cl_view"] = "kanban" if _cl_view2 == "liste" else "liste"
-        st.rerun()
+    # ⚙️ ve Kanban — sağda tek satırda
+    _rb1, _rb2 = st.columns([9, 1])
+    with _rb2:
+        if st.button("⚙️", key="rbar_ayar_btn", help="Grup Ayarları", use_container_width=True):
+            st.session_state["_rbar_ayar_modu"] = not _ayar_modu
+            st.rerun()
+        _kb_type = "primary" if _cl_view2 == "kanban" else "secondary"
+        if st.button("📋 Kanban", key="rbar_kanban_btn", type=_kb_type, use_container_width=True):
+            st.session_state["_cl_view"] = "kanban" if _cl_view2 == "liste" else "liste"
+            st.rerun()
 
     # Grup ayar param
     _qp_grp_gizli = st.query_params.get("_grp_gizli","")
@@ -3249,11 +3250,8 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
             st.session_state["_asamasiz_aktif"] = False
         st.rerun()
 
-    # Kanban butonu
+    # Kanban view
     _cl_view = st.session_state.get("_cl_view", "liste")
-    if st.button("📋 Kanban", key="cl_view_kanban", type="primary" if _cl_view=="kanban" else "secondary"):
-        st.session_state["_cl_view"] = "kanban" if _cl_view=="liste" else "liste"
-        st.rerun()
 
     if _cl_view == "kanban":
         # ── KART TIKLAMASI — query param ile müşteri seç ─────────────────────
