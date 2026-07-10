@@ -3188,10 +3188,6 @@ section[data-testid="stSidebar"] { display: none !important; }
             _ilk2 = False
 
     _cl_view2 = st.session_state.get("_cl_view","liste")
-    _kb_bg = "background:#dbeafe;" if _cl_view2=="kanban" else "background:#f8fafc;"
-    _kb_onclick = "sf('kanban')"
-    _html += f'<td onclick="{_kb_onclick}" style="border:0.5px solid #e2e8f0;padding:5px 8px;text-align:center;cursor:pointer;{_kb_bg}vertical-align:middle;">'
-    _html += '<div style="font-size:11px;color:#64748b;">📋</div><div style="font-size:9px;color:#64748b;">Kanban</div></td>'
     _html += '</tr></tbody></table></div>'
     import json as _rjson2
     _html += f"""<script>
@@ -3202,11 +3198,16 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
 </script>"""
     st.markdown(_html, unsafe_allow_html=True)
 
-    # Ayar toggle
-    _qp_rfil_ayar = st.query_params.get("_rfil","")
-    if _qp_rfil_ayar == "_ayar_toggle":
+    # ⚙️ ve Kanban butonları — Streamlit butonu olarak
+    _btn1, _btn2, _btn3 = st.columns([8, 1, 1])
+    if _btn2.button("⚙️", key="rbar_ayar_btn", help="Grup Ayarları", use_container_width=True):
         st.session_state["_rbar_ayar_modu"] = not _ayar_modu
-        st.query_params.clear(); st.rerun()
+        st.rerun()
+    _kb_type = "primary" if _cl_view2 == "kanban" else "secondary"
+    if _btn3.button("📋 Kanban", key="rbar_kanban_btn", type=_kb_type, use_container_width=True):
+        st.session_state["_cl_view"] = "kanban" if _cl_view2 == "liste" else "liste"
+        st.rerun()
+
     # Grup ayar param
     _qp_grp_gizli = st.query_params.get("_grp_gizli","")
     _qp_grp_sira  = st.query_params.get("_grp_sira","")
