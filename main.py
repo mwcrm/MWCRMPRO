@@ -3163,7 +3163,9 @@ section[data-testid="stSidebar"] { display: none !important; }
                 _html += "<th onclick=\"gg('" + _gid + "')\" style=\"border:0.5px solid #e2e8f0;padding:3px 5px;background:#fee2e2;cursor:pointer;font-size:9px;white-space:nowrap;\">👁 " + _lbl + "</th>"
 
     _gear_bg = "#fef9c3" if _ayar_modu else "#f8fafc"
+    _kb_bg3 = "#dbeafe" if _cl_view2=="kanban" else "#f8fafc"
     _html += f'<th rowspan="2" onclick="sf(\'_ayar_toggle\')" style="border:0.5px solid #e2e8f0;padding:4px 6px;cursor:pointer;background:{_gear_bg};vertical-align:middle;text-align:center;" title="Grup Ayarları"><span style="font-size:13px;">⚙️</span></th>'
+    _html += f'<th rowspan="2" onclick="sf(\'kanban\')" style="border:0.5px solid #e2e8f0;padding:4px 6px;cursor:pointer;background:{_kb_bg3};vertical-align:middle;text-align:center;"><div style="font-size:13px;">📋</div><div style="font-size:9px;color:#64748b;">Kanban</div></th>'
     _html += '</tr></thead>'
 
     # 2. SATIR — sayılar
@@ -3192,22 +3194,30 @@ section[data-testid="stSidebar"] { display: none !important; }
     import json as _rjson2
     _html += f"""<script>
 var _s={_rjson2.dumps(_grp_sira)};
-function sf(k){{var u=new URL(window.parent.location.href);u.searchParams.set("_rfil",k);window.parent.location.replace(u.toString());}}
+function sf(k){{
+  if(k==='_ayar_toggle'){{
+    var u=new URL(window.parent.location.href);
+    u.searchParams.set("_rfil","_ayar_toggle");
+    window.parent.location.replace(u.toString());
+    return;
+  }}
+  var u=new URL(window.parent.location.href);u.searchParams.set("_rfil",k);window.parent.location.replace(u.toString());
+}}
 function gg(id){{var u=new URL(window.parent.location.href);var g=JSON.parse(u.searchParams.get("_grp_gizli")||"[]");if(g.includes(id))g=g.filter(x=>x!==id);else g.push(id);u.searchParams.set("_grp_gizli",JSON.stringify(g));window.parent.location.replace(u.toString());}}
 function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse(u.searchParams.get("_grp_sira")||JSON.stringify(_s));var i=s.indexOf(id);if(dir==="l"&&i>0){{var t=s[i-1];s[i-1]=s[i];s[i]=t;}}else if(dir==="r"&&i<s.length-1){{var t=s[i+1];s[i+1]=s[i];s[i]=t;}}u.searchParams.set("_grp_sira",JSON.stringify(s));window.parent.location.replace(u.toString());}}
 </script>"""
     st.markdown(_html, unsafe_allow_html=True)
 
-    # ⚙️ ve Kanban — sağda tek satırda
-    _rb1, _rb2 = st.columns([9, 1])
-    with _rb2:
-        if st.button("⚙️", key="rbar_ayar_btn", help="Grup Ayarları", use_container_width=True):
-            st.session_state["_rbar_ayar_modu"] = not _ayar_modu
-            st.rerun()
-        _kb_type = "primary" if _cl_view2 == "kanban" else "secondary"
-        if st.button("📋 Kanban", key="rbar_kanban_btn", type=_kb_type, use_container_width=True):
-            st.session_state["_cl_view"] = "kanban" if _cl_view2 == "liste" else "liste"
-            st.rerun()
+    # Ayar ve Kanban toggle — query param ile
+    _qp_rfil_check = st.query_params.get("_rfil","")
+    if _qp_rfil_check == "_ayar_toggle":
+        st.session_state["_rbar_ayar_modu"] = not _ayar_modu
+        st.query_params.clear()
+        st.rerun()
+    elif _qp_rfil_check == "kanban":
+        st.session_state["_cl_view"] = "kanban" if _cl_view2 == "liste" else "liste"
+        st.query_params.clear()
+        st.rerun()
 
     # Grup ayar param
     _qp_grp_gizli = st.query_params.get("_grp_gizli","")
