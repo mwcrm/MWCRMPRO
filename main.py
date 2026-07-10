@@ -2360,6 +2360,11 @@ if aktif == "yeni":
             _seg_kayit   = st.session_state.get(f"yeni_seg_dis_{_form_id}", "--")
             _asama_kayit = st.session_state.get(f"yeni_asama_dis_{_form_id}", asama)
             _tem_kayit   = st.session_state.get(f"yeni_temsilci_dis_{_form_id}", temsilci)
+
+            # ── CİRO'YA GÖRE DURUM OTOMATİK BELİRLE ──────────────────────────
+            # 100.000₺ altı → Portföy | 100.000₺ ve üzeri → Özel Müşteri
+            if beklenen_ciro > 0:
+                _durum_kayit = "Özel Müşteri" if beklenen_ciro >= 100000 else "Portföy"
             if not firma:
                 st.warning("Firma adı boş bırakılamaz!")
             elif duzenle:
