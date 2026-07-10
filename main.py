@@ -3275,15 +3275,27 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
         elif _qp_rfil.startswith("asama1_"):
             st.session_state["_cl_fil_asama1"] = _qp_rfil[7:]
             st.session_state["_toplam_aktif"] = False
+            st.session_state["_asamasiz_aktif"] = False
+            for _fk in ["_cl_fil_asama2","_cl_fil_asama3","_cl_fil_sonuc","_cl_fil_asama_multi","_cl_fil_durum_multi"]:
+                st.session_state.pop(_fk, None)
         elif _qp_rfil.startswith("asama2_"):
             st.session_state["_cl_fil_asama2"] = _qp_rfil[7:]
             st.session_state["_toplam_aktif"] = False
+            st.session_state["_asamasiz_aktif"] = False
+            for _fk in ["_cl_fil_asama1","_cl_fil_asama3","_cl_fil_sonuc","_cl_fil_asama_multi","_cl_fil_durum_multi"]:
+                st.session_state.pop(_fk, None)
         elif _qp_rfil.startswith("asama3_"):
             st.session_state["_cl_fil_asama3"] = _qp_rfil[7:]
             st.session_state["_toplam_aktif"] = False
+            st.session_state["_asamasiz_aktif"] = False
+            for _fk in ["_cl_fil_asama1","_cl_fil_asama2","_cl_fil_sonuc","_cl_fil_asama_multi","_cl_fil_durum_multi"]:
+                st.session_state.pop(_fk, None)
         elif _qp_rfil.startswith("sonuc_"):
             st.session_state["_cl_fil_sonuc"] = _qp_rfil[6:]
             st.session_state["_toplam_aktif"] = False
+            st.session_state["_asamasiz_aktif"] = False
+            for _fk in ["_cl_fil_asama1","_cl_fil_asama2","_cl_fil_asama3","_cl_fil_asama_multi","_cl_fil_durum_multi"]:
+                st.session_state.pop(_fk, None)
         st.rerun()
 
     # Kanban view
@@ -3553,7 +3565,11 @@ function kartSec(id){
     if not st.session_state.get("_toplam_aktif") and \
        not st.session_state.get("_cl_fil_durum_multi") and \
        not st.session_state.get("_cl_fil_asama_multi") and \
-       not st.session_state.get("_asamasiz_aktif"):
+       not st.session_state.get("_asamasiz_aktif") and \
+       not st.session_state.get("_cl_fil_asama1") and \
+       not st.session_state.get("_cl_fil_asama2") and \
+       not st.session_state.get("_cl_fil_asama3") and \
+       not st.session_state.get("_cl_fil_sonuc"):
         st.session_state["_toplam_aktif"] = True
 
     # Filtre uygula
