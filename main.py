@@ -3009,17 +3009,15 @@ section[data-testid="stSidebar"] { display: none !important; }
     _tum_veri = _d_veri + _a_veri
     _d_adlar = {x[0] for x in _d_veri}
 
-    # ── AŞAMA GRUPLARI ────────────────────────────────────────────────────────
-    # Grup 1: İletişim aşamaları
-    _grp1_asama = ["Arama","Tekrar Ara","Mesaj","Whatsapp Mesaj","E-mail","Mail","TAKİP","Arama 71"]
-    # Grup 2: 1. Aşama
-    _grp2_asama = ["Randevu","İlk Temas"]
-    # Grup 3: 2. Aşama
-    _grp3_asama = ["Teklif","Fiyat Hazırla"]
-    # Grup 4: 3. Aşama
-    _grp4_asama = ["Deneme","Sözleşme","Devam Ediyor"]
-    # Grup 5: Sonuç
-    _grp5_asama = ["Kazanıldı","Kaybedildi","Negatif Portföy"]
+    # ── AŞAMA GRUPLARI — gerçek aşama adlarına göre ──────────────────────────
+    _grp1_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["arama","tekrar ara","mesaj","mail","e-mail","whatsapp","takip","iletisim","iletişim"])]
+    _grp2_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["randevu","ilk temas","ziyaret"])]
+    _grp3_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["teklif","fiyat"])]
+    _grp4_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["deneme","sözleşme","sozlesme","devam"])]
+    _grp5_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["kazanıldı","kazanildi","kaybedildi","negatif"])]
+    # Hiçbir gruba girmeyen aşamaları grp1'e ekle
+    _tum_grp = set(_grp1_asama+_grp2_asama+_grp3_asama+_grp4_asama+_grp5_asama)
+    _grp_diger = [a for a in tum_asama_opts if a not in _tum_grp and str(a).upper() not in ["NONE","NAN",""]]
 
     def _asama_sayi(ad):
         if "islem_asamasi" not in df.columns: return 0
@@ -3046,118 +3044,81 @@ section[data-testid="stSidebar"] { display: none !important; }
     _aktif_fil_asama = st.session_state.get("_cl_fil_asama_multi", [])
     _toplam_aktif_flag = st.session_state.get("_toplam_aktif", False)
 
-    def _btn_html(lbl, sayi, aktif=False, key=""):
-        _bg = "background:#dbeafe;border-color:#3b82f6;" if aktif else ""
-        _tc = "color:#1d4ed8;" if aktif else "color:#0f172a;"
-        return (f'<td onclick="setFil(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:3px 10px;'
-                f'text-align:center;cursor:pointer;white-space:nowrap;{_bg}">'
-                f'<div style="font-size:9px;color:{"#1d4ed8" if aktif else "#94a3b8"}">{lbl}</div>'
-                f'<div style="font-size:14px;font-weight:500;{_tc}">{sayi}</div></td>')
+    def _asama_ikon(a):
+        _ikon_map = {
+            "arama":"📞","tekrar ara":"📲","mesaj":"💬","mail":"📧","e-mail":"📧",
+            "whatsapp":"💬","takip":"📌","randevu":"📅","ilk temas":"👋","ziyaret":"🚗",
+            "teklif":"📄","fiyat":"💰","fiyat hazırla":"💰","deneme":"🧪",
+            "sözleşme":"📝","sozlesme":"📝","devam":"⏳","kazanıldı":"🏆",
+            "kazanildi":"🏆","kaybedildi":"❌","negatif":"👎","gereksiz":"🗑️",
+        }
+        for k,v in _ikon_map.items():
+            if k in a.lower(): return v
+        return "🔹"
 
-    def _grp_header(lbl, span, toplam=None):
-        _txt = f"{lbl} {toplam}" if toplam is not None else lbl
-        return (f'<td colspan="{span}" style="border:0.5px solid #e2e8f0;padding:2px 6px;'
-                f'text-align:center;font-size:9px;font-weight:500;color:#64748b;'
-                f'background:#f8fafc;white-space:nowrap;">{_txt}</td>')
+    def _durum_ikon(d):
+        return {"Portföy":"📦","Özel Müşteri":"⭐","Aşamasız":"📋","Toplam":"📊"}.get(d,"🔹")
 
-    # Genel grup
-    _genel_items = [("Toplam", len(df), "toplam", _toplam_aktif_flag)]
+    def _td(lbl, sayi, key, aktif):
+        _bg = "background:#dbeafe;" if aktif else "background:#fff;"
+        _tc = "color:#1d4ed8;font-weight:600;" if aktif else "color:#0f172a;"
+        _lc = "color:#3b82f6;" if aktif else "color:#64748b;"
+        return (f'<td onclick="sf(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:4px 9px;'
+                f'text-align:center;cursor:pointer;white-space:nowrap;{_bg}vertical-align:middle;">'
+                f'<span style="font-size:12px;font-weight:500;{_tc}">{sayi} {lbl}</span></td>')
+
+    def _th(lbl, span):
+        return (f'<th colspan="{span}" style="border:0.5px solid #e2e8f0;padding:2px 6px;'
+                f'text-align:center;font-size:9px;color:#64748b;background:#f8fafc;'
+                f'font-weight:500;white-space:nowrap;">{lbl}</th>')
+
+    _genel_items = [("📊 Toplam", len(df), "toplam", _toplam_aktif_flag)]
     for _dn in tum_durum_opts:
         if str(_dn).upper() in ["NONE","NAN",""]: continue
-        _genel_items.append((_dn, _durum_sayi(_dn), f"durum_{_dn}", _dn in _aktif_fil_durum))
-    _genel_items.append(("Aşamasız", _asamasiz_sayi(), "asamasiz", st.session_state.get("_asamasiz_aktif",False)))
+        _genel_items.append((f"{_durum_ikon(_dn)} {_dn}", _durum_sayi(_dn), f"durum_{_dn}", _dn in _aktif_fil_durum))
+    _genel_items.append(("📋 Aşamasız", _asamasiz_sayi(), "asamasiz", st.session_state.get("_asamasiz_aktif",False)))
 
-    # İletişim grubu — sadece sayısı > 0 olanlar
-    _iletisim_items = [(a, _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp1_asama if _asama_sayi(a) > 0]
+    _iletisim_items = [(f"{_asama_ikon(a)} {a}", _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp1_asama if _asama_sayi(a) >= 0]
+    _asama1_items   = [(f"{_asama_ikon(a)} {a}", _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp2_asama]
+    _asama2_items   = [(f"{_asama_ikon(a)} {a}", _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp3_asama]
+    _asama3_items   = [(f"{_asama_ikon(a)} {a}", _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp4_asama]
+    _sonuc_items    = [(f"{_asama_ikon(a)} {a}", _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp5_asama]
+    _diger_items    = [(f"{_asama_ikon(a)} {a}", _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp_diger]
 
-    # 1. Aşama
-    _asama1_items = [(a, _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp2_asama if _asama_sayi(a) > 0]
+    _html = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">'
+    _html += '<div style="overflow-x:auto;"><table style="border-collapse:collapse;font-family:inherit;font-size:13px;"><thead><tr>'
 
-    # 2. Aşama
-    _asama2_items = [(a, _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp3_asama if _asama_sayi(a) >= 0]
+    _html += _th("⚙️ Genel", len(_genel_items))
+    if _iletisim_items: _html += _th(f"📞 Aşama {_grp1_toplam}", len(_iletisim_items))
+    if _asama1_items:   _html += _th(f"📅 1. Aşama {_grp2_toplam}", len(_asama1_items))
+    if _asama2_items:   _html += _th(f"📄 2. Aşama {_grp3_toplam}", len(_asama2_items))
+    if _asama3_items:   _html += _th(f"🧪 3. Aşama {_grp4_toplam}", len(_asama3_items))
+    if _sonuc_items:    _html += _th(f"🏆 {_grp5_toplam} Sonuç", len(_sonuc_items))
+    if _diger_items:    _html += _th("🔹 Diğer", len(_diger_items))
+    _html += _th("", 1)
 
-    # 3. Aşama
-    _asama3_items = [(a, _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp4_asama]
-    # Tümü butonu da ekle
-    _asama3_tum = [("Tümü", _grp4_toplam, "asama3_tum", False)] + _asama3_items
-
-    # Sonuç
-    _sonuc_items = [(a, _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp5_asama]
-
-    _html_rapor = """
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
-<style>
-.rbar-tbl{border-collapse:collapse;font-family:inherit;}
-.rbar-tbl td{transition:background .1s;}
-.rbar-tbl td:hover{background:#f1f5f9!important;}
-</style>
-<div style="overflow-x:auto;padding:4px 0 6px;">
-<table class="rbar-tbl">
-<thead><tr>
-"""
-    # Başlıklar
-    _html_rapor += _grp_header("Genel", len(_genel_items))
+    _html += "</tr></thead><tbody><tr>"
+    for lbl,sayi,key,aktif in _genel_items:  _html += _td(lbl,sayi,key,aktif)
     if _iletisim_items:
-        _html_rapor += _grp_header(f"Aşama {_grp1_toplam}", len(_iletisim_items))
+        for lbl,sayi,key,aktif in _iletisim_items: _html += _td(lbl,sayi,key,aktif)
     if _asama1_items:
-        _html_rapor += _grp_header("1. Aşama", len(_asama1_items))
+        for lbl,sayi,key,aktif in _asama1_items: _html += _td(lbl,sayi,key,aktif)
     if _asama2_items:
-        _html_rapor += _grp_header("2. Aşama", len(_asama2_items))
-    _html_rapor += _grp_header(f"3. Aşama", len(_asama3_tum))
-    _html_rapor += _grp_header(f"{_grp5_toplam} Sonuç", len(_sonuc_items))
-    _html_rapor += '<td style="border:0.5px solid #e2e8f0;padding:2px 6px;text-align:center;font-size:9px;color:#64748b;background:#f8fafc;">Kanban</td>'
-    _html_rapor += "</tr></thead><tbody><tr>"
+        for lbl,sayi,key,aktif in _asama2_items: _html += _td(lbl,sayi,key,aktif)
+    if _asama3_items:
+        for lbl,sayi,key,aktif in _asama3_items: _html += _td(lbl,sayi,key,aktif)
+    if _sonuc_items:
+        for lbl,sayi,key,aktif in _sonuc_items: _html += _td(lbl,sayi,key,aktif)
+    if _diger_items:
+        for lbl,sayi,key,aktif in _diger_items: _html += _td(lbl,sayi,key,aktif)
 
-    # Butonlar
-    for lbl, sayi, key, aktif in _genel_items:
-        _html_rapor += _btn_html(lbl, sayi, aktif, key)
-    if _iletisim_items:
-        for lbl, sayi, key, aktif in _iletisim_items:
-            _sayi_lbl = f"{sayi} {lbl}"
-            _bg = "background:#dbeafe;border-color:#3b82f6;" if aktif else ""
-            _tc = "color:#1d4ed8;" if aktif else "color:#0f172a;"
-            _html_rapor += (f'<td onclick="setFil(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:3px 10px;'
-                           f'text-align:center;cursor:pointer;white-space:nowrap;{_bg}">'
-                           f'<div style="font-size:13px;font-weight:500;{_tc}">{sayi} {lbl}</div></td>')
-    if _asama1_items:
-        for lbl, sayi, key, aktif in _asama1_items:
-            _bg = "background:#dbeafe;border-color:#3b82f6;" if aktif else ""
-            _tc = "color:#1d4ed8;" if aktif else "color:#0f172a;"
-            _html_rapor += (f'<td onclick="setFil(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:3px 10px;'
-                           f'text-align:center;cursor:pointer;white-space:nowrap;{_bg}">'
-                           f'<div style="font-size:13px;font-weight:500;{_tc}">{sayi} {lbl}</div></td>')
-    if _asama2_items:
-        for lbl, sayi, key, aktif in _asama2_items:
-            _bg = "background:#dbeafe;border-color:#3b82f6;" if aktif else ""
-            _tc = "color:#1d4ed8;" if aktif else "color:#0f172a;"
-            _html_rapor += (f'<td onclick="setFil(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:3px 10px;'
-                           f'text-align:center;cursor:pointer;white-space:nowrap;{_bg}">'
-                           f'<div style="font-size:13px;font-weight:500;{_tc}">{sayi} {lbl}</div></td>')
-    for lbl, sayi, key, aktif in _asama3_tum:
-        _bg = "background:#dbeafe;border-color:#3b82f6;" if aktif else ""
-        _tc = "color:#1d4ed8;" if aktif else "color:#0f172a;"
-        _html_rapor += (f'<td onclick="setFil(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:3px 10px;'
-                       f'text-align:center;cursor:pointer;white-space:nowrap;{_bg}">'
-                       f'<div style="font-size:13px;font-weight:500;{_tc}">{sayi} {lbl}</div></td>')
-    for lbl, sayi, key, aktif in _sonuc_items:
-        _bg = "background:#dbeafe;border-color:#3b82f6;" if aktif else ""
-        _tc = "color:#1d4ed8;" if aktif else "color:#0f172a;"
-        _html_rapor += (f'<td onclick="setFil(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:3px 10px;'
-                       f'text-align:center;cursor:pointer;white-space:nowrap;{_bg}">'
-                       f'<div style="font-size:13px;font-weight:500;{_tc}">{sayi} {lbl}</div></td>')
-    _cl_view2 = st.session_state.get("_cl_view", "liste")
-    _kb_bg = "background:#eff6ff;" if _cl_view2=="kanban" else ""
-    _html_rapor += f'<td onclick="setFil(\'kanban\')" style="border:0.5px solid #e2e8f0;padding:3px 10px;text-align:center;cursor:pointer;{_kb_bg}"><div style="font-size:16px;">📋</div></td>'
-    _html_rapor += """</tr></tbody></table></div>
-<script>
-function setFil(key){
-  var url = new URL(window.parent.location.href);
-  url.searchParams.set('_rfil', key);
-  window.parent.location.replace(url.toString());
-}
-</script>"""
+    _cl_view2 = st.session_state.get("_cl_view","liste")
+    _kb_bg = "background:#dbeafe;" if _cl_view2=="kanban" else "background:#fff;"
+    _html += f'<td onclick="sf(\'kanban\')" style="border:0.5px solid #e2e8f0;padding:4px 9px;text-align:center;cursor:pointer;{_kb_bg}"><i class="ti ti-layout-kanban" style="font-size:16px;color:#64748b;"></i></td>'
+    _html += '</tr></tbody></table></div>'
+    _html += '<script>function sf(k){var u=new URL(window.parent.location.href);u.searchParams.set("_rfil",k);window.parent.location.replace(u.toString());}</script>'
 
-    st.markdown(_html_rapor, unsafe_allow_html=True)
+    st.markdown(_html, unsafe_allow_html=True)
 
 
     # Query param'dan filtre oku
