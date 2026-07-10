@@ -3952,9 +3952,6 @@ function kartSec(id){
                       "asama1":"asama1","asama2":"asama2","asama3":"asama3","sonuc":"sonuc"}
     col_order = [c for c in col_order if not any(c == _kol_gizli_map.get(g,g) for g in _GIZLI_KOLONLAR)]
 
-    # DEBUG
-    st.caption(f"🔍 df:{len(df)} df_f:{len(df_f)} toplam_aktif:{st.session_state.get('_toplam_aktif')} asama:{_asama_sec} durum:{_durum_sec}")
-
     # ── DATA EDITOR ─────────────────────────────────────────────────────────────
     df_edit = df_f.copy()
     # aciklama kolonu kesinlikle olsun
