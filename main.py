@@ -3503,14 +3503,13 @@ function kartSec(id){
                 pass
 
         # Eski sistemle uyumluluk
+        _df_il  = df["il"]  if "il"  in df.columns else pd.Series([""] * len(df))
+        _df_asa = df["islem_asamasi"] if "islem_asamasi" in df.columns else pd.Series([""] * len(df))
         kart_opts = ["-- Müşteri Seçin --"] + [
             f"[{int(i)}] {f} | {il} | {a}"
-            for i, f, il, a in zip(
-                df["id"], df["firma"],
-                df.get("il", pd.Series([""] * len(df))),
-                df.get("islem_asamasi", pd.Series([""] * len(df)))
-            ) if str(f) not in ["","nan","None"]
-        ] if not df.empty else ["-- Müşteri Seçin --"]
+            for i, f, il, a in zip(df["id"], df["firma"], _df_il, _df_asa)
+            if str(f) not in ["","nan","None"]
+        ] if not df.empty and "firma" in df.columns else ["-- Müşteri Seçin --"]
         if secili_kart_inline == "🔵 Tüm Firmalar":
             secili_kart = "-- Müşteri Seçin --"
             # Query param ile tam sıfırlama — widget değerleri de temizlenir
