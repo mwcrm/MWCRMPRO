@@ -3011,7 +3011,7 @@ section[data-testid="stSidebar"] { display: none !important; }
 
     # ── AŞAMA GRUPLARI — gerçek aşama adlarına göre ──────────────────────────
     # Gruplama — Supabase'deki GERÇEK değerler
-    _grp1_asama = [a for a in tum_asama_opts if a in ["Arama","Tekrar Ara","Mesaj","E-Mail","Mail","Whatsapp Mesaj","TAKİP"]]
+    _grp1_asama = [a for a in tum_asama_opts if a in ["Arama","Tekrar Ara","Mesaj","E-Mail","Mail","Whatsapp Mesaj"]]
     _grp2_asama = [a for a in tum_asama_opts if a in ["Randevu"]]
     _grp3_asama = [a for a in tum_asama_opts if a in ["Teklif"]]
     _grp4_asama = [a for a in tum_asama_opts if a in ["Takip","Fiyat Hazırla","Deneme","Sözleşme"]]
