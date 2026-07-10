@@ -3010,12 +3010,12 @@ section[data-testid="stSidebar"] { display: none !important; }
     _d_adlar = {x[0] for x in _d_veri}
 
     # ── AŞAMA GRUPLARI — gerçek aşama adlarına göre ──────────────────────────
-    # Gruplama — sistemdeki gerçek aşama adlarına tam eşleşme
-    _grp1_asama = [a for a in tum_asama_opts if a.lower() in ["arama","tekrar ara","mesaj","e-mail","mail","whatsapp mesaj","takip"]]
-    _grp2_asama = [a for a in tum_asama_opts if a.lower() in ["randevu"]]
-    _grp3_asama = [a for a in tum_asama_opts if a.lower() in ["teklif","fiyat hazırla","fiyat hazirlا"]]
-    _grp4_asama = [a for a in tum_asama_opts if a.lower() in ["deneme","sözleşme","sozlesme"]]
-    _grp5_asama = [a for a in tum_asama_opts if a.lower() in ["kazanıldı","kazanildi","kaybedildi","devam ediyor"]]
+    # Gruplama — Supabase'deki GERÇEK değerler
+    _grp1_asama = [a for a in tum_asama_opts if a in ["Arama","Tekrar Ara","Mesaj","E-Mail","Mail","Whatsapp Mesaj","TAKİP"]]
+    _grp2_asama = [a for a in tum_asama_opts if a in ["Randevu","İlk Temas"]]
+    _grp3_asama = [a for a in tum_asama_opts if a in ["Teklif","Fiyat Hazırla"]]
+    _grp4_asama = [a for a in tum_asama_opts if a in ["Deneme","Sözleşme"]]
+    _grp5_asama = [a for a in tum_asama_opts if a in ["Kazanıldı","Kaybedildi","Devam Ediyor","Negatif Portföy"]]
     # Diğer grubu YOK
     _tum_grp = set(_grp1_asama+_grp2_asama+_grp3_asama+_grp4_asama+_grp5_asama)
 
@@ -3112,7 +3112,7 @@ section[data-testid="stSidebar"] { display: none !important; }
 
     # HTML oluştur - 2 satırlı tablo
     _html = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">'
-    _html += '<div style="overflow-x:auto;margin-bottom:4px;"><table style="border-collapse:separate;border-spacing:0;font-family:inherit;font-size:12px;">'
+    _html += '<div style="overflow-x:auto;margin-bottom:4px;"><table style="border-collapse:separate;border-spacing:0;font-family:inherit;font-size:12px;width:100%;">'
 
     # 1. SATIR — grup başlıkları
     _html += '<thead><tr>'
