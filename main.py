@@ -3440,9 +3440,10 @@ function kartSec(id){
             st.session_state.pop("kart_sec_reset", None)
             st.session_state.pop("kart_sec", None)
 
-        kart_opts_inline = ["-- Müşteri Seçin --", "🔵 Tüm Firmalar"] + [
-            f"[{int(r['id'])}] {r.get('firma','')}" for _, r in df.iterrows()
-        ]
+        kart_opts_inline = ["-- Müşteri Seçin --", "🔵 Tüm Firmalar"]
+        if not df.empty and "firma" in df.columns and "id" in df.columns:
+            _ko_df = df[["id","firma"]].dropna(subset=["firma"]).head(2000)
+            kart_opts_inline += [f"[{int(r['id'])}] {r['firma']}" for _, r in _ko_df.iterrows()]
         if st.session_state.get("kart_sec_reset"):
             st.session_state.pop("kart_sec_reset", None)
             st.session_state.pop("kart_sec", None)
@@ -3490,7 +3491,8 @@ function kartSec(id){
         siralama_kol = "Tarih↓"  # Sıralama kutusu kaldırıldı, varsayılan sıralama sabit kaldı
 
         # ── Çoklu firma seçimi (karşılaştırma/düzeltme için) — seçilenler varsa tablo sadece onları gösterir ──
-        _cok_sec_opts = [f"[{int(r['id'])}] {r.get('firma','')}" for _, r in df.iterrows()]
+        _cok_sec_df = df[["id","firma"]].dropna(subset=["firma"]).head(2000) if not df.empty and "firma" in df.columns else pd.DataFrame()
+        _cok_sec_opts = [f"[{int(r['id'])}] {r['firma']}" for _, r in _cok_sec_df.iterrows()]
         _cok_secili_ham = st.multiselect(
             "🔍 Çoklu firma seçimi",
             _cok_sec_opts, key="_cl_cok_secim",
