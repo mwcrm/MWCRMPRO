@@ -3041,104 +3041,124 @@ section[data-testid="stSidebar"] { display: none !important; }
     _grp4_toplam = sum(_asama_sayi(a) for a in _grp4_asama)
     _grp5_toplam = sum(_asama_sayi(a) for a in _grp5_asama)
 
-    # ── HTML RAPOR SATIRI ─────────────────────────────────────────────────────
+    # ── HTML RAPOR SATIRI — senin çizdiğin formatta ──────────────────────────
     _aktif_fil_durum = st.session_state.get("_cl_fil_durum_multi", [])
     _aktif_fil_asama = st.session_state.get("_cl_fil_asama_multi", [])
     _toplam_aktif_flag = st.session_state.get("_toplam_aktif", False)
 
     def _btn_html(lbl, sayi, aktif=False, key=""):
-        _cls = "rb active" if aktif else "rb"
-        return f'<button class="{_cls}" onclick="setFil(\'{key}\')">' \
-               f'<span class="rl">{lbl}</span><span class="rn">{sayi}</span></button>'
+        _bg = "background:#dbeafe;border-color:#3b82f6;" if aktif else ""
+        _tc = "color:#1d4ed8;" if aktif else "color:#0f172a;"
+        return (f'<td onclick="setFil(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:3px 10px;'
+                f'text-align:center;cursor:pointer;white-space:nowrap;{_bg}">'
+                f'<div style="font-size:9px;color:{"#1d4ed8" if aktif else "#94a3b8"}">{lbl}</div>'
+                f'<div style="font-size:14px;font-weight:500;{_tc}">{sayi}</div></td>')
 
-    _genel_toplam_aktif = _toplam_aktif_flag and not _aktif_fil_durum and not _aktif_fil_asama
-    _portfoy_aktif = "Portföy" in _aktif_fil_durum
-    _ozel_aktif = "Özel Müşteri" in _aktif_fil_durum
-    _asamasiz_aktif = st.session_state.get("_asamasiz_aktif", False)
+    def _grp_header(lbl, span, toplam=None):
+        _txt = f"{lbl} {toplam}" if toplam is not None else lbl
+        return (f'<td colspan="{span}" style="border:0.5px solid #e2e8f0;padding:2px 6px;'
+                f'text-align:center;font-size:9px;font-weight:500;color:#64748b;'
+                f'background:#f8fafc;white-space:nowrap;">{_txt}</td>')
+
+    # Genel grup
+    _genel_items = [("Toplam", len(df), "toplam", _toplam_aktif_flag)]
+    for _dn in tum_durum_opts:
+        if str(_dn).upper() in ["NONE","NAN",""]: continue
+        _genel_items.append((_dn, _durum_sayi(_dn), f"durum_{_dn}", _dn in _aktif_fil_durum))
+    _genel_items.append(("Aşamasız", _asamasiz_sayi(), "asamasiz", st.session_state.get("_asamasiz_aktif",False)))
+
+    # İletişim grubu — sadece sayısı > 0 olanlar
+    _iletisim_items = [(a, _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp1_asama if _asama_sayi(a) > 0]
+
+    # 1. Aşama
+    _asama1_items = [(a, _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp2_asama if _asama_sayi(a) > 0]
+
+    # 2. Aşama
+    _asama2_items = [(a, _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp3_asama if _asama_sayi(a) >= 0]
+
+    # 3. Aşama
+    _asama3_items = [(a, _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp4_asama]
+    # Tümü butonu da ekle
+    _asama3_tum = [("Tümü", _grp4_toplam, "asama3_tum", False)] + _asama3_items
+
+    # Sonuç
+    _sonuc_items = [(a, _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp5_asama]
 
     _html_rapor = """
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
 <style>
-.rbar{display:flex;align-items:flex-start;gap:8px;overflow-x:auto;padding:4px 0 8px;}
-.rgrp{display:flex;flex-direction:column;gap:3px;}
-.rgrp-lbl{font-size:9px;font-weight:500;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px;
-  display:flex;align-items:center;justify-content:center;gap:3px;padding:0 2px;}
-.rgrp-lbl i{font-size:11px;}
-.rgrp-btns{display:flex;gap:3px;}
-.rb{border:0.5px solid #e2e8f0;border-radius:6px;background:white;cursor:pointer;
-  padding:5px 10px;display:flex;flex-direction:column;align-items:center;gap:1px;
-  white-space:nowrap;transition:all .1s;font-family:inherit;}
-.rb:hover{border-color:#94a3b8;background:#f8fafc;}
-.rb.active{border-color:#3b82f6;background:#eff6ff;}
-.rl{font-size:9px;color:#94a3b8;}
-.rn{font-size:14px;font-weight:500;color:#0f172a;}
-.rb.active .rl{color:#2563eb;}
-.rb.active .rn{color:#2563eb;}
-.rdiv{width:1px;background:#e2e8f0;align-self:stretch;margin:0 2px;margin-top:16px;}
+.rbar-tbl{border-collapse:collapse;font-family:inherit;}
+.rbar-tbl td{transition:background .1s;}
+.rbar-tbl td:hover{background:#f1f5f9!important;}
 </style>
-<div class="rbar">
+<div style="overflow-x:auto;padding:4px 0 6px;">
+<table class="rbar-tbl">
+<thead><tr>
 """
+    # Başlıklar
+    _html_rapor += _grp_header("Genel", len(_genel_items))
+    if _iletisim_items:
+        _html_rapor += _grp_header(f"Aşama {_grp1_toplam}", len(_iletisim_items))
+    if _asama1_items:
+        _html_rapor += _grp_header("1. Aşama", len(_asama1_items))
+    if _asama2_items:
+        _html_rapor += _grp_header("2. Aşama", len(_asama2_items))
+    _html_rapor += _grp_header(f"3. Aşama", len(_asama3_tum))
+    _html_rapor += _grp_header(f"{_grp5_toplam} Sonuç", len(_sonuc_items))
+    _html_rapor += '<td style="border:0.5px solid #e2e8f0;padding:2px 6px;text-align:center;font-size:9px;color:#64748b;background:#f8fafc;">Kanban</td>'
+    _html_rapor += "</tr></thead><tbody><tr>"
 
-    # Genel grup
-    _html_rapor += '<div class="rgrp"><div class="rgrp-lbl"><i class="ti ti-layout-list"></i> Genel</div><div class="rgrp-btns">'
-    _html_rapor += _btn_html("Toplam", len(df), _genel_toplam_aktif, "toplam")
-    for _dn in tum_durum_opts:
-        if str(_dn).upper() in ["NONE","NAN",""]: continue
-        _html_rapor += _btn_html(_dn, _durum_sayi(_dn), _dn in _aktif_fil_durum, f"durum_{_dn}")
-    _html_rapor += _btn_html("Aşamasız", _asamasiz_sayi(), _asamasiz_aktif, "asamasiz")
-    _html_rapor += '</div></div>'
-
-    _html_rapor += '<div class="rdiv"></div>'
-
-    # İletişim grubu
-    _grp1_gorunen = [(a, _asama_sayi(a)) for a in _grp1_asama if _asama_sayi(a) > 0 or a in ["Arama","Tekrar Ara","Mesaj","Mail"]]
-    if _grp1_gorunen:
-        _html_rapor += f'<div class="rgrp"><div class="rgrp-lbl"><i class="ti ti-phone-call"></i> İletişim · {_grp1_toplam}</div><div class="rgrp-btns">'
-        for a, s in _grp1_gorunen:
-            _html_rapor += _btn_html(a, s, a in _aktif_fil_asama, f"asama_{a}")
-        _html_rapor += '</div></div><div class="rdiv"></div>'
-
-    # 1. Aşama
-    _grp2_gorunen = [(a, _asama_sayi(a)) for a in _grp2_asama if _asama_sayi(a) >= 0]
-    if any(s > 0 for _,s in _grp2_gorunen):
-        _html_rapor += f'<div class="rgrp"><div class="rgrp-lbl"><i class="ti ti-calendar-event"></i> 1. Aşama · {_grp2_toplam}</div><div class="rgrp-btns">'
-        for a, s in _grp2_gorunen:
-            if s > 0 or a == "Randevu":
-                _html_rapor += _btn_html(a, s, a in _aktif_fil_asama, f"asama_{a}")
-        _html_rapor += '</div></div><div class="rdiv"></div>'
-
-    # 2. Aşama
-    _html_rapor += f'<div class="rgrp"><div class="rgrp-lbl"><i class="ti ti-file-text"></i> 2. Aşama · {_grp3_toplam}</div><div class="rgrp-btns">'
-    for a in _grp3_asama:
-        _html_rapor += _btn_html(a, _asama_sayi(a), a in _aktif_fil_asama, f"asama_{a}")
-    _html_rapor += '</div></div><div class="rdiv"></div>'
-
-    # 3. Aşama
-    _html_rapor += f'<div class="rgrp"><div class="rgrp-lbl"><i class="ti ti-git-branch"></i> 3. Aşama · {_grp4_toplam}</div><div class="rgrp-btns">'
-    for a in _grp4_asama:
-        _html_rapor += _btn_html(a, _asama_sayi(a), a in _aktif_fil_asama, f"asama_{a}")
-    _html_rapor += '</div></div><div class="rdiv"></div>'
-
-    # Sonuç
-    _html_rapor += f'<div class="rgrp"><div class="rgrp-lbl"><i class="ti ti-trophy"></i> Sonuç · {_grp5_toplam}</div><div class="rgrp-btns">'
-    for a in _grp5_asama:
-        _html_rapor += _btn_html(a, _asama_sayi(a), a in _aktif_fil_asama, f"asama_{a}")
-    _html_rapor += '</div></div>'
-
-    _html_rapor += '</div>'
-
-    # JS — tıklanınca query param ile Streamlit'e ilet
-    _html_rapor += """
+    # Butonlar
+    for lbl, sayi, key, aktif in _genel_items:
+        _html_rapor += _btn_html(lbl, sayi, aktif, key)
+    if _iletisim_items:
+        for lbl, sayi, key, aktif in _iletisim_items:
+            _sayi_lbl = f"{sayi} {lbl}"
+            _bg = "background:#dbeafe;border-color:#3b82f6;" if aktif else ""
+            _tc = "color:#1d4ed8;" if aktif else "color:#0f172a;"
+            _html_rapor += (f'<td onclick="setFil(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:3px 10px;'
+                           f'text-align:center;cursor:pointer;white-space:nowrap;{_bg}">'
+                           f'<div style="font-size:13px;font-weight:500;{_tc}">{sayi} {lbl}</div></td>')
+    if _asama1_items:
+        for lbl, sayi, key, aktif in _asama1_items:
+            _bg = "background:#dbeafe;border-color:#3b82f6;" if aktif else ""
+            _tc = "color:#1d4ed8;" if aktif else "color:#0f172a;"
+            _html_rapor += (f'<td onclick="setFil(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:3px 10px;'
+                           f'text-align:center;cursor:pointer;white-space:nowrap;{_bg}">'
+                           f'<div style="font-size:13px;font-weight:500;{_tc}">{sayi} {lbl}</div></td>')
+    if _asama2_items:
+        for lbl, sayi, key, aktif in _asama2_items:
+            _bg = "background:#dbeafe;border-color:#3b82f6;" if aktif else ""
+            _tc = "color:#1d4ed8;" if aktif else "color:#0f172a;"
+            _html_rapor += (f'<td onclick="setFil(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:3px 10px;'
+                           f'text-align:center;cursor:pointer;white-space:nowrap;{_bg}">'
+                           f'<div style="font-size:13px;font-weight:500;{_tc}">{sayi} {lbl}</div></td>')
+    for lbl, sayi, key, aktif in _asama3_tum:
+        _bg = "background:#dbeafe;border-color:#3b82f6;" if aktif else ""
+        _tc = "color:#1d4ed8;" if aktif else "color:#0f172a;"
+        _html_rapor += (f'<td onclick="setFil(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:3px 10px;'
+                       f'text-align:center;cursor:pointer;white-space:nowrap;{_bg}">'
+                       f'<div style="font-size:13px;font-weight:500;{_tc}">{sayi} {lbl}</div></td>')
+    for lbl, sayi, key, aktif in _sonuc_items:
+        _bg = "background:#dbeafe;border-color:#3b82f6;" if aktif else ""
+        _tc = "color:#1d4ed8;" if aktif else "color:#0f172a;"
+        _html_rapor += (f'<td onclick="setFil(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:3px 10px;'
+                       f'text-align:center;cursor:pointer;white-space:nowrap;{_bg}">'
+                       f'<div style="font-size:13px;font-weight:500;{_tc}">{sayi} {lbl}</div></td>')
+    _cl_view2 = st.session_state.get("_cl_view", "liste")
+    _kb_bg = "background:#eff6ff;" if _cl_view2=="kanban" else ""
+    _html_rapor += f'<td onclick="setFil(\'kanban\')" style="border:0.5px solid #e2e8f0;padding:3px 10px;text-align:center;cursor:pointer;{_kb_bg}"><div style="font-size:16px;">📋</div></td>'
+    _html_rapor += """</tr></tbody></table></div>
 <script>
 function setFil(key){
   var url = new URL(window.parent.location.href);
   url.searchParams.set('_rfil', key);
   window.parent.location.replace(url.toString());
 }
-</script>
-"""
+</script>"""
 
     st.markdown(_html_rapor, unsafe_allow_html=True)
+
 
     # Query param'dan filtre oku
     _qp_rfil = st.query_params.get("_rfil", "")
