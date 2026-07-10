@@ -3600,7 +3600,11 @@ function kartSec(id){
         if st.session_state.get("_cl_fil_sonuc") and "sonuc" in df_f.columns:
             df_f = df_f[df_f["sonuc"].astype(str).str.strip() == st.session_state["_cl_fil_sonuc"]]
         if _durum_sec:
-            df_f = df_f[df_f["durum"].isin(_durum_sec)]
+            _durum_mask = df_f["durum"].isin(_durum_sec) if "durum" in df_f.columns else pd.Series([False] * len(df_f), index=df_f.index)
+            for _dcol in ["islem_asamasi", "asama1", "asama2", "asama3"]:
+                if _dcol in df_f.columns:
+                    _durum_mask = _durum_mask | df_f[_dcol].astype(str).str.strip().isin(_durum_sec)
+            df_f = df_f[_durum_mask]
         if filtre_seg != "Tümü":
             df_f["_seg_tmp"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
             if filtre_seg == "Segmentsiz": df_f = df_f[df_f["_seg_tmp"]==""]
