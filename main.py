@@ -3959,6 +3959,10 @@ function kartSec(id){
 
     # ── DATA EDITOR ─────────────────────────────────────────────────────────────
     df_edit = df_f.copy()
+    # "None" / "nan" string değerlerini temizle — boş göster
+    for _col in df_edit.columns:
+        if df_edit[_col].dtype == object:
+            df_edit[_col] = df_edit[_col].replace({"None": "", "nan": "", "NaN": "", "none": ""})
     # aciklama kolonu kesinlikle olsun
     if "aciklama" not in df_edit.columns:
         df_edit["aciklama"] = ""
