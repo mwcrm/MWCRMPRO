@@ -3111,19 +3111,18 @@ section[data-testid="stSidebar"] { display: none !important; }
         _genel_items.append((_durum_ikon(_dn), _dn, _durum_sayi(_dn), f"durum_{_dn}", _dn in _aktif_fil_durum))
 
     _grp_data = {
-        "genel":    ("📊","Genel",    None,         _genel_items),
-        "iletisim": ("📞","Aşama",    _grp1_toplam, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama]),
-        "asama1":   ("📅","1. Aşama", _grp2_toplam, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp2_asama]),
-        "asama2":   ("📄","2. Aşama", _grp3_toplam, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp3_asama]),
-        "asama3":   ("🧪","3. Aşama", _grp4_toplam, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp4_asama] +
-                                                      [(("🧪","Tümü",_grp4_toplam,"asama3_tum",False))]),
-        "sonuc":    ("🏆","Sonuç",    _grp5_toplam, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp5_asama]),
-    }
-    # asama3 - Tümü başa ekle
-    if _grp4_asama:
-        _grp_data["asama3"] = ("🧪","3. Aşama", _grp4_toplam,
-            [(_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama) for a in _grp4_asama])
+        "genel":    ("📊","GENEL",    None, _genel_items),
+        "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama]),
+        "asama1":   ("📅","1. AŞAMA", None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp2_asama]),
+        "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp3_asama]),
+        "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp4_asama]),
 
+        "sonuc":    ("🏆","SONUÇ",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp5_asama]),
+    }
+    # asama3 guncelle
+    if _grp4_asama:
+        _grp_data["asama3"] = ("🧪","3. AŞAMA", None,
+            [(_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama) for a in _grp4_asama])
     # HTML oluştur - 2 satırlı tablo
     _html = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">'
     _html += '<div style="overflow-x:auto;margin-bottom:4px;"><table style="border-collapse:separate;border-spacing:0;font-family:inherit;font-size:12px;width:100%;">'
