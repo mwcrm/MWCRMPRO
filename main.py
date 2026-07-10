@@ -3447,7 +3447,7 @@ function kartSec(id){
             st.session_state.pop("kart_sec_reset", None)
             st.session_state.pop("kart_sec", None)
 
-        _fc = st.columns([2, 1.5, 1.2, 1.2, 1.6, 0.8])
+        _fc = st.columns([2, 1.5, 1.2, 1.2, 1.6, 0.8, 2])
 
         secili_kart_inline = _fc[0].selectbox("m", kart_opts_inline, key="kart_sec_inline", label_visibility="collapsed")
         ara_txt = _fc[1].text_input("a", placeholder="🔍 Firma, yetkili, il...", key="ara_liste", label_visibility="collapsed")
@@ -3464,7 +3464,7 @@ function kartSec(id){
         st.session_state["_cl_fil_durum_multi"] = _durum_sec_raw
         _durum_sec = _durum_sec_raw
 
-        filtre_seg = "Tümü"  # Segment filtresi kaldırıldı
+        filtre_seg = "Tümü"
 
         _il_opts = sorted(df["il"].dropna().astype(str).unique().tolist()) if "il" in df.columns else []
         _il_def  = [x for x in st.session_state.get("_cl_fil_il_multi",[]) if x in _il_opts]
@@ -3474,24 +3474,19 @@ function kartSec(id){
         _ilce_opts = [x for x in _ilce_opts if x not in ["nan","None",""]]
         _ilce_sec  = _fc[5].multiselect("ilce", _ilce_opts, default=[x for x in st.session_state.get("_cl_fil_ilce_multi",[]) if x in _ilce_opts], key="_cl_fil_ilce_multi", placeholder="İlçe...", label_visibility="collapsed")
 
-        _tem_sec = []  # Temsilci filtresi kaldırıldı
+        _tem_sec = []
         siralama_kol = "Tarih↓"
 
-        # Sıfırlama flag'ini temizle
-        if st.session_state.get("_filtre_sifirla_flag"):
-            del st.session_state["_filtre_sifirla_flag"]
-
+        # Çoklu firma seçimi — filtre satırında son sütun
         _cok_sec_opts = [f"[{int(i)}] {f}" for i, f in zip(df["id"], df["firma"]) if str(f) not in ["","nan","None"]] if not df.empty and "firma" in df.columns else []
-        _cok_secili_ham = st.multiselect(
-            "🔍 Çoklu firma seçimi",
-            _cok_sec_opts, key="_cl_cok_secim",
-            placeholder="Arayıp tıklayarak birden fazla firma seçin — sadece seçtikleriniz listelenir...")
+        _cok_secili_ham = _fc[6].multiselect("c", _cok_sec_opts, key="_cl_cok_secim", placeholder="🔍 Çoklu firma...", label_visibility="collapsed")
         _cok_secili_idler = set()
         for _cs in _cok_secili_ham:
-            try:
-                _cok_secili_idler.add(int(_cs.split("]")[0].replace("[","").strip()))
-            except Exception:
-                pass
+            try: _cok_secili_idler.add(int(_cs.split("]")[0].replace("[","").strip()))
+            except: pass
+
+        if st.session_state.get("_filtre_sifirla_flag"):
+            del st.session_state["_filtre_sifirla_flag"]
 
         # Eski sistemle uyumluluk
         _df_il  = df["il"]  if "il"  in df.columns else pd.Series([""] * len(df))
