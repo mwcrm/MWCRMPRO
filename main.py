@@ -3040,6 +3040,7 @@ section[data-testid="stSidebar"] { display: none !important; }
     _grp5_toplam = sum(_asama_sayi(a) for a in _grp5_asama)
 
     # ── HTML RAPOR SATIRI ─────────────────────────────────────────────────────
+    import json as _rjson
     _aktif_fil_durum = st.session_state.get("_cl_fil_durum_multi", [])
     _aktif_fil_asama = st.session_state.get("_cl_fil_asama_multi", [])
     _toplam_aktif_flag = st.session_state.get("_toplam_aktif", False)
@@ -3052,9 +3053,10 @@ section[data-testid="stSidebar"] { display: none !important; }
 
     def _asama_ikon(a):
         _m = {"arama":"📞","tekrar ara":"📲","mesaj":"💬","mail":"📧","e-mail":"📧",
-              "whatsapp":"💬","takip":"📌","randevu":"📅","ilk temas":"👋","ziyaret":"🚗",
-              "teklif":"📄","fiyat":"💰","deneme":"🧪","sözleşme":"📝","sozlesme":"📝",
-              "devam ediyor":"⏳","kazanıldı":"🏆","kazanildi":"🏆","kaybedildi":"❌","negatif":"👎"}
+              "whatsapp":"💬","takip":"📌","randevu":"📅","ilk temas":"👋",
+              "teklif":"📄","fiyat hazırla":"💰","fiyat":"💰","deneme":"🧪",
+              "sözleşme":"📝","devam ediyor":"⏳","kazanıldı":"🏆","kazanildi":"🏆",
+              "kaybedildi":"❌","negatif":"👎"}
         for k,v in _m.items():
             if k in a.lower(): return v
         return "🔹"
@@ -3081,93 +3083,110 @@ section[data-testid="stSidebar"] { display: none !important; }
     _grp4_toplam = sum(_asama_sayi(a) for a in _grp4_asama)
     _grp5_toplam = sum(_asama_sayi(a) for a in _grp5_asama)
 
-    def _td(lbl, sayi, key, aktif):
-        _bg = "background:#dbeafe;" if aktif else "background:#fff;"
-        _tc = "color:#1d4ed8;font-weight:600;" if aktif else "color:#0f172a;"
-        _h  = f'<td onclick="sf(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:5px 10px;text-align:center;cursor:pointer;white-space:nowrap;{_bg}vertical-align:middle;">'
-        _h += f'<span style="font-size:12px;font-weight:500;{_tc}">{sayi} {lbl}</span></td>'
-        return _h
-
-    def _th_grp(ikon, lbl, toplam, grp_id, span):
-        _idx = _grp_sira.index(grp_id) if grp_id in _grp_sira else 0
-        _n = len([g for g in _grp_sira if g in _grp_data and _grp_data[g][3]])
-        _top_txt = f" · {toplam}" if toplam is not None else ""
-        _h  = f'<th colspan="{span}" style="border:0.5px solid #e2e8f0;padding:0;text-align:center;background:#f8fafc;white-space:nowrap;">'
-        if _ayar_modu:
-            _sol = "opacity:.25;pointer-events:none;" if _idx==0 else "cursor:pointer;"
-            _sag = "opacity:.25;pointer-events:none;" if _idx>=_n-1 else "cursor:pointer;"
-            _giz_ic = "👁" if grp_id in _grp_gizli else "🙈"
-            _h += f'<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 5px;gap:2px;">'
-            _h += f'<span onclick="gs(\'{grp_id}\',\'l\')" style="font-size:10px;user-select:none;{_sol}">◀</span>'
-            _h += f'<span style="font-size:10px;font-weight:600;color:#374151;">{ikon} {lbl}{_top_txt}</span>'
-            _h += f'<span onclick="gs(\'{grp_id}\',\'r\')" style="font-size:10px;user-select:none;{_sag}">▶</span>'
-            _h += f'<span onclick="gg(\'{grp_id}\')" style="font-size:11px;cursor:pointer;margin-left:2px;">{_giz_ic}</span>'
-            _h += '</div>'
-        else:
-            _h += f'<div style="padding:3px 8px;font-size:10px;font-weight:600;color:#374151;">{ikon} {lbl}{_top_txt}</div>'
-        _h += '</th>'
-        return _h
-
-    _genel_items = [("📊 Toplam", len(df), "toplam", _toplam_aktif_flag)]
+    # Genel grup
+    _genel_items = [
+        ("📊","Toplam", len(df), "toplam", _toplam_aktif_flag),
+        ("📦","Portföy", _durum_sayi("Portföy"), "durum_Portföy", "Portföy" in _aktif_fil_durum),
+        ("⭐","Özel Müşteri", _durum_sayi("Özel Müşteri"), "durum_Özel Müşteri", "Özel Müşteri" in _aktif_fil_durum),
+        ("📋","Aşamasız", _asamasiz_sayi(), "asamasiz", st.session_state.get("_asamasiz_aktif",False)),
+    ]
     for _dn in tum_durum_opts:
-        if str(_dn).upper() in ["NONE","NAN",""]: continue
-        _genel_items.append((f"{_durum_ikon(_dn)} {_dn}", _durum_sayi(_dn), f"durum_{_dn}", _dn in _aktif_fil_durum))
-    _genel_items.append(("📋 Aşamasız", _asamasiz_sayi(), "asamasiz", st.session_state.get("_asamasiz_aktif",False)))
+        if str(_dn).upper() in ["NONE","NAN",""] or _dn in ["Portföy","Özel Müşteri"]: continue
+        _genel_items.append((_durum_ikon(_dn), _dn, _durum_sayi(_dn), f"durum_{_dn}", _dn in _aktif_fil_durum))
 
     _grp_data = {
-        "genel":    ("📊","Genel",    None,        _genel_items),
-        "iletisim": ("📞","Aşama",    _grp1_toplam,[(f"{_asama_ikon(a)} {a}",_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama) for a in _grp1_asama]),
-        "asama1":   ("📅","1. Aşama", _grp2_toplam,[(f"{_asama_ikon(a)} {a}",_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama) for a in _grp2_asama]),
-        "asama2":   ("📄","2. Aşama", _grp3_toplam,[(f"{_asama_ikon(a)} {a}",_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama) for a in _grp3_asama]),
-        "asama3":   ("🧪","3. Aşama", _grp4_toplam,[(f"{_asama_ikon(a)} {a}",_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama) for a in _grp4_asama]),
-        "sonuc":    ("🏆","Sonuç",    _grp5_toplam,[(f"{_asama_ikon(a)} {a}",_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama) for a in _grp5_asama]),
+        "genel":    ("📊","Genel",    None,         _genel_items),
+        "iletisim": ("📞","Aşama",    _grp1_toplam, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama]),
+        "asama1":   ("📅","1. Aşama", _grp2_toplam, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp2_asama]),
+        "asama2":   ("📄","2. Aşama", _grp3_toplam, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp3_asama]),
+        "asama3":   ("🧪","3. Aşama", _grp4_toplam, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp4_asama] +
+                                                      [(("🧪","Tümü",_grp4_toplam,"asama3_tum",False))]),
+        "sonuc":    ("🏆","Sonuç",    _grp5_toplam, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp5_asama]),
     }
+    # asama3 - Tümü başa ekle
+    if _grp4_asama:
+        _grp_data["asama3"] = ("🧪","3. Aşama", _grp4_toplam,
+            [("🧪","Tümü",_grp4_toplam,"asama3_tum",False)] +
+            [(_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama) for a in _grp4_asama])
 
+    # HTML oluştur - 2 satırlı tablo
     _html = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">'
-    _html += '<div style="overflow-x:auto;"><table style="border-collapse:collapse;font-family:inherit;font-size:12px;"><thead><tr>'
-    # ⚙️ ayar butonu — ilk hücre
-    _gear_bg = "background:#fef9c3;" if _ayar_modu else "background:#f8fafc;"
-    _html += f'<th rowspan="2" onclick="sf(\'_ayar_toggle\')" style="border:0.5px solid #e2e8f0;padding:4px 6px;cursor:pointer;{_gear_bg}vertical-align:middle;text-align:center;" title="Ayarlar"><span style="font-size:14px;">⚙️</span></th>'
+    _html += '<div style="overflow-x:auto;margin-bottom:4px;"><table style="border-collapse:collapse;font-family:inherit;font-size:12px;">'
+
+    # 1. SATIR — grup başlıkları
+    _html += '<thead><tr>'
     for _gid in _grp_sira:
-        if _gid not in _grp_data: continue
+        if _gid not in _grp_data or _gid in _grp_gizli: continue
         _ikon,_lbl,_top,_items = _grp_data[_gid]
         if not _items: continue
-        _span = 1 if _gid in _grp_gizli else len(_items)
-        _html += _th_grp(_ikon,_lbl,_top,_gid,_span)
-    _html += '<th style="border:0.5px solid #e2e8f0;padding:2px 4px;background:#f8fafc;"></th>'
-    _html += '</tr></thead><tbody><tr>'
-    for _gid in _grp_sira:
-        if _gid not in _grp_data: continue
-        _ikon,_lbl,_top,_items = _grp_data[_gid]
-        if not _items: continue
-        if _gid in _grp_gizli:
-            _html += (f'<td onclick="gg(\'{_gid}\')" style="border:0.5px solid #e2e8f0;padding:4px 8px;' +
-                      'text-align:center;background:#f8fafc;color:#94a3b8;font-size:11px;cursor:pointer;">···</td>')
+        _span = len(_items)
+        _top_txt = f" {_top}" if _top is not None else ""
+        if _ayar_modu:
+            _idx = _grp_sira.index(_gid)
+            _n = len([g for g in _grp_sira if g in _grp_data and _grp_data[g][3] and g not in _grp_gizli])
+            _sol = "opacity:.3;" if _idx==0 else "cursor:pointer;"
+            _sag = "opacity:.3;" if _idx>=_n-1 else "cursor:pointer;"
+            _h  = f'<th colspan="{_span}" style="border:0.5px solid #e2e8f0;padding:0;background:#fef9c3;text-align:center;">'
+            _h += f'<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 4px;">'
+            _h += f'<span onclick="gs(\'{_gid}\',\'l\')" style="font-size:10px;{_sol}">◀</span>'
+            _h += f'<b style="font-size:10px;color:#374151;">{_ikon} {_lbl}{_top_txt}</b>'
+            _h += f'<span onclick="gs(\'{_gid}\',\'r\')" style="font-size:10px;{_sag}">▶</span>'
+            _h += f'<span onclick="gg(\'{_gid}\')" style="font-size:11px;cursor:pointer;">🙈</span>'
+            _h += '</div></th>'
         else:
-            for lbl,sayi,key,aktif in _items:
-                _html += _td(lbl,sayi,key,aktif)
+            _h = f'<th colspan="{_span}" style="border:0.5px solid #e2e8f0;padding:3px 8px;background:#f8fafc;text-align:center;font-size:10px;font-weight:600;color:#374151;white-space:nowrap;">{_ikon} {_lbl}{_top_txt}</th>'
+        _html += _h
+
+    # Gizli gruplar için ayar modunda göster
+    if _ayar_modu:
+        for _gid in _grp_sira:
+            if _gid in _grp_gizli and _gid in _grp_data:
+                _ikon,_lbl,_top,_items = _grp_data[_gid]
+                _html += "<th onclick=\"gg('" + _gid + "')\" style=\"border:0.5px solid #e2e8f0;padding:3px 5px;background:#fee2e2;cursor:pointer;font-size:9px;white-space:nowrap;\">👁 " + _lbl + "</th>"
+
+    _gear_bg = "#fef9c3" if _ayar_modu else "#f8fafc"
+    _html += f'<th rowspan="2" onclick="sf(\'_ayar_toggle\')" style="border:0.5px solid #e2e8f0;padding:4px 6px;cursor:pointer;background:{_gear_bg};vertical-align:middle;text-align:center;" title="Grup Ayarları"><span style="font-size:13px;">⚙️</span></th>'
+    _html += '</tr></thead>'
+
+    # 2. SATIR — sayılar
+    _html += '<tbody><tr>'
+    for _gid in _grp_sira:
+        if _gid not in _grp_data or _gid in _grp_gizli: continue
+        _ikon,_lbl,_top,_items = _grp_data[_gid]
+        if not _items: continue
+        for _ic, _ad, _sayi, _key, _aktif in _items:
+            _bg = "background:#dbeafe;" if _aktif else "background:#fff;"
+            _tc = "color:#1d4ed8;font-weight:700;" if _aktif else "color:#0f172a;"
+            _td_onclick = f"sf('{_key}')"
+            _html += f'<td onclick="{_td_onclick}" style="border:0.5px solid #e2e8f0;padding:5px 8px;text-align:center;cursor:pointer;white-space:nowrap;{_bg}vertical-align:middle;">'
+            _html += f'<div style="font-size:11px;color:#94a3b8;margin-bottom:1px;">{_ic}</div>'
+            _html += f'<div style="font-size:13px;font-weight:600;{_tc}">{_sayi}</div>'
+            _html += f'<div style="font-size:9px;color:#64748b;">{_ad}</div>'
+            _html += '</td>'
+
     _cl_view2 = st.session_state.get("_cl_view","liste")
-    _kb_bg = "background:#dbeafe;" if _cl_view2=="kanban" else "background:#fff;"
-    _html += f'<td onclick="sf(\'kanban\')" style="border:0.5px solid #e2e8f0;padding:4px 9px;text-align:center;cursor:pointer;{_kb_bg}"><i class="ti ti-layout-kanban" style="font-size:16px;color:#64748b;"></i></td>'
+    _kb_bg = "background:#dbeafe;" if _cl_view2=="kanban" else "background:#f8fafc;"
+    _kb_onclick = "sf('kanban')"
+    _html += f'<td onclick="{_kb_onclick}" style="border:0.5px solid #e2e8f0;padding:5px 8px;text-align:center;cursor:pointer;{_kb_bg}vertical-align:middle;">'
+    _html += '<div style="font-size:11px;color:#64748b;">📋</div><div style="font-size:9px;color:#64748b;">Kanban</div></td>'
     _html += '</tr></tbody></table></div>'
     import json as _rjson2
-    _sira_js = _rjson2.dumps(_grp_sira)
     _html += f"""<script>
-var _s={_sira_js};
+var _s={_rjson2.dumps(_grp_sira)};
 function sf(k){{var u=new URL(window.parent.location.href);u.searchParams.set("_rfil",k);window.parent.location.replace(u.toString());}}
 function gg(id){{var u=new URL(window.parent.location.href);var g=JSON.parse(u.searchParams.get("_grp_gizli")||"[]");if(g.includes(id))g=g.filter(x=>x!==id);else g.push(id);u.searchParams.set("_grp_gizli",JSON.stringify(g));window.parent.location.replace(u.toString());}}
 function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse(u.searchParams.get("_grp_sira")||JSON.stringify(_s));var i=s.indexOf(id);if(dir==="l"&&i>0){{var t=s[i-1];s[i-1]=s[i];s[i]=t;}}else if(dir==="r"&&i<s.length-1){{var t=s[i+1];s[i+1]=s[i];s[i]=t;}}u.searchParams.set("_grp_sira",JSON.stringify(s));window.parent.location.replace(u.toString());}}
 </script>"""
     st.markdown(_html, unsafe_allow_html=True)
 
-    import json as _rjson
+    # Ayar toggle
+    _qp_rfil_ayar = st.query_params.get("_rfil","")
+    if _qp_rfil_ayar == "_ayar_toggle":
+        st.session_state["_rbar_ayar_modu"] = not _ayar_modu
+        st.query_params.clear(); st.rerun()
+    # Grup ayar param
     _qp_grp_gizli = st.query_params.get("_grp_gizli","")
     _qp_grp_sira  = st.query_params.get("_grp_sira","")
-    _qp_rfil2     = st.query_params.get("_rfil","")
-    if _qp_rfil2 == "_ayar_toggle":
-        st.session_state["_rbar_ayar_modu"] = not st.session_state.get("_rbar_ayar_modu", False)
-        st.query_params.clear()
-        st.rerun()
     if _qp_grp_gizli or _qp_grp_sira:
         if _qp_grp_gizli:
             try: st.session_state["_rbar_grp_gizli"] = _rjson.loads(_qp_grp_gizli)
@@ -3175,8 +3194,7 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
         if _qp_grp_sira:
             try: st.session_state["_rbar_grp_sira"] = _rjson.loads(_qp_grp_sira)
             except: pass
-        st.query_params.clear()
-        st.rerun()
+        st.query_params.clear(); st.rerun()
 
     # Query param'dan filtre oku
     _qp_rfil = st.query_params.get("_rfil", "")
