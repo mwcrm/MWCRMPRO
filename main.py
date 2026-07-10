@@ -3232,6 +3232,7 @@ function kartSec(id){
         _asama_sec = _asama_sec_raw
         st.session_state["_cl_fil_asama_multi"] = _asama_sec
 
+        _fk_sfx = st.session_state.get("_filtre_reset_sayac", 0)
         _durum_opts_tumu = ["Tümü"] + [x for x in tum_durum_opts if str(x).upper() not in ["NONE","NAN",""]]
         _durum_def = [x for x in st.session_state.get("_cl_fil_durum_multi",[]) if x in _durum_opts_tumu]
         _durum_sec_raw = _fc[3].multiselect("d", _durum_opts_tumu, default=_durum_def, key=f"_cl_fil_durum_multi_{_fk_sfx}", placeholder="Durum...", label_visibility="collapsed")
