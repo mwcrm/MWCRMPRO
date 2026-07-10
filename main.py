@@ -2975,18 +2975,18 @@ section[data-testid="stSidebar"] { display: none !important; }
                             st.session_state["_cl_fil_asama_multi"] = [_ad]
                         else:  # tek — durum+asama birleşik
                             if _ad == "Toplam":
-                                # Tüm filtreleri sıfırla
+                                st.session_state["_toplam_aktif"] = True
                                 for _fk in ["_cl_fil_durum_multi","_cl_fil_asama_multi",
                                             "_cl_fil_il_multi","_cl_fil_ilce_multi",
                                             "_cl_fil_temsilci_multi","_cl_sec_kart"]:
-                                    if _fk in st.session_state:
-                                        del st.session_state[_fk]
-                                # Widget key'lerini sıfırla
+                                    if _fk in st.session_state: del st.session_state[_fk]
                                 st.session_state["_filtre_reset_sayac"] = st.session_state.get("_filtre_reset_sayac", 0) + 1
                             elif d_adlar and _ad in d_adlar:
+                                st.session_state["_toplam_aktif"] = False
                                 st.session_state["_cl_fil_durum_multi"] = [_ad]
                                 st.session_state["_cl_fil_asama_multi"] = []
                             else:
+                                st.session_state["_toplam_aktif"] = False
                                 st.session_state["_cl_fil_asama_multi"] = [_ad]
                                 st.session_state["_cl_fil_durum_multi"] = []
                         st.rerun()
@@ -3286,22 +3286,24 @@ function kartSec(id){
 
     # Filtre uygula
     df_f = df.copy()
-    if ara_txt:
-        df_f = df_f[df_f.apply(lambda r: ara_txt.lower() in str(r).lower(), axis=1)]
-    if _asama_sec:
-        df_f = df_f[df_f["islem_asamasi"].isin(_asama_sec)]
-    if _durum_sec:
-        df_f = df_f[df_f["durum"].isin(_durum_sec)]
-    if filtre_seg != "Tümü":
-        df_f["_seg_tmp"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
-        if filtre_seg == "Segmentsiz": df_f = df_f[df_f["_seg_tmp"]==""]
-        else: df_f = df_f[df_f["_seg_tmp"]==filtre_seg]
-    if _il_sec:
-        df_f = df_f[df_f["il"].astype(str).isin(_il_sec)]
-    if _ilce_sec:
-        df_f = df_f[df_f["ilce"].astype(str).isin(_ilce_sec)]
-    if _tem_sec:
-        df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
+    # Toplam butonuna basıldıysa hiçbir filtre uygulanmaz
+    if not st.session_state.get("_toplam_aktif", False):
+        if ara_txt:
+            df_f = df_f[df_f.apply(lambda r: ara_txt.lower() in str(r).lower(), axis=1)]
+        if _asama_sec:
+            df_f = df_f[df_f["islem_asamasi"].isin(_asama_sec)]
+        if _durum_sec:
+            df_f = df_f[df_f["durum"].isin(_durum_sec)]
+        if filtre_seg != "Tümü":
+            df_f["_seg_tmp"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
+            if filtre_seg == "Segmentsiz": df_f = df_f[df_f["_seg_tmp"]==""]
+            else: df_f = df_f[df_f["_seg_tmp"]==filtre_seg]
+        if _il_sec:
+            df_f = df_f[df_f["il"].astype(str).isin(_il_sec)]
+        if _ilce_sec:
+            df_f = df_f[df_f["ilce"].astype(str).isin(_ilce_sec)]
+        if _tem_sec:
+            df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
 
     # Bölgeler ekranından gelen gizli bölge filtresi (ilçe pill'leri taşmasın diye görünmez uygulanır)
     if st.session_state.get("_bl_ilce_filtre") and "ilce" in df_f.columns:
