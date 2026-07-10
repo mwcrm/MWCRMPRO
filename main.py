@@ -3002,23 +3002,178 @@ section[data-testid="stSidebar"] { display: none !important; }
     # ── TEK SATIR: Durum + Aşama birleşik ───────────────────────────────────
     _d_veri = [("Toplam", len(df))]
     for _dn in tum_durum_opts:
-        if str(_dn).upper() in ["NONE","NAN",""]: continue  # NONE gösterme
+        if str(_dn).upper() in ["NONE","NAN",""]: continue
         _dc = len(df[df["durum"]==_dn]) if "durum" in df.columns else 0
         _d_veri.append((_dn, _dc))
     _a_veri = [(a, len(df[df["islem_asamasi"]==a]) if "islem_asamasi" in df.columns else 0) for a in tum_asama_opts if str(a).upper() not in ["NONE","NAN",""]] if tum_asama_opts else []
     _tum_veri = _d_veri + _a_veri
-    _tum_emoji = {**_DURUM_EMOJI, **_ASAMA_EMOJI}
     _d_adlar = {x[0] for x in _d_veri}
 
-    # Kanban butonu — buton satırında sağ tarafta
+    # ── AŞAMA GRUPLARI ────────────────────────────────────────────────────────
+    # Grup 1: İletişim aşamaları
+    _grp1_asama = ["Arama","Tekrar Ara","Mesaj","Whatsapp Mesaj","E-mail","Mail","TAKİP","Arama 71"]
+    # Grup 2: 1. Aşama
+    _grp2_asama = ["Randevu","İlk Temas"]
+    # Grup 3: 2. Aşama
+    _grp3_asama = ["Teklif","Fiyat Hazırla"]
+    # Grup 4: 3. Aşama
+    _grp4_asama = ["Deneme","Sözleşme","Devam Ediyor"]
+    # Grup 5: Sonuç
+    _grp5_asama = ["Kazanıldı","Kaybedildi","Negatif Portföy"]
+
+    def _asama_sayi(ad):
+        if "islem_asamasi" not in df.columns: return 0
+        return len(df[df["islem_asamasi"]==ad])
+
+    def _durum_sayi(ad):
+        if ad == "Toplam": return len(df)
+        if "durum" not in df.columns: return 0
+        return len(df[df["durum"]==ad])
+
+    def _asamasiz_sayi():
+        if "islem_asamasi" not in df.columns: return 0
+        _tum_asama = [a for grp in [_grp1_asama,_grp2_asama,_grp3_asama,_grp4_asama,_grp5_asama] for a in grp]
+        return len(df[~df["islem_asamasi"].isin(_tum_asama) | df["islem_asamasi"].isna()])
+
+    _grp1_toplam = sum(_asama_sayi(a) for a in _grp1_asama)
+    _grp2_toplam = sum(_asama_sayi(a) for a in _grp2_asama)
+    _grp3_toplam = sum(_asama_sayi(a) for a in _grp3_asama)
+    _grp4_toplam = sum(_asama_sayi(a) for a in _grp4_asama)
+    _grp5_toplam = sum(_asama_sayi(a) for a in _grp5_asama)
+
+    # ── HTML RAPOR SATIRI ─────────────────────────────────────────────────────
+    _aktif_fil_durum = st.session_state.get("_cl_fil_durum_multi", [])
+    _aktif_fil_asama = st.session_state.get("_cl_fil_asama_multi", [])
+    _toplam_aktif_flag = st.session_state.get("_toplam_aktif", False)
+
+    def _btn_html(lbl, sayi, aktif=False, key=""):
+        _cls = "rb active" if aktif else "rb"
+        return f'<button class="{_cls}" onclick="setFil(\'{key}\')">' \
+               f'<span class="rl">{lbl}</span><span class="rn">{sayi}</span></button>'
+
+    _genel_toplam_aktif = _toplam_aktif_flag and not _aktif_fil_durum and not _aktif_fil_asama
+    _portfoy_aktif = "Portföy" in _aktif_fil_durum
+    _ozel_aktif = "Özel Müşteri" in _aktif_fil_durum
+    _asamasiz_aktif = st.session_state.get("_asamasiz_aktif", False)
+
+    _html_rapor = """
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">
+<style>
+.rbar{display:flex;align-items:flex-start;gap:8px;overflow-x:auto;padding:4px 0 8px;}
+.rgrp{display:flex;flex-direction:column;gap:3px;}
+.rgrp-lbl{font-size:9px;font-weight:500;color:#94a3b8;text-transform:uppercase;letter-spacing:.4px;
+  display:flex;align-items:center;justify-content:center;gap:3px;padding:0 2px;}
+.rgrp-lbl i{font-size:11px;}
+.rgrp-btns{display:flex;gap:3px;}
+.rb{border:0.5px solid #e2e8f0;border-radius:6px;background:white;cursor:pointer;
+  padding:5px 10px;display:flex;flex-direction:column;align-items:center;gap:1px;
+  white-space:nowrap;transition:all .1s;font-family:inherit;}
+.rb:hover{border-color:#94a3b8;background:#f8fafc;}
+.rb.active{border-color:#3b82f6;background:#eff6ff;}
+.rl{font-size:9px;color:#94a3b8;}
+.rn{font-size:14px;font-weight:500;color:#0f172a;}
+.rb.active .rl{color:#2563eb;}
+.rb.active .rn{color:#2563eb;}
+.rdiv{width:1px;background:#e2e8f0;align-self:stretch;margin:0 2px;margin-top:16px;}
+</style>
+<div class="rbar">
+"""
+
+    # Genel grup
+    _html_rapor += '<div class="rgrp"><div class="rgrp-lbl"><i class="ti ti-layout-list"></i> Genel</div><div class="rgrp-btns">'
+    _html_rapor += _btn_html("Toplam", len(df), _genel_toplam_aktif, "toplam")
+    for _dn in tum_durum_opts:
+        if str(_dn).upper() in ["NONE","NAN",""]: continue
+        _html_rapor += _btn_html(_dn, _durum_sayi(_dn), _dn in _aktif_fil_durum, f"durum_{_dn}")
+    _html_rapor += _btn_html("Aşamasız", _asamasiz_sayi(), _asamasiz_aktif, "asamasiz")
+    _html_rapor += '</div></div>'
+
+    _html_rapor += '<div class="rdiv"></div>'
+
+    # İletişim grubu
+    _grp1_gorunen = [(a, _asama_sayi(a)) for a in _grp1_asama if _asama_sayi(a) > 0 or a in ["Arama","Tekrar Ara","Mesaj","Mail"]]
+    if _grp1_gorunen:
+        _html_rapor += f'<div class="rgrp"><div class="rgrp-lbl"><i class="ti ti-phone-call"></i> İletişim · {_grp1_toplam}</div><div class="rgrp-btns">'
+        for a, s in _grp1_gorunen:
+            _html_rapor += _btn_html(a, s, a in _aktif_fil_asama, f"asama_{a}")
+        _html_rapor += '</div></div><div class="rdiv"></div>'
+
+    # 1. Aşama
+    _grp2_gorunen = [(a, _asama_sayi(a)) for a in _grp2_asama if _asama_sayi(a) >= 0]
+    if any(s > 0 for _,s in _grp2_gorunen):
+        _html_rapor += f'<div class="rgrp"><div class="rgrp-lbl"><i class="ti ti-calendar-event"></i> 1. Aşama · {_grp2_toplam}</div><div class="rgrp-btns">'
+        for a, s in _grp2_gorunen:
+            if s > 0 or a == "Randevu":
+                _html_rapor += _btn_html(a, s, a in _aktif_fil_asama, f"asama_{a}")
+        _html_rapor += '</div></div><div class="rdiv"></div>'
+
+    # 2. Aşama
+    _html_rapor += f'<div class="rgrp"><div class="rgrp-lbl"><i class="ti ti-file-text"></i> 2. Aşama · {_grp3_toplam}</div><div class="rgrp-btns">'
+    for a in _grp3_asama:
+        _html_rapor += _btn_html(a, _asama_sayi(a), a in _aktif_fil_asama, f"asama_{a}")
+    _html_rapor += '</div></div><div class="rdiv"></div>'
+
+    # 3. Aşama
+    _html_rapor += f'<div class="rgrp"><div class="rgrp-lbl"><i class="ti ti-git-branch"></i> 3. Aşama · {_grp4_toplam}</div><div class="rgrp-btns">'
+    for a in _grp4_asama:
+        _html_rapor += _btn_html(a, _asama_sayi(a), a in _aktif_fil_asama, f"asama_{a}")
+    _html_rapor += '</div></div><div class="rdiv"></div>'
+
+    # Sonuç
+    _html_rapor += f'<div class="rgrp"><div class="rgrp-lbl"><i class="ti ti-trophy"></i> Sonuç · {_grp5_toplam}</div><div class="rgrp-btns">'
+    for a in _grp5_asama:
+        _html_rapor += _btn_html(a, _asama_sayi(a), a in _aktif_fil_asama, f"asama_{a}")
+    _html_rapor += '</div></div>'
+
+    _html_rapor += '</div>'
+
+    # JS — tıklanınca query param ile Streamlit'e ilet
+    _html_rapor += """
+<script>
+function setFil(key){
+  var url = new URL(window.parent.location.href);
+  url.searchParams.set('_rfil', key);
+  window.parent.location.replace(url.toString());
+}
+</script>
+"""
+
+    st.markdown(_html_rapor, unsafe_allow_html=True)
+
+    # Query param'dan filtre oku
+    _qp_rfil = st.query_params.get("_rfil", "")
+    if _qp_rfil:
+        st.query_params.clear()
+        if _qp_rfil == "toplam":
+            st.session_state["_toplam_aktif"] = True
+            st.session_state["_asamasiz_aktif"] = False
+            st.session_state["_filtre_reset_sayac"] = st.session_state.get("_filtre_reset_sayac",0)+1
+            for _fk in ["_cl_fil_durum_multi","_cl_fil_asama_multi","_cl_fil_il_multi","_cl_fil_ilce_multi","_cl_fil_temsilci_multi"]:
+                st.session_state.pop(_fk, None)
+        elif _qp_rfil == "asamasiz":
+            st.session_state["_asamasiz_aktif"] = True
+            st.session_state["_toplam_aktif"] = False
+            st.session_state.pop("_cl_fil_durum_multi", None)
+            st.session_state["_cl_fil_asama_multi"] = []
+        elif _qp_rfil.startswith("durum_"):
+            _d = _qp_rfil[6:]
+            st.session_state["_cl_fil_durum_multi"] = [_d]
+            st.session_state["_cl_fil_asama_multi"] = []
+            st.session_state["_toplam_aktif"] = False
+            st.session_state["_asamasiz_aktif"] = False
+        elif _qp_rfil.startswith("asama_"):
+            _a = _qp_rfil[6:]
+            st.session_state["_cl_fil_asama_multi"] = [_a]
+            st.session_state["_cl_fil_durum_multi"] = []
+            st.session_state["_toplam_aktif"] = False
+            st.session_state["_asamasiz_aktif"] = False
+        st.rerun()
+
+    # Kanban butonu
     _cl_view = st.session_state.get("_cl_view", "liste")
-    _bsatir1, _bsatir2 = st.columns([9, 1])
-    with _bsatir1:
-        _rapor_satir(_tum_veri, "_tek_sirasi", "_tek_gizlisi", "tek", _tum_emoji, "", d_adlar=_d_adlar)
-    with _bsatir2:
-        if st.button("📋 Kanban", key="cl_view_kanban", type="primary" if _cl_view=="kanban" else "secondary", use_container_width=True):
-            st.session_state["_cl_view"] = "kanban" if _cl_view=="liste" else "liste"
-            st.rerun()
+    if st.button("📋 Kanban", key="cl_view_kanban", type="primary" if _cl_view=="kanban" else "secondary"):
+        st.session_state["_cl_view"] = "kanban" if _cl_view=="liste" else "liste"
+        st.rerun()
 
     if _cl_view == "kanban":
         # ── KART TIKLAMASI — query param ile müşteri seç ─────────────────────
@@ -3286,8 +3441,13 @@ function kartSec(id){
 
     # Filtre uygula
     df_f = df.copy()
+    # Aşamasız filtresi
+    if st.session_state.get("_asamasiz_aktif", False):
+        _tum_asama_set = set(_grp1_asama + _grp2_asama + _grp3_asama + _grp4_asama + _grp5_asama)
+        if "islem_asamasi" in df_f.columns:
+            df_f = df_f[df_f["islem_asamasi"].isna() | ~df_f["islem_asamasi"].isin(_tum_asama_set)]
     # Toplam butonuna basıldıysa hiçbir filtre uygulanmaz
-    if not st.session_state.get("_toplam_aktif", False):
+    elif not st.session_state.get("_toplam_aktif", False):
         if ara_txt:
             df_f = df_f[df_f.apply(lambda r: ara_txt.lower() in str(r).lower(), axis=1)]
         if _asama_sec:
