@@ -3447,49 +3447,40 @@ function kartSec(id){
             st.session_state.pop("kart_sec_reset", None)
             st.session_state.pop("kart_sec", None)
 
-        _fc = st.columns([2, 1.5, 1.2, 1.2, 0.7, 1.6, 0.8, 0.9])
+        _fc = st.columns([2, 1.5, 1.2, 1.2, 1.6, 0.8])
 
         secili_kart_inline = _fc[0].selectbox("m", kart_opts_inline, key="kart_sec_inline", label_visibility="collapsed")
         ara_txt = _fc[1].text_input("a", placeholder="🔍 Firma, yetkili, il...", key="ara_liste", label_visibility="collapsed")
 
         _fk_sfx = st.session_state.get("_filtre_reset_sayac", 0)
-        _asama_def = [] if st.session_state.get("_toplam_aktif") else [x for x in st.session_state.get("_cl_fil_asama_multi",[]) if x in tum_asama_opts]
-        _asama_sec_raw = _fc[2].multiselect("a", tum_asama_opts, default=_asama_def, key=f"_cl_fil_asama_multi_{_fk_sfx}", placeholder="Aşama...", label_visibility="collapsed")
-        _asama_sec = _asama_sec_raw
+        _asama_def = [] if st.session_state.get("_filtre_sifirla_flag") else [x for x in st.session_state.get("_cl_fil_asama_multi",[]) if x in tum_asama_opts]
+        _asama_sec = _fc[2].multiselect("a", tum_asama_opts, default=_asama_def, key=f"_cl_fil_asama_multi_{_fk_sfx}", placeholder="Aşama...", label_visibility="collapsed")
         st.session_state["_cl_fil_asama_multi"] = _asama_sec
-        _durum_opts_tumu = ["Tümü"] + [x for x in tum_durum_opts if str(x).upper() not in ["NONE","NAN",""]]
-        _durum_def = [x for x in st.session_state.get("_cl_fil_durum_multi",[]) if x in _durum_opts_tumu]
+
+        _fk_sfx = st.session_state.get("_filtre_reset_sayac", 0)
+        _durum_opts_tumu = [x for x in tum_durum_opts if str(x).upper() not in ["NONE","NAN",""]]
+        _durum_def = [] if st.session_state.get("_filtre_sifirla_flag") else [x for x in st.session_state.get("_cl_fil_durum_multi",[]) if x in _durum_opts_tumu]
         _durum_sec_raw = _fc[3].multiselect("d", _durum_opts_tumu, default=_durum_def, key=f"_cl_fil_durum_multi_{_fk_sfx}", placeholder="Durum...", label_visibility="collapsed")
         st.session_state["_cl_fil_durum_multi"] = _durum_sec_raw
-        if "Tümü" in _durum_sec_raw:
-            for _fk2 in ["_cl_fil_durum_multi","_cl_fil_asama_multi","_cl_fil_il_multi","_cl_fil_ilce_multi"]:
-                if _fk2 in st.session_state: del st.session_state[_fk2]
-            st.rerun()
         _durum_sec = _durum_sec_raw
 
-        filtre_seg = _fc[4].selectbox("s", ["Tümü","👑 A+","⭐ A","🔵 B","⚪ C"], key="fil_seg", label_visibility="collapsed")
+        filtre_seg = "Tümü"  # Segment filtresi kaldırıldı
 
-        _il_opts = ["🌍 Tümü / Hepsi"] + (sorted(df["il"].dropna().astype(str).unique().tolist()) if "il" in df.columns else [])
+        _il_opts = sorted(df["il"].dropna().astype(str).unique().tolist()) if "il" in df.columns else []
         _il_def  = [x for x in st.session_state.get("_cl_fil_il_multi",[]) if x in _il_opts]
-        _il_sec_raw = _fc[5].multiselect("i", _il_opts, default=_il_def, key="_cl_fil_il_multi", placeholder="İl...", label_visibility="collapsed")
-        if "🌍 Tümü / Hepsi" in _il_sec_raw:
-            for _fk3 in ["_cl_fil_il_multi", "_cl_fil_ilce_multi", "_bl_ilce_filtre", "_bl_havuz_filtre"]:
-                if _fk3 in st.session_state: del st.session_state[_fk3]
-            st.session_state.pop("_bl_ilce_filtre_ad", None)
-            st.rerun()
-        _il_sec = _il_sec_raw
+        _il_sec  = _fc[4].multiselect("i", _il_opts, default=_il_def, key="_cl_fil_il_multi", placeholder="İl...", label_visibility="collapsed")
 
         _ilce_opts = sorted((df[df["il"].astype(str).isin(_il_sec)] if _il_sec else df)["ilce"].dropna().astype(str).unique().tolist()) if "ilce" in df.columns else []
         _ilce_opts = [x for x in _ilce_opts if x not in ["nan","None",""]]
-        _ilce_sec  = _fc[6].multiselect("ilce", _ilce_opts, default=[x for x in st.session_state.get("_cl_fil_ilce_multi",[]) if x in _ilce_opts], key="_cl_fil_ilce_multi", placeholder="İlçe...", label_visibility="collapsed")
+        _ilce_sec  = _fc[5].multiselect("ilce", _ilce_opts, default=[x for x in st.session_state.get("_cl_fil_ilce_multi",[]) if x in _ilce_opts], key="_cl_fil_ilce_multi", placeholder="İlçe...", label_visibility="collapsed")
 
-        _tem_opts = sorted(df["temsilci"].dropna().astype(str).unique().tolist()) if "temsilci" in df.columns else []
-        _tem_def  = [x for x in st.session_state.get("_cl_fil_temsilci_multi",[]) if x in _tem_opts]
-        _tem_sec  = _fc[7].multiselect("t", _tem_opts, default=_tem_def, key="_cl_fil_temsilci_multi", placeholder="Temsilci...", label_visibility="collapsed")
+        _tem_sec = []  # Temsilci filtresi kaldırıldı
+        siralama_kol = "Tarih↓"
 
-        siralama_kol = "Tarih↓"  # Sıralama kutusu kaldırıldı, varsayılan sıralama sabit kaldı
+        # Sıfırlama flag'ini temizle
+        if st.session_state.get("_filtre_sifirla_flag"):
+            del st.session_state["_filtre_sifirla_flag"]
 
-        # ── Çoklu firma seçimi (karşılaştırma/düzeltme için) — seçilenler varsa tablo sadece onları gösterir ──
         _cok_sec_opts = [f"[{int(i)}] {f}" for i, f in zip(df["id"], df["firma"]) if str(f) not in ["","nan","None"]] if not df.empty and "firma" in df.columns else []
         _cok_secili_ham = st.multiselect(
             "🔍 Çoklu firma seçimi",
