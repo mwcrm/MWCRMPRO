@@ -3014,7 +3014,7 @@ section[data-testid="stSidebar"] { display: none !important; }
     _grp1_asama = [a for a in tum_asama_opts if a in ["Arama","Tekrar Ara","Mesaj","E-Mail","Mail","Whatsapp Mesaj","TAKİP"]]
     _grp2_asama = [a for a in tum_asama_opts if a in ["Randevu"]]
     _grp3_asama = [a for a in tum_asama_opts if a in ["Teklif"]]
-    _grp4_asama = [a for a in tum_asama_opts if a in ["Fiyat Hazırla","Deneme","Sözleşme"]]
+    _grp4_asama = [a for a in tum_asama_opts if a in ["Takip","Fiyat Hazırla","Deneme","Sözleşme"]]
     _grp5_asama = [a for a in tum_asama_opts if a in ["Kazanıldı","Kaybedildi","Devam Ediyor","Negatif Portföy"]]
     # İlk Temas = Aşamasız sayılır — gruplara dahil edilmez
     # Diğer grubu YOK
@@ -3110,7 +3110,6 @@ section[data-testid="stSidebar"] { display: none !important; }
     # asama3 - Tümü başa ekle
     if _grp4_asama:
         _grp_data["asama3"] = ("🧪","3. Aşama", _grp4_toplam,
-            [("🧪","Tümü",_grp4_toplam,"asama3_tum",False)] +
             [(_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama) for a in _grp4_asama])
 
     # HTML oluştur - 2 satırlı tablo
