@@ -3010,10 +3010,10 @@ section[data-testid="stSidebar"] { display: none !important; }
     _d_adlar = {x[0] for x in _d_veri}
 
     # ── AŞAMA GRUPLARI — gerçek aşama adlarına göre ──────────────────────────
-    _grp1_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["arama","tekrar ara","mesaj","mail","e-mail","whatsapp","takip","iletisim","iletişim"])]
-    _grp2_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["randevu","ilk temas","ziyaret"])]
-    _grp3_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["teklif","fiyat"])]
-    _grp4_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["deneme","sözleşme","sozlesme","devam"])]
+    _grp1_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["arama","tekrar ara","mesaj","mail","e-mail","whatsapp","takip"])]
+    _grp2_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["randevu"])]
+    _grp3_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["teklif","fiyat hazırla","fiyat hazirlا"])]
+    _grp4_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["deneme","sözleşme","sozlesme","takip"])]
     _grp5_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["kazanıldı","kazanildi","kaybedildi","devam ediyor"])]
     # Diğer grubu YOK
     _tum_grp = set(_grp1_asama+_grp2_asama+_grp3_asama+_grp4_asama+_grp5_asama)
@@ -3048,6 +3048,7 @@ section[data-testid="stSidebar"] { display: none !important; }
     _grp_sira = list(st.session_state.get("_rbar_grp_sira", _grp_sira_def.copy()))
     for _gs in _grp_sira_def:
         if _gs not in _grp_sira: _grp_sira.append(_gs)
+    _ayar_modu = st.session_state.get("_rbar_ayar_modu", False)
 
     def _asama_ikon(a):
         _m = {"arama":"📞","tekrar ara":"📲","mesaj":"💬","mail":"📧","e-mail":"📧",
@@ -3090,17 +3091,21 @@ section[data-testid="stSidebar"] { display: none !important; }
     def _th_grp(ikon, lbl, toplam, grp_id, span):
         _idx = _grp_sira.index(grp_id) if grp_id in _grp_sira else 0
         _n = len([g for g in _grp_sira if g in _grp_data and _grp_data[g][3]])
-        _sol = "opacity:.25;pointer-events:none;" if _idx==0 else "cursor:pointer;"
-        _sag = "opacity:.25;pointer-events:none;" if _idx>=_n-1 else "cursor:pointer;"
-        _giz_ic = "👁" if grp_id in _grp_gizli else "🙈"
         _top_txt = f" · {toplam}" if toplam is not None else ""
         _h  = f'<th colspan="{span}" style="border:0.5px solid #e2e8f0;padding:0;text-align:center;background:#f8fafc;white-space:nowrap;">'
-        _h += f'<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 5px;gap:2px;">'
-        _h += f'<span onclick="gs(\'{grp_id}\',\'l\')" style="font-size:10px;user-select:none;{_sol}">◀</span>'
-        _h += f'<span style="font-size:10px;font-weight:600;color:#374151;">{ikon} {lbl}{_top_txt}</span>'
-        _h += f'<span onclick="gs(\'{grp_id}\',\'r\')" style="font-size:10px;user-select:none;{_sag}">▶</span>'
-        _h += f'<span onclick="gg(\'{grp_id}\')" style="font-size:11px;cursor:pointer;margin-left:2px;">{_giz_ic}</span>'
-        _h += '</div></th>'
+        if _ayar_modu:
+            _sol = "opacity:.25;pointer-events:none;" if _idx==0 else "cursor:pointer;"
+            _sag = "opacity:.25;pointer-events:none;" if _idx>=_n-1 else "cursor:pointer;"
+            _giz_ic = "👁" if grp_id in _grp_gizli else "🙈"
+            _h += f'<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 5px;gap:2px;">'
+            _h += f'<span onclick="gs(\'{grp_id}\',\'l\')" style="font-size:10px;user-select:none;{_sol}">◀</span>'
+            _h += f'<span style="font-size:10px;font-weight:600;color:#374151;">{ikon} {lbl}{_top_txt}</span>'
+            _h += f'<span onclick="gs(\'{grp_id}\',\'r\')" style="font-size:10px;user-select:none;{_sag}">▶</span>'
+            _h += f'<span onclick="gg(\'{grp_id}\')" style="font-size:11px;cursor:pointer;margin-left:2px;">{_giz_ic}</span>'
+            _h += '</div>'
+        else:
+            _h += f'<div style="padding:3px 8px;font-size:10px;font-weight:600;color:#374151;">{ikon} {lbl}{_top_txt}</div>'
+        _h += '</th>'
         return _h
 
     _genel_items = [("📊 Toplam", len(df), "toplam", _toplam_aktif_flag)]
@@ -3120,6 +3125,9 @@ section[data-testid="stSidebar"] { display: none !important; }
 
     _html = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">'
     _html += '<div style="overflow-x:auto;"><table style="border-collapse:collapse;font-family:inherit;font-size:12px;"><thead><tr>'
+    # ⚙️ ayar butonu — ilk hücre
+    _gear_bg = "background:#fef9c3;" if _ayar_modu else "background:#f8fafc;"
+    _html += f'<th rowspan="2" onclick="sf(\'_ayar_toggle\')" style="border:0.5px solid #e2e8f0;padding:4px 6px;cursor:pointer;{_gear_bg}vertical-align:middle;text-align:center;" title="Ayarlar"><span style="font-size:14px;">⚙️</span></th>'
     for _gid in _grp_sira:
         if _gid not in _grp_data: continue
         _ikon,_lbl,_top,_items = _grp_data[_gid]
@@ -3155,6 +3163,11 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
     import json as _rjson
     _qp_grp_gizli = st.query_params.get("_grp_gizli","")
     _qp_grp_sira  = st.query_params.get("_grp_sira","")
+    _qp_rfil2     = st.query_params.get("_rfil","")
+    if _qp_rfil2 == "_ayar_toggle":
+        st.session_state["_rbar_ayar_modu"] = not st.session_state.get("_rbar_ayar_modu", False)
+        st.query_params.clear()
+        st.rerun()
     if _qp_grp_gizli or _qp_grp_sira:
         if _qp_grp_gizli:
             try: st.session_state["_rbar_grp_gizli"] = _rjson.loads(_qp_grp_gizli)
