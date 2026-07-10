@@ -3014,10 +3014,10 @@ section[data-testid="stSidebar"] { display: none !important; }
     _grp2_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["randevu","ilk temas","ziyaret"])]
     _grp3_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["teklif","fiyat"])]
     _grp4_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["deneme","sözleşme","sozlesme","devam"])]
-    _grp5_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["kazanıldı","kazanildi","kaybedildi","negatif"])]
-    # Hiçbir gruba girmeyen aşamaları grp1'e ekle
+    _grp5_asama = [a for a in tum_asama_opts if any(k in a.lower() for k in ["kazanıldı","kazanildi","kaybedildi","devam ediyor"])]
+    # Diğer grubu YOK
     _tum_grp = set(_grp1_asama+_grp2_asama+_grp3_asama+_grp4_asama+_grp5_asama)
-    _grp_diger = [a for a in tum_asama_opts if a not in _tum_grp and str(a).upper() not in ["NONE","NAN",""]]
+
 
     def _asama_sayi(ad):
         if "islem_asamasi" not in df.columns: return 0
@@ -3039,38 +3039,67 @@ section[data-testid="stSidebar"] { display: none !important; }
     _grp4_toplam = sum(_asama_sayi(a) for a in _grp4_asama)
     _grp5_toplam = sum(_asama_sayi(a) for a in _grp5_asama)
 
-    # ── HTML RAPOR SATIRI — senin çizdiğin formatta ──────────────────────────
+    # ── HTML RAPOR SATIRI ─────────────────────────────────────────────────────
     _aktif_fil_durum = st.session_state.get("_cl_fil_durum_multi", [])
     _aktif_fil_asama = st.session_state.get("_cl_fil_asama_multi", [])
     _toplam_aktif_flag = st.session_state.get("_toplam_aktif", False)
+    _grp_gizli = set(st.session_state.get("_rbar_grp_gizli", []))
+    _grp_sira_def = ["genel","iletisim","asama1","asama2","asama3","sonuc"]
+    _grp_sira = list(st.session_state.get("_rbar_grp_sira", _grp_sira_def.copy()))
+    for _gs in _grp_sira_def:
+        if _gs not in _grp_sira: _grp_sira.append(_gs)
 
     def _asama_ikon(a):
-        _ikon_map = {
-            "arama":"📞","tekrar ara":"📲","mesaj":"💬","mail":"📧","e-mail":"📧",
-            "whatsapp":"💬","takip":"📌","randevu":"📅","ilk temas":"👋","ziyaret":"🚗",
-            "teklif":"📄","fiyat":"💰","fiyat hazırla":"💰","deneme":"🧪",
-            "sözleşme":"📝","sozlesme":"📝","devam":"⏳","kazanıldı":"🏆",
-            "kazanildi":"🏆","kaybedildi":"❌","negatif":"👎","gereksiz":"🗑️",
-        }
-        for k,v in _ikon_map.items():
+        _m = {"arama":"📞","tekrar ara":"📲","mesaj":"💬","mail":"📧","e-mail":"📧",
+              "whatsapp":"💬","takip":"📌","randevu":"📅","ilk temas":"👋","ziyaret":"🚗",
+              "teklif":"📄","fiyat":"💰","deneme":"🧪","sözleşme":"📝","sozlesme":"📝",
+              "devam ediyor":"⏳","kazanıldı":"🏆","kazanildi":"🏆","kaybedildi":"❌","negatif":"👎"}
+        for k,v in _m.items():
             if k in a.lower(): return v
         return "🔹"
 
     def _durum_ikon(d):
         return {"Portföy":"📦","Özel Müşteri":"⭐","Aşamasız":"📋","Toplam":"📊"}.get(d,"🔹")
 
+    def _asama_sayi(ad):
+        if "islem_asamasi" not in df.columns: return 0
+        return len(df[df["islem_asamasi"]==ad])
+
+    def _durum_sayi(ad):
+        if ad == "Toplam": return len(df)
+        if "durum" not in df.columns: return 0
+        return len(df[df["durum"]==ad])
+
+    def _asamasiz_sayi():
+        if "islem_asamasi" not in df.columns: return 0
+        return len(df[df["islem_asamasi"].isna() | ~df["islem_asamasi"].isin(_tum_grp)])
+
+    _grp1_toplam = sum(_asama_sayi(a) for a in _grp1_asama)
+    _grp2_toplam = sum(_asama_sayi(a) for a in _grp2_asama)
+    _grp3_toplam = sum(_asama_sayi(a) for a in _grp3_asama)
+    _grp4_toplam = sum(_asama_sayi(a) for a in _grp4_asama)
+    _grp5_toplam = sum(_asama_sayi(a) for a in _grp5_asama)
+
     def _td(lbl, sayi, key, aktif):
         _bg = "background:#dbeafe;" if aktif else "background:#fff;"
         _tc = "color:#1d4ed8;font-weight:600;" if aktif else "color:#0f172a;"
-        _lc = "color:#3b82f6;" if aktif else "color:#64748b;"
-        return (f'<td onclick="sf(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:4px 9px;'
-                f'text-align:center;cursor:pointer;white-space:nowrap;{_bg}vertical-align:middle;">'
+        return (f'<td onclick="sf(\'{key}\')" style="border:0.5px solid #e2e8f0;padding:5px 10px;text-align:center;cursor:pointer;white-space:nowrap;{_bg}vertical-align:middle;">' +
                 f'<span style="font-size:12px;font-weight:500;{_tc}">{sayi} {lbl}</span></td>')
 
-    def _th(lbl, span):
-        return (f'<th colspan="{span}" style="border:0.5px solid #e2e8f0;padding:2px 6px;'
-                f'text-align:center;font-size:9px;color:#64748b;background:#f8fafc;'
-                f'font-weight:500;white-space:nowrap;">{lbl}</th>')
+    def _th_grp(ikon, lbl, toplam, grp_id, span):
+        _idx = _grp_sira.index(grp_id) if grp_id in _grp_sira else 0
+        _n = len([g for g in _grp_sira if g in _grp_data and _grp_data[g][3]])
+        _sol = "opacity:.25;pointer-events:none;" if _idx==0 else "cursor:pointer;"
+        _sag = "opacity:.25;pointer-events:none;" if _idx>=_n-1 else "cursor:pointer;"
+        _giz_ic = "👁" if grp_id in _grp_gizli else "🙈"
+        _top_txt = f" · {toplam}" if toplam is not None else ""
+        return (f'<th colspan="{span}" style="border:0.5px solid #e2e8f0;padding:0;text-align:center;background:#f8fafc;white-space:nowrap;">' +
+                f'<div style="display:flex;align-items:center;justify-content:space-between;padding:2px 5px;gap:2px;">' +
+                f'<span onclick="gs(\'{grp_id}\','l')" style="font-size:10px;user-select:none;{_sol}">◀</span>' +
+                f'<span style="font-size:10px;font-weight:600;color:#374151;">{ikon} {lbl}{_top_txt}</span>' +
+                f'<span onclick="gs(\'{grp_id}\','r')" style="font-size:10px;user-select:none;{_sag}">▶</span>' +
+                f'<span onclick="gg(\'{grp_id}\')" style="font-size:11px;cursor:pointer;margin-left:2px;">{_giz_ic}</span>' +
+                '</div></th>')
 
     _genel_items = [("📊 Toplam", len(df), "toplam", _toplam_aktif_flag)]
     for _dn in tum_durum_opts:
@@ -3078,48 +3107,63 @@ section[data-testid="stSidebar"] { display: none !important; }
         _genel_items.append((f"{_durum_ikon(_dn)} {_dn}", _durum_sayi(_dn), f"durum_{_dn}", _dn in _aktif_fil_durum))
     _genel_items.append(("📋 Aşamasız", _asamasiz_sayi(), "asamasiz", st.session_state.get("_asamasiz_aktif",False)))
 
-    _iletisim_items = [(f"{_asama_ikon(a)} {a}", _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp1_asama if _asama_sayi(a) >= 0]
-    _asama1_items   = [(f"{_asama_ikon(a)} {a}", _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp2_asama]
-    _asama2_items   = [(f"{_asama_ikon(a)} {a}", _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp3_asama]
-    _asama3_items   = [(f"{_asama_ikon(a)} {a}", _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp4_asama]
-    _sonuc_items    = [(f"{_asama_ikon(a)} {a}", _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp5_asama]
-    _diger_items    = [(f"{_asama_ikon(a)} {a}", _asama_sayi(a), f"asama_{a}", a in _aktif_fil_asama) for a in _grp_diger]
+    _grp_data = {
+        "genel":    ("📊","Genel",    None,        _genel_items),
+        "iletisim": ("📞","Aşama",    _grp1_toplam,[(f"{_asama_ikon(a)} {a}",_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama) for a in _grp1_asama]),
+        "asama1":   ("📅","1. Aşama", _grp2_toplam,[(f"{_asama_ikon(a)} {a}",_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama) for a in _grp2_asama]),
+        "asama2":   ("📄","2. Aşama", _grp3_toplam,[(f"{_asama_ikon(a)} {a}",_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama) for a in _grp3_asama]),
+        "asama3":   ("🧪","3. Aşama", _grp4_toplam,[(f"{_asama_ikon(a)} {a}",_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama) for a in _grp4_asama]),
+        "sonuc":    ("🏆","Sonuç",    _grp5_toplam,[(f"{_asama_ikon(a)} {a}",_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama) for a in _grp5_asama]),
+    }
 
     _html = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">'
-    _html += '<div style="overflow-x:auto;"><table style="border-collapse:collapse;font-family:inherit;font-size:13px;"><thead><tr>'
-
-    _html += _th("⚙️ Genel", len(_genel_items))
-    if _iletisim_items: _html += _th(f"📞 Aşama {_grp1_toplam}", len(_iletisim_items))
-    if _asama1_items:   _html += _th(f"📅 1. Aşama {_grp2_toplam}", len(_asama1_items))
-    if _asama2_items:   _html += _th(f"📄 2. Aşama {_grp3_toplam}", len(_asama2_items))
-    if _asama3_items:   _html += _th(f"🧪 3. Aşama {_grp4_toplam}", len(_asama3_items))
-    if _sonuc_items:    _html += _th(f"🏆 {_grp5_toplam} Sonuç", len(_sonuc_items))
-    if _diger_items:    _html += _th("🔹 Diğer", len(_diger_items))
-    _html += _th("", 1)
-
-    _html += "</tr></thead><tbody><tr>"
-    for lbl,sayi,key,aktif in _genel_items:  _html += _td(lbl,sayi,key,aktif)
-    if _iletisim_items:
-        for lbl,sayi,key,aktif in _iletisim_items: _html += _td(lbl,sayi,key,aktif)
-    if _asama1_items:
-        for lbl,sayi,key,aktif in _asama1_items: _html += _td(lbl,sayi,key,aktif)
-    if _asama2_items:
-        for lbl,sayi,key,aktif in _asama2_items: _html += _td(lbl,sayi,key,aktif)
-    if _asama3_items:
-        for lbl,sayi,key,aktif in _asama3_items: _html += _td(lbl,sayi,key,aktif)
-    if _sonuc_items:
-        for lbl,sayi,key,aktif in _sonuc_items: _html += _td(lbl,sayi,key,aktif)
-    if _diger_items:
-        for lbl,sayi,key,aktif in _diger_items: _html += _td(lbl,sayi,key,aktif)
-
+    _html += '<div style="overflow-x:auto;"><table style="border-collapse:collapse;font-family:inherit;font-size:12px;"><thead><tr>'
+    for _gid in _grp_sira:
+        if _gid not in _grp_data: continue
+        _ikon,_lbl,_top,_items = _grp_data[_gid]
+        if not _items: continue
+        _span = 1 if _gid in _grp_gizli else len(_items)
+        _html += _th_grp(_ikon,_lbl,_top,_gid,_span)
+    _html += '<th style="border:0.5px solid #e2e8f0;padding:2px 4px;background:#f8fafc;"></th>'
+    _html += '</tr></thead><tbody><tr>'
+    for _gid in _grp_sira:
+        if _gid not in _grp_data: continue
+        _ikon,_lbl,_top,_items = _grp_data[_gid]
+        if not _items: continue
+        if _gid in _grp_gizli:
+            _html += (f'<td onclick="gg(\'{_gid}\')" style="border:0.5px solid #e2e8f0;padding:4px 8px;' +
+                      'text-align:center;background:#f8fafc;color:#94a3b8;font-size:11px;cursor:pointer;">···</td>')
+        else:
+            for lbl,sayi,key,aktif in _items:
+                _html += _td(lbl,sayi,key,aktif)
     _cl_view2 = st.session_state.get("_cl_view","liste")
     _kb_bg = "background:#dbeafe;" if _cl_view2=="kanban" else "background:#fff;"
-    _html += f'<td onclick="sf(\'kanban\')" style="border:0.5px solid #e2e8f0;padding:4px 9px;text-align:center;cursor:pointer;{_kb_bg}"><i class="ti ti-layout-kanban" style="font-size:16px;color:#64748b;"></i></td>'
+    _html += (f'<td onclick="sf('kanban')" style="border:0.5px solid #e2e8f0;padding:4px 9px;' +
+              f'text-align:center;cursor:pointer;{_kb_bg}">' +
+              '<i class="ti ti-layout-kanban" style="font-size:16px;color:#64748b;"></i></td>')
     _html += '</tr></tbody></table></div>'
-    _html += '<script>function sf(k){var u=new URL(window.parent.location.href);u.searchParams.set("_rfil",k);window.parent.location.replace(u.toString());}</script>'
-
+    import json as _rjson2
+    _sira_js = _rjson2.dumps(_grp_sira)
+    _html += f"""<script>
+var _s={_sira_js};
+function sf(k){{var u=new URL(window.parent.location.href);u.searchParams.set("_rfil",k);window.parent.location.replace(u.toString());}}
+function gg(id){{var u=new URL(window.parent.location.href);var g=JSON.parse(u.searchParams.get("_grp_gizli")||"[]");if(g.includes(id))g=g.filter(x=>x!==id);else g.push(id);u.searchParams.set("_grp_gizli",JSON.stringify(g));window.parent.location.replace(u.toString());}}
+function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse(u.searchParams.get("_grp_sira")||JSON.stringify(_s));var i=s.indexOf(id);if(dir==="l"&&i>0){{var t=s[i-1];s[i-1]=s[i];s[i]=t;}}else if(dir==="r"&&i<s.length-1){{var t=s[i+1];s[i+1]=s[i];s[i]=t;}}u.searchParams.set("_grp_sira",JSON.stringify(s));window.parent.location.replace(u.toString());}}
+</script>"""
     st.markdown(_html, unsafe_allow_html=True)
 
+    import json as _rjson
+    _qp_grp_gizli = st.query_params.get("_grp_gizli","")
+    _qp_grp_sira  = st.query_params.get("_grp_sira","")
+    if _qp_grp_gizli or _qp_grp_sira:
+        if _qp_grp_gizli:
+            try: st.session_state["_rbar_grp_gizli"] = _rjson.loads(_qp_grp_gizli)
+            except: pass
+        if _qp_grp_sira:
+            try: st.session_state["_rbar_grp_sira"] = _rjson.loads(_qp_grp_sira)
+            except: pass
+        st.query_params.clear()
+        st.rerun()
 
     # Query param'dan filtre oku
     _qp_rfil = st.query_params.get("_rfil", "")
