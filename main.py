@@ -3974,11 +3974,11 @@ function kartSec(id){
     # ── KOLON AYARLARI ──────────────────────────────────────────────────────────
     # ── KOLON GENİŞLİKLERİ — DB'den oku ─────────────────────────────────────
     _KOL_VARSAYILAN = {
-        "firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
-        "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
-        "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50,
-        "beklenen_ciro":80,"gerceklesen_ciro":80,"✅ Analiz":80,
-        "asama1":100,"asama2":100,"asama3":100,"sonuc":100
+        "firma":90,"yetkili":90,"gsm":100,"sabit":90,"email":90,
+        "adres":110,"il":70,"ilce":60,"durum":80,"temsilci":80,
+        "islem_asamasi":80,"aciklama":110,"📅 Son Randevu":170,"📨 Notlar":50,"id":40,
+        "beklenen_ciro":70,"gerceklesen_ciro":70,"✅ Analiz":70,
+        "asama1":90,"asama2":90,"asama3":90,"sonuc":90
     }
     # Gizli kolonları DB'den yükle
     if "_kol_genislik_init" not in st.session_state:
@@ -8918,9 +8918,9 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
                     _tum_asama_r.append(str(_da))
 
         _KOL_VARSAYILAN_R = {
-            "id":50,"firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
-            "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
-            "islem_asamasi":90,"beklenen_ciro":80,"gerceklesen_ciro":80,
+            "id":40,"firma":90,"yetkili":90,"gsm":100,"sabit":90,"email":90,
+            "adres":110,"il":70,"ilce":60,"durum":80,"temsilci":80,
+            "islem_asamasi":80,"beklenen_ciro":70,"gerceklesen_ciro":70,
         }
         _KG_R = st.session_state.get("_kol_genislik", _KOL_VARSAYILAN_R)
         def _w(k):
