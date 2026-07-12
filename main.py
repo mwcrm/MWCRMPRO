@@ -2324,8 +2324,9 @@ if aktif == "yeni":
     asama    = r2c6.selectbox("İşlem Aşaması", _asama_base, index=asama_idx, key=f"yeni_asama_dis_{_form_id}")
 
     with st.form("yeni_kart_form"):
-        # ── SATIR 1: Firma, Yetkili, GSM, Sabit Tel, E-Mail ─────────────────
-        r1c1,r1c2,r1c3,r1c4,r1c5 = st.columns(5)
+        # ── SATIR 1: Rakip Firma, Firma, Yetkili, GSM, Sabit Tel, E-Mail ─────
+        r1c0,r1c1,r1c2,r1c3,r1c4,r1c5 = st.columns(6)
+        rakip_firma = r1c0.text_input("Rakip Firma", value=duzenle.get("rakip_firma","") if duzenle else "", placeholder="Rakip firma adı", key=f"yeni_rakip_{_form_id}")
         firma   = r1c1.text_input("Firma Adı *", value=duzenle.get("firma","") if duzenle else "", placeholder="Firma adı", key=f"yeni_firma_{_form_id}")
         yetkili = r1c2.text_input("Yetkili",     value=duzenle.get("yetkili","") if duzenle else "", placeholder="Ad Soyad", key=f"yeni_yetkili_{_form_id}")
         gsm     = r1c3.text_input("GSM",         value=fmt_tel(duzenle.get("gsm","")) if duzenle else "", placeholder="05xx xxx xx xx", key=f"yeni_gsm_{_form_id}")
@@ -2369,7 +2370,7 @@ if aktif == "yeni":
                 st.warning("Firma adı boş bırakılamaz!")
             elif duzenle:
                 ok = db_update("cari_kartlar", {
-                    "firma": firma, "yetkili": yetkili, "gsm": gsm,
+                    "firma": firma, "rakip_firma": rakip_firma, "yetkili": yetkili, "gsm": gsm,
                     "sabit": sabit, "email": email, "adres": adres,
                     "ilce": _ilce_kayit, "il": _il_kayit, "durum": _durum_kayit,
                     "temsilci": _tem_kayit, "islem_asamasi": _asama_kayit,
@@ -2385,7 +2386,7 @@ if aktif == "yeni":
             else:
                 ok = db_insert("cari_kartlar", {
                     "tarih": datetime.now().isoformat(),
-                    "firma": firma, "yetkili": yetkili, "gsm": gsm,
+                    "firma": firma, "rakip_firma": rakip_firma, "yetkili": yetkili, "gsm": gsm,
                     "sabit": sabit, "email": email, "adres": adres,
                     "ilce": _ilce_kayit, "il": _il_kayit, "durum": _durum_kayit,
                     "temsilci": _tem_kayit, "islem_asamasi": _asama_kayit,
@@ -2428,7 +2429,7 @@ elif aktif == "mukerrer":
             st.caption("Hücrelere tıklayıp elle düzenleyin, \"💾 Kaydet\" ile kaydedin. "
                        "Silmek istediklerinizi \"Seç\" kutusuyla işaretleyip \"🗑️ Seçilenleri Sil\"e basın.")
 
-            _mk_kolonlar = [c for c in ["id","firma","yetkili","gsm","sabit","email","il","ilce",
+            _mk_kolonlar = [c for c in ["id","rakip_firma","firma","yetkili","gsm","sabit","email","il","ilce",
                                          "durum","islem_asamasi","beklenen_ciro","gerceklesen_ciro"]
                              if c in _mk_df.columns]
             _mk_tablo = _mk_df[_mk_df["id"].astype(int).isin(_mk_tum_idler)][_mk_kolonlar].copy()
@@ -2469,7 +2470,7 @@ elif aktif == "mukerrer":
             # Kolon genişlik ayarlarını (Kolon Ayarları panelinde kaydedilen) burada da uygula
             _mk_KG = st.session_state.get("_kol_genislik", {})
             _mk_VARSAYILAN = {
-                "firma":90,"yetkili":90,"gsm":100,"sabit":90,"email":90,
+                "firma":90,"rakip_firma":90,"yetkili":90,"gsm":100,"sabit":90,"email":90,
                 "il":70,"ilce":60,"durum":80,"islem_asamasi":80,
                 "beklenen_ciro":70,"gerceklesen_ciro":70,
                 "id":40,"Seç":40,"Notlar":50,"Randevu":170,"Analiz":70,
@@ -2480,6 +2481,7 @@ elif aktif == "mukerrer":
             _mk_col_config = {
                 "Seç": st.column_config.CheckboxColumn("Seç", default=False, width=_mk_w("Seç")),
                 "id": st.column_config.NumberColumn("ID", disabled=True, width=_mk_w("id")),
+                "rakip_firma": st.column_config.TextColumn("Rakip Firma", width=_mk_w("rakip_firma")),
                 "firma": st.column_config.TextColumn("Firma", width=_mk_w("firma")),
                 "yetkili": st.column_config.TextColumn("Yetkili", width=_mk_w("yetkili")),
                 "gsm": st.column_config.TextColumn("GSM", width=_mk_w("gsm")),
@@ -3985,7 +3987,7 @@ function kartSec(id){
     # ── KOLON AYARLARI ──────────────────────────────────────────────────────────
     # ── KOLON GENİŞLİKLERİ — DB'den oku ─────────────────────────────────────
     _KOL_VARSAYILAN = {
-        "firma":90,"yetkili":90,"gsm":100,"sabit":90,"email":90,
+        "firma":90,"rakip_firma":90,"yetkili":90,"gsm":100,"sabit":90,"email":90,
         "adres":110,"il":70,"ilce":60,"durum":80,"temsilci":80,
         "islem_asamasi":80,"aciklama":110,"📅 Son Randevu":170,"📨 Notlar":50,"id":40,
         "beklenen_ciro":70,"gerceklesen_ciro":70,"✅ Analiz":70,
@@ -4042,6 +4044,7 @@ function kartSec(id){
         "olusturan": None, "silindi": None,
         "beklenen_ciro":    st.column_config.NumberColumn("Hedef ₺",  format="%,.0f ₺", width=_w("beklenen_ciro")),
         "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width=_w("gerceklesen_ciro")),
+        "rakip_firma":   st.column_config.TextColumn("Rakip Firma", width=_w("rakip_firma")),
         "firma":         st.column_config.TextColumn("Firma",     width=_w("firma")),
         "yetkili":       st.column_config.TextColumn("Yetkili",   width=_w("yetkili")),
         "gsm":           st.column_config.TextColumn("GSM",       width=_w("gsm")),
@@ -4067,12 +4070,12 @@ function kartSec(id){
     # Sütun sırası — sizin verdiğiniz şablonla birebir: Seç, İşlem Tarih, Id, Firma, Yetkili,
     # Gsm, S.Tel, E-Mail, Adres, İlçe, İl, Hedef(+Gerçek), Durum, Analiz, Aşama, 1-2-3.Aşama,
     # Açıklama, Notlar, Son Randevu, Teklif, Mesaj, Sonuç. Temsilci silinmedi, en sona eklendi.
-    col_order = ["Seç","tarih","id","firma","yetkili","gsm","sabit","email","adres","ilce","il",
+    col_order = ["Seç","tarih","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
                  "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","islem_asamasi",
                  "asama1","asama2","asama3","aciklama","📨 Notlar","📅 Son Randevu",
                  "🧾 Teklif","💬 Mesaj","sonuc","temsilci"]
     # Gizli kolonları çıkar
-    _kol_gizli_map = {"firma":"firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email",
+    _kol_gizli_map = {"firma":"firma","rakip_firma":"rakip_firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email",
                       "adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci",
                       "islem_asamasi":"islem_asamasi","aciklama":"aciklama","tarih":"tarih",
                       "📅 Son Randevu":"📅 Son Randevu","📨 Notlar":"📨 Notlar","id":"id",
@@ -4091,6 +4094,10 @@ function kartSec(id){
     if "aciklama" not in df_edit.columns:
         df_edit["aciklama"] = ""
     df_edit["aciklama"] = df_edit["aciklama"].fillna("").astype(str).replace("nan","")
+    # rakip_firma kolonu kesinlikle olsun
+    if "rakip_firma" not in df_edit.columns:
+        df_edit["rakip_firma"] = ""
+    df_edit["rakip_firma"] = df_edit["rakip_firma"].fillna("").astype(str).replace("nan","")
 
     # Son randevu bilgisini ekle (tarih + saat + bölge) — normalize edilmiş eşleştirme
     try:
@@ -5309,14 +5316,14 @@ function updateBot(v){{
         st.markdown("### 📐 Cari Liste Kolon Ayarları")
         st.caption("Genişlik ayarlayın, gizlemek istediklerinizi kapatın → Kaydet")
         _KOL_VARS_UI = {
-            "firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
+            "firma":100,"rakip_firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
             "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
             "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50,
             "asama1":100,"asama2":100,"asama3":100,"sonuc":100,
             "beklenen_ciro":80,"gerceklesen_ciro":80,"✅ Analiz":80
         }
         _KG_UI_ETIKET = {
-            "firma":"Firma","yetkili":"Yetkili","gsm":"GSM","sabit":"S.Tel",
+            "firma":"Firma","rakip_firma":"Rakip Firma","yetkili":"Yetkili","gsm":"GSM","sabit":"S.Tel",
             "email":"Email","adres":"Adres","il":"İl","ilce":"İlçe",
             "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"Aşama",
             "aciklama":"Açıklama","📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID",
@@ -8929,13 +8936,16 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
 
         _tum_asama_r = _tanimlar_yukle("asama")
         _tum_durum_r = _tanimlar_yukle("durum")
+        if "rakip_firma" not in _df_as.columns:
+            _df_as["rakip_firma"] = ""
+        _df_as["rakip_firma"] = _df_as["rakip_firma"].fillna("").astype(str).replace("nan","")
         if not _df_as.empty and "islem_asamasi" in _df_as.columns:
             for _da in _df_as["islem_asamasi"].dropna().unique():
                 if str(_da).strip() and str(_da) not in ["nan",""] and _da not in _tum_asama_r:
                     _tum_asama_r.append(str(_da))
 
         _KOL_VARSAYILAN_R = {
-            "id":40,"firma":90,"yetkili":90,"gsm":100,"sabit":90,"email":90,
+            "id":40,"firma":90,"rakip_firma":90,"yetkili":90,"gsm":100,"sabit":90,"email":90,
             "adres":110,"il":70,"ilce":60,"durum":80,"temsilci":80,
             "islem_asamasi":80,"beklenen_ciro":70,"gerceklesen_ciro":70,
         }
@@ -8949,6 +8959,7 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
             "tarih":         None, "olusturan": None, "silindi": None,
             "beklenen_ciro": st.column_config.NumberColumn("Hedef ₺", format="%,.0f ₺", width=_w("beklenen_ciro")),
             "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width=_w("gerceklesen_ciro")),
+            "rakip_firma":   st.column_config.TextColumn("Rakip Firma", width=_w("rakip_firma")),
             "firma":         st.column_config.TextColumn("Firma",    width=_w("firma")),
             "yetkili":       st.column_config.TextColumn("Yetkili",  width=_w("yetkili")),
             "gsm":           st.column_config.TextColumn("GSM",      width=_w("gsm")),
@@ -8965,8 +8976,8 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
             "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
         }
         # Gizli kolonları col_order'dan çıkar
-        _col_order_r = ["Seç","id","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","aciklama","beklenen_ciro","gerceklesen_ciro","📅 Son Randevu","📨 Notlar"]
-        _kol_gizli_map_r = {"firma":"firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email","adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci","islem_asamasi":"islem_asamasi","aciklama":"aciklama",
+        _col_order_r = ["Seç","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","il","ilce","durum","temsilci","islem_asamasi","aciklama","beklenen_ciro","gerceklesen_ciro","📅 Son Randevu","📨 Notlar"]
+        _kol_gizli_map_r = {"firma":"firma","rakip_firma":"rakip_firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email","adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci","islem_asamasi":"islem_asamasi","aciklama":"aciklama",
                             "📅 Son Randevu":"📅 Son Randevu","📨 Notlar":"📨 Notlar","id":"id",
                             "beklenen_ciro":"beklenen_ciro","gerceklesen_ciro":"gerceklesen_ciro"}
         _GIZLI_KOLONLAR = set(st.session_state.get("_kol_gizli", []))
