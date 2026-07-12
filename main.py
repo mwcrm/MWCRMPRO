@@ -5357,7 +5357,7 @@ function updateBot(v){{
                 # Slider — gizliyse devre dışı
                 _yeni_kg_ui[_k] = st.slider(
                     f"{'~~' if _gizli_mi else ''}{_etiket}",
-                    min_value=20, max_value=400,
+                    min_value=10, max_value=400,
                     value=int(_kg_ui_mevcut.get(_k, _KOL_VARS_UI.get(_k,100))),
                     step=10, key=f"ui_kg_{_k}",
                     disabled=_gizli_mi
