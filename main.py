@@ -2466,23 +2466,34 @@ elif aktif == "mukerrer":
 
             _mk_tablo.insert(0, "Seç", False)
 
+            # Kolon genişlik ayarlarını (Kolon Ayarları panelinde kaydedilen) burada da uygula
+            _mk_KG = st.session_state.get("_kol_genislik", {})
+            _mk_VARSAYILAN = {
+                "firma":90,"yetkili":90,"gsm":100,"sabit":90,"email":90,
+                "il":70,"ilce":60,"durum":80,"islem_asamasi":80,
+                "beklenen_ciro":70,"gerceklesen_ciro":70,
+                "id":40,"Seç":40,"Notlar":50,"Randevu":170,"Analiz":70,
+            }
+            def _mk_w(k):
+                return int(_mk_KG.get(k, _mk_VARSAYILAN.get(k, 100)))
+
             _mk_col_config = {
-                "Seç": st.column_config.CheckboxColumn("Seç", default=False, width="small"),
-                "id": st.column_config.NumberColumn("ID", disabled=True, width="small"),
-                "firma": st.column_config.TextColumn("Firma", width="medium"),
-                "yetkili": st.column_config.TextColumn("Yetkili", width="medium"),
-                "gsm": st.column_config.TextColumn("GSM", width="medium"),
-                "sabit": st.column_config.TextColumn("Sabit", width="medium"),
-                "email": st.column_config.TextColumn("Email", width="medium"),
-                "il": st.column_config.TextColumn("İl", width="small"),
-                "ilce": st.column_config.TextColumn("İlçe", width="small"),
-                "durum": st.column_config.TextColumn("Durum", width="small"),
-                "islem_asamasi": st.column_config.TextColumn("Aşama", width="small"),
-                "beklenen_ciro": st.column_config.NumberColumn("Hedef ₺", format="%,.0f ₺", width="small"),
-                "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width="small"),
-                "Notlar": st.column_config.NumberColumn("📨 Notlar", disabled=True, width="small"),
-                "Randevu": st.column_config.NumberColumn("📅 Randevu", disabled=True, width="small"),
-                "Analiz": st.column_config.TextColumn("✅ Analiz", disabled=True, width="small"),
+                "Seç": st.column_config.CheckboxColumn("Seç", default=False, width=_mk_w("Seç")),
+                "id": st.column_config.NumberColumn("ID", disabled=True, width=_mk_w("id")),
+                "firma": st.column_config.TextColumn("Firma", width=_mk_w("firma")),
+                "yetkili": st.column_config.TextColumn("Yetkili", width=_mk_w("yetkili")),
+                "gsm": st.column_config.TextColumn("GSM", width=_mk_w("gsm")),
+                "sabit": st.column_config.TextColumn("Sabit", width=_mk_w("sabit")),
+                "email": st.column_config.TextColumn("Email", width=_mk_w("email")),
+                "il": st.column_config.TextColumn("İl", width=_mk_w("il")),
+                "ilce": st.column_config.TextColumn("İlçe", width=_mk_w("ilce")),
+                "durum": st.column_config.TextColumn("Durum", width=_mk_w("durum")),
+                "islem_asamasi": st.column_config.TextColumn("Aşama", width=_mk_w("islem_asamasi")),
+                "beklenen_ciro": st.column_config.NumberColumn("Hedef ₺", format="%,.0f ₺", width=_mk_w("beklenen_ciro")),
+                "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width=_mk_w("gerceklesen_ciro")),
+                "Notlar": st.column_config.NumberColumn("📨 Notlar", disabled=True, width=_mk_w("Notlar")),
+                "Randevu": st.column_config.NumberColumn("📅 Randevu", disabled=True, width=_mk_w("Randevu")),
+                "Analiz": st.column_config.TextColumn("✅ Analiz", disabled=True, width=_mk_w("Analiz")),
             }
 
             _mk_edited = st.data_editor(
@@ -4009,10 +4020,9 @@ function kartSec(id){
     _GIZLI_KOLONLAR = set(st.session_state.get("_kol_gizli", []))
 
     def _w(k):
-        px = int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100)))
-        if px <= 80:    return "small"
-        elif px <= 150: return "medium"
-        else:           return "large"
+        # Gerçek piksel genişliği kullan — small/medium/large'a yuvarlarsak
+        # 10 ile 79 arası tüm değerler görsel olarak aynı görünüyordu
+        return int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100)))
 
     # Asama1/2/3 sabit seçenek listeleri — mevcut veride bu listede olmayan bir
     # değer varsa açılır kutu bozulmasın diye otomatik listeye eklenir.
@@ -5364,6 +5374,13 @@ function updateBot(v){{
                 )
                 if _gizli_mi:
                     _yeni_gizli_ui.append(_k)
+
+        # Canlı önizleme: Kaydet'e basmadan slider'ı hareket ettirir ettirmez
+        # ana listedeki tablo hemen bu genişlikleri kullanır (henüz DB'ye yazılmaz,
+        # sayfayı/oturumu tamamen kapatıp açarsan Kaydet basılmayan değişiklik kaybolur)
+        st.session_state["_kol_genislik"] = {**st.session_state.get("_kol_genislik", {}), **_yeni_kg_ui}
+        st.session_state["_kol_genislik_init"] = True  # liste sayfası DB'den tekrar çekip ezmesin
+        st.caption("👆 Değerler anında canlı önizlenir. Kalıcı olması (herkeste, her oturumda) için **Kaydet**'e basın.")
 
         if st.button("💾 Kaydet", type="primary", key="ui_kg_kaydet"):
             try:
@@ -8924,10 +8941,7 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
         }
         _KG_R = st.session_state.get("_kol_genislik", _KOL_VARSAYILAN_R)
         def _w(k):
-            px = int(_KG_R.get(k, _KOL_VARSAYILAN_R.get(k, 100)))
-            if px <= 80:    return "small"
-            elif px <= 150: return "medium"
-            else:           return "large"
+            return int(_KG_R.get(k, _KOL_VARSAYILAN_R.get(k, 100)))
 
         _col_config_r = {
             "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
