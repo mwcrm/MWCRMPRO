@@ -1435,7 +1435,7 @@ def _notlar_yukle(cari_id):
 @st.dialog("📋 Notlar & Randevu", width="large")
 def not_dialog(cari_id, firma_adi=""):
     """Ekran ortasında açılan not + randevu + silme + düzenleme penceresi"""
-    _tab_not, _tab_rdv, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
+    _tab_not, _tab_rdv, _tab_teklif, _tab_analiz, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "⭐ Özel Teklif", "🔍 Analiz", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
     with _tab_not:
         not_paneli(cari_id, firma_adi, key_prefix="dlg")
     with _tab_rdv:
@@ -1463,6 +1463,18 @@ def not_dialog(cari_id, firma_adi=""):
                     st.cache_data.clear()
             except Exception as _re:
                 st.error(f"Hata: {_re}")
+    with _tab_teklif:
+        st.caption(f"**{firma_adi}** için özel teklif oluştur — müşteri otomatik seçili şekilde Özel Teklif sayfası açılır.")
+        if st.button("⭐ Özel Teklif Sayfasını Aç", key=f"dlg_ozel_teklif_{cari_id}", type="primary", use_container_width=True):
+            st.session_state["aktif_tab"] = "ozel_teklif"
+            st.session_state["teklif_musteri_onsel"] = firma_adi
+            st.rerun()
+    with _tab_analiz:
+        st.caption(f"**{firma_adi}** için analiz yap/düzenle — müşteri otomatik seçili şekilde Analiz sayfası açılır.")
+        if st.button("🔍 Analiz Sayfasını Aç", key=f"dlg_analiz_{cari_id}", type="primary", use_container_width=True):
+            st.session_state["aktif_tab"] = "analiz"
+            st.session_state["an_cari_sec"] = f"[{int(cari_id)}] {firma_adi}"
+            st.rerun()
     with _tab_duz:
         st.caption(f"**{firma_adi}** — kayıtlı tüm bilgilerle eksiksiz düzenleme ekranı açılır.")
         if st.button("✏️ Cari Kartı Düzenle", key=f"dlg_cari_duzenle_{cari_id}", type="primary", use_container_width=True):
