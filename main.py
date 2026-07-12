@@ -10212,7 +10212,7 @@ elif aktif == "patron":
             _sk_tanimsiz_durum = _p_cari[(_sk_durum_deger != "") & (~_sk_durum_deger.isin(_sk_gecerli_durumlar)) & (~_sk_durum_deger.isin(["nan","None"]))]
             if not _sk_tanimsiz_durum.empty:
                 _sk_sorun_sayisi += 1
-                _sk_liste_ornek = ", ".join(sorted(_sk_tanimsiz_durum["durum"].astype(str).unique())[:5])
+                _sk_liste_ornek = ", ".join(sorted(_sk_tanimsiz_durum["durum"].dropna().astype(str).unique())[:5])
                 st.warning(f"⚠️ **Tanımlı olmayan Durum değeri kullanan kayıt:** {len(_sk_tanimsiz_durum)} adet — örnek değerler: {_sk_liste_ornek}")
                 _sk_listede_goster(_sk_tanimsiz_durum["id"].tolist(), "sk_tanimsizdurum")
 
@@ -10223,7 +10223,7 @@ elif aktif == "patron":
             _sk_tanimsiz_asama = _p_cari[(_sk_asama_deger != "") & (~_sk_asama_deger.isin(_sk_gecerli_asama)) & (~_sk_asama_deger.isin(["nan","None"]))]
             if not _sk_tanimsiz_asama.empty:
                 _sk_sorun_sayisi += 1
-                _sk_liste_ornek2 = ", ".join(sorted(_sk_tanimsiz_asama["islem_asamasi"].astype(str).unique())[:5])
+                _sk_liste_ornek2 = ", ".join(sorted(_sk_tanimsiz_asama["islem_asamasi"].dropna().astype(str).unique())[:5])
                 st.warning(f"⚠️ **Tanımlı olmayan Süreç/Aşama değeri kullanan kayıt:** {len(_sk_tanimsiz_asama)} adet — örnek değerler: {_sk_liste_ornek2}")
                 _sk_listede_goster(_sk_tanimsiz_asama["id"].tolist(), "sk_tanimsizasama")
 
