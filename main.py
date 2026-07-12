@@ -3551,7 +3551,7 @@ function kartSec(id){
             st.session_state.pop("kart_sec_reset", None)
             st.session_state.pop("kart_sec", None)
 
-        _fc = st.columns([2, 1.5, 1.2, 1.2, 1.2, 1.6, 0.8, 2])
+        _fc = st.columns([2, 1.5, 1.2, 1.2, 1.6, 0.8, 2])
 
         secili_kart_inline = _fc[0].selectbox("m", kart_opts_inline, key="kart_sec_inline", label_visibility="collapsed")
         ara_txt = _fc[1].text_input("a", placeholder="🔍 Firma, yetkili, il...", key="ara_liste", label_visibility="collapsed")
@@ -3575,30 +3575,25 @@ function kartSec(id){
 
         filtre_seg = "Tümü"
 
-        _ara_islem_opts = sorted(df["ara_islem"].dropna().astype(str).unique().tolist()) if "ara_islem" in df.columns else []
-        _ara_islem_opts = [x for x in _ara_islem_opts if x.strip() not in ["nan","None",""]]
-        _ara_islem_def  = [x for x in st.session_state.get("_cl_fil_ara_islem_multi",[]) if x in _ara_islem_opts]
-        _ara_islem_sec  = _fc[4].multiselect("araislem", _ara_islem_opts, default=_ara_islem_def, key="_cl_fil_ara_islem_multi", placeholder="Ara İşlem...", label_visibility="collapsed")
-
         _il_opts = sorted(df["il"].dropna().astype(str).unique().tolist()) if "il" in df.columns else []
         _il_def  = [x for x in st.session_state.get("_cl_fil_il_multi",[]) if x in _il_opts]
-        _il_sec  = _fc[5].multiselect("i", _il_opts, default=_il_def, key="_cl_fil_il_multi", placeholder="İl...", label_visibility="collapsed")
+        _il_sec  = _fc[4].multiselect("i", _il_opts, default=_il_def, key="_cl_fil_il_multi", placeholder="İl...", label_visibility="collapsed")
 
         _ilce_opts = sorted((df[df["il"].astype(str).isin(_il_sec)] if _il_sec else df)["ilce"].dropna().astype(str).unique().tolist()) if "ilce" in df.columns else []
         _ilce_opts = [x for x in _ilce_opts if x not in ["nan","None",""]]
-        _ilce_sec  = _fc[6].multiselect("ilce", _ilce_opts, default=[x for x in st.session_state.get("_cl_fil_ilce_multi",[]) if x in _ilce_opts], key="_cl_fil_ilce_multi", placeholder="İlçe...", label_visibility="collapsed")
+        _ilce_sec  = _fc[5].multiselect("ilce", _ilce_opts, default=[x for x in st.session_state.get("_cl_fil_ilce_multi",[]) if x in _ilce_opts], key="_cl_fil_ilce_multi", placeholder="İlçe...", label_visibility="collapsed")
 
         _tem_sec = []
         siralama_kol = "Tarih↓"
 
         # Manuel filtre kutularından biri (Aşama, Durum, Arama, İl, İlçe) kullanıldıysa
         # 'Toplam' modu otomatik kapanır — aksi halde seçim görünür ama uygulanmaz
-        if ara_txt or _asama_sec or _durum_sec or _il_sec or _ilce_sec or _ara_islem_sec:
+        if ara_txt or _asama_sec or _durum_sec or _il_sec or _ilce_sec:
             st.session_state["_toplam_aktif"] = False
 
         # Çoklu firma seçimi — filtre satırında son sütun
         _cok_sec_opts = [f"[{int(i)}] {f}" for i, f in zip(df["id"], df["firma"]) if str(f) not in ["","nan","None"]] if not df.empty and "firma" in df.columns else []
-        _cok_secili_ham = _fc[7].multiselect("c", _cok_sec_opts, key="_cl_cok_secim", placeholder="🔍 Çoklu firma...", label_visibility="collapsed")
+        _cok_secili_ham = _fc[6].multiselect("c", _cok_sec_opts, key="_cl_cok_secim", placeholder="🔍 Çoklu firma...", label_visibility="collapsed")
         _cok_secili_idler = set()
         for _cs in _cok_secili_ham:
             try: _cok_secili_idler.add(int(_cs.split("]")[0].replace("[","").strip()))
@@ -3633,7 +3628,6 @@ function kartSec(id){
     if not st.session_state.get("_toplam_aktif") and \
        not st.session_state.get("_cl_fil_durum_multi") and \
        not st.session_state.get("_cl_fil_asama_multi") and \
-       not st.session_state.get("_cl_fil_ara_islem_multi") and \
        not st.session_state.get("_asamasiz_aktif") and \
        not st.session_state.get("_cl_fil_asama1") and \
        not st.session_state.get("_cl_fil_asama2") and \
@@ -3645,7 +3639,7 @@ function kartSec(id){
     df_f = df.copy()
     # Toplam aktifse tüm filtreleri zorla sıfırla
     if st.session_state.get("_toplam_aktif", False):
-        ara_txt = ""; _asama_sec = []; _durum_sec = []; _il_sec = []; _ilce_sec = []; _tem_sec = []; _ara_islem_sec = []; filtre_seg = "Tümü"
+        ara_txt = ""; _asama_sec = []; _durum_sec = []; _il_sec = []; _ilce_sec = []; _tem_sec = []; filtre_seg = "Tümü"
         for _fk in ["_cl_fil_asama1","_cl_fil_asama2","_cl_fil_asama3","_cl_fil_sonuc"]:
             st.session_state.pop(_fk, None)
     # Aşamasız filtresi
@@ -3699,8 +3693,6 @@ function kartSec(id){
             df_f = df_f[df_f["sonuc"].apply(_asama_norm) == _asama_norm(st.session_state["_cl_fil_sonuc"])]
         if _durum_sec:
             df_f = df_f[df_f["durum"].isin(_durum_sec)]
-        if _ara_islem_sec and "ara_islem" in df_f.columns:
-            df_f = df_f[df_f["ara_islem"].astype(str).isin(_ara_islem_sec)]
         if filtre_seg != "Tümü":
             df_f["_seg_tmp"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
             if filtre_seg == "Segmentsiz": df_f = df_f[df_f["_seg_tmp"]==""]
