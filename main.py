@@ -3551,7 +3551,7 @@ function kartSec(id){
             st.session_state.pop("kart_sec_reset", None)
             st.session_state.pop("kart_sec", None)
 
-        _fc = st.columns([2, 1.5, 1.2, 1.2, 1.6, 0.8, 2])
+        _fc = st.columns([2, 1.5, 1.2, 1.2, 1.2, 1.6, 0.8, 2])
 
         secili_kart_inline = _fc[0].selectbox("m", kart_opts_inline, key="kart_sec_inline", label_visibility="collapsed")
         ara_txt = _fc[1].text_input("a", placeholder="🔍 Firma, yetkili, il...", key="ara_liste", label_visibility="collapsed")
@@ -3575,25 +3575,30 @@ function kartSec(id){
 
         filtre_seg = "Tümü"
 
+        _ara_islem_opts = sorted(df["ara_islem"].dropna().astype(str).unique().tolist()) if "ara_islem" in df.columns else []
+        _ara_islem_opts = [x for x in _ara_islem_opts if x.strip() not in ["nan","None",""]]
+        _ara_islem_def  = [x for x in st.session_state.get("_cl_fil_ara_islem_multi",[]) if x in _ara_islem_opts]
+        _ara_islem_sec  = _fc[4].multiselect("araislem", _ara_islem_opts, default=_ara_islem_def, key="_cl_fil_ara_islem_multi", placeholder="Ara İşlem...", label_visibility="collapsed")
+
         _il_opts = sorted(df["il"].dropna().astype(str).unique().tolist()) if "il" in df.columns else []
         _il_def  = [x for x in st.session_state.get("_cl_fil_il_multi",[]) if x in _il_opts]
-        _il_sec  = _fc[4].multiselect("i", _il_opts, default=_il_def, key="_cl_fil_il_multi", placeholder="İl...", label_visibility="collapsed")
+        _il_sec  = _fc[5].multiselect("i", _il_opts, default=_il_def, key="_cl_fil_il_multi", placeholder="İl...", label_visibility="collapsed")
 
         _ilce_opts = sorted((df[df["il"].astype(str).isin(_il_sec)] if _il_sec else df)["ilce"].dropna().astype(str).unique().tolist()) if "ilce" in df.columns else []
         _ilce_opts = [x for x in _ilce_opts if x not in ["nan","None",""]]
-        _ilce_sec  = _fc[5].multiselect("ilce", _ilce_opts, default=[x for x in st.session_state.get("_cl_fil_ilce_multi",[]) if x in _ilce_opts], key="_cl_fil_ilce_multi", placeholder="İlçe...", label_visibility="collapsed")
+        _ilce_sec  = _fc[6].multiselect("ilce", _ilce_opts, default=[x for x in st.session_state.get("_cl_fil_ilce_multi",[]) if x in _ilce_opts], key="_cl_fil_ilce_multi", placeholder="İlçe...", label_visibility="collapsed")
 
         _tem_sec = []
         siralama_kol = "Tarih↓"
 
         # Manuel filtre kutularından biri (Aşama, Durum, Arama, İl, İlçe) kullanıldıysa
         # 'Toplam' modu otomatik kapanır — aksi halde seçim görünür ama uygulanmaz
-        if ara_txt or _asama_sec or _durum_sec or _il_sec or _ilce_sec:
+        if ara_txt or _asama_sec or _durum_sec or _il_sec or _ilce_sec or _ara_islem_sec:
             st.session_state["_toplam_aktif"] = False
 
         # Çoklu firma seçimi — filtre satırında son sütun
         _cok_sec_opts = [f"[{int(i)}] {f}" for i, f in zip(df["id"], df["firma"]) if str(f) not in ["","nan","None"]] if not df.empty and "firma" in df.columns else []
-        _cok_secili_ham = _fc[6].multiselect("c", _cok_sec_opts, key="_cl_cok_secim", placeholder="🔍 Çoklu firma...", label_visibility="collapsed")
+        _cok_secili_ham = _fc[7].multiselect("c", _cok_sec_opts, key="_cl_cok_secim", placeholder="🔍 Çoklu firma...", label_visibility="collapsed")
         _cok_secili_idler = set()
         for _cs in _cok_secili_ham:
             try: _cok_secili_idler.add(int(_cs.split("]")[0].replace("[","").strip()))
@@ -3628,6 +3633,7 @@ function kartSec(id){
     if not st.session_state.get("_toplam_aktif") and \
        not st.session_state.get("_cl_fil_durum_multi") and \
        not st.session_state.get("_cl_fil_asama_multi") and \
+       not st.session_state.get("_cl_fil_ara_islem_multi") and \
        not st.session_state.get("_asamasiz_aktif") and \
        not st.session_state.get("_cl_fil_asama1") and \
        not st.session_state.get("_cl_fil_asama2") and \
@@ -3639,7 +3645,7 @@ function kartSec(id){
     df_f = df.copy()
     # Toplam aktifse tüm filtreleri zorla sıfırla
     if st.session_state.get("_toplam_aktif", False):
-        ara_txt = ""; _asama_sec = []; _durum_sec = []; _il_sec = []; _ilce_sec = []; _tem_sec = []; filtre_seg = "Tümü"
+        ara_txt = ""; _asama_sec = []; _durum_sec = []; _il_sec = []; _ilce_sec = []; _tem_sec = []; _ara_islem_sec = []; filtre_seg = "Tümü"
         for _fk in ["_cl_fil_asama1","_cl_fil_asama2","_cl_fil_asama3","_cl_fil_sonuc"]:
             st.session_state.pop(_fk, None)
     # Aşamasız filtresi
@@ -3693,6 +3699,8 @@ function kartSec(id){
             df_f = df_f[df_f["sonuc"].apply(_asama_norm) == _asama_norm(st.session_state["_cl_fil_sonuc"])]
         if _durum_sec:
             df_f = df_f[df_f["durum"].isin(_durum_sec)]
+        if _ara_islem_sec and "ara_islem" in df_f.columns:
+            df_f = df_f[df_f["ara_islem"].astype(str).isin(_ara_islem_sec)]
         if filtre_seg != "Tümü":
             df_f["_seg_tmp"] = df_f.apply(lambda r: hesapla_segment(r.get("segment",""), r.get("gerceklesen_ciro",0)), axis=1)
             if filtre_seg == "Segmentsiz": df_f = df_f[df_f["_seg_tmp"]==""]
@@ -4003,7 +4011,7 @@ function kartSec(id){
         "adres":110,"il":70,"ilce":60,"durum":80,"temsilci":80,
         "islem_asamasi":80,"aciklama":110,"📅 Son Randevu":170,"📨 Notlar":50,"id":40,
         "beklenen_ciro":70,"gerceklesen_ciro":70,"✅ Analiz":70,
-        "asama1":90,"asama2":90,"asama3":90,"sonuc":90
+        "asama1":90,"asama2":90,"asama3":90,"sonuc":90,"ara_islem":90
     }
     # Gizli kolonları DB'den yükle
     if "_kol_genislik_init" not in st.session_state:
@@ -4077,6 +4085,7 @@ function kartSec(id){
         "asama1":        st.column_config.SelectboxColumn("1. Aşama", options=_asama_secenek_guvenli("asama1", ["", "Randevu"]), width=_w("asama1")),
         "asama2":        st.column_config.SelectboxColumn("2. Aşama", options=_asama_secenek_guvenli("asama2", ["", "Teklif"]), width=_w("asama2")),
         "asama3":        st.column_config.SelectboxColumn("3. Aşama", options=_asama_secenek_guvenli("asama3", ["Tümü", "Deneme", "TAKİP", "Fiyat Hazırla", "Sözleşme"]), width=_w("asama3")),
+        "ara_islem":     st.column_config.TextColumn("Ara İşlem", width=_w("ara_islem")),
         "sonuc":         st.column_config.SelectboxColumn("Sonuç", options=_asama_secenek_guvenli("sonuc", ["Tümü", "Kazanıldı", "Kaybedildi", "Devam Ediyor"]), width=_w("sonuc")),
     }
     # Sütun sırası — sizin verdiğiniz şablonla birebir: Seç, İşlem Tarih, Id, Firma, Yetkili,
@@ -4085,7 +4094,7 @@ function kartSec(id){
     col_order = ["Seç","tarih","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
                  "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","islem_asamasi",
                  "asama1","asama2","asama3","aciklama","📨 Notlar","📅 Son Randevu",
-                 "🧾 Teklif","💬 Mesaj","sonuc","temsilci"]
+                 "🧾 Teklif","💬 Mesaj","ara_islem","sonuc","temsilci"]
     # Gizli kolonları çıkar
     _kol_gizli_map = {"firma":"firma","rakip_firma":"rakip_firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email",
                       "adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci",
@@ -4093,7 +4102,7 @@ function kartSec(id){
                       "📅 Son Randevu":"📅 Son Randevu","📨 Notlar":"📨 Notlar","id":"id",
                       "beklenen_ciro":"beklenen_ciro","gerceklesen_ciro":"gerceklesen_ciro","✅ Analiz":"✅ Analiz",
                       "🧾 Teklif":"🧾 Teklif","💬 Mesaj":"💬 Mesaj",
-                      "asama1":"asama1","asama2":"asama2","asama3":"asama3","sonuc":"sonuc"}
+                      "asama1":"asama1","asama2":"asama2","asama3":"asama3","sonuc":"sonuc","ara_islem":"ara_islem"}
     col_order = [c for c in col_order if not any(c == _kol_gizli_map.get(g,g) for g in _GIZLI_KOLONLAR)]
 
     # ── DATA EDITOR ─────────────────────────────────────────────────────────────
@@ -4110,6 +4119,10 @@ function kartSec(id){
     if "rakip_firma" not in df_edit.columns:
         df_edit["rakip_firma"] = ""
     df_edit["rakip_firma"] = df_edit["rakip_firma"].fillna("").astype(str).replace("nan","")
+    # ara_islem kolonu kesinlikle olsun
+    if "ara_islem" not in df_edit.columns:
+        df_edit["ara_islem"] = ""
+    df_edit["ara_islem"] = df_edit["ara_islem"].fillna("").astype(str).replace("nan","")
 
     # Son randevu bilgisini ekle (tarih + saat + bölge) — normalize edilmiş eşleştirme
     try:
@@ -5331,7 +5344,7 @@ function updateBot(v){{
             "firma":100,"rakip_firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
             "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
             "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50,
-            "asama1":100,"asama2":100,"asama3":100,"sonuc":100,
+            "asama1":100,"asama2":100,"asama3":100,"sonuc":100,"ara_islem":100,
             "beklenen_ciro":80,"gerceklesen_ciro":80,"✅ Analiz":80
         }
         _KG_UI_ETIKET = {
@@ -5339,7 +5352,7 @@ function updateBot(v){{
             "email":"Email","adres":"Adres","il":"İl","ilce":"İlçe",
             "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"Aşama",
             "aciklama":"Açıklama","📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID",
-            "asama1":"1. Aşama","asama2":"2. Aşama","asama3":"3. Aşama","sonuc":"Sonuç",
+            "asama1":"1. Aşama","asama2":"2. Aşama","asama3":"3. Aşama","sonuc":"Sonuç","ara_islem":"Ara İşlem",
             "beklenen_ciro":"Hedef ₺","gerceklesen_ciro":"Gerçek ₺","✅ Analiz":"Analiz"
         }
         try:
