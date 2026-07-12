@@ -6384,6 +6384,14 @@ elif aktif == "ozel_teklif":
                 _oz_eml = str(_oz_mus.get("email","") or "")
         except: pass
 
+    _oz_gsm = ""; _oz_eml = ""; _oz_sabit = ""
+    if _oz_mus is not None:
+        _oz_gsm   = str(_oz_mus.get("gsm","") or "")
+        _oz_eml   = str(_oz_mus.get("email","") or "")
+        _oz_sabit = str(_oz_mus.get("sabit","") or "")
+        if not _oz_gsm:
+            _oz_gsm = _oz_sabit  # GSM boşsa sabit telefonu göster
+
     _oz_fdef = str(_oz_mus["firma"]) if _oz_mus is not None else ""
     if "oz2_duz_musteri" in st.session_state:
         _oz_fdef = st.session_state.pop("oz2_duz_musteri")
@@ -6401,6 +6409,62 @@ elif aktif == "ozel_teklif":
     _oz_not   = _ozr[5].text_input("", placeholder="Not...", key="oz2_not", label_visibility="collapsed")
     _oz_wa_no = _ozr[6].text_input("", value=_oz_gsm, placeholder="05xxxxxxxxx", key=_oz_gsm_key, label_visibility="collapsed")
     _oz_email = _ozr[7].text_input("", value=_oz_eml, placeholder="Email", key=_oz_email_key, label_visibility="collapsed")
+
+    # ── MÜŞTERİYE AİT TÜM BİLGİLER — Yetkili, adres, il/ilçe, durum, temsilci ──
+    if _oz_mus is not None:
+        _oz_yetkili  = str(_oz_mus.get("yetkili","") or "") or "—"
+        _oz_il       = str(_oz_mus.get("il","") or "")
+        _oz_ilce     = str(_oz_mus.get("ilce","") or "")
+        _oz_adres    = str(_oz_mus.get("adres","") or "") or "—"
+        _oz_durum_b  = str(_oz_mus.get("durum","") or "") or "—"
+        _oz_temsilci = str(_oz_mus.get("temsilci","") or "") or "—"
+        _oz_ic1, _oz_ic2, _oz_ic3, _oz_ic4, _oz_ic5 = st.columns(5)
+        _oz_ic1.caption(f"👤 **Yetkili:** {_oz_yetkili}")
+        _oz_ic2.caption(f"📍 **İl/İlçe:** {(_oz_il + '/' + _oz_ilce) if (_oz_il or _oz_ilce) else '—'}")
+        _oz_ic3.caption(f"🏠 **Adres:** {_oz_adres[:40]}{'…' if len(_oz_adres) > 40 else ''}")
+        _oz_ic4.caption(f"📌 **Durum:** {_oz_durum_b}")
+        _oz_ic5.caption(f"🧑‍💼 **Temsilci:** {_oz_temsilci}")
+
+        # ── DAHA ÖNCE BU MÜŞTERİYE ÖZEL TEKLİF VERİLMİŞ Mİ? ────────────────────
+        try:
+            _oz_gecmis_df = db_read("teklifler", order_col="tarih")
+            if not _oz_gecmis_df.empty and "satirlar" in _oz_gecmis_df.columns:
+                _oz_gecmis_ozel = _oz_gecmis_df[_oz_gecmis_df["satirlar"].str.contains('ozel', case=False, na=False)]
+                _oz_gecmis_bu = _oz_gecmis_ozel[_oz_gecmis_ozel["musteri_adi"].astype(str).str.strip().str.upper() == _oz_hedef.strip().upper()] if not _oz_gecmis_ozel.empty else pd.DataFrame()
+            else:
+                _oz_gecmis_bu = pd.DataFrame()
+        except Exception:
+            _oz_gecmis_bu = pd.DataFrame()
+
+        if not _oz_gecmis_bu.empty:
+            _oz_gecmis_bu = _oz_gecmis_bu.sort_values("tarih", ascending=False)
+            _oz_son_teklif = _oz_gecmis_bu.iloc[0]
+            st.warning(f"⚠️ **{_oz_hedef}** için daha önce **{fmt_tarih(_oz_son_teklif.get('tarih',''))}** tarihinde teklif verilmiş ({len(_oz_gecmis_bu)} kayıt).")
+            with st.expander(f"📋 {_oz_hedef} — Önceki Teklif(ler)i Gör", expanded=True):
+                for _og_idx, _og_row in _oz_gecmis_bu.iterrows():
+                    st.caption(f"📅 {fmt_tarih(_og_row.get('tarih',''))} · 👤 {_og_row.get('olusturan','')} · 📝 {_og_row.get('notlar','')}")
+                    try:
+                        _oz_gecmis_data = _ozj.loads(_og_row.get("satirlar","{}"))
+                        for _og2 in _oz_gecmis_data.get("grp",[]):
+                            for _os2 in _og2.get("satirlar",[]):
+                                _cv2 = _os2.get("cikis","")
+                                _vv2 = _os2.get("varis","")
+                                _cv2s = ", ".join(_cv2) if isinstance(_cv2,list) else (_cv2 or "—")
+                                _vv2s = ", ".join(_vv2) if isinstance(_vv2,list) else (_vv2 or "—")
+                                _tur2 = ", ".join(_os2.get("tur",[]) or []) or "—"
+                                st.caption(f"　• {_cv2s} → {_vv2s} | {_tur2} | {int(_os2.get('bas',0) or 0)}-{int(_os2.get('bit',0) or 0)} desi | {fmt_para(float(_os2.get('fiyat',0) or 0))}")
+                    except Exception:
+                        pass
+                    if st.button("✏️ Bu Teklifi Düzenlemek İçin Yükle", key=f"oz2_gecmis_yukle_{int(_og_row['id'])}", use_container_width=True):
+                        try:
+                            _oz_data3 = _ozj.loads(_og_row.get("satirlar","{}"))
+                            st.session_state["oz2_grp"] = _oz_data3.get("grp",[])
+                            st.session_state["oz2_duz_id"] = int(_og_row["id"])
+                            st.session_state["oz2_duz_musteri"] = str(_og_row.get("musteri_adi",""))
+                            st.rerun()
+                        except Exception as _oge:
+                            st.error(f"Yüklenemedi: {_oge}")
+                    st.divider()
 
     st.divider()
 
