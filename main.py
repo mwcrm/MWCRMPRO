@@ -5347,21 +5347,30 @@ function updateBot(v){{
             "asama1":"1. Aşama","asama2":"2. Aşama","asama3":"3. Aşama","sonuc":"Sonuç","ara_islem":"Ara İşlem",
             "beklenen_ciro":"Hedef ₺","gerceklesen_ciro":"Gerçek ₺","✅ Analiz":"Analiz"
         }
-        try:
-            _sb_kg_ui = get_sb_client()
-            _kg_ui_mevcut = _KOL_VARS_UI.copy()
-            _gizli_ui = []
-            if _sb_kg_ui:
-                import json as _kguj
-                _r_kgu = _sb_kg_ui.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kol_genislik").execute()
-                if _r_kgu.data:
-                    _kg_ui_mevcut = _kguj.loads(_r_kgu.data[0]["deger"])
-                _r_gizli = _sb_kg_ui.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kol_gizli").execute()
-                if _r_gizli.data:
-                    _gizli_ui = _kguj.loads(_r_gizli.data[0]["deger"])
-        except:
-            _kg_ui_mevcut = _KOL_VARS_UI.copy()
-            _gizli_ui = []
+        # ÖNEMLİ: Ana listenin de kullandığı session_state["_kol_genislik"] tek doğruluk kaynağıdır.
+        # Burada AYRI bir DB sorgusu yapmıyoruz — aksi halde iki farklı kaynak birbirini
+        # ezip "ayarladığım gibi kalmıyor" sorununa yol açıyordu.
+        if "_kol_genislik" not in st.session_state or "_kol_gizli" not in st.session_state:
+            try:
+                _sb_kg_ui = get_sb_client()
+                _kg_ui_mevcut = _KOL_VARS_UI.copy()
+                _gizli_ui = []
+                if _sb_kg_ui:
+                    import json as _kguj
+                    _r_kgu = _sb_kg_ui.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kol_genislik").execute()
+                    if _r_kgu.data:
+                        _kg_ui_mevcut = _kguj.loads(_r_kgu.data[0]["deger"])
+                    _r_gizli = _sb_kg_ui.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kol_gizli").execute()
+                    if _r_gizli.data:
+                        _gizli_ui = _kguj.loads(_r_gizli.data[0]["deger"])
+            except:
+                _kg_ui_mevcut = _KOL_VARS_UI.copy()
+                _gizli_ui = []
+            st.session_state["_kol_genislik"] = {**_KOL_VARS_UI.copy(), **_kg_ui_mevcut}
+            st.session_state["_kol_gizli"] = _gizli_ui
+        else:
+            _kg_ui_mevcut = st.session_state["_kol_genislik"]
+            _gizli_ui = st.session_state["_kol_gizli"]
 
         _yeni_kg_ui = {}
         _yeni_gizli_ui = []
