@@ -3627,11 +3627,31 @@ function kartSec(id){
         if ara_txt:
             df_f = df_f[df_f.apply(lambda r: ara_txt.lower() in str(r).lower(), axis=1)]
         if _asama_sec:
+            # Aşama değerleri (Randevu, Teklif, TAKİP, Sözleşme...) ile Sonuç değerlerini (Kazanıldı, Kaybedildi, Devam Ediyor)
+            # ayrı gruplar olarak ele alıyoruz: kendi grubu içinde VEYA (OR), gruplar arasında VE (AND).
+            # Örn: "TAKİP" + "Devam Ediyor" seçilince -> 3. aşaması TAKİP OLAN VE sonucu Devam Ediyor OLAN kayıtlar gelir.
+            _sonuc_kategori_n = {_asama_norm(x) for x in ["Kazanıldı", "Kaybedildi", "Devam Ediyor"]}
             _asama_sec_n = [_asama_norm(x) for x in _asama_sec]
-            _asama_mask = df_f["islem_asamasi"].apply(_asama_norm).isin(_asama_sec_n) if "islem_asamasi" in df_f.columns else pd.Series([False] * len(df_f), index=df_f.index)
-            for _acol in ["asama1", "asama2", "asama3", "sonuc"]:
-                if _acol in df_f.columns:
-                    _asama_mask = _asama_mask | df_f[_acol].apply(_asama_norm).isin(_asama_sec_n)
+            _stage_vals_n = [x for x in _asama_sec_n if x not in _sonuc_kategori_n]
+            _sonuc_vals_n = [x for x in _asama_sec_n if x in _sonuc_kategori_n]
+
+            _stage_mask = None
+            if _stage_vals_n:
+                _stage_mask = df_f["islem_asamasi"].apply(_asama_norm).isin(_stage_vals_n) if "islem_asamasi" in df_f.columns else pd.Series([False] * len(df_f), index=df_f.index)
+                for _acol in ["asama1", "asama2", "asama3"]:
+                    if _acol in df_f.columns:
+                        _stage_mask = _stage_mask | df_f[_acol].apply(_asama_norm).isin(_stage_vals_n)
+
+            _sonuc_mask = None
+            if _sonuc_vals_n:
+                _sonuc_mask = df_f["sonuc"].apply(_asama_norm).isin(_sonuc_vals_n) if "sonuc" in df_f.columns else pd.Series([False] * len(df_f), index=df_f.index)
+
+            if _stage_mask is not None and _sonuc_mask is not None:
+                _asama_mask = _stage_mask & _sonuc_mask
+            elif _stage_mask is not None:
+                _asama_mask = _stage_mask
+            else:
+                _asama_mask = _sonuc_mask
             df_f = df_f[_asama_mask]
         # asama1/2/3/sonuc filtresi — hangi kolonda olduğuna bakılmaksızın, büyük/küçük harf farkı yok sayılarak eşleşeni yakalar
         _tekli_asama_hedef = (st.session_state.get("_cl_fil_asama1") or
