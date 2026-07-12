@@ -2861,6 +2861,10 @@ section[data-testid="stSidebar"] { display: none !important; }
     # ── ASAMA & DURUM LİSTELERİ — sistem_tanimlar tablosundan ──────────────────
     tum_asama_opts = _tanimlar_yukle("asama")
     tum_durum_opts = _tanimlar_yukle("durum")
+    # SONUÇ rozetlerinden biri (Devam Ediyor) tanımlar tablosunda eksik olsa bile
+    # filtre kutusunda seçilebilir olsun diye garanti ediyoruz
+    if "Devam Ediyor" not in tum_asama_opts:
+        tum_asama_opts.append("Devam Ediyor")
     # NOT: df'de olan ama tanımlardan silinmiş durum/aşamalar eklenmez
     # Sadece tanımlar tablosundakiler gösterilir
 
@@ -3264,15 +3268,22 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
             st.session_state[_hedef_key] = _cur
             st.session_state[f"{_hedef_key}_{_fk_sfx_now}"] = _cur
 
+        def _tekli_asama_temizle():
+            """Eski tekli-kolon (1/2/3. Aşama) yedek filtrelerini temizler — genel kutuyla çakışmasın diye"""
+            for _fk in ["_cl_fil_asama1", "_cl_fil_asama2", "_cl_fil_asama3", "_cl_fil_sonuc"]:
+                st.session_state.pop(_fk, None)
+
         if _qp_rfil == "toplam":
             st.session_state["_toplam_aktif"] = True
             st.session_state["_asamasiz_aktif"] = False
             st.session_state["_filtre_reset_sayac"] = st.session_state.get("_filtre_reset_sayac",0)+1
+            _tekli_asama_temizle()
             for _fk in ["_cl_fil_durum_multi","_cl_fil_asama_multi","_cl_fil_il_multi","_cl_fil_ilce_multi","_cl_fil_temsilci_multi"]:
                 st.session_state.pop(_fk, None)
         elif _qp_rfil == "asamasiz":
             st.session_state["_asamasiz_aktif"] = True
             st.session_state["_toplam_aktif"] = False
+            _tekli_asama_temizle()
             st.session_state.pop("_cl_fil_durum_multi", None)
             st.session_state["_cl_fil_asama_multi"] = []
         elif _qp_rfil.startswith("durum_"):
@@ -3289,21 +3300,29 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
             _a = _qp_rfil[7:]
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
+            _tekli_asama_temizle()
+            st.session_state["_cl_fil_asama1"] = _a
             _rapor_kutuya_ekle("_cl_fil_asama_multi", _a)
         elif _qp_rfil.startswith("asama2_"):
             _a = _qp_rfil[7:]
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
+            _tekli_asama_temizle()
+            st.session_state["_cl_fil_asama2"] = _a
             _rapor_kutuya_ekle("_cl_fil_asama_multi", _a)
         elif _qp_rfil.startswith("asama3_"):
             _a = _qp_rfil[7:]
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
+            _tekli_asama_temizle()
+            st.session_state["_cl_fil_asama3"] = _a
             _rapor_kutuya_ekle("_cl_fil_asama_multi", _a)
         elif _qp_rfil.startswith("sonuc_"):
             _a = _qp_rfil[6:]
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
+            _tekli_asama_temizle()
+            st.session_state["_cl_fil_sonuc"] = _a
             _rapor_kutuya_ekle("_cl_fil_asama_multi", _a)
         st.rerun()
 
@@ -3516,6 +3535,11 @@ function kartSec(id){
         _asama_def = [] if st.session_state.get("_filtre_sifirla_flag") else [x for x in st.session_state.get("_cl_fil_asama_multi",[]) if x in tum_asama_opts]
         _asama_sec = _fc[2].multiselect("a", tum_asama_opts, default=_asama_def, key=f"_cl_fil_asama_multi_{_fk_sfx}", placeholder="Aşama...", label_visibility="collapsed")
         st.session_state["_cl_fil_asama_multi"] = _asama_sec
+        # Kutudan çıkarılmış/değiştirilmiş bir değer için eski tekli-kolon yedeği (asama1/2/3/sonuc) takılı kalmasın
+        for _fk_stale in ["_cl_fil_asama1", "_cl_fil_asama2", "_cl_fil_asama3", "_cl_fil_sonuc"]:
+            _fv_stale = st.session_state.get(_fk_stale)
+            if _fv_stale and _fv_stale not in _asama_sec:
+                st.session_state.pop(_fk_stale, None)
 
         _fk_sfx = st.session_state.get("_filtre_reset_sayac", 0)
         _durum_opts_tumu = [x for x in tum_durum_opts if str(x).upper() not in ["NONE","NAN",""]]
