@@ -4820,11 +4820,11 @@ elif aktif == "kullanici":
     )
 
     if st.session_state.get("rol") == "admin":
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_font = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar"])
     elif _surum_yetkisi:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_font = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar"])
     else:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_font = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar"])
         kul_tab5 = None
 
     with kul_tab1:
@@ -5794,6 +5794,35 @@ function updateBot(v){{
                 if _dc2.button("🗑", key=f"dsil2_{_di}_{_d[:8]}", use_container_width=True, help="Sil"):
                     if _tan_sil("durum", _d):
                         st.success(f"'{_d}' silindi!"); st.rerun()
+
+    with kul_tab_font:
+        st.markdown("### 🔤 Sözleşme PDF Fontları")
+        st.caption("Sözleşme PDF'lerinin Türkçe karakterleri (ş, ğ, ı, ç, ö, ü, İ) doğru basabilmesi için gereken "
+                   "font dosyaları. Başka bir bilgisayarda kuruluma ihtiyaç olursa buradan indirilebilir; "
+                   "`fonts/` klasörüne konup GitHub'a yüklenmesi gerekir.")
+        import os as _fnt_os
+        _fnt_dir = None
+        for _aday in ["fonts", "./fonts", "/mount/src/mwcrmpro/fonts"]:
+            if _fnt_os.path.isdir(_aday):
+                _fnt_dir = _aday; break
+        if not _fnt_dir:
+            st.warning("⚠️ Sunucuda `fonts/` klasörü henüz yok — önce font dosyalarını repo'ya eklemeniz gerekiyor.")
+        else:
+            _fnt1, _fnt2 = st.columns(2)
+            _fnt_normal = _fnt_os.path.join(_fnt_dir, "DejaVuSans.ttf")
+            _fnt_bold   = _fnt_os.path.join(_fnt_dir, "DejaVuSans-Bold.ttf")
+            if _fnt_os.path.isfile(_fnt_normal):
+                with open(_fnt_normal, "rb") as _f:
+                    _fnt1.download_button("⬇️ DejaVuSans.ttf indir", data=_f.read(),
+                        file_name="DejaVuSans.ttf", mime="font/ttf", use_container_width=True, key="fnt_dl_normal")
+            else:
+                _fnt1.warning("DejaVuSans.ttf bulunamadı")
+            if _fnt_os.path.isfile(_fnt_bold):
+                with open(_fnt_bold, "rb") as _f:
+                    _fnt2.download_button("⬇️ DejaVuSans-Bold.ttf indir", data=_f.read(),
+                        file_name="DejaVuSans-Bold.ttf", mime="font/ttf", use_container_width=True, key="fnt_dl_bold")
+            else:
+                _fnt2.warning("DejaVuSans-Bold.ttf bulunamadı")
 
 elif aktif == "rapor":
     sayfa_log("rapor")
@@ -6772,7 +6801,7 @@ elif aktif == "ozel_teklif":
 
     # ── KAYDET + MESAJ ────────────────────────────────────────────────────────
     st.divider()
-    _ks1, _ks2 = st.columns(2)
+    _ks1, _ks2, _ks3 = st.columns(3)
     if _ks1.button("💾 Teklifi Kaydet", use_container_width=True, type="primary", key="oz2_kaydet"):
         if not _oz_hedef:
             st.warning("Müşteri adı boş!")
@@ -6805,6 +6834,14 @@ elif aktif == "ozel_teklif":
     if _ks2.button("📱 WA Mesajı Oluştur", use_container_width=True, key="oz2_wa_olustur"):
         st.session_state["oz2_wa_mesaj"] = _oz_mesaj_olustur(grp, _oz_hedef, _oz_vade)
         st.rerun()
+
+    if _ks3.button("📜 Sözleşme Hazırla", use_container_width=True, key="oz2_sozlesme_git"):
+        if not _oz_hedef:
+            st.warning("Müşteri adı boş!")
+        else:
+            st.session_state["aktif_tab"] = "sozlesme"
+            st.session_state["sozlesme_musteri_onsel"] = _oz_hedef
+            st.rerun()
 
     if st.session_state.get("oz2_wa_mesaj"):
         _wtxt = st.text_area("WA Mesajı:", value=st.session_state["oz2_wa_mesaj"], height=220, key="oz2_wa_txt")
@@ -7331,6 +7368,10 @@ elif aktif == "sozlesme":
             else:
                 st.warning("⚠️ Bu müşteri için Özel Teklif bulunamadı. MADDE 3 fiyat tablosu boş oluşturulacak — "
                            "önce '⭐ Özel Teklif' sayfasından fiyat oluşturmanız önerilir.")
+                if st.button(f"⭐ {_sz_uzun} için Özel Teklif Oluştur", key="sz_teklife_git", use_container_width=True):
+                    st.session_state["aktif_tab"] = "ozel_teklif"
+                    st.session_state["teklif_musteri_onsel"] = _sz_uzun
+                    st.rerun()
 
             st.markdown("---")
             st.markdown("**MADDE 4 — Vade** 🔴 *(zorunlu)*")
