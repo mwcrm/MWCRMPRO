@@ -1441,6 +1441,32 @@ def not_dialog(cari_id, firma_adi=""):
     with _tab_rdv:
         if firma_adi:
             st.markdown(f"**{firma_adi}** için randevu ekle")
+
+        # ── Bu müşterinin ÖNCEKİ randevuları — hiçbiri silinmez, hepsi burada listelenir ──
+        try:
+            _rdv_sb_l = get_sb_client()
+            _rdv_gecmis = pd.DataFrame(_rdv_sb_l.table("randevular").select("*").eq("musteri_id", int(cari_id)).order("randevu_tarihi", desc=True).execute().data) if _rdv_sb_l else pd.DataFrame()
+        except Exception:
+            _rdv_gecmis = pd.DataFrame()
+
+        if not _rdv_gecmis.empty:
+            st.caption(f"📌 {len(_rdv_gecmis)} randevu kayıtlı — yeni ekleme bunları silmez:")
+            for _, _rg in _rdv_gecmis.iterrows():
+                _rgc1, _rgc2, _rgc3, _rgc4 = st.columns([1.2, 1.2, 3, 0.6])
+                _rgc1.caption(f"📅 {fmt_tarih(_rg.get('randevu_tarihi',''))} {_rg.get('randevu_saati','')}")
+                _rgc2.caption(f"🏷️ {_rg.get('gorev','') or '—'}")
+                _rgc3.caption(f"📝 {(_rg.get('aciklama','') or '—')[:60]}")
+                if _rgc4.button("🗑", key=f"dlg_rdv_gecmis_sil_{cari_id}_{int(_rg['id'])}"):
+                    try:
+                        _rdv_sb_l.table("randevular").delete().eq("id", int(_rg["id"])).execute()
+                        st.rerun()
+                    except Exception as _rge:
+                        st.error(f"Hata: {_rge}")
+            st.divider()
+        else:
+            st.caption("Henüz randevu kaydı yok.")
+
+        st.markdown("**➕ Yeni Randevu Ekle**")
         _dr1, _dr2 = st.columns(2)
         _rdv_t = _dr1.date_input("Tarih", key=f"dlg_rdv_t_{cari_id}")
         _rdv_s = _dr2.selectbox("Saat", [f"{h:02d}:{m:02d}" for h in range(8,21) for m in [0,30]], key=f"dlg_rdv_s_{cari_id}")
@@ -1461,6 +1487,7 @@ def not_dialog(cari_id, firma_adi=""):
                     }).execute()
                     st.success(f"✅ Randevu eklendi!")
                     st.cache_data.clear()
+                    st.rerun()
             except Exception as _re:
                 st.error(f"Hata: {_re}")
     with _tab_yetkili:
