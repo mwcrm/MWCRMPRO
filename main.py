@@ -7056,241 +7056,312 @@ elif aktif == "sozlesme":
     ]
 
     def _sz_docx_uret(v):
-        from docx import Document
-        from docx.shared import Pt, Cm, RGBColor
-        from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
-        from docx.enum.table import WD_TABLE_ALIGNMENT
-        from docx.oxml.ns import qn
+        """Hiçbir pip paketi gerektirmeden (sadece Python stdlib zipfile) .docx üretir"""
+        import zipfile as _szzip
         import io as _szio
+        from xml.sax.saxutils import escape as _szesc
 
-        def _f(run, size=11, bold=False):
-            run.font.name = "Calibri"; run.font.size = Pt(size); run.font.bold = bold
+        _CONTENT_TYPES = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+            '</Types>')
+        _RELS = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>'
+            '</Relationships>')
+        _DOC_RELS = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>')
 
-        def _p(doc, text="", size=11, bold=False, align=None, sa=4, sb=0):
-            para = doc.add_paragraph()
-            para.paragraph_format.space_after = Pt(sa)
-            para.paragraph_format.space_before = Pt(sb)
-            if align: para.alignment = align
-            if text:
-                r = para.add_run(text); _f(r, size, bold)
-            return para
+        def _run(text, bold=False, size=22):
+            props = f'<w:sz w:val="{size}"/><w:szCs w:val="{size}"/>'
+            if bold: props = "<w:b/><w:bCs/>" + props
+            return f'<w:r><w:rPr>{props}</w:rPr><w:t xml:space="preserve">{_szesc(str(text))}</w:t></w:r>'
 
-        def _pm(doc, parts, size=11, sa=4):
-            para = doc.add_paragraph(); para.paragraph_format.space_after = Pt(sa)
-            for t, b in parts:
-                r = para.add_run(t); _f(r, size, b)
-            return para
+        def _para(runs_xml="", after=120, before=0, align=None, indent=None):
+            pPr = f'<w:spacing w:after="{after}" w:before="{before}"/>'
+            if align: pPr += f'<w:jc w:val="{align}"/>'
+            if indent: pPr += f'<w:ind w:left="{indent}"/>'
+            return f'<w:p><w:pPr>{pPr}</w:pPr>{runs_xml}</w:p>'
 
-        def _bullet(doc, text, size=10.5):
-            para = doc.add_paragraph(); para.paragraph_format.space_after = Pt(2)
-            para.paragraph_format.left_indent = Cm(0.5)
-            r = para.add_run("•  " + text); _f(r, size)
+        def _page_break():
+            return '<w:p><w:r><w:br w:type="page"/></w:r></w:p>'
 
-        def _num(doc, n, text, size=10):
-            para = doc.add_paragraph(); para.paragraph_format.space_after = Pt(4)
-            para.paragraph_format.left_indent = Cm(0.6)
-            r = para.add_run(f"{n}.  {text}"); _f(r, size)
+        def _two_col(left, right, bold=True, size=22, after=60):
+            pPr = f'<w:tabs><w:tab w:val="left" w:pos="5040"/></w:tabs><w:spacing w:after="{after}"/>'
+            r1 = _run(left, bold=bold, size=size)
+            r2 = '<w:r><w:tab/></w:r>' + _run(right, bold=bold, size=size)
+            return f'<w:p><w:pPr>{pPr}</w:pPr>{r1}{r2}</w:p>'
 
-        def _imza_tablosu(doc):
-            tbl = doc.add_table(rows=2, cols=2)
-            tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
-            r = tbl.cell(0,0).paragraphs[0].add_run("STF KARGO NAKLİYAT VE TİCARET LTD. ŞTİ."); _f(r,11,True)
-            r = tbl.cell(0,1).paragraphs[0].add_run(v["musteri_kisa"]); _f(r,11,True)
-            r = tbl.cell(1,0).paragraphs[0].add_run("KAŞE-İMZA"); _f(r,10.5,False)
-            r = tbl.cell(1,1).paragraphs[0].add_run("KAŞE-İMZA"); _f(r,10.5,False)
-            p2 = tbl.cell(1,1).add_paragraph()
-            r = p2.add_run(v["musteri_uzun"]); _f(r,9,False)
+        def _imza_bloklari():
+            return (_two_col("STF KARGO NAKLİYAT VE TİCARET LTD. ŞTİ.", v["musteri_kisa"], bold=True, size=22)
+                  + _two_col("KAŞE-İMZA", "KAŞE-İMZA", bold=False, size=21)
+                  + _two_col("", v["musteri_uzun"], bold=False, size=16))
 
-        doc = Document()
-        sec = doc.sections[0]
-        sec.page_width = Cm(21); sec.page_height = Cm(29.7)
-        sec.left_margin = Cm(2); sec.right_margin = Cm(2)
-        sec.top_margin = Cm(1.5); sec.bottom_margin = Cm(1.5)
+        P = []
+        P.append(_para(_run("MADDE 1: TARAFLAR", bold=True, size=26), after=160))
+        P.append(_para(_run("Taşıyıcı", bold=True) + _run(" : ") + _run("STF KARGO NAKLİYAT TİCARET LTD.ŞTİ", bold=True)))
+        P.append(_para(_run("Adres", bold=True) + _run(" : Halkalı Merkez Mah.Dereboyu Caddesi No:56 KÜÇÜKÇEKMECE/İSTANBUL"), after=200))
+        P.append(_para(_run("Taşıtıcı", bold=True) + _run(" : ") + _run(v["musteri_uzun"], bold=True)))
+        P.append(_para(_run("Adres", bold=True) + _run(" : " + (v["adres"] or "—"))))
+        P.append(_para(_run("V.D: ", bold=True) + _run(v["vd"] or "—") + _run("   V.No: ", bold=True) + _run(v["vno"] or "—"), after=200))
+        P.append(_para(_run(f"Bir tarafta Stf Kargo Nakliyat ve Ticaret Ltd. Şti. (kısaca STF KARGO olarak "
+                             f"anılacaktır.) diğer tarafta {v['musteri_uzun']} (kısaca {v['musteri_kisa']} olarak "
+                             f"anılacaktır) arasında akdedilen bu sözleşme tarafların İstanbul geneli yapılacak "
+                             f"taşımacılık faaliyetine ilişkin karşılıklı hak ve yükümlülüklerini belirler.", size=21), after=220))
 
-        _p(doc, "MADDE 1: TARAFLAR", size=13, bold=True, sa=8)
-        _pm(doc, [("Taşıyıcı", True), (" : ", False), ("STF KARGO NAKLİYAT TİCARET LTD.ŞTİ", True)])
-        _pm(doc, [("Adres", True), (" : ", False), ("Halkalı Merkez Mah.Dereboyu Caddesi No:56 KÜÇÜKÇEKMECE/İSTANBUL", False)], sa=10)
-        _pm(doc, [("Taşıtıcı", True), (" : ", False), (v["musteri_uzun"], True)])
-        _pm(doc, [("Adres", True), (" : ", False), (v["adres"] or "—", False)])
-        _pm(doc, [("V.D: ", True), (v["vd"] or "—", False), ("   V.No: ", True), (v["vno"] or "—", False)], sa=10)
-        _p(doc, f"Bir tarafta Stf Kargo Nakliyat ve Ticaret Ltd. Şti. (kısaca STF KARGO olarak anılacaktır.) diğer "
-                f"tarafta {v['musteri_uzun']} (kısaca {v['musteri_kisa']} olarak anılacaktır) arasında akdedilen bu "
-                f"sözleşme tarafların İstanbul geneli yapılacak taşımacılık faaliyetine ilişkin karşılıklı hak ve "
-                f"yükümlülüklerini belirler.", size=10.5, sa=10)
+        P.append(_para(_run("MADDE 2: GEÇERLİLİK SÜRESİ:", bold=True, size=24), after=100))
+        P.append(_para(_run(f"İşbu sözleşme {v['gecerlilik_tarihi']} tarihine kadar geçerlidir. Bitiminde "
+                             f"karşılıklı mutabakat ile yenilenir.", size=21)))
+        P.append(_para(_run("Taraflardan herhangi biri bir ay önceden yazılı bildirim yapmak koşulu ile veya bu "
+                             "sözleşme hükümlerine aykırı hareket edilmesi halinde sözleşme tek taraflı "
+                             "feshedilebilir.", size=21), after=220))
 
-        _p(doc, "MADDE 2: GEÇERLİLİK SÜRESİ:", size=12, bold=True, sa=4)
-        _p(doc, f"İşbu sözleşme {v['gecerlilik_tarihi']} tarihine kadar geçerlidir. Bitiminde karşılıklı mutabakat "
-                f"ile yenilenir.", size=10.5, sa=4)
-        _p(doc, "Taraflardan herhangi biri bir ay önceden yazılı bildirim yapmak koşulu ile veya bu sözleşme "
-                "hükümlerine aykırı hareket edilmesi halinde sözleşme tek taraflı feshedilebilir.", size=10.5, sa=10)
-
-        _p(doc, "MADDE 3: UYGULANACAK FİYAT TARİFESİ:", size=12, bold=True, sa=4)
-        _p(doc, f"Geçerlilik süresi içerisinde STF KARGO {v['musteri_kisa']}'nin aşağıdaki tabloda belirtilen "
-                f"ebattaki kargolarını yazılı fiyatlarla taşımayı kabul eder.", size=10.5, sa=6)
+        P.append(_para(_run("MADDE 3: UYGULANACAK FİYAT TARİFESİ:", bold=True, size=24), after=100))
+        P.append(_para(_run(f"Geçerlilik süresi içerisinde STF KARGO {v['musteri_kisa']}'nin aşağıdaki tabloda "
+                             f"belirtilen ebattaki kargolarını yazılı fiyatlarla taşımayı kabul eder.", size=21), after=140))
         if v["fiyat_gruplari"]:
             for grp in v["fiyat_gruplari"]:
-                _p(doc, "*" + grp["baslik"] + "*", size=10.5, bold=True, sa=2)
+                P.append(_para(_run(grp["baslik"], bold=True, size=21), after=60))
                 for satir in grp["satirlar"]:
-                    _bullet(doc, satir)
-                doc.add_paragraph().paragraph_format.space_after = Pt(2)
+                    P.append(_para(_run("•  " + satir, size=20), after=40, indent=280))
+                P.append(_para("", after=60))
         else:
-            _p(doc, "(Bu müşteri için tanımlı fiyat bulunamadı — Özel Teklif oluşturulunca burada listelenir.)",
-               size=10, sa=6)
-        _p(doc, "Taşıma fiyatlarında KDV ayrıca eklenecektir.", size=10.5, bold=True, sa=10)
+            P.append(_para(_run("(Bu müşteri için tanımlı fiyat bulunamadı — Özel Teklif oluşturulunca burada "
+                                 "listelenir.)", size=19), after=100))
+        P.append(_para(_run("Taşıma fiyatlarında KDV ayrıca eklenecektir.", bold=True, size=21), after=220))
 
-        _p(doc, "MADDE 4: ÖDEME ŞEKLİ VE ZAMANI", size=12, bold=True, sa=4)
-        _p(doc, f"{v['musteri_kisa']} kendisine gelen ürünlere ait ücret alıcı faturalar ile gönderdiği ürünlere "
-                f"ait ücret gönderen faturaları tarihlerinden itibaren {v['vade']} eft-havale olarak öder.",
-           size=10.5, sa=10)
+        P.append(_para(_run("MADDE 4: ÖDEME ŞEKLİ VE ZAMANI", bold=True, size=24), after=100))
+        P.append(_para(_run(f"{v['musteri_kisa']} kendisine gelen ürünlere ait ücret alıcı faturalar ile "
+                             f"gönderdiği ürünlere ait ücret gönderen faturaları tarihlerinden itibaren "
+                             f"{v['vade']} eft-havale olarak öder.", size=21), after=220))
 
-        _p(doc, "MADDE 5: YAKIT KLOZU", size=12, bold=True, sa=4)
-        _p(doc, "Ay sonunda oluşan yakıt artış farkı %50 oranında fiyatlara yansıtılır", size=10.5, sa=10)
+        P.append(_para(_run("MADDE 5: YAKIT KLOZU", bold=True, size=24), after=100))
+        P.append(_para(_run("Ay sonunda oluşan yakıt artış farkı %50 oranında fiyatlara yansıtılır", size=21), after=220))
 
-        _p(doc, "MADDE 6: HİZMET ŞUBESİ ve YETKİLİSİ: İstanbul-Merkez Şubesi: Koray Ertaş", size=12, bold=True, sa=4)
-        _p(doc, "0 212 671 50 35-36 / 0 212 671 96 51-444 77 83", size=10.5, sa=2)
-        _p(doc, "Halkalı Merkez Mah.Dereboyu Caddesi No:56 K.Çekmece-İSTANBUL", size=10.5, sa=2)
-        _p(doc, "koray.ertas@stflojistik.com", size=10.5, sa=10)
+        P.append(_para(_run("MADDE 6: HİZMET ŞUBESİ ve YETKİLİSİ: İstanbul-Merkez Şubesi: Koray Ertaş", bold=True, size=24), after=100))
+        P.append(_para(_run("0 212 671 50 35-36 / 0 212 671 96 51-444 77 83", size=21), after=40))
+        P.append(_para(_run("Halkalı Merkez Mah.Dereboyu Caddesi No:56 K.Çekmece-İSTANBUL", size=21), after=40))
+        P.append(_para(_run("koray.ertas@stflojistik.com", size=21), after=220))
 
-        _p(doc, "MADDE 7: TAŞIMA KOŞULLARI:", size=12, bold=True, sa=4)
-        _p(doc, "Genel taşıma koşulları ikinci sayfada 14 madde halinde açıklanmış olup tarafları tamamen "
-                "bağlayıcı nitelik taşır.", size=10.5, sa=10)
+        P.append(_para(_run("MADDE 7: TAŞIMA KOŞULLARI:", bold=True, size=24), after=100))
+        P.append(_para(_run("Genel taşıma koşulları ikinci sayfada 14 madde halinde açıklanmış olup tarafları "
+                             "tamamen bağlayıcı nitelik taşır.", size=21), after=220))
 
-        _p(doc, "MADDE 8:", size=12, bold=True, sa=4)
-        _p(doc, f"İşbu taşıma sözleşmesi toplam sekiz maddeden ibaret olup taraflarca kabul edilerek "
-                f"{v['imza_tarihi']} tarihinde imza altına alınmıştır.", size=10.5, sa=10)
+        P.append(_para(_run("MADDE 8:", bold=True, size=24), after=100))
+        P.append(_para(_run(f"İşbu taşıma sözleşmesi toplam sekiz maddeden ibaret olup taraflarca kabul edilerek "
+                             f"{v['imza_tarihi']} tarihinde imza altına alınmıştır.", size=21), after=220))
 
-        _p(doc, "Ekleri:", size=10.5, bold=True, sa=2)
-        _p(doc, "1) Taşıma Koşulları", size=10.5, sa=2)
-        _p(doc, "2) Taşınması yasak olan kargolar ve taşınması şarta bağlı kargolar", size=10.5, sa=14)
+        P.append(_para(_run("Ekleri:", bold=True, size=21), after=40))
+        P.append(_para(_run("1) Taşıma Koşulları", size=21), after=40))
+        P.append(_para(_run("2) Taşınması yasak olan kargolar ve taşınması şarta bağlı kargolar", size=21), after=280))
 
-        _imza_tablosu(doc)
+        P.append(_imza_bloklari())
+        P.append(_page_break())
 
-        brk = doc.add_paragraph(); brk.add_run().add_break(WD_BREAK.PAGE)
-        _p(doc, "TAŞIMA KOŞULLARI", size=13, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, sa=10)
+        P.append(_para(_run("TAŞIMA KOŞULLARI", bold=True, size=26), after=200, align="center"))
         for i, k in enumerate(_SZ_KOSULLAR, 1):
-            _num(doc, i, k)
-        _p(doc, "", sa=6)
-        _p(doc, "TAŞIMASI YASAK OLAN KARGOLAR", size=12, bold=True, sa=6)
+            P.append(_para(_run(f"{i}.  {k}", size=20), after=80, indent=240))
+        P.append(_para("", after=100))
+        P.append(_para(_run("TAŞIMASI YASAK OLAN KARGOLAR", bold=True, size=24), after=140))
         for i, y in enumerate(_SZ_YASAKLAR, 1):
-            _num(doc, i, y)
-        _p(doc, "", sa=10)
-        _imza_tablosu(doc)
+            P.append(_para(_run(f"{i}.  {y}", size=20), after=80, indent=240))
+        P.append(_para("", after=200))
+        P.append(_imza_bloklari())
 
+        document_xml = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+            '<w:body>' + "".join(P) +
+            '<w:sectPr><w:pgSz w:w="11907" w:h="16840"/>'
+            '<w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/></w:sectPr>'
+            '</w:body></w:document>'
+        )
         _buf = _szio.BytesIO()
-        doc.save(_buf)
+        with _szzip.ZipFile(_buf, "w", _szzip.ZIP_DEFLATED) as _z:
+            _z.writestr("[Content_Types].xml", _CONTENT_TYPES)
+            _z.writestr("_rels/.rels", _RELS)
+            _z.writestr("word/document.xml", document_xml)
+            _z.writestr("word/_rels/document.xml.rels", _DOC_RELS)
         return _buf.getvalue()
 
     def _sz_pdf_uret(v):
-        from fpdf import FPDF
-        import os as _szos
+        """Hiçbir pip paketi gerektirmeden (sadece Python stdlib) PDF üretir.
+        Standart PDF Helvetica fontu İ/ı/Ş/ş/Ğ/ğ desteklemediği için bu harfler
+        PDF'e özel en yakın Latin harfe çevrilir (Word tarafı tam Türkçe kalır)."""
+        import io as _szio2
 
-        _font_dir = None
-        for _aday in ["fonts", "./fonts", "/mount/src/mwcrmpro/fonts"]:
-            if _szos.path.isfile(_szos.path.join(_aday, "DejaVuSans.ttf")):
-                _font_dir = _aday; break
-        if not _font_dir:
-            return None  # font bulunamadı — PDF üretilemez, docx yeterli olur
+        _TR_MAP = str.maketrans({
+            "İ": "I", "ı": "i", "Ş": "S", "ş": "s", "Ğ": "G", "ğ": "g",
+            "\u2192": "->", "\u20ba": "TL", "\u2013": "-", "\u2014": "-",
+            "\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"',
+        })
 
-        pdf = FPDF(format="A4")
-        pdf.set_auto_page_break(auto=True, margin=15)
-        pdf.add_font("DejaVu", "", _szos.path.join(_font_dir, "DejaVuSans.ttf"))
-        pdf.add_font("DejaVu", "B", _szos.path.join(_font_dir, "DejaVuSans-Bold.ttf"))
-        pdf.add_page()
-        pdf.set_margins(20, 15, 20)
+        def _tr(text): return str(text).translate(_TR_MAP)
 
-        def _line(text, size=10.5, bold=False, gap=4.2):
-            pdf.set_font("DejaVu", "B" if bold else "", size)
-            pdf.set_x(pdf.l_margin)
-            pdf.multi_cell(0, gap, text)
+        def _pdf_esc(text):
+            text = _tr(text).replace("\\", r"\\").replace("(", r"\(").replace(")", r"\)")
+            return text.encode("cp1252", errors="replace").decode("latin1")
 
-        def _kv(label, value, size=10.5, gap=6):
-            pdf.set_font("DejaVu", "B", size); pdf.write(gap, f"{label}: ")
-            pdf.set_font("DejaVu", "", size); pdf.write(gap, value); pdf.ln(gap)
+        def _text_w(text, size, bold=False):
+            w = 0
+            for ch in text:
+                if ch == " ": w += 278
+                elif ch.isupper(): w += 722
+                elif ch in "iIl.,'": w += 260
+                else: w += 556
+            return w * size / 1000.0 * (1.05 if bold else 1.0)
 
-        def _imza(v):
-            pdf.ln(6)
-            y = pdf.get_y()
-            pdf.set_font("DejaVu", "B", 11)
-            pdf.set_xy(20, y); pdf.cell(80, 6, "STF KARGO NAKLİYAT VE TİCARET LTD. ŞTİ.")
-            pdf.set_xy(115, y); pdf.cell(80, 6, v["musteri_kisa"])
-            pdf.ln(10)
-            pdf.set_font("DejaVu", "", 10)
-            pdf.set_x(20); pdf.cell(80, 6, "KAŞE-İMZA")
-            pdf.set_x(115); pdf.cell(80, 6, "KAŞE-İMZA")
-            pdf.ln(5)
-            pdf.set_font("DejaVu", "", 8)
-            pdf.set_x(115); pdf.cell(80, 6, v["musteri_uzun"])
+        def _wrap(text, size, max_w, bold=False):
+            words = text.split(" "); lines, cur = [], ""
+            for w in words:
+                trial = (cur + " " + w).strip()
+                if _text_w(trial, size, bold) <= max_w or not cur:
+                    cur = trial
+                else:
+                    lines.append(cur); cur = w
+            if cur: lines.append(cur)
+            return lines
 
-        _line("MADDE 1: TARAFLAR", size=13, bold=True, gap=8)
-        _kv("Taşıyıcı", "STF KARGO NAKLİYAT TİCARET LTD.ŞTİ")
-        _kv("Adres", "Halkalı Merkez Mah.Dereboyu Caddesi No:56 KÜÇÜKÇEKMECE/İSTANBUL")
-        pdf.ln(2)
-        _kv("Taşıtıcı", v["musteri_uzun"])
-        _kv("Adres", v["adres"] or "—")
-        _kv("V.D / V.No", f"{v['vd'] or '—'} / {v['vno'] or '—'}")
-        pdf.ln(2)
-        _line(f"Bir tarafta Stf Kargo Nakliyat ve Ticaret Ltd. Şti. (kısaca STF KARGO olarak anılacaktır.) diğer "
-              f"tarafta {v['musteri_uzun']} (kısaca {v['musteri_kisa']} olarak anılacaktır) arasında akdedilen bu "
-              f"sözleşme tarafların İstanbul geneli yapılacak taşımacılık faaliyetine ilişkin karşılıklı hak ve "
-              f"yükümlülüklerini belirler.")
-        pdf.ln(4)
+        class _SimplePDF:
+            def __init__(self, pw=595, ph=842, margin=56):
+                self.pw, self.ph, self.margin = pw, ph, margin
+                self.pages = []; self._new_page()
+            def _new_page(self):
+                self.pages.append([]); self.y = self.ph - self.margin
+            def _ensure(self, need):
+                if self.y - need < self.margin: self._new_page()
+            def line(self, text, size=10.5, bold=False, gap=13, indent=0, center=False):
+                max_w = self.pw - 2*self.margin - indent
+                for ln in _wrap(text, size, max_w, bold):
+                    self._ensure(gap)
+                    font = "/F2" if bold else "/F1"
+                    xpos = self.margin + indent
+                    if center: xpos = (self.pw - _text_w(ln, size, bold)) / 2
+                    esc = _pdf_esc(ln)
+                    self.pages[-1].append(f"BT {font} {size} Tf {xpos:.2f} {self.y:.2f} Td ({esc}) Tj ET")
+                    self.y -= gap
+            def gap(self, n=8): self.y -= n
+            def two_col(self, left, right, size=11, bold=True, gap=14):
+                self._ensure(gap)
+                font = "/F2" if bold else "/F1"
+                le, re_ = _pdf_esc(left), _pdf_esc(right)
+                self.pages[-1].append(f"BT {font} {size} Tf {self.margin:.2f} {self.y:.2f} Td ({le}) Tj ET")
+                rx = self.pw/2 + 20
+                self.pages[-1].append(f"BT {font} {size} Tf {rx:.2f} {self.y:.2f} Td ({re_}) Tj ET")
+                self.y -= gap
+            def page_break(self): self._new_page()
+            def output(self):
+                objs = []
+                objs.append("<< /Type /Catalog /Pages 2 0 R >>")
+                kids = " ".join(f"{4+2*i} 0 R" for i in range(len(self.pages)))
+                objs.append(f"<< /Type /Pages /Kids [{kids}] /Count {len(self.pages)} >>")
+                objs.append("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>")
+                obj_num = 4
+                for ops in self.pages:
+                    content = "\n".join(ops)
+                    content_bytes = content.encode("latin1", errors="replace")
+                    objs.append(
+                        f"<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 3 0 R "
+                        f"/F2 {3+2*len(self.pages)+1} 0 R >> >> /MediaBox [0 0 {self.pw} {self.ph}] "
+                        f"/Contents {obj_num+1} 0 R >>"
+                    )
+                    obj_num += 1
+                    objs.append(("STREAM", content_bytes))
+                    obj_num += 1
+                objs.append("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>")
+                buf = _szio2.BytesIO()
+                buf.write(b"%PDF-1.4\n")
+                offsets = [0]
+                for idx, o in enumerate(objs, start=1):
+                    offsets.append(buf.tell())
+                    if isinstance(o, tuple) and o[0] == "STREAM":
+                        data = o[1]
+                        buf.write(f"{idx} 0 obj\n<< /Length {len(data)} >>\nstream\n".encode("latin1"))
+                        buf.write(data)
+                        buf.write(b"\nendstream\nendobj\n")
+                    else:
+                        buf.write(f"{idx} 0 obj\n{o}\nendobj\n".encode("latin1"))
+                xref_pos = buf.tell()
+                n = len(objs) + 1
+                buf.write(f"xref\n0 {n}\n0000000000 65535 f \n".encode("latin1"))
+                for off in offsets[1:]:
+                    buf.write(f"{off:010d} 00000 n \n".encode("latin1"))
+                buf.write(f"trailer\n<< /Size {n} /Root 1 0 R >>\nstartxref\n{xref_pos}\n%%EOF".encode("latin1"))
+                return buf.getvalue()
 
-        _line("MADDE 2: GEÇERLİLİK SÜRESİ:", size=12, bold=True, gap=6)
-        _line(f"İşbu sözleşme {v['gecerlilik_tarihi']} tarihine kadar geçerlidir. Bitiminde karşılıklı mutabakat "
-              f"ile yenilenir.")
-        _line("Taraflardan herhangi biri bir ay önceden yazılı bildirim yapmak koşulu ile veya bu sözleşme "
-              "hükümlerine aykırı hareket edilmesi halinde sözleşme tek taraflı feshedilebilir.")
-        pdf.ln(4)
-
-        _line("MADDE 3: UYGULANACAK FİYAT TARİFESİ:", size=12, bold=True, gap=6)
-        _line(f"Geçerlilik süresi içerisinde STF KARGO {v['musteri_kisa']}'nin aşağıdaki tabloda belirtilen "
-              f"ebattaki kargolarını yazılı fiyatlarla taşımayı kabul eder.")
+        pdf = _SimplePDF()
+        pdf.line("MADDE 1: TARAFLAR", size=14, bold=True, gap=20)
+        pdf.line("Taşıyıcı : STF KARGO NAKLİYAT TİCARET LTD.ŞTİ", bold=True)
+        pdf.line("Adres : Halkalı Merkez Mah.Dereboyu Caddesi No:56 KÜÇÜKÇEKMECE/İSTANBUL")
+        pdf.gap(6)
+        pdf.line(f"Taşıtıcı : {v['musteri_uzun']}", bold=True)
+        pdf.line(f"Adres : {v['adres'] or '—'}")
+        pdf.line(f"V.D: {v['vd'] or '—'}   V.No: {v['vno'] or '—'}")
+        pdf.gap(10)
+        pdf.line(f"Bir tarafta Stf Kargo Nakliyat ve Ticaret Ltd. Şti. (kısaca STF KARGO olarak anılacaktır.) "
+                 f"diğer tarafta {v['musteri_uzun']} (kısaca {v['musteri_kisa']} olarak anılacaktır) arasında "
+                 f"akdedilen bu sözleşme tarafların İstanbul geneli yapılacak taşımacılık faaliyetine ilişkin "
+                 f"karşılıklı hak ve yükümlülüklerini belirler.")
+        pdf.gap(14)
+        pdf.line("MADDE 2: GEÇERLİLİK SÜRESİ:", size=12, bold=True, gap=16)
+        pdf.line(f"İşbu sözleşme {v['gecerlilik_tarihi']} tarihine kadar geçerlidir. Bitiminde karşılıklı "
+                 f"mutabakat ile yenilenir.")
+        pdf.line("Taraflardan herhangi biri bir ay önceden yazılı bildirim yapmak koşulu ile veya bu sözleşme "
+                 "hükümlerine aykırı hareket edilmesi halinde sözleşme tek taraflı feshedilebilir.")
+        pdf.gap(14)
+        pdf.line("MADDE 3: UYGULANACAK FİYAT TARİFESİ:", size=12, bold=True, gap=16)
+        pdf.line(f"Geçerlilik süresi içerisinde STF KARGO {v['musteri_kisa']}'nin aşağıdaki tabloda belirtilen "
+                 f"ebattaki kargolarını yazılı fiyatlarla taşımayı kabul eder.")
         if v["fiyat_gruplari"]:
             for grp in v["fiyat_gruplari"]:
-                _line(grp["baslik"], bold=True, gap=6)
+                pdf.line(grp["baslik"], bold=True, gap=16)
                 for s in grp["satirlar"]:
-                    _line("• " + s, size=10, gap=5)
-                pdf.ln(1)
+                    pdf.line("• " + s, size=10, indent=20)
+                pdf.gap(6)
         else:
-            _line("(Bu müşteri için tanımlı fiyat bulunamadı.)", size=10)
-        _line("Taşıma fiyatlarında KDV ayrıca eklenecektir.", bold=True)
-        pdf.ln(4)
+            pdf.line("(Bu müşteri için tanımlı fiyat bulunamadı.)", size=10)
+        pdf.gap(6)
+        pdf.line("Taşıma fiyatlarında KDV ayrıca eklenecektir.", bold=True)
+        pdf.gap(14)
+        pdf.line("MADDE 4: ÖDEME ŞEKLİ VE ZAMANI", size=12, bold=True, gap=16)
+        pdf.line(f"{v['musteri_kisa']} kendisine gelen ürünlere ait ücret alıcı faturalar ile gönderdiği "
+                 f"ürünlere ait ücret gönderen faturaları tarihlerinden itibaren {v['vade']} eft-havale olarak öder.")
+        pdf.gap(14)
+        pdf.line("MADDE 5: YAKIT KLOZU", size=12, bold=True, gap=16)
+        pdf.line("Ay sonunda oluşan yakıt artış farkı %50 oranında fiyatlara yansıtılır")
+        pdf.gap(14)
+        pdf.line("MADDE 6: HİZMET ŞUBESİ ve YETKİLİSİ: İstanbul-Merkez Şubesi: Koray Ertaş", size=12, bold=True, gap=16)
+        pdf.line("0 212 671 50 35-36 / 0 212 671 96 51-444 77 83 · koray.ertas@stflojistik.com")
+        pdf.gap(14)
+        pdf.line("MADDE 7: TAŞIMA KOŞULLARI:", size=12, bold=True, gap=16)
+        pdf.line("Genel taşıma koşulları ekte 14 madde halinde açıklanmış olup tarafları tamamen bağlayıcı "
+                 "nitelik taşır.")
+        pdf.gap(14)
+        pdf.line("MADDE 8:", size=12, bold=True, gap=16)
+        pdf.line(f"İşbu taşıma sözleşmesi toplam sekiz maddeden ibaret olup taraflarca kabul edilerek "
+                 f"{v['imza_tarihi']} tarihinde imza altına alınmıştır.")
+        pdf.gap(26)
+        pdf.two_col("STF KARGO NAKLİYAT VE TİCARET LTD. ŞTİ.", v["musteri_kisa"], bold=True)
+        pdf.two_col("KAŞE-İMZA", "KAŞE-İMZA", bold=False)
+        pdf.two_col("", v["musteri_uzun"], bold=False, size=9)
 
-        _line("MADDE 4: ÖDEME ŞEKLİ VE ZAMANI", size=12, bold=True, gap=6)
-        _line(f"{v['musteri_kisa']} kendisine gelen ürünlere ait ücret alıcı faturalar ile gönderdiği ürünlere ait "
-              f"ücret gönderen faturaları tarihlerinden itibaren {v['vade']} eft-havale olarak öder.")
-        pdf.ln(4)
-
-        _line("MADDE 5: YAKIT KLOZU", size=12, bold=True, gap=6)
-        _line("Ay sonunda oluşan yakıt artış farkı %50 oranında fiyatlara yansıtılır")
-        pdf.ln(4)
-
-        _line("MADDE 6: HİZMET ŞUBESİ ve YETKİLİSİ: İstanbul-Merkez Şubesi: Koray Ertaş", size=12, bold=True, gap=6)
-        _line("0 212 671 50 35-36 / 0 212 671 96 51-444 77 83 · koray.ertas@stflojistik.com")
-        pdf.ln(4)
-
-        _line("MADDE 7: TAŞIMA KOŞULLARI:", size=12, bold=True, gap=6)
-        _line("Genel taşıma koşulları ekte 14 madde halinde açıklanmış olup tarafları tamamen bağlayıcı "
-              "nitelik taşır.")
-        pdf.ln(4)
-
-        _line("MADDE 8:", size=12, bold=True, gap=6)
-        _line(f"İşbu taşıma sözleşmesi toplam sekiz maddeden ibaret olup taraflarca kabul edilerek "
-              f"{v['imza_tarihi']} tarihinde imza altına alınmıştır.")
-
-        _imza(v)
-
-        pdf.add_page()
-        _line("TAŞIMA KOŞULLARI", size=13, bold=True, gap=8)
+        pdf.page_break()
+        pdf.line("TAŞIMA KOŞULLARI", size=14, bold=True, gap=20, center=True)
         for i, k in enumerate(_SZ_KOSULLAR, 1):
-            _line(f"{i}. {k}", size=10, gap=5)
-        pdf.ln(4)
-        _line("TAŞIMASI YASAK OLAN KARGOLAR", size=12, bold=True, gap=6)
+            pdf.line(f"{i}. {k}", size=10, gap=13, indent=14)
+        pdf.gap(10)
+        pdf.line("TAŞIMASI YASAK OLAN KARGOLAR", size=12, bold=True, gap=16)
         for i, y in enumerate(_SZ_YASAKLAR, 1):
-            _line(f"{i}. {y}", size=10, gap=5)
-        _imza(v)
+            pdf.line(f"{i}. {y}", size=10, gap=13, indent=14)
+        pdf.gap(20)
+        pdf.two_col("STF KARGO NAKLİYAT VE TİCARET LTD. ŞTİ.", v["musteri_kisa"], bold=True)
+        pdf.two_col("KAŞE-İMZA", "KAŞE-İMZA", bold=False)
+        pdf.two_col("", v["musteri_uzun"], bold=False, size=9)
 
-        return bytes(pdf.output())
+        return pdf.output()
+
 
     # ══════════════════════════════════════════════════════════════════════
     # SEKMELER
