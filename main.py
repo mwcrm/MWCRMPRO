@@ -4464,6 +4464,43 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
     except:
         pass
 
+    # ── ANINDA NOT ARŞİVLEME — "Kaydet"e basılmasa bile, arama/filtre değişse bile
+    # Açıklama hücresine yazılmış bir not asla kaybolmasın. Her render'da (arama
+    # kutusuna yazmak dahil) çalışır; boş olmayan aciklama varsa hemen arşivler ve
+    # hücreyi temizler, böylece bir sonraki aramaya geçmeden önce not güvenceye alınmış olur.
+    try:
+        if "aciklama" in edited_df.columns and "id" in edited_df.columns:
+            _anlik_notlar = edited_df[edited_df["aciklama"].fillna("").astype(str).str.strip().replace("nan","") != ""]
+            if not _anlik_notlar.empty:
+                _sb_anlik = get_sb_client()
+                for _, _anr in _anlik_notlar.iterrows():
+                    _anlik_id = int(float(str(_anr.get("id",0))))
+                    _anlik_txt = str(_anr.get("aciklama","")).strip()
+                    if not _anlik_id or not _anlik_txt or _anlik_txt == "nan":
+                        continue
+                    try:
+                        if _sb_anlik:
+                            _sb_anlik.table("cari_aciklamalar").insert({
+                                "cari_id": _anlik_id,
+                                "cari_adi": str(_anr.get("firma","")),
+                                "aciklama": _anlik_txt,
+                                "olusturan": st.session_state.get("kullanici",""),
+                            }).execute()
+                            _sb_anlik.table("cari_kartlar").update({"aciklama":""}).eq("id", _anlik_id).execute()
+                        else:
+                            _cx_anlik = get_conn()
+                            _cx_anlik.execute("INSERT INTO cari_aciklamalar (cari_id,cari_adi,aciklama,olusturan) VALUES (?,?,?,?)",
+                                (_anlik_id, str(_anr.get("firma","")), _anlik_txt, st.session_state.get("kullanici","")))
+                            _cx_anlik.execute("UPDATE cari_kartlar SET aciklama='' WHERE id=?", (_anlik_id,))
+                            _cx_anlik.commit(); _cx_anlik.close()
+                    except Exception:
+                        pass
+                try: db_read.clear()
+                except: pass
+                st.rerun()
+    except Exception:
+        pass
+
     secili_df = edited_df[edited_df["Seç"] == True]
     secili_sayi = len(secili_df)
     secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
