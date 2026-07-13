@@ -1435,7 +1435,7 @@ def _notlar_yukle(cari_id):
 @st.dialog("📋 Notlar & Randevu", width="large")
 def not_dialog(cari_id, firma_adi=""):
     """Ekran ortasında açılan not + randevu + silme + düzenleme penceresi"""
-    _tab_not, _tab_rdv, _tab_teklif, _tab_analiz, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "⭐ Özel Teklif", "🔍 Analiz", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
+    _tab_not, _tab_rdv, _tab_yetkili, _tab_teklif, _tab_analiz, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "⭐ Özel Teklif", "🔍 Analiz", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
     with _tab_not:
         not_paneli(cari_id, firma_adi, key_prefix="dlg")
     with _tab_rdv:
@@ -1463,6 +1463,58 @@ def not_dialog(cari_id, firma_adi=""):
                     st.cache_data.clear()
             except Exception as _re:
                 st.error(f"Hata: {_re}")
+    with _tab_yetkili:
+        st.caption(f"**{firma_adi}** için birden fazla yetkili kişi ekleyebilirsiniz (ad, görev, email, GSM, sabit tel).")
+        try:
+            _yk_sb = get_sb_client()
+            _yk_df = pd.DataFrame(_yk_sb.table("cari_yetkililer").select("*").eq("cari_id", int(cari_id)).order("id").execute().data) if _yk_sb else pd.DataFrame()
+        except Exception as _yke:
+            _yk_df = pd.DataFrame()
+            st.caption(f"⚠️ Yetkililer yüklenemedi (tablo henüz oluşturulmamış olabilir): {_yke}")
+
+        if not _yk_df.empty:
+            for _, _yk_r in _yk_df.iterrows():
+                with st.container(border=True):
+                    _yc1, _yc2, _yc3, _yc4, _yc5 = st.columns([2,1.4,2,1.4,1.4])
+                    _yc1.markdown(f"**{_yk_r.get('ad','') or '—'}**")
+                    _yc2.caption(f"🧩 {_yk_r.get('gorev','') or '—'}")
+                    _yc3.caption(f"✉️ {_yk_r.get('email','') or '—'}")
+                    _yc4.caption(f"📱 {_yk_r.get('gsm','') or '—'}")
+                    _yc5.caption(f"☎️ {_yk_r.get('sabit_tel','') or '—'}")
+                    if st.button("🗑️ Sil", key=f"dlg_yk_sil_{cari_id}_{int(_yk_r['id'])}"):
+                        try:
+                            _yk_sb.table("cari_yetkililer").delete().eq("id", int(_yk_r["id"])).execute()
+                            st.success("Silindi.")
+                            st.cache_data.clear()
+                            st.rerun()
+                        except Exception as _yde:
+                            st.error(f"Hata: {_yde}")
+        else:
+            st.caption("Henüz yetkili eklenmemiş.")
+
+        st.markdown("**➕ Yeni Yetkili Ekle**")
+        _yn1, _yn2, _yn3, _yn4, _yn5 = st.columns([2,1.4,2,1.4,1.4])
+        _yk_ad     = _yn1.text_input("", placeholder="Ad Soyad", key=f"dlg_yk_ad_{cari_id}", label_visibility="collapsed")
+        _yk_gorev  = _yn2.text_input("", placeholder="Görev", key=f"dlg_yk_gorev_{cari_id}", label_visibility="collapsed")
+        _yk_email  = _yn3.text_input("", placeholder="Email", key=f"dlg_yk_email_{cari_id}", label_visibility="collapsed")
+        _yk_gsm    = _yn4.text_input("", placeholder="GSM", key=f"dlg_yk_gsm_{cari_id}", label_visibility="collapsed")
+        _yk_sabit  = _yn5.text_input("", placeholder="Sabit Tel", key=f"dlg_yk_sabit_{cari_id}", label_visibility="collapsed")
+        if st.button("👥 Yetkili Ekle", key=f"dlg_yk_ekle_{cari_id}", type="primary", use_container_width=True):
+            if not _yk_ad.strip():
+                st.warning("Ad Soyad gerekli.")
+            else:
+                try:
+                    _yk_sb2 = get_sb_client()
+                    _yk_sb2.table("cari_yetkililer").insert({
+                        "cari_id": int(cari_id), "ad": _yk_ad.strip(), "gorev": _yk_gorev.strip(),
+                        "email": _yk_email.strip(), "gsm": _yk_gsm.strip(), "sabit_tel": _yk_sabit.strip(),
+                        "olusturan": st.session_state.get("kullanici",""),
+                    }).execute()
+                    st.success("✅ Yetkili eklendi!")
+                    st.cache_data.clear()
+                    st.rerun()
+                except Exception as _yee:
+                    st.error(f"Hata: {_yee}")
     with _tab_teklif:
         st.caption(f"**{firma_adi}** için özel teklif oluştur — müşteri otomatik seçili şekilde Özel Teklif sayfası açılır.")
         if st.button("⭐ Özel Teklif Sayfasını Aç", key=f"dlg_ozel_teklif_{cari_id}", type="primary", use_container_width=True):
