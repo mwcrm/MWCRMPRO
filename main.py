@@ -4469,11 +4469,16 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
     # kutusuna yazmak dahil) çalışır; boş olmayan aciklama varsa hemen arşivler ve
     # hücreyi temizler, böylece bir sonraki aramaya geçmeden önce not güvenceye alınmış olur.
     try:
-        if "aciklama" in edited_df.columns and "id" in edited_df.columns:
-            _anlik_notlar = edited_df[edited_df["aciklama"].fillna("").astype(str).str.strip().replace("nan","") != ""]
-            if not _anlik_notlar.empty:
+        _edf_pos = edited_df.reset_index(drop=True)
+        if "aciklama" in _edf_pos.columns and "id" in _edf_pos.columns:
+            _anlik_mask = _edf_pos["aciklama"].fillna("").astype(str).str.strip().replace("nan","") != ""
+            if _anlik_mask.any():
                 _sb_anlik = get_sb_client()
-                for _, _anr in _anlik_notlar.iterrows():
+                _editor_st_anlik = st.session_state.get("cari_editor", {})
+                _edited_rows_anlik = _editor_st_anlik.get("edited_rows", {})
+                _islendi = False
+                for _pos in _edf_pos[_anlik_mask].index:
+                    _anr = _edf_pos.loc[_pos]
                     _anlik_id = int(float(str(_anr.get("id",0))))
                     _anlik_txt = str(_anr.get("aciklama","")).strip()
                     if not _anlik_id or not _anlik_txt or _anlik_txt == "nan":
@@ -4493,11 +4498,21 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                                 (_anlik_id, str(_anr.get("firma","")), _anlik_txt, st.session_state.get("kullanici","")))
                             _cx_anlik.execute("UPDATE cari_kartlar SET aciklama='' WHERE id=?", (_anlik_id,))
                             _cx_anlik.commit(); _cx_anlik.close()
+                        # Widget'ın kendi hafızasından da bu hücrenin "değişti" kaydını sil —
+                        # aksi halde DB'de temizlense bile tablo eski notu göstermeye devam eder
+                        # ve her render'da aynı notu tekrar tekrar arşivleyip sonsuz döngüye girer.
+                        _pos_key = str(_pos)
+                        if _pos_key in _edited_rows_anlik and "aciklama" in _edited_rows_anlik[_pos_key]:
+                            del _edited_rows_anlik[_pos_key]["aciklama"]
+                            if not _edited_rows_anlik[_pos_key]:
+                                del _edited_rows_anlik[_pos_key]
+                        _islendi = True
                     except Exception:
                         pass
-                try: db_read.clear()
-                except: pass
-                st.rerun()
+                if _islendi:
+                    try: db_read.clear()
+                    except: pass
+                    st.rerun()
     except Exception:
         pass
 
