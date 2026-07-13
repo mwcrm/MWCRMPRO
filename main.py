@@ -4488,13 +4488,13 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                         continue  # bu metin bu müşteri için zaten arşivlendi, tekrar etme
                     try:
                         if _sb_anlik:
-                            _sb_anlik.table("cari_aciklamalar").insert({
+                            _ins_r = _sb_anlik.table("cari_aciklamalar").insert({
                                 "cari_id": _anlik_id,
                                 "cari_adi": _anlik_firma,
                                 "aciklama": _anlik_txt,
                                 "olusturan": st.session_state.get("kullanici",""),
                             }).execute()
-                            _sb_anlik.table("cari_kartlar").update({"aciklama":""}).eq("id", _anlik_id).execute()
+                            _upd_r = _sb_anlik.table("cari_kartlar").update({"aciklama":""}).eq("id", _anlik_id).execute()
                         else:
                             _cx_anlik = get_conn()
                             _cx_anlik.execute("INSERT INTO cari_aciklamalar (cari_id,cari_adi,aciklama,olusturan) VALUES (?,?,?,?)",
@@ -4503,14 +4503,15 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                             _cx_anlik.commit(); _cx_anlik.close()
                         _arsiv_takip[_anlik_id] = _anlik_txt  # bu metni bir daha arşivleme
                         _yeni_arsivlendi.append(_anlik_firma)
-                    except Exception:
-                        pass
+                    except Exception as _ac_hata:
+                        # ARTIK GİZLEMİYORUZ — hata varsa ekranda görünsün ki nedenini bulabilelim
+                        st.error(f"⚠️ '{_anlik_firma}' notu arşivlenemedi: {_ac_hata}")
                 if _yeni_arsivlendi:
                     # Widget'ı tamamen sıfırla — tek tek hücre silmeye çalışmak güvenilir değildi
                     st.session_state.pop("cari_editor", None)
-                    try: db_read.clear()
+                    try: st.cache_data.clear()
                     except: pass
-                    st.toast("✅ Not kaydedildi: " + ", ".join(_yeni_arsivlendi), icon="✅")
+                    st.toast("✅ Arşivlendi: " + ", ".join(_yeni_arsivlendi), icon="✅")
                     st.rerun()
     except Exception:
         pass
