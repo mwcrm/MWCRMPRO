@@ -7481,21 +7481,17 @@ elif aktif == "sozlesme":
                         _sz_docx_bytes = _sz_docx_uret(_sz_veri)
                         _sz_pdf_bytes = _sz_pdf_uret(_sz_veri)
 
-                        # Arşivle
+                        # Arşivle — YENİ TABLO GEREKMEZ, var olan "teklifler" tablosunu kullanıyoruz
+                        # (Özel Teklif'in "tip":"ozel" işaretlemesiyle aynı mantık, "tip":"sozlesme" ile ayırt edilir)
                         _sz_sb = get_sb_client()
                         if _sz_sb:
-                            _sz_sb.table("sozlesmeler").insert({
-                                "cari_id": _sz_id,
-                                "musteri_uzun": _sz_veri["musteri_uzun"],
-                                "musteri_kisa": _sz_veri["musteri_kisa"],
-                                "adres": _sz_veri["adres"],
-                                "vd": _sz_veri["vd"],
-                                "vno": _sz_veri["vno"],
-                                "gecerlilik_tarihi": _sz_gecerlilik.isoformat(),
-                                "vade": _sz_veri["vade"],
-                                "imza_tarihi": _sz_imza_tarihi.isoformat(),
-                                "fiyat_json": _szj.dumps(_sz_fiyat_gruplari, ensure_ascii=False),
+                            _sz_sb.table("teklifler").insert({
+                                "musteri_id": _sz_id or 0,
+                                "musteri_adi": _sz_uzun,
+                                "satirlar": _szj.dumps({"tip": "sozlesme", "veri": _sz_veri}, ensure_ascii=False),
+                                "toplam_tutar": 0,
                                 "olusturan": st.session_state.get("kullanici",""),
+                                "notlar": f"Sözleşme · Vade:{_sz_veri['vade']} · Geçerlilik:{_sz_veri['gecerlilik_tarihi']} · İmza:{_sz_veri['imza_tarihi']}",
                             }).execute()
                             st.toast("✅ Sözleşme arşivlendi!", icon="✅")
 
@@ -7518,35 +7514,46 @@ elif aktif == "sozlesme":
         st.markdown("### 📚 Geçmiş Sözleşmeler")
         try:
             _sz_sb2 = get_sb_client()
-            _sz_arsiv = pd.DataFrame(_sz_sb2.table("sozlesmeler").select("*").order("id", desc=True).execute().data) if _sz_sb2 else pd.DataFrame()
+            _sz_ham = pd.DataFrame(_sz_sb2.table("teklifler").select("*").order("id", desc=True).execute().data) if _sz_sb2 else pd.DataFrame()
+            if not _sz_ham.empty and "satirlar" in _sz_ham.columns:
+                _sz_arsiv_ham = _sz_ham[_sz_ham["satirlar"].astype(str).str.contains("sozlesme", case=False, na=False)].copy()
+            else:
+                _sz_arsiv_ham = pd.DataFrame()
         except Exception:
-            _sz_arsiv = pd.DataFrame()
+            _sz_arsiv_ham = pd.DataFrame()
 
-        if _sz_arsiv.empty:
+        # Ham satırları sözleşme veri sözlüğüne çeviriyoruz
+        _sz_arsiv_liste = []
+        for _, _ar in _sz_arsiv_ham.iterrows():
+            try:
+                _parsed = _szj.loads(_ar.get("satirlar", "{}"))
+                if _parsed.get("tip") != "sozlesme":
+                    continue
+                _vv = _parsed.get("veri", {})
+                _vv["id"] = _ar.get("id")
+                _vv["olusturan"] = _ar.get("olusturan", "")
+                _sz_arsiv_liste.append(_vv)
+            except Exception:
+                continue
+
+        if not _sz_arsiv_liste:
             st.info("Henüz sözleşme arşivlenmemiş.")
         else:
             _sz_ara = st.text_input("🔍 Müşteri ara", key="sz_arsiv_ara")
             if _sz_ara:
-                _sz_arsiv = _sz_arsiv[_sz_arsiv["musteri_uzun"].astype(str).str.contains(_sz_ara, case=False, na=False)]
-            for _, _sa in _sz_arsiv.iterrows():
+                _sz_arsiv_liste = [x for x in _sz_arsiv_liste if _sz_ara.lower() in str(x.get("musteri_uzun","")).lower()]
+            for _sa in _sz_arsiv_liste:
                 with st.container(border=True):
                     _sac1, _sac2, _sac3 = st.columns([2.5, 1.3, 1.3])
                     _sac1.markdown(f"**{_sa.get('musteri_uzun','')}**")
-                    _sac1.caption(f"Vade: {_sa.get('vade','—')} · Geçerlilik: {fmt_tarih(str(_sa.get('gecerlilik_tarihi','')))}")
-                    _sac2.caption(f"📅 İmza: {fmt_tarih(str(_sa.get('imza_tarihi','')))}")
+                    _sac1.caption(f"Vade: {_sa.get('vade','—')} · Geçerlilik: {_sa.get('gecerlilik_tarihi','—')}")
+                    _sac2.caption(f"📅 İmza: {_sa.get('imza_tarihi','—')}")
                     _sac3.caption(f"👤 {_sa.get('olusturan','')}")
                     if st.button("📥 Yeniden indir", key=f"sz_yeniden_{int(_sa['id'])}"):
                         try:
-                            _sz_v2 = {
-                                "musteri_uzun": _sa.get("musteri_uzun",""), "musteri_kisa": _sa.get("musteri_kisa",""),
-                                "adres": _sa.get("adres",""), "vd": _sa.get("vd",""), "vno": _sa.get("vno",""),
-                                "gecerlilik_tarihi": fmt_tarih(str(_sa.get("gecerlilik_tarihi",""))),
-                                "vade": _sa.get("vade",""), "imza_tarihi": fmt_tarih(str(_sa.get("imza_tarihi",""))),
-                                "fiyat_gruplari": _szj.loads(_sa.get("fiyat_json","[]")),
-                            }
-                            _dbytes = _sz_docx_uret(_sz_v2)
+                            _dbytes = _sz_docx_uret(_sa)
                             st.download_button("⬇️ Word indir", data=_dbytes,
-                                file_name=f"Sozlesme_{_sa.get('musteri_kisa','')}_{_sa.get('imza_tarihi','')}.docx",
+                                file_name=f"Sozlesme_{_sa.get('musteri_kisa','')}_{_sa.get('imza_tarihi','').replace('/','')}.docx",
                                 mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                                 key=f"sz_yeniden_dl_{int(_sa['id'])}")
                         except Exception as _sz_e2:
