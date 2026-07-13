@@ -728,7 +728,7 @@ def sayfa_log(sayfa):
     # Sekme başlığını güncelle
     _menu_adlari = {
         "yeni": "Yeni Kart", "liste": "Cari Liste", "analiz": "Müşteri Analizi",
-        "randevu": "Randevular", "teklif": "Spot Teklif", "ozel_teklif": "Özel Teklif",
+        "randevu": "Randevular", "teklif": "Spot Teklif", "ozel_teklif": "Özel Teklif", "sozlesme": "Sözleşmeler",
         "rota_analiz": "Rota Analiz", "operasyon": "Operasyon", "kisiler": "Telefon Kişiler",
         "rapor": "Raporlar", "excel": "Excel", "kullanici": "Kullanıcılar",
         "admin_rapor": "Admin Rapor", "harita": "Müşteri Haritası", "patron": "Patron",
@@ -963,7 +963,7 @@ try{localStorage.removeItem('mwcrm_oturum');}catch(e){}
 # ── SESSION STATE ─────────────────────────────────────────────────────────────
 _sayfa_adlari_cfg = {
     "yeni":"Yeni Kart","liste":"Cari Liste","analiz":"Müşteri Analizi",
-    "randevu":"Randevular","teklif":"Spot Teklif","ozel_teklif":"Özel Teklif",
+    "randevu":"Randevular","teklif":"Spot Teklif","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler",
     "rota_analiz":"Rota Analiz","operasyon":"Operasyon","kisiler":"Telefon Kişiler",
     "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
     "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
@@ -976,7 +976,7 @@ st.set_page_config(page_title=_baslik_cfg, layout="wide", initial_sidebar_state=
 # Sekme başlığını aktif menüye göre güncelle
 _sayfa_adlari = {
     "yeni":"Yeni Kart","liste":"Cari Liste","analiz":"Müşteri Analizi",
-    "randevu":"Randevular","teklif":"Spot Teklif","ozel_teklif":"Özel Teklif",
+    "randevu":"Randevular","teklif":"Spot Teklif","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler",
     "rota_analiz":"Rota Analiz","operasyon":"Operasyon","kisiler":"Telefon Kişiler",
     "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
     "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
@@ -1310,7 +1310,7 @@ function mwTab(tab) {
   var btns = window.parent.document.querySelectorAll('section[data-testid="stSidebar"] button');
   var tabMap = {
     'liste':'Cari Liste','analiz':'Müşteri Analizi','randevu':'Randevular',
-    'teklif':'Spot Teklif','ozel_teklif':'Özel Teklif','harita':'Müşteri Haritası',
+    'teklif':'Spot Teklif','ozel_teklif':'Özel Teklif','sozlesme':'Sözleşmeler','harita':'Müşteri Haritası',
     'rapor':'Raporlar','yeni':'Yeni Kart'
   };
   var hedef = tabMap[tab] || tab;
@@ -1435,7 +1435,7 @@ def _notlar_yukle(cari_id):
 @st.dialog("📋 Notlar & Randevu", width="large")
 def not_dialog(cari_id, firma_adi=""):
     """Ekran ortasında açılan not + randevu + silme + düzenleme penceresi"""
-    _tab_not, _tab_rdv, _tab_yetkili, _tab_teklif, _tab_analiz, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "⭐ Özel Teklif", "🔍 Analiz", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
+    _tab_not, _tab_rdv, _tab_yetkili, _tab_teklif, _tab_sozlesme, _tab_analiz, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "🔍 Analiz", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
     with _tab_not:
         not_paneli(cari_id, firma_adi, key_prefix="dlg")
     with _tab_rdv:
@@ -1548,6 +1548,12 @@ def not_dialog(cari_id, firma_adi=""):
             st.session_state["aktif_tab"] = "ozel_teklif"
             st.session_state["teklif_musteri_onsel"] = firma_adi
             st.rerun()
+    with _tab_sozlesme:
+        st.caption(f"**{firma_adi}** için sözleşme hazırla — müşteri otomatik seçili şekilde Sözleşmeler sayfası açılır.")
+        if st.button("📜 Sözleşmeler Sayfasını Aç", key=f"dlg_sozlesme_{cari_id}", type="primary", use_container_width=True):
+            st.session_state["aktif_tab"] = "sozlesme"
+            st.session_state["sozlesme_musteri_onsel"] = firma_adi
+            st.rerun()
     with _tab_analiz:
         st.caption(f"**{firma_adi}** için analiz yap/düzenle — müşteri otomatik seçili şekilde Analiz sayfası açılır.")
         if st.button("🔍 Analiz Sayfasını Aç", key=f"dlg_analiz_{cari_id}", type="primary", use_container_width=True):
@@ -1656,13 +1662,14 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "sozlesme", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
     "rapor": "📊 Raporlar",
     "teklif": "📄 Spot Teklif",
     "ozel_teklif": "⭐ Özel Teklif",
+    "sozlesme": "📜 Sözleşmeler",
     "excel": "📥 Excel Aktar",
     "kisiler": "📞 Telefon Kişiler",
     "analiz": "🔍 Müşteri Analizi",
@@ -2012,6 +2019,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
         "randevu":     "#1d4ed8",
         "teklif":      "#b45309",
         "ozel_teklif": "#7c3aed",
+        "sozlesme":    "#9333ea",
         "kisiler":     "#0f766e",
         "rapor":       "#6d28d9",
         "excel":       "#047857",
@@ -2072,7 +2080,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
     _MENU_GRUPLARI = [
         ("🧾 Cari işlemleri",    ["yeni", "liste", "excel", "mukerrer"]),
         ("🔎 Analiz ve takip",   ["analiz", "islem_takip"]),
-        ("📅 Randevu ve teklif", ["randevu", "teklif", "ozel_teklif"]),
+        ("📅 Randevu ve teklif", ["randevu", "teklif", "ozel_teklif", "sozlesme"]),
         ("🚚 Saha",              ["rota_analiz", "operasyon", "harita"]),
         ("⚙️ Yönetim",          ["kullanici", "patron", "musteri_atama"]),
         ("📊 Raporlar",          ["admin_rapor", "rapor"]),
@@ -2292,7 +2300,7 @@ st.markdown(f"""
   // Nav butonlarında aktif class güncelle
   var _cur = '{_aktif_tab_js}';
   var _tabMap = {{'liste':'liste','analiz':'analiz','randevu':'randevu',
-    'teklif':'teklif','ozel_teklif':'teklif','harita':'harita'}};
+    'teklif':'teklif','ozel_teklif':'teklif','sozlesme':'teklif','harita':'harita'}};
   var _curNav = _tabMap[_cur] || _cur;
   document.querySelectorAll('.mw-nav-btn').forEach(function(b){{
     var _fn = b.getAttribute('onclick') || '';
@@ -6929,6 +6937,508 @@ elif aktif == "ozel_teklif":
                     if _oz_urun_kaydet(_OZ_URUN_VARSAYILAN+_ekstra_liste):
                         st.success(f"✅ '{_yeni_urun}' eklendi!"); st.rerun()
                     else: st.error("Kaydedilemedi!")
+
+
+elif aktif == "sozlesme":
+    sayfa_log("sozlesme")
+    import json as _szj
+    from datetime import date as _szdate
+
+    st.markdown("## 📜 Sözleşmeler")
+
+    # ══════════════════════════════════════════════════════════════════════
+    # YARDIMCI FONKSİYONLAR — fiyat gruplama + docx/pdf üretimi
+    # ══════════════════════════════════════════════════════════════════════
+    def _sz_fiyat_grupla(teklif_veri):
+        """Özel Teklif JSON'unu MADDE 3 formatına (başlık + madde listesi) çevirir"""
+        try:
+            data = _szj.loads(teklif_veri) if isinstance(teklif_veri, str) else (teklif_veri or {})
+        except Exception:
+            return []
+        gruplar, sira = {}, []
+        for grp in data.get("grp", []):
+            for s in grp.get("satirlar", []):
+                _cikis = s.get("cikis", [])
+                _varis = s.get("varis", [])
+                _cikis_s = ", ".join(_cikis) if isinstance(_cikis, list) else str(_cikis or "")
+                _varis_s = ", ".join(_varis) if isinstance(_varis, list) else str(_varis or "")
+                if not _cikis_s and not _varis_s:
+                    continue
+                _baslik = f"{_cikis_s} → {_varis_s}"
+                _tur = ", ".join(s.get("tur", []) or []) or "—"
+                try: _bas = int(float(s.get("bas", 0) or 0))
+                except: _bas = 0
+                try: _bit = int(float(s.get("bit", 0) or 0))
+                except: _bit = 0
+                try: _fiyat = float(s.get("fiyat", 0) or 0)
+                except: _fiyat = 0.0
+                _satir_txt = f"{_tur} | {_bas}-{_bit} desi → {fmt_para(_fiyat)}"
+                if _baslik not in gruplar:
+                    gruplar[_baslik] = []
+                    sira.append(_baslik)
+                gruplar[_baslik].append(_satir_txt)
+        return [{"baslik": b, "satirlar": gruplar[b]} for b in sira]
+
+    _SZ_KOSULLAR = [
+        "STF KARGO her gün kargo İhbarlarını adresten alır ve ertesi gün teslim eder.",
+        "Kargo taşımaları STF KARGO'nun kurallarına göre yapılır.",
+        "Kargo taşıma sonunda alıcı veya vekiline yada temsilcisine hüviyet ve imzası karşılığında teslim edilir. "
+        "Teslimden sonra STF KARGO'nun her türlü sorumluluğu sona erer.",
+        "Harp ve harbe benzer hareket. Grev, kargaşalık, halk hareketleri ve hareketlerle ilgili olarak alınan "
+        "önlemlerden doğan gecikme ve hasardan STF KARGO sorumlu değildir.",
+        "Gelen kargo alıcısına en kısa zamanda bildirilecek iki gün bekletilir. Bu süre içerisinde kargonun teslim "
+        "alınmaması halinde göndericisinden talimat istenir. Üç gün içerisinde talimat gelmezse, kargo "
+        "göndericisine iade edilerek taşıma ücreti ve masrafları kendisinden tahsil edilir.",
+        "İrsaliye ve faturası STF KARGO'ya verilmiş ve değer beyanı yapılmış tüm kargo taşıma YURT İÇİ TAŞIYICI "
+        "MALİ MESULİYET SİGORTA SÖZLEŞMESİ hükümlerine göre sigortalıdır.",
+        "Bulundurulması yasalarla men edilmiş veya ruhsat ve izne tabi olanlarla, çabuk bozulabilecek, fena ve "
+        "ağır koku veren, yanıcı, patlayıcı, parlayıcı, zehirli, yakıcı aşındırıcı maddeler taşınmaz.",
+        "Çek, senet, hisse senedi vb kıymetli kağıtlar taşınmaz.",
+        "Gönderenin taşınan eşyanın mutad evsafına göre yeterli veya uygun olmayan ambalajlanmasının neden "
+        "olduğu hasar, ziyan ve masraflardan STF KARGO sorumlu değildir.",
+        "Üzerinde tahrifat yapılmış, oynanmış, silinti, kazıntı bulunan ambar tesellüm fişleri hükümsüzdür.",
+        "Üç ay içersinde aranmayan kargolardan sorumluluk kabul edilmez.",
+        "Bazı mal çeşitlerinin nitelikleri itibarıyla bozulma, aşınma, normal çürüme, kuruma vb. nedenlerden "
+        "meydan gelen hasarlardan STF KARGO sorumlu değildir.",
+        "İş bu sözleşme taraflarının ihtilafı vukuunda İSTANBUL mahkemeleri ve icra daireleri yetkilidir.",
+        "Sigorta ücreti fatura edilmeyen taşımalarda meydana gelebilecek hasar veya kayıp durumunda ödenecek "
+        "tazminat tutarı taşıma bedelinin 3 (üç) katıdır.",
+    ]
+    _SZ_YASAKLAR = [
+        "Her türlü patlayıcı, yanıcı, zehirleyici, fena kokulu kargolar. Ayrıca dolu ve boş gaz tüpleri "
+        "(yangın söndürme cihazı hariç)",
+        "Kısa sürede bozulabilecek; et, tavuk, balık, bağırsak, ham deri, mutfak yağları ve yumurta, sıvı "
+        "deterjan, makine yağları, plastik ve yağlı boyalar.",
+        "Yüklenip indirilmesi zor, diğer kargolara zarar verme ihtimali yüksek olan 100 kg'dan ağır tek parça "
+        "kargolarla, uzunluğu üç metreden fazla sandık veya demir malzemeler.",
+        "Kapalı zarf veya başka bir muhafaza içine konmuş para ve senet, yemek çeki, piyango bileti ile altın "
+        "ve ziynet eşyası taşınmaz.",
+        "Ambalajından dolayı delinme, parçalanma, dağılma, kırılma sonucunda kendine veya diğer kargolara "
+        "zarar verme ihtimali yüksek olan kargolar.",
+        "Zarf içinde ağır, sivri, zarfı yırtabilecek maddeler.",
+    ]
+
+    def _sz_docx_uret(v):
+        from docx import Document
+        from docx.shared import Pt, Cm, RGBColor
+        from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
+        from docx.enum.table import WD_TABLE_ALIGNMENT
+        from docx.oxml.ns import qn
+        import io as _szio
+
+        def _f(run, size=11, bold=False):
+            run.font.name = "Calibri"; run.font.size = Pt(size); run.font.bold = bold
+
+        def _p(doc, text="", size=11, bold=False, align=None, sa=4, sb=0):
+            para = doc.add_paragraph()
+            para.paragraph_format.space_after = Pt(sa)
+            para.paragraph_format.space_before = Pt(sb)
+            if align: para.alignment = align
+            if text:
+                r = para.add_run(text); _f(r, size, bold)
+            return para
+
+        def _pm(doc, parts, size=11, sa=4):
+            para = doc.add_paragraph(); para.paragraph_format.space_after = Pt(sa)
+            for t, b in parts:
+                r = para.add_run(t); _f(r, size, b)
+            return para
+
+        def _bullet(doc, text, size=10.5):
+            para = doc.add_paragraph(); para.paragraph_format.space_after = Pt(2)
+            para.paragraph_format.left_indent = Cm(0.5)
+            r = para.add_run("•  " + text); _f(r, size)
+
+        def _num(doc, n, text, size=10):
+            para = doc.add_paragraph(); para.paragraph_format.space_after = Pt(4)
+            para.paragraph_format.left_indent = Cm(0.6)
+            r = para.add_run(f"{n}.  {text}"); _f(r, size)
+
+        def _imza_tablosu(doc):
+            tbl = doc.add_table(rows=2, cols=2)
+            tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
+            r = tbl.cell(0,0).paragraphs[0].add_run("STF KARGO NAKLİYAT VE TİCARET LTD. ŞTİ."); _f(r,11,True)
+            r = tbl.cell(0,1).paragraphs[0].add_run(v["musteri_kisa"]); _f(r,11,True)
+            r = tbl.cell(1,0).paragraphs[0].add_run("KAŞE-İMZA"); _f(r,10.5,False)
+            r = tbl.cell(1,1).paragraphs[0].add_run("KAŞE-İMZA"); _f(r,10.5,False)
+            p2 = tbl.cell(1,1).add_paragraph()
+            r = p2.add_run(v["musteri_uzun"]); _f(r,9,False)
+
+        doc = Document()
+        sec = doc.sections[0]
+        sec.page_width = Cm(21); sec.page_height = Cm(29.7)
+        sec.left_margin = Cm(2); sec.right_margin = Cm(2)
+        sec.top_margin = Cm(1.5); sec.bottom_margin = Cm(1.5)
+
+        _p(doc, "MADDE 1: TARAFLAR", size=13, bold=True, sa=8)
+        _pm(doc, [("Taşıyıcı", True), (" : ", False), ("STF KARGO NAKLİYAT TİCARET LTD.ŞTİ", True)])
+        _pm(doc, [("Adres", True), (" : ", False), ("Halkalı Merkez Mah.Dereboyu Caddesi No:56 KÜÇÜKÇEKMECE/İSTANBUL", False)], sa=10)
+        _pm(doc, [("Taşıtıcı", True), (" : ", False), (v["musteri_uzun"], True)])
+        _pm(doc, [("Adres", True), (" : ", False), (v["adres"] or "—", False)])
+        _pm(doc, [("V.D: ", True), (v["vd"] or "—", False), ("   V.No: ", True), (v["vno"] or "—", False)], sa=10)
+        _p(doc, f"Bir tarafta Stf Kargo Nakliyat ve Ticaret Ltd. Şti. (kısaca STF KARGO olarak anılacaktır.) diğer "
+                f"tarafta {v['musteri_uzun']} (kısaca {v['musteri_kisa']} olarak anılacaktır) arasında akdedilen bu "
+                f"sözleşme tarafların İstanbul geneli yapılacak taşımacılık faaliyetine ilişkin karşılıklı hak ve "
+                f"yükümlülüklerini belirler.", size=10.5, sa=10)
+
+        _p(doc, "MADDE 2: GEÇERLİLİK SÜRESİ:", size=12, bold=True, sa=4)
+        _p(doc, f"İşbu sözleşme {v['gecerlilik_tarihi']} tarihine kadar geçerlidir. Bitiminde karşılıklı mutabakat "
+                f"ile yenilenir.", size=10.5, sa=4)
+        _p(doc, "Taraflardan herhangi biri bir ay önceden yazılı bildirim yapmak koşulu ile veya bu sözleşme "
+                "hükümlerine aykırı hareket edilmesi halinde sözleşme tek taraflı feshedilebilir.", size=10.5, sa=10)
+
+        _p(doc, "MADDE 3: UYGULANACAK FİYAT TARİFESİ:", size=12, bold=True, sa=4)
+        _p(doc, f"Geçerlilik süresi içerisinde STF KARGO {v['musteri_kisa']}'nin aşağıdaki tabloda belirtilen "
+                f"ebattaki kargolarını yazılı fiyatlarla taşımayı kabul eder.", size=10.5, sa=6)
+        if v["fiyat_gruplari"]:
+            for grp in v["fiyat_gruplari"]:
+                _p(doc, "*" + grp["baslik"] + "*", size=10.5, bold=True, sa=2)
+                for satir in grp["satirlar"]:
+                    _bullet(doc, satir)
+                doc.add_paragraph().paragraph_format.space_after = Pt(2)
+        else:
+            _p(doc, "(Bu müşteri için tanımlı fiyat bulunamadı — Özel Teklif oluşturulunca burada listelenir.)",
+               size=10, sa=6)
+        _p(doc, "Taşıma fiyatlarında KDV ayrıca eklenecektir.", size=10.5, bold=True, sa=10)
+
+        _p(doc, "MADDE 4: ÖDEME ŞEKLİ VE ZAMANI", size=12, bold=True, sa=4)
+        _p(doc, f"{v['musteri_kisa']} kendisine gelen ürünlere ait ücret alıcı faturalar ile gönderdiği ürünlere "
+                f"ait ücret gönderen faturaları tarihlerinden itibaren {v['vade']} eft-havale olarak öder.",
+           size=10.5, sa=10)
+
+        _p(doc, "MADDE 5: YAKIT KLOZU", size=12, bold=True, sa=4)
+        _p(doc, "Ay sonunda oluşan yakıt artış farkı %50 oranında fiyatlara yansıtılır", size=10.5, sa=10)
+
+        _p(doc, "MADDE 6: HİZMET ŞUBESİ ve YETKİLİSİ: İstanbul-Merkez Şubesi: Koray Ertaş", size=12, bold=True, sa=4)
+        _p(doc, "0 212 671 50 35-36 / 0 212 671 96 51-444 77 83", size=10.5, sa=2)
+        _p(doc, "Halkalı Merkez Mah.Dereboyu Caddesi No:56 K.Çekmece-İSTANBUL", size=10.5, sa=2)
+        _p(doc, "koray.ertas@stflojistik.com", size=10.5, sa=10)
+
+        _p(doc, "MADDE 7: TAŞIMA KOŞULLARI:", size=12, bold=True, sa=4)
+        _p(doc, "Genel taşıma koşulları ikinci sayfada 14 madde halinde açıklanmış olup tarafları tamamen "
+                "bağlayıcı nitelik taşır.", size=10.5, sa=10)
+
+        _p(doc, "MADDE 8:", size=12, bold=True, sa=4)
+        _p(doc, f"İşbu taşıma sözleşmesi toplam sekiz maddeden ibaret olup taraflarca kabul edilerek "
+                f"{v['imza_tarihi']} tarihinde imza altına alınmıştır.", size=10.5, sa=10)
+
+        _p(doc, "Ekleri:", size=10.5, bold=True, sa=2)
+        _p(doc, "1) Taşıma Koşulları", size=10.5, sa=2)
+        _p(doc, "2) Taşınması yasak olan kargolar ve taşınması şarta bağlı kargolar", size=10.5, sa=14)
+
+        _imza_tablosu(doc)
+
+        brk = doc.add_paragraph(); brk.add_run().add_break(WD_BREAK.PAGE)
+        _p(doc, "TAŞIMA KOŞULLARI", size=13, bold=True, align=WD_ALIGN_PARAGRAPH.CENTER, sa=10)
+        for i, k in enumerate(_SZ_KOSULLAR, 1):
+            _num(doc, i, k)
+        _p(doc, "", sa=6)
+        _p(doc, "TAŞIMASI YASAK OLAN KARGOLAR", size=12, bold=True, sa=6)
+        for i, y in enumerate(_SZ_YASAKLAR, 1):
+            _num(doc, i, y)
+        _p(doc, "", sa=10)
+        _imza_tablosu(doc)
+
+        _buf = _szio.BytesIO()
+        doc.save(_buf)
+        return _buf.getvalue()
+
+    def _sz_pdf_uret(v):
+        from fpdf import FPDF
+        import os as _szos
+
+        _font_dir = None
+        for _aday in ["fonts", "./fonts", "/mount/src/mwcrmpro/fonts"]:
+            if _szos.path.isfile(_szos.path.join(_aday, "DejaVuSans.ttf")):
+                _font_dir = _aday; break
+        if not _font_dir:
+            return None  # font bulunamadı — PDF üretilemez, docx yeterli olur
+
+        pdf = FPDF(format="A4")
+        pdf.set_auto_page_break(auto=True, margin=15)
+        pdf.add_font("DejaVu", "", _szos.path.join(_font_dir, "DejaVuSans.ttf"))
+        pdf.add_font("DejaVu", "B", _szos.path.join(_font_dir, "DejaVuSans-Bold.ttf"))
+        pdf.add_page()
+        pdf.set_margins(20, 15, 20)
+
+        def _line(text, size=10.5, bold=False, gap=4.2):
+            pdf.set_font("DejaVu", "B" if bold else "", size)
+            pdf.set_x(pdf.l_margin)
+            pdf.multi_cell(0, gap, text)
+
+        def _kv(label, value, size=10.5, gap=6):
+            pdf.set_font("DejaVu", "B", size); pdf.write(gap, f"{label}: ")
+            pdf.set_font("DejaVu", "", size); pdf.write(gap, value); pdf.ln(gap)
+
+        def _imza(v):
+            pdf.ln(6)
+            y = pdf.get_y()
+            pdf.set_font("DejaVu", "B", 11)
+            pdf.set_xy(20, y); pdf.cell(80, 6, "STF KARGO NAKLİYAT VE TİCARET LTD. ŞTİ.")
+            pdf.set_xy(115, y); pdf.cell(80, 6, v["musteri_kisa"])
+            pdf.ln(10)
+            pdf.set_font("DejaVu", "", 10)
+            pdf.set_x(20); pdf.cell(80, 6, "KAŞE-İMZA")
+            pdf.set_x(115); pdf.cell(80, 6, "KAŞE-İMZA")
+            pdf.ln(5)
+            pdf.set_font("DejaVu", "", 8)
+            pdf.set_x(115); pdf.cell(80, 6, v["musteri_uzun"])
+
+        _line("MADDE 1: TARAFLAR", size=13, bold=True, gap=8)
+        _kv("Taşıyıcı", "STF KARGO NAKLİYAT TİCARET LTD.ŞTİ")
+        _kv("Adres", "Halkalı Merkez Mah.Dereboyu Caddesi No:56 KÜÇÜKÇEKMECE/İSTANBUL")
+        pdf.ln(2)
+        _kv("Taşıtıcı", v["musteri_uzun"])
+        _kv("Adres", v["adres"] or "—")
+        _kv("V.D / V.No", f"{v['vd'] or '—'} / {v['vno'] or '—'}")
+        pdf.ln(2)
+        _line(f"Bir tarafta Stf Kargo Nakliyat ve Ticaret Ltd. Şti. (kısaca STF KARGO olarak anılacaktır.) diğer "
+              f"tarafta {v['musteri_uzun']} (kısaca {v['musteri_kisa']} olarak anılacaktır) arasında akdedilen bu "
+              f"sözleşme tarafların İstanbul geneli yapılacak taşımacılık faaliyetine ilişkin karşılıklı hak ve "
+              f"yükümlülüklerini belirler.")
+        pdf.ln(4)
+
+        _line("MADDE 2: GEÇERLİLİK SÜRESİ:", size=12, bold=True, gap=6)
+        _line(f"İşbu sözleşme {v['gecerlilik_tarihi']} tarihine kadar geçerlidir. Bitiminde karşılıklı mutabakat "
+              f"ile yenilenir.")
+        _line("Taraflardan herhangi biri bir ay önceden yazılı bildirim yapmak koşulu ile veya bu sözleşme "
+              "hükümlerine aykırı hareket edilmesi halinde sözleşme tek taraflı feshedilebilir.")
+        pdf.ln(4)
+
+        _line("MADDE 3: UYGULANACAK FİYAT TARİFESİ:", size=12, bold=True, gap=6)
+        _line(f"Geçerlilik süresi içerisinde STF KARGO {v['musteri_kisa']}'nin aşağıdaki tabloda belirtilen "
+              f"ebattaki kargolarını yazılı fiyatlarla taşımayı kabul eder.")
+        if v["fiyat_gruplari"]:
+            for grp in v["fiyat_gruplari"]:
+                _line(grp["baslik"], bold=True, gap=6)
+                for s in grp["satirlar"]:
+                    _line("• " + s, size=10, gap=5)
+                pdf.ln(1)
+        else:
+            _line("(Bu müşteri için tanımlı fiyat bulunamadı.)", size=10)
+        _line("Taşıma fiyatlarında KDV ayrıca eklenecektir.", bold=True)
+        pdf.ln(4)
+
+        _line("MADDE 4: ÖDEME ŞEKLİ VE ZAMANI", size=12, bold=True, gap=6)
+        _line(f"{v['musteri_kisa']} kendisine gelen ürünlere ait ücret alıcı faturalar ile gönderdiği ürünlere ait "
+              f"ücret gönderen faturaları tarihlerinden itibaren {v['vade']} eft-havale olarak öder.")
+        pdf.ln(4)
+
+        _line("MADDE 5: YAKIT KLOZU", size=12, bold=True, gap=6)
+        _line("Ay sonunda oluşan yakıt artış farkı %50 oranında fiyatlara yansıtılır")
+        pdf.ln(4)
+
+        _line("MADDE 6: HİZMET ŞUBESİ ve YETKİLİSİ: İstanbul-Merkez Şubesi: Koray Ertaş", size=12, bold=True, gap=6)
+        _line("0 212 671 50 35-36 / 0 212 671 96 51-444 77 83 · koray.ertas@stflojistik.com")
+        pdf.ln(4)
+
+        _line("MADDE 7: TAŞIMA KOŞULLARI:", size=12, bold=True, gap=6)
+        _line("Genel taşıma koşulları ekte 14 madde halinde açıklanmış olup tarafları tamamen bağlayıcı "
+              "nitelik taşır.")
+        pdf.ln(4)
+
+        _line("MADDE 8:", size=12, bold=True, gap=6)
+        _line(f"İşbu taşıma sözleşmesi toplam sekiz maddeden ibaret olup taraflarca kabul edilerek "
+              f"{v['imza_tarihi']} tarihinde imza altına alınmıştır.")
+
+        _imza(v)
+
+        pdf.add_page()
+        _line("TAŞIMA KOŞULLARI", size=13, bold=True, gap=8)
+        for i, k in enumerate(_SZ_KOSULLAR, 1):
+            _line(f"{i}. {k}", size=10, gap=5)
+        pdf.ln(4)
+        _line("TAŞIMASI YASAK OLAN KARGOLAR", size=12, bold=True, gap=6)
+        for i, y in enumerate(_SZ_YASAKLAR, 1):
+            _line(f"{i}. {y}", size=10, gap=5)
+        _imza(v)
+
+        return bytes(pdf.output())
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SEKMELER
+    # ══════════════════════════════════════════════════════════════════════
+    _sz_tab1, _sz_tab2 = st.tabs(["📝 Yeni Sözleşme", "📚 Geçmiş Sözleşmeler"])
+
+    with _sz_tab1:
+        _sz_dfm = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
+        _sz_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['firma']}" for _, r in _sz_dfm.iterrows()] if not _sz_dfm.empty else ["-- Müşteri Seçin --"]
+
+        _sz_onsel = st.session_state.pop("sozlesme_musteri_onsel", None)
+        _sz_index = 0
+        if _sz_onsel:
+            for _i, _o in enumerate(_sz_opts):
+                if _o.endswith(f"] {_sz_onsel}"):
+                    _sz_index = _i; break
+
+        _sz_sec = st.selectbox("Müşteri Seç", _sz_opts, index=_sz_index, key="sz_musteri_sec")
+
+        _sz_mus = None; _sz_id = None
+        if _sz_sec != "-- Müşteri Seçin --" and "[" in _sz_sec:
+            try:
+                _sz_id = int(_sz_sec.split("]")[0].replace("[","").strip())
+                _mr = _sz_dfm[_sz_dfm["id"] == _sz_id]
+                if not _mr.empty:
+                    _sz_mus = _mr.iloc[0]
+            except Exception:
+                pass
+
+        if _sz_mus is None:
+            st.info("Sözleşme hazırlamak için önce bir müşteri seçin.")
+        else:
+            _sz_uzun = str(_sz_mus.get("firma",""))
+            _sz_adres_oto = str(_sz_mus.get("adres","") or "")
+            _sz_kisa_tahmin = " ".join(_sz_uzun.split()[:2]).upper()
+
+            st.markdown(f"### 📄 {_sz_uzun}")
+
+            _szc1, _szc2 = st.columns(2)
+            _sz_kisa = _szc1.text_input("Kısa Ad (sözleşme metninde kullanılacak)", value=_sz_kisa_tahmin, key="sz_kisa")
+            _sz_adres = _szc2.text_input("Adres", value=_sz_adres_oto, key="sz_adres")
+
+            st.caption("Vergi Dairesi / Vergi No — yoksa boş bırakıp geçebilirsiniz")
+            _szv1, _szv2, _szv3 = st.columns([1.5, 1.5, 1])
+            _sz_vd = _szv1.text_input("V.D", key="sz_vd", placeholder="Vergi Dairesi...")
+            _sz_vno = _szv2.text_input("V.No", key="sz_vno", placeholder="Vergi No...")
+            _sz_gec = _szv3.checkbox("Geç (V.D/V.No girme)", key="sz_gec")
+
+            st.markdown("---")
+            st.markdown("**MADDE 2 — Geçerlilik Tarihi** 🔴 *(zorunlu)*")
+            _sz_gecerlilik = st.date_input("Sözleşme Geçerlilik Tarihi", value=_szdate.today().replace(year=_szdate.today().year+1),
+                                            key="sz_gecerlilik", format="DD/MM/YYYY")
+
+            st.markdown("**MADDE 3 — Fiyat Tarifesi** (son Özel Teklif'ten otomatik çekilir)")
+            _sz_teklif_df = pd.DataFrame()
+            try:
+                _sz_tekliflerdf = db_read("teklifler", order_col="tarih")
+                if not _sz_tekliflerdf.empty and "satirlar" in _sz_tekliflerdf.columns:
+                    _sz_ozel = _sz_tekliflerdf[_sz_tekliflerdf["satirlar"].str.contains("ozel", case=False, na=False)]
+                    _sz_teklif_df = _sz_ozel[_sz_ozel["musteri_adi"].astype(str).str.strip().str.upper() == _sz_uzun.strip().upper()]
+            except Exception:
+                pass
+
+            _sz_fiyat_gruplari = []
+            if not _sz_teklif_df.empty:
+                _sz_teklif_df = _sz_teklif_df.sort_values("tarih", ascending=False)
+                _sz_son_teklif = _sz_teklif_df.iloc[0]
+                _sz_fiyat_gruplari = _sz_fiyat_grupla(_sz_son_teklif.get("satirlar", "{}"))
+                st.success(f"✅ {fmt_tarih(_sz_son_teklif.get('tarih',''))} tarihli Özel Teklif'ten {len(_sz_fiyat_gruplari)} fiyat grubu bulundu.")
+                with st.expander("Fiyat tablosunu önizle", expanded=False):
+                    for _g in _sz_fiyat_gruplari:
+                        st.markdown(f"**{_g['baslik']}**")
+                        for _s in _g["satirlar"]:
+                            st.caption("• " + _s)
+            else:
+                st.warning("⚠️ Bu müşteri için Özel Teklif bulunamadı. MADDE 3 fiyat tablosu boş oluşturulacak — "
+                           "önce '⭐ Özel Teklif' sayfasından fiyat oluşturmanız önerilir.")
+
+            st.markdown("---")
+            st.markdown("**MADDE 4 — Vade** 🔴 *(zorunlu)*")
+            _sz_vade = st.text_input("Ödeme Vadesi (örn: 45 GÜN)", key="sz_vade", placeholder="Örn: 45 GÜN")
+
+            st.markdown("**MADDE 8 — Sözleşme İmza Tarihi**")
+            _sz_imza_tarihi = st.date_input("İmza Tarihi (varsayılan bugün)", value=_szdate.today(),
+                                             key="sz_imza_tarihi", format="DD/MM/YYYY")
+
+            st.markdown("---")
+            if st.button("📜 Sözleşme Oluştur", type="primary", use_container_width=True, key="sz_olustur"):
+                _sz_hata = []
+                if not _sz_gecerlilik:
+                    _sz_hata.append("Geçerlilik tarihi seçilmedi (MADDE 2 zorunlu).")
+                if not _sz_vade or not _sz_vade.strip():
+                    _sz_hata.append("Vade girilmedi (MADDE 4 zorunlu).")
+                if not _sz_gec and (not _sz_vd.strip() and not _sz_vno.strip()):
+                    st.info("ℹ️ V.D/V.No girilmedi ve 'Geç' işaretlenmedi — sözleşmede boş (—) olarak görünecek.")
+
+                if _sz_hata:
+                    for _h in _sz_hata:
+                        st.error(f"❌ {_h}")
+                else:
+                    _sz_veri = {
+                        "musteri_uzun": _sz_uzun,
+                        "musteri_kisa": _sz_kisa.strip() or _sz_kisa_tahmin,
+                        "adres": _sz_adres,
+                        "vd": _sz_vd.strip(),
+                        "vno": _sz_vno.strip(),
+                        "gecerlilik_tarihi": _sz_gecerlilik.strftime("%d/%m/%Y"),
+                        "vade": _sz_vade.strip() if "gün" in _sz_vade.strip().lower() else f"{_sz_vade.strip()} GÜN",
+                        "imza_tarihi": _sz_imza_tarihi.strftime("%d/%m/%Y"),
+                        "fiyat_gruplari": _sz_fiyat_gruplari,
+                    }
+                    try:
+                        _sz_docx_bytes = _sz_docx_uret(_sz_veri)
+                        _sz_pdf_bytes = _sz_pdf_uret(_sz_veri)
+
+                        # Arşivle
+                        _sz_sb = get_sb_client()
+                        if _sz_sb:
+                            _sz_sb.table("sozlesmeler").insert({
+                                "cari_id": _sz_id,
+                                "musteri_uzun": _sz_veri["musteri_uzun"],
+                                "musteri_kisa": _sz_veri["musteri_kisa"],
+                                "adres": _sz_veri["adres"],
+                                "vd": _sz_veri["vd"],
+                                "vno": _sz_veri["vno"],
+                                "gecerlilik_tarihi": _sz_gecerlilik.isoformat(),
+                                "vade": _sz_veri["vade"],
+                                "imza_tarihi": _sz_imza_tarihi.isoformat(),
+                                "fiyat_json": _szj.dumps(_sz_fiyat_gruplari, ensure_ascii=False),
+                                "olusturan": st.session_state.get("kullanici",""),
+                            }).execute()
+                            st.toast("✅ Sözleşme arşivlendi!", icon="✅")
+
+                        st.success(f"✅ {_sz_uzun} için sözleşme oluşturuldu ve arşivlendi!")
+                        _szd1, _szd2 = st.columns(2)
+                        _szd1.download_button("⬇️ Word (.docx) indir", data=_sz_docx_bytes,
+                            file_name=f"Sozlesme_{_sz_kisa.strip() or _sz_kisa_tahmin}_{_sz_imza_tarihi.strftime('%Y%m%d')}.docx",
+                            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                            use_container_width=True, key="sz_dl_docx")
+                        if _sz_pdf_bytes:
+                            _szd2.download_button("⬇️ PDF indir", data=_sz_pdf_bytes,
+                                file_name=f"Sozlesme_{_sz_kisa.strip() or _sz_kisa_tahmin}_{_sz_imza_tarihi.strftime('%Y%m%d')}.pdf",
+                                mime="application/pdf", use_container_width=True, key="sz_dl_pdf")
+                        else:
+                            _szd2.warning("PDF için fonts/DejaVuSans.ttf bulunamadı — repo'ya eklenmesi gerekiyor.")
+                    except Exception as _sz_e:
+                        st.error(f"⚠️ Sözleşme oluşturulamadı: {_sz_e}")
+
+    with _sz_tab2:
+        st.markdown("### 📚 Geçmiş Sözleşmeler")
+        try:
+            _sz_sb2 = get_sb_client()
+            _sz_arsiv = pd.DataFrame(_sz_sb2.table("sozlesmeler").select("*").order("id", desc=True).execute().data) if _sz_sb2 else pd.DataFrame()
+        except Exception:
+            _sz_arsiv = pd.DataFrame()
+
+        if _sz_arsiv.empty:
+            st.info("Henüz sözleşme arşivlenmemiş.")
+        else:
+            _sz_ara = st.text_input("🔍 Müşteri ara", key="sz_arsiv_ara")
+            if _sz_ara:
+                _sz_arsiv = _sz_arsiv[_sz_arsiv["musteri_uzun"].astype(str).str.contains(_sz_ara, case=False, na=False)]
+            for _, _sa in _sz_arsiv.iterrows():
+                with st.container(border=True):
+                    _sac1, _sac2, _sac3 = st.columns([2.5, 1.3, 1.3])
+                    _sac1.markdown(f"**{_sa.get('musteri_uzun','')}**")
+                    _sac1.caption(f"Vade: {_sa.get('vade','—')} · Geçerlilik: {fmt_tarih(str(_sa.get('gecerlilik_tarihi','')))}")
+                    _sac2.caption(f"📅 İmza: {fmt_tarih(str(_sa.get('imza_tarihi','')))}")
+                    _sac3.caption(f"👤 {_sa.get('olusturan','')}")
+                    if st.button("📥 Yeniden indir", key=f"sz_yeniden_{int(_sa['id'])}"):
+                        try:
+                            _sz_v2 = {
+                                "musteri_uzun": _sa.get("musteri_uzun",""), "musteri_kisa": _sa.get("musteri_kisa",""),
+                                "adres": _sa.get("adres",""), "vd": _sa.get("vd",""), "vno": _sa.get("vno",""),
+                                "gecerlilik_tarihi": fmt_tarih(str(_sa.get("gecerlilik_tarihi",""))),
+                                "vade": _sa.get("vade",""), "imza_tarihi": fmt_tarih(str(_sa.get("imza_tarihi",""))),
+                                "fiyat_gruplari": _szj.loads(_sa.get("fiyat_json","[]")),
+                            }
+                            _dbytes = _sz_docx_uret(_sz_v2)
+                            st.download_button("⬇️ Word indir", data=_dbytes,
+                                file_name=f"Sozlesme_{_sa.get('musteri_kisa','')}_{_sa.get('imza_tarihi','')}.docx",
+                                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                                key=f"sz_yeniden_dl_{int(_sa['id'])}")
+                        except Exception as _sz_e2:
+                            st.error(f"Hata: {_sz_e2}")
 
 
 elif aktif == "excel":
