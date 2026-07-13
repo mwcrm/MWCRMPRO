@@ -4465,29 +4465,32 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
         pass
 
     # ── ANINDA NOT ARŞİVLEME — "Kaydet"e basılmasa bile, arama/filtre değişse bile
-    # Açıklama hücresine yazılmış bir not asla kaybolmasın. Her render'da (arama
-    # kutusuna yazmak dahil) çalışır; boş olmayan aciklama varsa hemen arşivler ve
-    # hücreyi temizler, böylece bir sonraki aramaya geçmeden önce not güvenceye alınmış olur.
+    # Açıklama hücresine yazılmış bir not asla kaybolmasın VE asla mükerrer kaydedilmesin.
+    # Her render'da otomatik çalışır; boş olmayan aciklama varsa hemen arşivler.
     try:
         _edf_pos = edited_df.reset_index(drop=True)
         if "aciklama" in _edf_pos.columns and "id" in _edf_pos.columns:
             _anlik_mask = _edf_pos["aciklama"].fillna("").astype(str).str.strip().replace("nan","") != ""
             if _anlik_mask.any():
                 _sb_anlik = get_sb_client()
-                _editor_st_anlik = st.session_state.get("cari_editor", {})
-                _edited_rows_anlik = _editor_st_anlik.get("edited_rows", {})
-                _islendi = False
+                # Mükerrer kaydı önlemek için: bu tam metni bu müşteri için daha önce
+                # arşivlediysek bir daha arşivleme (widget eski metni göstermeye devam etse bile).
+                _arsiv_takip = st.session_state.setdefault("_ac_arsiv_takip", {})
+                _yeni_arsivlendi = []
                 for _pos in _edf_pos[_anlik_mask].index:
                     _anr = _edf_pos.loc[_pos]
                     _anlik_id = int(float(str(_anr.get("id",0))))
                     _anlik_txt = str(_anr.get("aciklama","")).strip()
+                    _anlik_firma = str(_anr.get("firma",""))
                     if not _anlik_id or not _anlik_txt or _anlik_txt == "nan":
                         continue
+                    if _arsiv_takip.get(_anlik_id) == _anlik_txt:
+                        continue  # bu metin bu müşteri için zaten arşivlendi, tekrar etme
                     try:
                         if _sb_anlik:
                             _sb_anlik.table("cari_aciklamalar").insert({
                                 "cari_id": _anlik_id,
-                                "cari_adi": str(_anr.get("firma","")),
+                                "cari_adi": _anlik_firma,
                                 "aciklama": _anlik_txt,
                                 "olusturan": st.session_state.get("kullanici",""),
                             }).execute()
@@ -4495,23 +4498,19 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                         else:
                             _cx_anlik = get_conn()
                             _cx_anlik.execute("INSERT INTO cari_aciklamalar (cari_id,cari_adi,aciklama,olusturan) VALUES (?,?,?,?)",
-                                (_anlik_id, str(_anr.get("firma","")), _anlik_txt, st.session_state.get("kullanici","")))
+                                (_anlik_id, _anlik_firma, _anlik_txt, st.session_state.get("kullanici","")))
                             _cx_anlik.execute("UPDATE cari_kartlar SET aciklama='' WHERE id=?", (_anlik_id,))
                             _cx_anlik.commit(); _cx_anlik.close()
-                        # Widget'ın kendi hafızasından da bu hücrenin "değişti" kaydını sil —
-                        # aksi halde DB'de temizlense bile tablo eski notu göstermeye devam eder
-                        # ve her render'da aynı notu tekrar tekrar arşivleyip sonsuz döngüye girer.
-                        _pos_key = str(_pos)
-                        if _pos_key in _edited_rows_anlik and "aciklama" in _edited_rows_anlik[_pos_key]:
-                            del _edited_rows_anlik[_pos_key]["aciklama"]
-                            if not _edited_rows_anlik[_pos_key]:
-                                del _edited_rows_anlik[_pos_key]
-                        _islendi = True
+                        _arsiv_takip[_anlik_id] = _anlik_txt  # bu metni bir daha arşivleme
+                        _yeni_arsivlendi.append(_anlik_firma)
                     except Exception:
                         pass
-                if _islendi:
+                if _yeni_arsivlendi:
+                    # Widget'ı tamamen sıfırla — tek tek hücre silmeye çalışmak güvenilir değildi
+                    st.session_state.pop("cari_editor", None)
                     try: db_read.clear()
                     except: pass
+                    st.toast("✅ Not kaydedildi: " + ", ".join(_yeni_arsivlendi), icon="✅")
                     st.rerun()
     except Exception:
         pass
