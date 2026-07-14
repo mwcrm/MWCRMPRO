@@ -1091,7 +1091,10 @@ div[data-testid="stMainBlockContainer"] {
                                     _cikis = ", ".join(_s.get("cikis",[])) if isinstance(_s.get("cikis"),list) else str(_s.get("cikis") or "")
                                     _varis = ", ".join(_s.get("varis",[])) if isinstance(_s.get("varis"),list) else str(_s.get("varis") or "")
                                     _tur = ", ".join(_s.get("tur",[]) or [])
-                                    st.caption(f"　• {_cikis} → {_varis} · {_tur} · {fmt_para(_s.get('fiyat',0))}")
+                                    _bas_v = _s.get("bas", "")
+                                    _bit_v = _s.get("bit", "")
+                                    _desi_txt = f"{_bas_v}-{_bit_v} desi · " if (_bas_v != "" or _bit_v != "") else ""
+                                    st.caption(f"　• {_cikis} → {_varis} · {_tur} · {_desi_txt}{fmt_para(_s.get('fiyat',0))}")
 
         # ══════════════════════════════════════════════════════════════════════
         # SEKME 2 — Fiyat Al
@@ -1109,11 +1112,6 @@ div[data-testid="stMainBlockContainer"] {
             _mp_a_ilceler = sorted(set(r[1] for r in DAGITIM_PLANI if r[0] == _mp_a_il))
             _mp_a_ilce = _mpa2.selectbox("Alıcı İlçe", _mp_a_ilceler, key="mp_a_ilce")
             _mp_a_adres = _mpaa.text_input("Alıcı Adresi *", key="mp_a_adres", placeholder="Açık adres...")
-
-            with st.expander("🗺️ Haritada Gör (yol tarifi)", expanded=False):
-                _mp_rota_sorgu = f"{_mp_g_il},Türkiye/{_mp_a_il},Türkiye".replace(" ", "+")
-                st.components.v1.iframe(
-                    f"https://www.google.com/maps?saddr={_mp_g_il}&daddr={_mp_a_il}&output=embed", height=320)
 
             _mpk0, _mpk1, _mpk2, _mpk3, _mpk4, _mpk5, _mpkdesi, _mpkfiyat = st.columns(8)
             _mpk0.markdown("<br>**📦 Kargo Bilgileri**", unsafe_allow_html=True)
@@ -1166,15 +1164,25 @@ div[data-testid="stMainBlockContainer"] {
                                 if _mp_birim_fiyat is not None:
                                     break
 
-                        # ── ÖZEL TEKLİF ──
+                        # ── ÖZEL TEKLİF (desi aralığına göre doğru dilimi seçer) ──
                         if _p2.get("tip") == "ozel" and _mp_birim_fiyat is None:
+                            _hedef_desi2 = max(_mp_desi, _mp_toplam_kg)
                             for _g in _p2.get("grp", []):
                                 for _s in _g.get("satirlar", []):
                                     _cikis_l = [_mp_tr_norm(c) for c in (_s.get("cikis") or [])] if isinstance(_s.get("cikis"),list) else [_mp_tr_norm(_s.get("cikis") or "")]
                                     _varis_l = [_mp_tr_norm(v) for v in (_s.get("varis") or [])] if isinstance(_s.get("varis"),list) else [_mp_tr_norm(_s.get("varis") or "")]
                                     if _mp_g_il_n in _cikis_l and _mp_a_il_n in _varis_l:
-                                        _mp_birim_fiyat = float(_s.get("fiyat",0) or 0)
-                                        _mp_kaynak = "Özel Teklifinizdeki fiyat"
+                                        try:
+                                            _bas2 = float(_s.get("bas", 0) or 0)
+                                            _bit2 = float(_s.get("bit", 0) or 0)
+                                        except Exception:
+                                            _bas2, _bit2 = 0, 0
+                                        if _bas2 <= _hedef_desi2 <= _bit2:
+                                            _mp_birim_fiyat = float(_s.get("fiyat",0) or 0)
+                                            _mp_kaynak = f"Özel Teklifinizdeki fiyat ({int(_bas2)}-{int(_bit2)} desi)"
+                                            break
+                                if _mp_birim_fiyat is not None:
+                                    break
             except Exception:
                 pass
 
@@ -1195,6 +1203,10 @@ div[data-testid="stMainBlockContainer"] {
             _aciklama, _sure = _dagitim_bilgisi(_mp_a_il, _mp_a_ilce)
             if _aciklama:
                 _mpmsg2.info(f"🚚 **{_mp_a_ilce}** için teslim süresi: **{_sure}** · Dağıtım günü: **{_aciklama}**")
+
+            with st.expander("🗺️ Haritada Gör (yol tarifi)", expanded=False):
+                st.components.v1.iframe(
+                    f"https://www.google.com/maps?saddr={_mp_g_il}&daddr={_mp_a_il}&output=embed", height=320)
 
             st.markdown("---")
 
