@@ -962,6 +962,29 @@ def _tanim_guncelle(tip, eski, yeni):
     except: pass
     return False
 
+IL_KOORDINAT = {
+    "İSTANBUL": (41.0082, 28.9784), "BURSA": (40.1885, 29.0610), "ANKARA": (39.9334, 32.8597),
+    "İZMİR": (38.4237, 27.1428), "KOCAELİ": (40.8533, 29.8815), "SAKARYA": (40.7569, 30.3781),
+    "BİLECİK": (40.1506, 29.9792), "YALOVA": (40.6500, 29.2667), "ESKİŞEHİR": (39.7767, 30.5206),
+    "BALIK ESİR": (39.6484, 27.8826), "MANİSA": (38.6191, 27.4289), "AFYON": (38.7507, 30.5567),
+    "ISPARTA": (37.7648, 30.5566), "DÜZCE": (40.8438, 31.1565),
+}
+
+def _il_mesafe_km(il1, il2):
+    """İki il merkezi arası kuş uçuşu mesafe (km) — haversine formülü"""
+    import math
+    _k1 = IL_KOORDINAT.get(str(il1 or "").strip().upper())
+    _k2 = IL_KOORDINAT.get(str(il2 or "").strip().upper())
+    if not _k1 or not _k2:
+        return None
+    _lat1, _lon1 = _k1; _lat2, _lon2 = _k2
+    _R = 6371.0
+    _dlat = math.radians(_lat2 - _lat1)
+    _dlon = math.radians(_lon2 - _lon1)
+    _a = (math.sin(_dlat/2)**2 + math.cos(math.radians(_lat1)) * math.cos(math.radians(_lat2)) * math.sin(_dlon/2)**2)
+    _c = 2 * math.atan2(math.sqrt(_a), math.sqrt(1-_a))
+    return round(_R * _c)
+
 def _dagitim_bilgisi(il, ilce):
     """Excel'den gelen dağıtım planında bu il/ilçe için gün ve süre bilgisini bulur"""
     _il_n = str(il or "").strip().upper()
@@ -1040,15 +1063,13 @@ def musteri_portal():
                 _tip = _parsed.get("tip","")
                 if _tip == "sozlesme":
                     _v = _parsed.get("veri",{})
-                    with st.container(border=True):
-                        st.markdown(f"**📜 Sözleşme** — Geçerlilik: {_v.get('gecerlilik_tarihi','—')} · Vade: {_v.get('vade','—')}")
+                    with st.expander(f"📜 Sözleşme — Geçerlilik: {_v.get('gecerlilik_tarihi','—')} · Vade: {_v.get('vade','—')}"):
                         for _g in _v.get("fiyat_gruplari",[]):
                             st.caption(f"**{_g['baslik']}**")
                             for _s in _g["satirlar"]:
                                 st.caption("　• " + _s)
                 elif _tip == "ozel":
-                    with st.container(border=True):
-                        st.markdown(f"**⭐ Özel Teklif** — {fmt_tarih(_mr.get('tarih',''))}")
+                    with st.expander(f"⭐ Özel Teklif — {fmt_tarih(_mr.get('tarih',''))}"):
                         for _g in _parsed.get("grp", []):
                             for _s in _g.get("satirlar", []):
                                 _cikis = ", ".join(_s.get("cikis",[])) if isinstance(_s.get("cikis"),list) else str(_s.get("cikis") or "")
@@ -1073,12 +1094,18 @@ def musteri_portal():
         _mp_a_il = _mpa1.selectbox("İl", _mp_iller, key="mp_a_il")
         _mp_a_ilceler = sorted(set(r[1] for r in DAGITIM_PLANI if r[0] == _mp_a_il))
         _mp_a_ilce = _mpa2.selectbox("İlçe", _mp_a_ilceler, key="mp_a_ilce")
-        _mp_a_adres = st.text_area("Alıcı Adresi *", key="mp_a_adres", placeholder="Açık adres yazınız...")
+        _mp_a_adres = st.text_area("Alıcı Adresi *", key="mp_a_adres", placeholder="Açık adres yazınız...", height=68)
 
-        if _mp_a_adres and _mp_a_adres.strip():
-            _mp_harita_sorgu = f"{_mp_a_adres}, {_mp_a_ilce}, {_mp_a_il}".replace(" ", "+")
+        # ── Gönderen → Alıcı arası mesafe + rota haritası ──────────────────
+        _mp_km = _il_mesafe_km(_mp_g_il, _mp_a_il)
+        if _mp_g_il == _mp_a_il:
+            st.success(f"📍 **{_mp_g_il}** içi teslimat — aynı il, kısa mesafe!")
+        elif _mp_km:
+            st.success(f"🛣️ **{_mp_g_il} → {_mp_a_il}** arası yaklaşık **{_mp_km} km** (kuş uçuşu)")
+        with st.expander("🗺️ Haritada Gör (yol tarifi)", expanded=False):
+            _mp_rota_sorgu = f"{_mp_g_il},Türkiye/{_mp_a_il},Türkiye".replace(" ", "+")
             st.components.v1.iframe(
-                f"https://www.google.com/maps?q={_mp_harita_sorgu}&output=embed", height=280)
+                f"https://www.google.com/maps?saddr={_mp_g_il}&daddr={_mp_a_il}&output=embed", height=320)
 
         _aciklama, _sure = _dagitim_bilgisi(_mp_a_il, _mp_a_ilce)
         if _aciklama:
@@ -1126,6 +1153,49 @@ def musteri_portal():
         _mps1, _mps2 = st.columns(2)
         _mps1.metric("💰 Tahmini Fiyat", fmt_para(_mp_hesaplanan_fiyat))
         _mps2.caption(f"Kaynak: {_mp_kaynak}")
+
+        # ── Bu fiyat sorgusunu otomatik kaydet (aynısını tekrar tekrar kaydetme) ──
+        if _mp_desi > 0 or _mp_toplam_kg > 0:
+            _mp_sorgu_imza = f"{_mp_g_il}|{_mp_a_il}|{_mp_adet}|{_mp_en}|{_mp_boy}|{_mp_yuk}|{_mp_kg}"
+            _mp_kayitli_sorgular = st.session_state.setdefault("_mp_fiyat_takip", set())
+            if _mp_sorgu_imza not in _mp_kayitli_sorgular:
+                try:
+                    if _mp_sb:
+                        _mp_sb.table("teklifler").insert({
+                            "musteri_id": _mp_cari_id, "musteri_adi": _mp_firma_adi,
+                            "satirlar": _mpj.dumps({"tip":"fiyat_sorgu","veri":{
+                                "gonderen_il": _mp_g_il, "gonderen_ilce": _mp_g_ilce,
+                                "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce,
+                                "km": _mp_km, "adet": _mp_adet, "desi": round(_mp_desi,1),
+                                "toplam_kg": round(_mp_toplam_kg,1), "fiyat": round(_mp_hesaplanan_fiyat,2),
+                                "fiyat_kaynak": _mp_kaynak, "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                            }}, ensure_ascii=False),
+                            "toplam_tutar": _mp_hesaplanan_fiyat,
+                            "olusturan": st.session_state.get("kullanici",""),
+                            "notlar": f"Fiyat Sorgusu · {_mp_g_il}→{_mp_a_il} · {fmt_para(_mp_hesaplanan_fiyat)}",
+                        }).execute()
+                    _mp_kayitli_sorgular.add(_mp_sorgu_imza)
+                except Exception:
+                    pass
+
+        try:
+            _mp_gecmis_sorgular = []
+            if not _mp_ham.empty:
+                for _, _gr in _mp_ham.iterrows():
+                    try:
+                        _gp = _mpj.loads(_gr.get("satirlar","{}"))
+                        if _gp.get("tip") == "fiyat_sorgu":
+                            _mp_gecmis_sorgular.append(_gp.get("veri",{}))
+                    except Exception:
+                        continue
+            if _mp_gecmis_sorgular:
+                with st.expander(f"📜 Geçmiş Fiyat Sorgularım ({len(_mp_gecmis_sorgular)})", expanded=False):
+                    for _gs in _mp_gecmis_sorgular[:20]:
+                        _kmtxt = f" · {_gs.get('km')} km" if _gs.get("km") else ""
+                        st.caption(f"📅 {_gs.get('tarih','')} — {_gs.get('gonderen_il','')} → {_gs.get('alici_il','')}"
+                                   f"{_kmtxt} · {_gs.get('desi','')} desi/{_gs.get('toplam_kg','')} kg → **{fmt_para(_gs.get('fiyat',0))}**")
+        except Exception:
+            pass
 
         if st.button("📦 Kargo İhbarı Ver", type="primary", use_container_width=True, key="mp_ihbar_ver"):
             if not _mp_a_adres or not _mp_a_adres.strip():
