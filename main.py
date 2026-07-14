@@ -1007,7 +1007,7 @@ div[data-testid="stAppViewContainer"] .block-container,
 section.main .block-container,
 .block-container,
 div[data-testid="stMainBlockContainer"] {
-    max-width: 640px !important;
+    max-width: 900px !important;
     margin-left: auto !important;
     margin-right: auto !important;
     padding-left: 1rem !important;
