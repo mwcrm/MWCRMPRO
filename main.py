@@ -2595,9 +2595,12 @@ elif aktif == "mukerrer":
         import re as _mkre
 
         def _mk_norm_tel(s):
-            """Telefonu sadece rakamlara indirger, boşluk/parantez/tire farkını yok sayar, son 10 haneyi alır"""
+            """Telefonu sadece rakamlara indirger, boşluk/parantez/tire farkını yok sayar, son 10 haneyi alır.
+            Kısa/anlamsız veriler (örn. tek '0', bozuk kayıt) eşleşmeyi bozmasın diye en az 7 hane şartı var."""
             _d = _mkre.sub(r"\D", "", str(s or ""))
-            return _d[-10:] if len(_d) >= 10 else (_d if _d else "")
+            if len(_d) < 7:
+                return ""  # çok kısa/anlamsız — karşılaştırmaya dahil etme
+            return _d[-10:]
 
         def _mk_norm_isim(s):
             """Firma adını karşılaştırmak için normalize eder: büyük harf, noktalama/boşluk sadeleştirme,
@@ -2612,7 +2615,8 @@ elif aktif == "mukerrer":
             _s = " " + _mkre.sub(r"\s+", " ", _s).strip() + " "
             for _ek in _ekler:
                 _s = _s.replace(_ek, " ")
-            return _mkre.sub(r"\s+", " ", _s).strip()
+            _sonuc = _mkre.sub(r"\s+", " ", _s).strip()
+            return _sonuc if len(_sonuc) >= 3 else ""  # çok kısa/anlamsız isim eşleşmeyi bozmasın
 
         _mk_firma_gruplari = _mk_df.groupby(_mk_df["firma"].astype(str).str.strip().str.upper())["id"].apply(list)
         _mk_mukerrerler = {k: v for k, v in _mk_firma_gruplari.items() if len(v) > 1 and k not in ["", "NAN", "NONE"]}
