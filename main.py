@@ -1112,6 +1112,7 @@ div[data-testid="stMainBlockContainer"] {
             _mp_a_ilceler = sorted(set(r[1] for r in DAGITIM_PLANI if r[0] == _mp_a_il))
             _mp_a_ilce = _mpa2.selectbox("Alıcı İlçe", _mp_a_ilceler, key="mp_a_ilce")
             _mp_a_adres = _mpaa.text_input("Alıcı Adresi *", key="mp_a_adres", placeholder="Açık adres...")
+            _mp_alici_firma = st.text_input("Alıcı Firma Adı (opsiyonel — sorguları tanımak için kolaylık)", key="mp_alici_firma", placeholder="Örn: XYZ Ticaret Ltd.")
 
             _mpk0, _mpk1, _mpk2, _mpk3, _mpk4, _mpk5, _mpkdesi, _mpkfiyat = st.columns(8)
             _mpk0.markdown("<br>**📦 Kargo Bilgileri**", unsafe_allow_html=True)
@@ -1237,7 +1238,7 @@ div[data-testid="stMainBlockContainer"] {
                                 "musteri_id": _mp_cari_id, "musteri_adi": _mp_firma_adi,
                                 "satirlar": _mpj.dumps({"tip":"fiyat_sorgu","veri":{
                                     "gonderen_il": _mp_g_il, "gonderen_ilce": _mp_g_ilce,
-                                    "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce,
+                                    "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce, "alici_firma": _mp_alici_firma,
                                     "km": _mp_km, "adet": _mp_adet, "en": _mp_en, "boy": _mp_boy, "yukseklik": _mp_yuk, "kilo": _mp_kg,
                                     "desi": round(_mp_desi,1), "toplam_kg": round(_mp_toplam_kg,1), "fiyat": round(_mp_hesaplanan_fiyat,2),
                                     "fiyat_kaynak": _mp_kaynak, "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"),
@@ -1261,12 +1262,25 @@ div[data-testid="stMainBlockContainer"] {
                                 _mp_tum_kayitlar.append((_gp.get("tip"), _gp.get("veri",{})))
                         except Exception:
                             continue
+
                 if _mp_tum_kayitlar:
-                    with st.expander(f"📜 Fiyat Sorgularım / İhbarlarım ({len(_mp_tum_kayitlar)})", expanded=False):
-                        for _tip_v, _kayit in _mp_tum_kayitlar[:20]:
+                    with st.expander(f"📜 Fiyat Sorgularım / İhbarlarım — Harita ve Liste ({len(_mp_tum_kayitlar)})", expanded=False):
+                        # ── Tarih bazlı çoklu seçim filtresi ──
+                        _mp_tum_tarihler = sorted(set(_k.get("tarih","")[:10] for _t, _k in _mp_tum_kayitlar if _k.get("tarih")), reverse=True)
+                        _mp_secili_tarihler = st.multiselect("📅 Tarihe göre filtrele (boş bırakırsan hepsi gelir)",
+                                                              _mp_tum_tarihler, key="mp_tarih_filtre")
+                        _mp_filtreli = [(t, k) for t, k in _mp_tum_kayitlar
+                                        if not _mp_secili_tarihler or k.get("tarih","")[:10] in _mp_secili_tarihler]
+
+                        st.markdown(f"**{len(_mp_filtreli)} sorgu/ihbar** — haritada görmek istediklerini işaretle:")
+                        _mp_tumunu_sec = st.checkbox("☑️ Tümünü Seç / Kaldır", key="mp_tumunu_sec")
+
+                        _mp_secili_kayitlar = []
+                        for _mi, (_tip_v, _kayit) in enumerate(_mp_filtreli[:30]):
                             _kmtxt = f" · {_kayit.get('km')} km" if _kayit.get("km") else ""
+                            _firma_txt = f" · 🏢 {_kayit.get('alici_firma')}" if _kayit.get("alici_firma") else ""
                             _satir = (f"📅 {_kayit.get('tarih','')} — {_kayit.get('gonderen_il','')} → {_kayit.get('alici_il','')}"
-                                      f"{_kmtxt} · {_kayit.get('desi','')} desi/{_kayit.get('toplam_kg','')} kg → **{fmt_para(_kayit.get('fiyat',0))}**")
+                                      f"{_firma_txt}{_kmtxt} · {_kayit.get('desi','')} desi/{_kayit.get('toplam_kg','')} kg → **{fmt_para(_kayit.get('fiyat',0))}**")
                             if _tip_v == "kargo_ihbar":
                                 _durum_v = _kayit.get("durum","beklemede")
                                 if _durum_v == "onaylandı":
@@ -1275,7 +1289,20 @@ div[data-testid="stMainBlockContainer"] {
                                 else:
                                     _durum_yazi = "⏳ Beklemede (onay bekliyor)"
                                 _satir += f" · {_durum_yazi}"
-                            st.caption(_satir)
+                            _ksec1, _ksec2 = st.columns([0.06, 0.94])
+                            _isaretli = _ksec1.checkbox("", value=_mp_tumunu_sec, key=f"mp_ksec_{_mi}", label_visibility="collapsed")
+                            _ksec2.caption(_satir)
+                            if _isaretli:
+                                _mp_secili_kayitlar.append(_kayit)
+
+                        if _mp_secili_kayitlar:
+                            st.markdown(f"**🗺️ Seçilen {len(_mp_secili_kayitlar)} rota:**")
+                            for _sk in _mp_secili_kayitlar:
+                                _firma_baslik = f" — 🏢 {_sk.get('alici_firma')}" if _sk.get("alici_firma") else ""
+                                st.caption(f"📅 {_sk.get('tarih','')} · {_sk.get('gonderen_il','')} → {_sk.get('alici_il','')}{_firma_baslik}")
+                                st.components.v1.iframe(
+                                    f"https://www.google.com/maps?saddr={_sk.get('gonderen_il','')}&daddr={_sk.get('alici_il','')}&output=embed",
+                                    height=250)
             except Exception:
                 pass
 
@@ -1289,7 +1316,7 @@ div[data-testid="stMainBlockContainer"] {
                         _mp_ihbar_veri = {
                             "musteri_firma": _mp_firma_adi, "gonderen_il": _mp_g_il, "gonderen_ilce": _mp_g_ilce,
                             "gonderen_adres": _mp_g_adres,
-                            "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce, "alici_adres": _mp_a_adres,
+                            "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce, "alici_adres": _mp_a_adres, "alici_firma": _mp_alici_firma,
                             "adet": _mp_adet, "en": _mp_en, "boy": _mp_boy, "yukseklik": _mp_yuk, "kilo": _mp_kg,
                             "desi": round(_mp_desi,1), "toplam_kg": round(_mp_toplam_kg,1), "km": _mp_km,
                             "fiyat": round(_mp_hesaplanan_fiyat,2), "fiyat_kaynak": _mp_kaynak,
