@@ -1209,46 +1209,39 @@ div[data-testid="stMainBlockContainer"] {
                 st.components.v1.iframe(
                     f"https://www.google.com/maps?saddr={_mp_g_il}&daddr={_mp_a_il}&output=embed", height=320)
 
-            # ── Bu fiyat sorgusunu otomatik kaydet (aynısını tekrar tekrar kaydetme) ──
+            # ── Bu fiyat sorgusunu kaydet — TEK OTURUMDA TEK SATIR: alanları değiştirsen bile
+            # yeni satır açmaz, aynı taslak kaydını günceller. Sadece "Kargo İhbarı Ver"den
+            # sonra taslak kapanır, bir sonraki sorgu için yeni bir taslak açılır.
             if _mp_desi > 0 or _mp_toplam_kg > 0:
-                _mp_sorgu_imza = f"{_mp_g_il}|{_mp_a_il}|{_mp_adet}|{_mp_en}|{_mp_boy}|{_mp_yuk}|{_mp_kg}"
-                _mp_kayitli_sorgular = st.session_state.setdefault("_mp_fiyat_takip", {})
-
-                # Sadece oturum hafızasına değil, VERİTABANINDAKİ mevcut kayıtlara da bak —
-                # sayfa yenilenince oturum hafızası sıfırlanıyor, DB kontrolü olmazsa mükerrer satır oluşuyor.
-                if _mp_sorgu_imza not in _mp_kayitli_sorgular and not _mp_ham.empty:
-                    for _, _dr in _mp_ham.iterrows():
-                        try:
-                            _dp = _mpj.loads(_dr.get("satirlar","{}"))
-                            if _dp.get("tip") not in ("fiyat_sorgu", "kargo_ihbar"):
-                                continue
-                            _dv = _dp.get("veri", {})
-                            _db_imza = (f"{_dv.get('gonderen_il','')}|{_dv.get('alici_il','')}|{_dv.get('adet','')}|"
-                                        f"{_dv.get('en','')}|{_dv.get('boy','')}|{_dv.get('yukseklik','')}|{_dv.get('kilo','')}")
-                            if _db_imza == _mp_sorgu_imza:
-                                _mp_kayitli_sorgular[_mp_sorgu_imza] = _dr.get("id")
-                                break
-                        except Exception:
-                            continue
-
-                if _mp_sorgu_imza not in _mp_kayitli_sorgular:
+                _mp_aktif_veri = {
+                    "gonderen_il": _mp_g_il, "gonderen_ilce": _mp_g_ilce,
+                    "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce, "alici_firma": _mp_alici_firma,
+                    "km": _mp_km, "adet": _mp_adet, "en": _mp_en, "boy": _mp_boy, "yukseklik": _mp_yuk, "kilo": _mp_kg,
+                    "desi": round(_mp_desi,1), "toplam_kg": round(_mp_toplam_kg,1), "fiyat": round(_mp_hesaplanan_fiyat,2),
+                    "fiyat_kaynak": _mp_kaynak, "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                }
+                _mp_aktif_json = _mpj.dumps(_mp_aktif_veri, sort_keys=True, ensure_ascii=False)
+                if st.session_state.get("_mp_son_kaydedilen_json") != _mp_aktif_json:
                     try:
                         if _mp_sb:
-                            _mp_ins_r = _mp_sb.table("teklifler").insert({
-                                "musteri_id": _mp_cari_id, "musteri_adi": _mp_firma_adi,
-                                "satirlar": _mpj.dumps({"tip":"fiyat_sorgu","veri":{
-                                    "gonderen_il": _mp_g_il, "gonderen_ilce": _mp_g_ilce,
-                                    "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce, "alici_firma": _mp_alici_firma,
-                                    "km": _mp_km, "adet": _mp_adet, "en": _mp_en, "boy": _mp_boy, "yukseklik": _mp_yuk, "kilo": _mp_kg,
-                                    "desi": round(_mp_desi,1), "toplam_kg": round(_mp_toplam_kg,1), "fiyat": round(_mp_hesaplanan_fiyat,2),
-                                    "fiyat_kaynak": _mp_kaynak, "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                                }}, ensure_ascii=False),
-                                "toplam_tutar": _mp_hesaplanan_fiyat,
-                                "olusturan": st.session_state.get("kullanici",""),
-                                "notlar": f"Fiyat Sorgusu · {_mp_g_il}→{_mp_a_il} · {fmt_para(_mp_hesaplanan_fiyat)}",
-                            }).execute()
-                            _mp_yeni_id = _mp_ins_r.data[0].get("id") if _mp_ins_r.data else None
-                            _mp_kayitli_sorgular[_mp_sorgu_imza] = _mp_yeni_id
+                            _mp_aktif_id = st.session_state.get("_mp_aktif_sorgu_id")
+                            if _mp_aktif_id:
+                                _mp_sb.table("teklifler").update({
+                                    "satirlar": _mpj.dumps({"tip":"fiyat_sorgu","veri":_mp_aktif_veri}, ensure_ascii=False),
+                                    "toplam_tutar": _mp_hesaplanan_fiyat,
+                                    "notlar": f"Fiyat Sorgusu · {_mp_g_il}→{_mp_a_il} · {fmt_para(_mp_hesaplanan_fiyat)}",
+                                }).eq("id", int(_mp_aktif_id)).execute()
+                            else:
+                                _mp_ins_r = _mp_sb.table("teklifler").insert({
+                                    "musteri_id": _mp_cari_id, "musteri_adi": _mp_firma_adi,
+                                    "satirlar": _mpj.dumps({"tip":"fiyat_sorgu","veri":_mp_aktif_veri}, ensure_ascii=False),
+                                    "toplam_tutar": _mp_hesaplanan_fiyat,
+                                    "olusturan": st.session_state.get("kullanici",""),
+                                    "notlar": f"Fiyat Sorgusu · {_mp_g_il}→{_mp_a_il} · {fmt_para(_mp_hesaplanan_fiyat)}",
+                                }).execute()
+                                if _mp_ins_r.data:
+                                    st.session_state["_mp_aktif_sorgu_id"] = _mp_ins_r.data[0].get("id")
+                        st.session_state["_mp_son_kaydedilen_json"] = _mp_aktif_json
                     except Exception:
                         pass
 
@@ -1322,9 +1315,8 @@ div[data-testid="stMainBlockContainer"] {
                             "fiyat": round(_mp_hesaplanan_fiyat,2), "fiyat_kaynak": _mp_kaynak,
                             "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"), "durum": "beklemede",
                         }
-                        # Aynı sorgu zaten kaydedilmişse (fiyat_sorgu) o kaydı ihbara ÇEVİR — mükerrer satır oluşmasın
-                        _mp_sorgu_imza2 = f"{_mp_g_il}|{_mp_a_il}|{_mp_adet}|{_mp_en}|{_mp_boy}|{_mp_yuk}|{_mp_kg}"
-                        _mp_mevcut_id = st.session_state.get("_mp_fiyat_takip", {}).get(_mp_sorgu_imza2)
+                        # Aktif taslak satırı varsa onu ihbara ÇEVİR — mükerrer satır oluşmasın
+                        _mp_mevcut_id = st.session_state.get("_mp_aktif_sorgu_id")
                         if _mp_sb and _mp_mevcut_id:
                             _mp_sb.table("teklifler").update({
                                 "satirlar": _mpj.dumps({"tip":"kargo_ihbar","veri":_mp_ihbar_veri}, ensure_ascii=False),
@@ -1339,6 +1331,9 @@ div[data-testid="stMainBlockContainer"] {
                                 "olusturan": st.session_state.get("kullanici",""),
                                 "notlar": f"Kargo İhbarı · {_mp_g_il}→{_mp_a_il} · {fmt_para(_mp_hesaplanan_fiyat)}",
                             }).execute()
+                        # Taslağı kapat — bir sonraki sorgu için TEMİZ, yeni bir taslak satırı açılsın
+                        st.session_state.pop("_mp_aktif_sorgu_id", None)
+                        st.session_state.pop("_mp_son_kaydedilen_json", None)
                         st.success("✅ Kargo ihbarınız alındı — Beklemede, yönetici onayı bekleniyor. Onaylandığında size e-posta ile bilgi verilecektir.")
                         st.info("📞 Acil durumlar için: **0540 034 42 28**")
                         st.cache_data.clear()
