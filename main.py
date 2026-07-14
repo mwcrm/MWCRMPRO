@@ -1492,15 +1492,46 @@ def not_dialog(cari_id, firma_adi=""):
                 st.error(f"Hata: {_re}")
     with _tab_yetkili:
         st.caption(f"**{firma_adi}** için birden fazla yetkili kişi ekleyebilirsiniz (ad, görev, email, GSM, sabit tel).")
+        import json as _ykj
+        _YK_ETIKET = "##YETKILI##"
+
+        # ── Kart üzerindeki mevcut (eski) tek Yetkili alanını da listenin başında göster ──
+        _yk_kart_liste = []
+        try:
+            _yk_sb0 = get_sb_client()
+            _yk_kart_r = _yk_sb0.table("cari_kartlar").select("yetkili,gsm,sabit,email").eq("id", int(cari_id)).execute() if _yk_sb0 else None
+            if _yk_kart_r and _yk_kart_r.data:
+                _yk_kart = _yk_kart_r.data[0]
+                if str(_yk_kart.get("yetkili","") or "").strip():
+                    _yk_kart_liste.append({
+                        "id": None, "ad": _yk_kart.get("yetkili",""), "gorev": "(Kart üzerindeki birincil yetkili)",
+                        "email": _yk_kart.get("email","") or "", "gsm": _yk_kart.get("gsm","") or "",
+                        "sabit_tel": _yk_kart.get("sabit","") or "", "kart_kaynakli": True,
+                    })
+        except Exception:
+            pass
+
         try:
             _yk_sb = get_sb_client()
-            _yk_df = pd.DataFrame(_yk_sb.table("cari_yetkililer").select("*").eq("cari_id", int(cari_id)).order("id").execute().data) if _yk_sb else pd.DataFrame()
+            _yk_ham = pd.DataFrame(_yk_sb.table("cari_aciklamalar").select("*").eq("cari_id", int(cari_id)).order("id").execute().data) if _yk_sb else pd.DataFrame()
         except Exception as _yke:
-            _yk_df = pd.DataFrame()
-            st.caption(f"⚠️ Yetkililer yüklenemedi (tablo henüz oluşturulmamış olabilir): {_yke}")
+            _yk_ham = pd.DataFrame()
+            st.caption(f"⚠️ Yetkililer yüklenemedi: {_yke}")
 
-        if not _yk_df.empty:
-            for _, _yk_r in _yk_df.iterrows():
+        _yk_liste = list(_yk_kart_liste)
+        if not _yk_ham.empty and "aciklama" in _yk_ham.columns:
+            for _, _hr in _yk_ham.iterrows():
+                _metin = str(_hr.get("aciklama","") or "")
+                if _metin.startswith(_YK_ETIKET):
+                    try:
+                        _kayit = _ykj.loads(_metin[len(_YK_ETIKET):])
+                        _kayit["id"] = _hr.get("id")
+                        _yk_liste.append(_kayit)
+                    except Exception:
+                        pass
+
+        if _yk_liste:
+            for _yk_r in _yk_liste:
                 with st.container(border=True):
                     _yc1, _yc2, _yc3, _yc4, _yc5 = st.columns([2,1.4,2,1.4,1.4])
                     _yc1.markdown(f"**{_yk_r.get('ad','') or '—'}**")
@@ -1508,9 +1539,11 @@ def not_dialog(cari_id, firma_adi=""):
                     _yc3.caption(f"✉️ {_yk_r.get('email','') or '—'}")
                     _yc4.caption(f"📱 {_yk_r.get('gsm','') or '—'}")
                     _yc5.caption(f"☎️ {_yk_r.get('sabit_tel','') or '—'}")
-                    if st.button("🗑️ Sil", key=f"dlg_yk_sil_{cari_id}_{int(_yk_r['id'])}"):
+                    if _yk_r.get("kart_kaynakli"):
+                        st.caption("ℹ️ Bu kişi cari karttaki 'Yetkili' alanından otomatik geliyor — değiştirmek için 'Cari Kartı Düzenle' sekmesini kullanın.")
+                    elif st.button("🗑️ Sil", key=f"dlg_yk_sil_{cari_id}_{int(_yk_r['id'])}"):
                         try:
-                            _yk_sb.table("cari_yetkililer").delete().eq("id", int(_yk_r["id"])).execute()
+                            _yk_sb.table("cari_aciklamalar").delete().eq("id", int(_yk_r["id"])).execute()
                             st.success("Silindi.")
                             st.cache_data.clear()
                             st.rerun()
@@ -1532,9 +1565,14 @@ def not_dialog(cari_id, firma_adi=""):
             else:
                 try:
                     _yk_sb2 = get_sb_client()
-                    _yk_sb2.table("cari_yetkililer").insert({
-                        "cari_id": int(cari_id), "ad": _yk_ad.strip(), "gorev": _yk_gorev.strip(),
-                        "email": _yk_email.strip(), "gsm": _yk_gsm.strip(), "sabit_tel": _yk_sabit.strip(),
+                    _yk_json = _ykj.dumps({
+                        "ad": _yk_ad.strip(), "gorev": _yk_gorev.strip(), "email": _yk_email.strip(),
+                        "gsm": _yk_gsm.strip(), "sabit_tel": _yk_sabit.strip(),
+                    }, ensure_ascii=False)
+                    _yk_sb2.table("cari_aciklamalar").insert({
+                        "cari_id": int(cari_id),
+                        "cari_adi": firma_adi,
+                        "aciklama": _YK_ETIKET + _yk_json,
                         "olusturan": st.session_state.get("kullanici",""),
                     }).execute()
                     st.success("✅ Yetkili eklendi!")
@@ -1604,6 +1642,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
     """Her yerde kullanılan ortak not paneli — Model 5: ultra minimal"""
     _sb = get_sb_client()
     _notlar = _notlar_yukle(cari_id)
+    _notlar = [n for n in _notlar if not str(n.get("aciklama","") or "").startswith("##YETKILI##")]
 
     try:
         _notlar = sorted(_notlar, key=lambda x: str(x.get("created_at","") or x.get("tarih","") or x.get("id",0)), reverse=True)
@@ -10364,6 +10403,8 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
                 try:
                     _rnotlar = sb_liste.table("cari_aciklamalar").select("*").eq("cari_id", _sec_cari_id).order("id", desc=True).execute()
                     _df_notlar = pd.DataFrame(_rnotlar.data) if _rnotlar.data else pd.DataFrame()
+                    if not _df_notlar.empty and "aciklama" in _df_notlar.columns:
+                        _df_notlar = _df_notlar[~_df_notlar["aciklama"].astype(str).str.startswith("##YETKILI##")]
                 except:
                     _df_notlar = pd.DataFrame()
 
