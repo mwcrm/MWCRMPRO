@@ -728,7 +728,7 @@ def sayfa_log(sayfa):
     # Sekme başlığını güncelle
     _menu_adlari = {
         "yeni": "Yeni Kart", "liste": "Cari Liste", "analiz": "Müşteri Analizi",
-        "randevu": "Randevular", "teklif": "Spot Teklif", "ozel_teklif": "Özel Teklif", "sozlesme": "Sözleşmeler",
+        "randevu": "Randevular", "teklif": "Spot Teklif", "ozel_teklif": "Özel Teklif", "sozlesme": "Sözleşmeler", "fatura": "Faturalar",
         "rota_analiz": "Rota Analiz", "operasyon": "Operasyon", "kisiler": "Telefon Kişiler",
         "rapor": "Raporlar", "excel": "Excel", "kullanici": "Kullanıcılar",
         "admin_rapor": "Admin Rapor", "harita": "Müşteri Haritası", "patron": "Patron",
@@ -963,7 +963,7 @@ try{localStorage.removeItem('mwcrm_oturum');}catch(e){}
 # ── SESSION STATE ─────────────────────────────────────────────────────────────
 _sayfa_adlari_cfg = {
     "yeni":"Yeni Kart","liste":"Cari Liste","analiz":"Müşteri Analizi",
-    "randevu":"Randevular","teklif":"Spot Teklif","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler",
+    "randevu":"Randevular","teklif":"Spot Teklif","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler","fatura":"Faturalar",
     "rota_analiz":"Rota Analiz","operasyon":"Operasyon","kisiler":"Telefon Kişiler",
     "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
     "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
@@ -976,7 +976,7 @@ st.set_page_config(page_title=_baslik_cfg, layout="wide", initial_sidebar_state=
 # Sekme başlığını aktif menüye göre güncelle
 _sayfa_adlari = {
     "yeni":"Yeni Kart","liste":"Cari Liste","analiz":"Müşteri Analizi",
-    "randevu":"Randevular","teklif":"Spot Teklif","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler",
+    "randevu":"Randevular","teklif":"Spot Teklif","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler","fatura":"Faturalar",
     "rota_analiz":"Rota Analiz","operasyon":"Operasyon","kisiler":"Telefon Kişiler",
     "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
     "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
@@ -1310,7 +1310,7 @@ function mwTab(tab) {
   var btns = window.parent.document.querySelectorAll('section[data-testid="stSidebar"] button');
   var tabMap = {
     'liste':'Cari Liste','analiz':'Müşteri Analizi','randevu':'Randevular',
-    'teklif':'Spot Teklif','ozel_teklif':'Özel Teklif','sozlesme':'Sözleşmeler','harita':'Müşteri Haritası',
+    'teklif':'Spot Teklif','ozel_teklif':'Özel Teklif','sozlesme':'Sözleşmeler','fatura':'Faturalar','harita':'Müşteri Haritası',
     'rapor':'Raporlar','yeni':'Yeni Kart'
   };
   var hedef = tabMap[tab] || tab;
@@ -1733,7 +1733,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "sozlesme", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "sozlesme", "fatura", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -1741,6 +1741,7 @@ _TAB_ETIKETLER = {
     "teklif": "📄 Spot Teklif",
     "ozel_teklif": "⭐ Özel Teklif",
     "sozlesme": "📜 Sözleşmeler",
+    "fatura": "💰 Faturalar",
     "excel": "📥 Excel Aktar",
     "kisiler": "📞 Telefon Kişiler",
     "analiz": "🔍 Müşteri Analizi",
@@ -2091,6 +2092,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
         "teklif":      "#b45309",
         "ozel_teklif": "#7c3aed",
         "sozlesme":    "#9333ea",
+        "fatura":      "#16a34a",
         "kisiler":     "#0f766e",
         "rapor":       "#6d28d9",
         "excel":       "#047857",
@@ -2152,6 +2154,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
         ("🧾 Cari işlemleri",    ["yeni", "liste", "excel", "mukerrer"]),
         ("🔎 Analiz ve takip",   ["analiz", "islem_takip"]),
         ("📅 Randevu ve teklif", ["randevu", "teklif", "ozel_teklif", "sozlesme"]),
+        ("💰 Faturalar",         ["fatura"]),
         ("🚚 Saha",              ["rota_analiz", "operasyon", "harita"]),
         ("⚙️ Yönetim",          ["kullanici", "patron", "musteri_atama"]),
         ("📊 Raporlar",          ["admin_rapor", "rapor"]),
@@ -2371,7 +2374,7 @@ st.markdown(f"""
   // Nav butonlarında aktif class güncelle
   var _cur = '{_aktif_tab_js}';
   var _tabMap = {{'liste':'liste','analiz':'analiz','randevu':'randevu',
-    'teklif':'teklif','ozel_teklif':'teklif','sozlesme':'teklif','harita':'harita'}};
+    'teklif':'teklif','ozel_teklif':'teklif','sozlesme':'teklif','fatura':'fatura','harita':'harita'}};
   var _curNav = _tabMap[_cur] || _cur;
   document.querySelectorAll('.mw-nav-btn').forEach(function(b){{
     var _fn = b.getAttribute('onclick') || '';
@@ -7633,6 +7636,166 @@ elif aktif == "sozlesme":
                         except Exception as _sz_e2:
                             st.error(f"Hata: {_sz_e2}")
 
+
+elif aktif == "fatura":
+    sayfa_log("fatura")
+    import json as _ftj
+    from datetime import date as _ftdate
+
+    st.markdown("## 💰 Faturalar")
+    st.info("🔧 **Kurulum aşamasında.** Paraşüt API bağlantısı (Client ID / Secret) henüz eklenmedi — şu an "
+            "sadece fatura taslağı hazırlayıp arşivleyebilirsin. Bağlantı eklendiğinde 'Paraşüt'e Gönder' "
+            "butonu aktif olacak, başka hiçbir şey değişmeyecek.")
+
+    _ft_tab1, _ft_tab2 = st.tabs(["📝 Yeni Fatura Taslağı", "📚 Taslak/Gönderilen Faturalar"])
+
+    with _ft_tab1:
+        _ft_dfm = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
+        _ft_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['firma']}" for _, r in _ft_dfm.iterrows()] if not _ft_dfm.empty else ["-- Müşteri Seçin --"]
+        _ft_sec = st.selectbox("Müşteri Seç", _ft_opts, key="ft_musteri_sec")
+
+        _ft_mus = None; _ft_id = None
+        if _ft_sec != "-- Müşteri Seçin --" and "[" in _ft_sec:
+            try:
+                _ft_id = int(_ft_sec.split("]")[0].replace("[","").strip())
+                _mr = _ft_dfm[_ft_dfm["id"] == _ft_id]
+                if not _mr.empty:
+                    _ft_mus = _mr.iloc[0]
+            except Exception:
+                pass
+
+        if _ft_mus is None:
+            st.info("Fatura taslağı hazırlamak için önce bir müşteri seçin.")
+        else:
+            _ft_uzun = str(_ft_mus.get("firma",""))
+            st.markdown(f"### 🧾 {_ft_uzun}")
+            _ftc1, _ftc2 = st.columns(2)
+            _ft_vd  = _ftc1.text_input("Vergi Dairesi", key="ft_vd", placeholder="Vergi Dairesi...")
+            _ft_vno = _ftc2.text_input("Vergi No / TCKN", key="ft_vno", placeholder="Vergi No...")
+
+            st.markdown("**Fatura Kalemleri**")
+            st.caption("İstersen bu müşterinin son Özel Teklif fiyatlarını otomatik çekebilir, istersen elle satır ekleyebilirsin.")
+
+            if "ft_kalemler" not in st.session_state:
+                st.session_state["ft_kalemler"] = []
+
+            if st.button("⭐ Son Özel Teklif'ten Kalemleri Çek", key="ft_teklif_cek"):
+                try:
+                    _ft_tekdf = db_read("teklifler", order_col="tarih")
+                    _ft_ozel = _ft_tekdf[_ft_tekdf["satirlar"].astype(str).str.contains('"tip": "ozel"', case=False, na=False) |
+                                          _ft_tekdf["satirlar"].astype(str).str.contains('"ozel"', case=False, na=False)] if not _ft_tekdf.empty else pd.DataFrame()
+                    _ft_bu = _ft_ozel[_ft_ozel["musteri_adi"].astype(str).str.strip().str.upper() == _ft_uzun.strip().upper()] if not _ft_ozel.empty else pd.DataFrame()
+                    if not _ft_bu.empty:
+                        _ft_bu = _ft_bu.sort_values("tarih", ascending=False)
+                        _ft_data = _ftj.loads(_ft_bu.iloc[0]["satirlar"])
+                        _yeni_kalemler = []
+                        for grp in _ft_data.get("grp", []):
+                            for s in grp.get("satirlar", []):
+                                _cikis = ", ".join(s.get("cikis",[])) if isinstance(s.get("cikis"),list) else str(s.get("cikis") or "")
+                                _varis = ", ".join(s.get("varis",[])) if isinstance(s.get("varis"),list) else str(s.get("varis") or "")
+                                _tur = ", ".join(s.get("tur",[]) or [])
+                                _yeni_kalemler.append({
+                                    "aciklama": f"{_cikis} → {_varis} · {_tur}",
+                                    "miktar": 1, "birim_fiyat": float(s.get("fiyat",0) or 0),
+                                })
+                        st.session_state["ft_kalemler"] = _yeni_kalemler
+                        st.success(f"✅ {len(_yeni_kalemler)} kalem çekildi.")
+                        st.rerun()
+                    else:
+                        st.warning("Bu müşteri için Özel Teklif bulunamadı.")
+                except Exception as _fte:
+                    st.error(f"Hata: {_fte}")
+
+            for _fi, _kal in enumerate(st.session_state["ft_kalemler"]):
+                _fk1, _fk2, _fk3, _fk4 = st.columns([3,1,1.3,0.6])
+                _kal["aciklama"] = _fk1.text_input("", value=_kal.get("aciklama",""), key=f"ft_k_ack_{_fi}", label_visibility="collapsed", placeholder="Açıklama")
+                _kal["miktar"] = _fk2.number_input("", value=float(_kal.get("miktar",1)), key=f"ft_k_mik_{_fi}", label_visibility="collapsed", min_value=0.0, step=1.0)
+                _kal["birim_fiyat"] = _fk3.number_input("", value=float(_kal.get("birim_fiyat",0)), key=f"ft_k_fiy_{_fi}", label_visibility="collapsed", min_value=0.0, step=10.0)
+                if _fk4.button("🗑", key=f"ft_k_sil_{_fi}"):
+                    st.session_state["ft_kalemler"].pop(_fi)
+                    st.rerun()
+
+            if st.button("➕ Satır Ekle", key="ft_satir_ekle"):
+                st.session_state["ft_kalemler"].append({"aciklama":"", "miktar":1, "birim_fiyat":0})
+                st.rerun()
+
+            _ft_kdv = st.selectbox("KDV Oranı", [0, 1, 10, 20], index=3, key="ft_kdv")
+            _ft_ara_toplam = sum(float(k.get("miktar",0)) * float(k.get("birim_fiyat",0)) for k in st.session_state["ft_kalemler"])
+            _ft_kdv_tutar = _ft_ara_toplam * _ft_kdv / 100
+            _ft_genel_toplam = _ft_ara_toplam + _ft_kdv_tutar
+
+            st.markdown("---")
+            _fts1, _fts2, _fts3 = st.columns(3)
+            _fts1.metric("Ara Toplam", fmt_para(_ft_ara_toplam))
+            _fts2.metric(f"KDV (%{_ft_kdv})", fmt_para(_ft_kdv_tutar))
+            _fts3.metric("Genel Toplam", fmt_para(_ft_genel_toplam))
+
+            st.markdown("---")
+            _ftb1, _ftb2 = st.columns(2)
+            if _ftb1.button("💾 Taslak Olarak Kaydet", type="primary", use_container_width=True, key="ft_taslak_kaydet"):
+                if not st.session_state["ft_kalemler"]:
+                    st.warning("En az bir kalem eklemelisin.")
+                else:
+                    try:
+                        _ft_sb = get_sb_client()
+                        _ft_veri = {
+                            "musteri_uzun": _ft_uzun, "vd": _ft_vd, "vno": _ft_vno,
+                            "kalemler": st.session_state["ft_kalemler"], "kdv_orani": _ft_kdv,
+                            "ara_toplam": _ft_ara_toplam, "kdv_tutar": _ft_kdv_tutar, "genel_toplam": _ft_genel_toplam,
+                            "tarih": _ftdate.today().strftime("%d/%m/%Y"), "durum": "taslak",
+                        }
+                        if _ft_sb:
+                            _ft_sb.table("teklifler").insert({
+                                "musteri_id": _ft_id or 0,
+                                "musteri_adi": _ft_uzun,
+                                "satirlar": _ftj.dumps({"tip": "fatura", "veri": _ft_veri}, ensure_ascii=False),
+                                "toplam_tutar": _ft_genel_toplam,
+                                "olusturan": st.session_state.get("kullanici",""),
+                                "notlar": f"Fatura taslağı · {fmt_para(_ft_genel_toplam)}",
+                            }).execute()
+                        st.success("✅ Taslak kaydedildi! 'Taslak/Gönderilen Faturalar' sekmesinden görebilirsin.")
+                        st.session_state["ft_kalemler"] = []
+                        st.rerun()
+                    except Exception as _ftse:
+                        st.error(f"Hata: {_ftse}")
+            _ftb2.button("📤 Paraşüt'e Gönder (yakında)", use_container_width=True, disabled=True,
+                         help="Paraşüt API bağlantısı eklendiğinde aktif olacak")
+
+    with _ft_tab2:
+        st.markdown("### 📚 Taslak / Gönderilen Faturalar")
+        try:
+            _ft_sb2 = get_sb_client()
+            _ft_ham = pd.DataFrame(_ft_sb2.table("teklifler").select("*").order("id", desc=True).execute().data) if _ft_sb2 else pd.DataFrame()
+            _ft_ham = _ft_ham[_ft_ham["satirlar"].astype(str).str.contains("fatura", case=False, na=False)] if not _ft_ham.empty else pd.DataFrame()
+        except Exception:
+            _ft_ham = pd.DataFrame()
+
+        _ft_liste = []
+        for _, _ar in _ft_ham.iterrows():
+            try:
+                _parsed = _ftj.loads(_ar.get("satirlar","{}"))
+                if _parsed.get("tip") != "fatura":
+                    continue
+                _vv = _parsed.get("veri", {})
+                _vv["id"] = _ar.get("id")
+                _vv["olusturan"] = _ar.get("olusturan","")
+                _ft_liste.append(_vv)
+            except Exception:
+                continue
+
+        if not _ft_liste:
+            st.info("Henüz fatura taslağı oluşturulmamış.")
+        else:
+            for _fv in _ft_liste:
+                with st.container(border=True):
+                    _fc1, _fc2, _fc3 = st.columns([2.5,1,1])
+                    _fc1.markdown(f"**{_fv.get('musteri_uzun','')}**")
+                    _fc1.caption(f"📅 {_fv.get('tarih','')} · 👤 {_fv.get('olusturan','')}")
+                    _fc2.metric("Toplam", fmt_para(_fv.get("genel_toplam",0)))
+                    _fc3.markdown(f"🏷️ **{_fv.get('durum','taslak').upper()}**")
+                    with st.expander("Kalemleri gör"):
+                        for _k in _fv.get("kalemler", []):
+                            st.caption(f"• {_k.get('aciklama','')} — {_k.get('miktar',0)} x {fmt_para(_k.get('birim_fiyat',0))}")
 
 elif aktif == "excel":
     sayfa_log("excel")
