@@ -1533,22 +1533,54 @@ def not_dialog(cari_id, firma_adi=""):
         if _yk_liste:
             for _yk_r in _yk_liste:
                 with st.container(border=True):
-                    _yc1, _yc2, _yc3, _yc4, _yc5 = st.columns([2,1.4,2,1.4,1.4])
-                    _yc1.markdown(f"**{_yk_r.get('ad','') or '—'}**")
-                    _yc2.caption(f"🧩 {_yk_r.get('gorev','') or '—'}")
-                    _yc3.caption(f"✉️ {_yk_r.get('email','') or '—'}")
-                    _yc4.caption(f"📱 {_yk_r.get('gsm','') or '—'}")
-                    _yc5.caption(f"☎️ {_yk_r.get('sabit_tel','') or '—'}")
-                    if _yk_r.get("kart_kaynakli"):
-                        st.caption("ℹ️ Bu kişi cari karttaki 'Yetkili' alanından otomatik geliyor — değiştirmek için 'Cari Kartı Düzenle' sekmesini kullanın.")
-                    elif st.button("🗑️ Sil", key=f"dlg_yk_sil_{cari_id}_{int(_yk_r['id'])}"):
-                        try:
-                            _yk_sb.table("cari_aciklamalar").delete().eq("id", int(_yk_r["id"])).execute()
-                            st.success("Silindi.")
-                            st.cache_data.clear()
+                    _yk_duzenleniyor = st.session_state.get("dlg_yk_duzenle_id") == _yk_r.get("id") and _yk_r.get("id") is not None
+
+                    if _yk_duzenleniyor:
+                        _dc1, _dc2, _dc3, _dc4, _dc5 = st.columns([2,1.4,2,1.4,1.4])
+                        _d_ad    = _dc1.text_input("Ad Soyad", value=_yk_r.get("ad",""), key=f"dlg_yk_dad_{_yk_r['id']}")
+                        _d_gorev = _dc2.text_input("Görev", value=_yk_r.get("gorev",""), key=f"dlg_yk_dgorev_{_yk_r['id']}")
+                        _d_email = _dc3.text_input("Email", value=_yk_r.get("email",""), key=f"dlg_yk_demail_{_yk_r['id']}")
+                        _d_gsm   = _dc4.text_input("GSM", value=_yk_r.get("gsm",""), key=f"dlg_yk_dgsm_{_yk_r['id']}")
+                        _d_sabit = _dc5.text_input("Sabit Tel", value=_yk_r.get("sabit_tel",""), key=f"dlg_yk_dsabit_{_yk_r['id']}")
+                        _de1, _de2 = st.columns(2)
+                        if _de1.button("💾 Kaydet", key=f"dlg_yk_dkaydet_{_yk_r['id']}", type="primary", use_container_width=True):
+                            try:
+                                _yeni_json = _ykj.dumps({
+                                    "ad": _d_ad.strip(), "gorev": _d_gorev.strip(), "email": _d_email.strip(),
+                                    "gsm": _d_gsm.strip(), "sabit_tel": _d_sabit.strip(),
+                                }, ensure_ascii=False)
+                                _yk_sb.table("cari_aciklamalar").update({"aciklama": _YK_ETIKET + _yeni_json}).eq("id", int(_yk_r["id"])).execute()
+                                st.session_state.pop("dlg_yk_duzenle_id", None)
+                                st.success("✅ Güncellendi!")
+                                st.cache_data.clear()
+                                st.rerun()
+                            except Exception as _yue:
+                                st.error(f"Hata: {_yue}")
+                        if _de2.button("✖️ Vazgeç", key=f"dlg_yk_diptal_{_yk_r['id']}", use_container_width=True):
+                            st.session_state.pop("dlg_yk_duzenle_id", None)
                             st.rerun()
-                        except Exception as _yde:
-                            st.error(f"Hata: {_yde}")
+                    else:
+                        _yc1, _yc2, _yc3, _yc4, _yc5 = st.columns([2,1.4,2,1.4,1.4])
+                        _yc1.markdown(f"**{_yk_r.get('ad','') or '—'}**")
+                        _yc2.caption(f"🧩 {_yk_r.get('gorev','') or '—'}")
+                        _yc3.caption(f"✉️ {_yk_r.get('email','') or '—'}")
+                        _yc4.caption(f"📱 {_yk_r.get('gsm','') or '—'}")
+                        _yc5.caption(f"☎️ {_yk_r.get('sabit_tel','') or '—'}")
+                        if _yk_r.get("kart_kaynakli"):
+                            st.caption("ℹ️ Bu kişi cari karttaki 'Yetkili' alanından otomatik geliyor — değiştirmek için 'Cari Kartı Düzenle' sekmesini kullanın.")
+                        else:
+                            _yb1, _yb2 = st.columns(2)
+                            if _yb1.button("✏️ Düzenle", key=f"dlg_yk_duz_{cari_id}_{int(_yk_r['id'])}", use_container_width=True):
+                                st.session_state["dlg_yk_duzenle_id"] = _yk_r["id"]
+                                st.rerun()
+                            if _yb2.button("🗑️ Sil", key=f"dlg_yk_sil_{cari_id}_{int(_yk_r['id'])}", use_container_width=True):
+                                try:
+                                    _yk_sb.table("cari_aciklamalar").delete().eq("id", int(_yk_r["id"])).execute()
+                                    st.success("Silindi.")
+                                    st.cache_data.clear()
+                                    st.rerun()
+                                except Exception as _yde:
+                                    st.error(f"Hata: {_yde}")
         else:
             st.caption("Henüz yetkili eklenmemiş.")
 
