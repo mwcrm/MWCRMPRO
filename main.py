@@ -1208,8 +1208,6 @@ div[data-testid="stMainBlockContainer"] {
                 st.components.v1.iframe(
                     f"https://www.google.com/maps?saddr={_mp_g_il}&daddr={_mp_a_il}&output=embed", height=320)
 
-            st.markdown("---")
-
             # ── Bu fiyat sorgusunu otomatik kaydet (aynısını tekrar tekrar kaydetme) ──
             if _mp_desi > 0 or _mp_toplam_kg > 0:
                 _mp_sorgu_imza = f"{_mp_g_il}|{_mp_a_il}|{_mp_adet}|{_mp_en}|{_mp_boy}|{_mp_yuk}|{_mp_kg}"
