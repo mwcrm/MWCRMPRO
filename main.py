@@ -1158,7 +1158,7 @@ def musteri_portal():
         st.caption("📞 Alım ihbarı için bizi de arayabilirsiniz: **0540 034 42 28**")
 
 
-
+def giris_ekrani():
     # ── LOGO ──────────────────────────────────────────────────────────────────
     st.markdown("""
 <div style="text-align:center;padding:2rem 0 1.5rem;">
