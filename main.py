@@ -1000,232 +1000,239 @@ def musteri_portal():
     import json as _mpj
 
     st.markdown("""
+<style>
+section[data-testid="stSidebar"] { display: none !important; }
+div[data-testid="stAppViewContainer"] > section.main { max-width: 100% !important; }
+</style>
 <div style="text-align:center;padding:1.2rem 0 1rem;">
   <div style="font-size:22px;font-weight:600;color:#0f172a;">📦 Müşteri Paneli</div>
 </div>
 """, unsafe_allow_html=True)
 
-    _mp_c1, _mp_c2 = st.columns([5,1])
-    with _mp_c2:
-        if st.button("🚪 Çıkış", use_container_width=True):
-            st.session_state.clear()
-            st.rerun()
+    _mpw1, _mpw2, _mpw3 = st.columns([1, 1.6, 1])
+    with _mpw2:
+        _mp_c1, _mp_c2 = st.columns([5,1])
+        with _mp_c2:
+            if st.button("🚪 Çıkış", use_container_width=True):
+                st.session_state.clear()
+                st.rerun()
 
-    # Bağlı cari_id'yi yetkiler alanından çöz
-    _mp_cari_id = None
-    try:
-        _mp_yet = st.session_state.get("_yetki_listesi") or []
-        if isinstance(_mp_yet, list):
-            for _y in _mp_yet:
-                if str(_y).startswith("MUSTERI_CARI_ID:"):
-                    _mp_cari_id = int(str(_y).split(":")[1])
-    except Exception:
-        pass
-
-    if not _mp_cari_id:
-        st.error("⚠️ Hesabınız bir müşteri kaydına bağlı değil. Lütfen yöneticinizle iletişime geçin.")
-        st.stop()
-
-    _mp_sb = get_sb_client()
-    _mp_firma_adi = ""
-    try:
-        if _mp_sb:
-            _mp_cari_r = _mp_sb.table("cari_kartlar").select("firma").eq("id", _mp_cari_id).execute()
-            if _mp_cari_r.data:
-                _mp_firma_adi = _mp_cari_r.data[0].get("firma","")
-    except Exception:
-        pass
-
-    with _mp_c1:
-        st.markdown(f"#### 🏢 {_mp_firma_adi}")
-
-    _mpt1, _mpt2 = st.tabs(["📄 Sözleşmelerim / Tekliflerim", "💰 Fiyat Al"])
-
-    # ══════════════════════════════════════════════════════════════════════
-    # SEKME 1 — Sözleşmelerim / Tekliflerim (salt okunur)
-    # ══════════════════════════════════════════════════════════════════════
-    with _mpt1:
+        # Bağlı cari_id'yi yetkiler alanından çöz
+        _mp_cari_id = None
         try:
-            _mp_ham = pd.DataFrame(_mp_sb.table("teklifler").select("*").order("id", desc=True).execute().data) if _mp_sb else pd.DataFrame()
-            if not _mp_ham.empty:
-                _mp_ham = _mp_ham[_mp_ham["musteri_adi"].astype(str).str.strip().str.upper() == _mp_firma_adi.strip().upper()]
-        except Exception:
-            _mp_ham = pd.DataFrame()
-
-        if _mp_ham.empty:
-            st.info("Henüz size ait bir sözleşme veya teklif bulunmuyor.")
-        else:
-            for _, _mr in _mp_ham.iterrows():
-                try:
-                    _parsed = _mpj.loads(_mr.get("satirlar","{}"))
-                except Exception:
-                    continue
-                _tip = _parsed.get("tip","")
-                if _tip == "sozlesme":
-                    _v = _parsed.get("veri",{})
-                    with st.expander(f"📜 Sözleşme — Geçerlilik: {_v.get('gecerlilik_tarihi','—')} · Vade: {_v.get('vade','—')}"):
-                        for _g in _v.get("fiyat_gruplari",[]):
-                            st.caption(f"**{_g['baslik']}**")
-                            for _s in _g["satirlar"]:
-                                st.caption("　• " + _s)
-                elif _tip == "ozel":
-                    with st.expander(f"⭐ Özel Teklif — {fmt_tarih(_mr.get('tarih',''))}"):
-                        for _g in _parsed.get("grp", []):
-                            for _s in _g.get("satirlar", []):
-                                _cikis = ", ".join(_s.get("cikis",[])) if isinstance(_s.get("cikis"),list) else str(_s.get("cikis") or "")
-                                _varis = ", ".join(_s.get("varis",[])) if isinstance(_s.get("varis"),list) else str(_s.get("varis") or "")
-                                _tur = ", ".join(_s.get("tur",[]) or [])
-                                st.caption(f"　• {_cikis} → {_varis} · {_tur} · {fmt_para(_s.get('fiyat',0))}")
-
-    # ══════════════════════════════════════════════════════════════════════
-    # SEKME 2 — Fiyat Al
-    # ══════════════════════════════════════════════════════════════════════
-    with _mpt2:
-        _mp_iller = sorted(set(r[0] for r in DAGITIM_PLANI))
-
-        st.markdown("**📍 Gönderen**")
-        _mpg1, _mpg2 = st.columns(2)
-        _mp_g_il = _mpg1.selectbox("İl", _mp_iller, key="mp_g_il")
-        _mp_g_ilceler = sorted(set(r[1] for r in DAGITIM_PLANI if r[0] == _mp_g_il))
-        _mp_g_ilce = _mpg2.selectbox("İlçe", _mp_g_ilceler, key="mp_g_ilce")
-
-        st.markdown("**📍 Alıcı**")
-        _mpa1, _mpa2 = st.columns(2)
-        _mp_a_il = _mpa1.selectbox("İl", _mp_iller, key="mp_a_il")
-        _mp_a_ilceler = sorted(set(r[1] for r in DAGITIM_PLANI if r[0] == _mp_a_il))
-        _mp_a_ilce = _mpa2.selectbox("İlçe", _mp_a_ilceler, key="mp_a_ilce")
-        _mp_a_adres = st.text_area("Alıcı Adresi *", key="mp_a_adres", placeholder="Açık adres yazınız...", height=68)
-
-        # ── Gönderen → Alıcı arası mesafe + rota haritası ──────────────────
-        _mp_km = _il_mesafe_km(_mp_g_il, _mp_a_il)
-        if _mp_g_il == _mp_a_il:
-            st.success(f"📍 **{_mp_g_il}** içi teslimat — aynı il, kısa mesafe!")
-        elif _mp_km:
-            st.success(f"🛣️ **{_mp_g_il} → {_mp_a_il}** arası yaklaşık **{_mp_km} km** (kuş uçuşu)")
-        with st.expander("🗺️ Haritada Gör (yol tarifi)", expanded=False):
-            _mp_rota_sorgu = f"{_mp_g_il},Türkiye/{_mp_a_il},Türkiye".replace(" ", "+")
-            st.components.v1.iframe(
-                f"https://www.google.com/maps?saddr={_mp_g_il}&daddr={_mp_a_il}&output=embed", height=320)
-
-        _aciklama, _sure = _dagitim_bilgisi(_mp_a_il, _mp_a_ilce)
-        if _aciklama:
-            st.info(f"🚚 **{_mp_a_ilce}** için teslim süresi: **{_sure}** · Dağıtım günü: **{_aciklama}**")
-
-        st.markdown("**📦 Kargo Bilgileri**")
-        _mpk1, _mpk2, _mpk3, _mpk4, _mpk5 = st.columns(5)
-        _mp_adet = _mpk1.number_input("Adet", min_value=1, value=1, step=1, key="mp_adet")
-        _mp_en   = _mpk2.number_input("En (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_en")
-        _mp_boy  = _mpk3.number_input("Boy (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_boy")
-        _mp_yuk  = _mpk4.number_input("Yükseklik (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_yuk")
-        _mp_kg   = _mpk5.number_input("Kilo (kg)", min_value=0.0, value=0.0, step=1.0, key="mp_kg")
-
-        _mp_desi = (_mp_en * _mp_boy * _mp_yuk / 3000.0) * _mp_adet
-        _mp_toplam_kg = _mp_kg * _mp_adet
-        st.caption(f"📐 Hesaplanan Desi: **{_mp_desi:.1f}** · Toplam Kilo: **{_mp_toplam_kg:.1f}**")
-
-        # ── Fiyat hesabı: önce sözleşme/teklifte bu güzergah var mı bak, yoksa 6 TL/desi-kg ──
-        _mp_birim_fiyat = None
-        _mp_kaynak = "Standart (6 ₺/desi-kg)"
-        try:
-            if not _mp_ham.empty:
-                for _, _mr2 in _mp_ham.iterrows():
-                    try:
-                        _p2 = _mpj.loads(_mr2.get("satirlar","{}"))
-                    except Exception:
-                        continue
-                    if _p2.get("tip") == "ozel":
-                        for _g in _p2.get("grp", []):
-                            for _s in _g.get("satirlar", []):
-                                _cikis_l = [c.upper() for c in (_s.get("cikis") or [])] if isinstance(_s.get("cikis"),list) else [str(_s.get("cikis") or "").upper()]
-                                _varis_l = [v.upper() for v in (_s.get("varis") or [])] if isinstance(_s.get("varis"),list) else [str(_s.get("varis") or "").upper()]
-                                if _mp_g_il.upper() in _cikis_l and _mp_a_il.upper() in _varis_l:
-                                    _mp_birim_fiyat = float(_s.get("fiyat",0) or 0)
-                                    _mp_kaynak = "Özel Teklifinizdeki fiyat"
+            _mp_yet = st.session_state.get("_yetki_listesi") or []
+            if isinstance(_mp_yet, list):
+                for _y in _mp_yet:
+                    if str(_y).startswith("MUSTERI_CARI_ID:"):
+                        _mp_cari_id = int(str(_y).split(":")[1])
         except Exception:
             pass
 
-        if _mp_birim_fiyat:
-            _mp_hesaplanan_fiyat = _mp_birim_fiyat
-        else:
-            _mp_hesaplanan_fiyat = max(_mp_desi, _mp_toplam_kg) * 6
+        if not _mp_cari_id:
+            st.error("⚠️ Hesabınız bir müşteri kaydına bağlı değil. Lütfen yöneticinizle iletişime geçin.")
+            st.stop()
 
-        st.markdown("---")
-        _mps1, _mps2 = st.columns(2)
-        _mps1.metric("💰 Tahmini Fiyat", fmt_para(_mp_hesaplanan_fiyat))
-        _mps2.caption(f"Kaynak: {_mp_kaynak}")
-
-        # ── Bu fiyat sorgusunu otomatik kaydet (aynısını tekrar tekrar kaydetme) ──
-        if _mp_desi > 0 or _mp_toplam_kg > 0:
-            _mp_sorgu_imza = f"{_mp_g_il}|{_mp_a_il}|{_mp_adet}|{_mp_en}|{_mp_boy}|{_mp_yuk}|{_mp_kg}"
-            _mp_kayitli_sorgular = st.session_state.setdefault("_mp_fiyat_takip", set())
-            if _mp_sorgu_imza not in _mp_kayitli_sorgular:
-                try:
-                    if _mp_sb:
-                        _mp_sb.table("teklifler").insert({
-                            "musteri_id": _mp_cari_id, "musteri_adi": _mp_firma_adi,
-                            "satirlar": _mpj.dumps({"tip":"fiyat_sorgu","veri":{
-                                "gonderen_il": _mp_g_il, "gonderen_ilce": _mp_g_ilce,
-                                "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce,
-                                "km": _mp_km, "adet": _mp_adet, "desi": round(_mp_desi,1),
-                                "toplam_kg": round(_mp_toplam_kg,1), "fiyat": round(_mp_hesaplanan_fiyat,2),
-                                "fiyat_kaynak": _mp_kaynak, "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"),
-                            }}, ensure_ascii=False),
-                            "toplam_tutar": _mp_hesaplanan_fiyat,
-                            "olusturan": st.session_state.get("kullanici",""),
-                            "notlar": f"Fiyat Sorgusu · {_mp_g_il}→{_mp_a_il} · {fmt_para(_mp_hesaplanan_fiyat)}",
-                        }).execute()
-                    _mp_kayitli_sorgular.add(_mp_sorgu_imza)
-                except Exception:
-                    pass
-
+        _mp_sb = get_sb_client()
+        _mp_firma_adi = ""
         try:
-            _mp_gecmis_sorgular = []
-            if not _mp_ham.empty:
-                for _, _gr in _mp_ham.iterrows():
-                    try:
-                        _gp = _mpj.loads(_gr.get("satirlar","{}"))
-                        if _gp.get("tip") == "fiyat_sorgu":
-                            _mp_gecmis_sorgular.append(_gp.get("veri",{}))
-                    except Exception:
-                        continue
-            if _mp_gecmis_sorgular:
-                with st.expander(f"📜 Geçmiş Fiyat Sorgularım ({len(_mp_gecmis_sorgular)})", expanded=False):
-                    for _gs in _mp_gecmis_sorgular[:20]:
-                        _kmtxt = f" · {_gs.get('km')} km" if _gs.get("km") else ""
-                        st.caption(f"📅 {_gs.get('tarih','')} — {_gs.get('gonderen_il','')} → {_gs.get('alici_il','')}"
-                                   f"{_kmtxt} · {_gs.get('desi','')} desi/{_gs.get('toplam_kg','')} kg → **{fmt_para(_gs.get('fiyat',0))}**")
+            if _mp_sb:
+                _mp_cari_r = _mp_sb.table("cari_kartlar").select("firma").eq("id", _mp_cari_id).execute()
+                if _mp_cari_r.data:
+                    _mp_firma_adi = _mp_cari_r.data[0].get("firma","")
         except Exception:
             pass
 
-        if st.button("📦 Kargo İhbarı Ver", type="primary", use_container_width=True, key="mp_ihbar_ver"):
-            if not _mp_a_adres or not _mp_a_adres.strip():
-                st.error("⚠️ Alıcı adresi zorunludur.")
-            elif _mp_desi <= 0 and _mp_toplam_kg <= 0:
-                st.error("⚠️ Kargo ölçüleri veya kilosu girilmeli.")
+        with _mp_c1:
+            st.markdown(f"#### 🏢 {_mp_firma_adi}")
+
+        _mpt1, _mpt2 = st.tabs(["📄 Sözleşmelerim / Tekliflerim", "💰 Fiyat Al"])
+
+        # ══════════════════════════════════════════════════════════════════════
+        # SEKME 1 — Sözleşmelerim / Tekliflerim (salt okunur)
+        # ══════════════════════════════════════════════════════════════════════
+        with _mpt1:
+            try:
+                _mp_ham = pd.DataFrame(_mp_sb.table("teklifler").select("*").order("id", desc=True).execute().data) if _mp_sb else pd.DataFrame()
+                if not _mp_ham.empty:
+                    _mp_ham = _mp_ham[_mp_ham["musteri_adi"].astype(str).str.strip().str.upper() == _mp_firma_adi.strip().upper()]
+            except Exception:
+                _mp_ham = pd.DataFrame()
+
+            if _mp_ham.empty:
+                st.info("Henüz size ait bir sözleşme veya teklif bulunmuyor.")
             else:
-                try:
-                    _mp_ihbar_veri = {
-                        "musteri_firma": _mp_firma_adi, "gonderen_il": _mp_g_il, "gonderen_ilce": _mp_g_ilce,
-                        "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce, "alici_adres": _mp_a_adres,
-                        "adet": _mp_adet, "en": _mp_en, "boy": _mp_boy, "yukseklik": _mp_yuk, "kilo": _mp_kg,
-                        "desi": round(_mp_desi,1), "toplam_kg": round(_mp_toplam_kg,1),
-                        "fiyat": round(_mp_hesaplanan_fiyat,2), "fiyat_kaynak": _mp_kaynak,
-                        "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"), "durum": "yeni",
-                    }
-                    if _mp_sb:
-                        _mp_sb.table("teklifler").insert({
-                            "musteri_id": _mp_cari_id, "musteri_adi": _mp_firma_adi,
-                            "satirlar": _mpj.dumps({"tip":"kargo_ihbar","veri":_mp_ihbar_veri}, ensure_ascii=False),
-                            "toplam_tutar": _mp_hesaplanan_fiyat,
-                            "olusturan": st.session_state.get("kullanici",""),
-                            "notlar": f"Kargo İhbarı · {_mp_g_il}→{_mp_a_il} · {fmt_para(_mp_hesaplanan_fiyat)}",
-                        }).execute()
-                    st.success("✅ Kargo ihbarınız alındı! En kısa sürede size dönüş yapılacaktır.")
-                    st.info("📞 Acil durumlar için: **0540 034 42 28**")
-                except Exception as _mpe:
-                    st.error(f"Hata: {_mpe}")
+                for _, _mr in _mp_ham.iterrows():
+                    try:
+                        _parsed = _mpj.loads(_mr.get("satirlar","{}"))
+                    except Exception:
+                        continue
+                    _tip = _parsed.get("tip","")
+                    if _tip == "sozlesme":
+                        _v = _parsed.get("veri",{})
+                        with st.expander(f"📜 Sözleşme — Geçerlilik: {_v.get('gecerlilik_tarihi','—')} · Vade: {_v.get('vade','—')}"):
+                            for _g in _v.get("fiyat_gruplari",[]):
+                                st.caption(f"**{_g['baslik']}**")
+                                for _s in _g["satirlar"]:
+                                    st.caption("　• " + _s)
+                    elif _tip == "ozel":
+                        with st.expander(f"⭐ Özel Teklif — {fmt_tarih(_mr.get('tarih',''))}"):
+                            for _g in _parsed.get("grp", []):
+                                for _s in _g.get("satirlar", []):
+                                    _cikis = ", ".join(_s.get("cikis",[])) if isinstance(_s.get("cikis"),list) else str(_s.get("cikis") or "")
+                                    _varis = ", ".join(_s.get("varis",[])) if isinstance(_s.get("varis"),list) else str(_s.get("varis") or "")
+                                    _tur = ", ".join(_s.get("tur",[]) or [])
+                                    st.caption(f"　• {_cikis} → {_varis} · {_tur} · {fmt_para(_s.get('fiyat',0))}")
 
-        st.caption("📞 Alım ihbarı için bizi de arayabilirsiniz: **0540 034 42 28**")
+        # ══════════════════════════════════════════════════════════════════════
+        # SEKME 2 — Fiyat Al
+        # ══════════════════════════════════════════════════════════════════════
+        with _mpt2:
+            _mp_iller = sorted(set(r[0] for r in DAGITIM_PLANI))
+
+            st.markdown("**📍 Gönderen**")
+            _mpg1, _mpg2 = st.columns(2)
+            _mp_g_il = _mpg1.selectbox("İl", _mp_iller, key="mp_g_il")
+            _mp_g_ilceler = sorted(set(r[1] for r in DAGITIM_PLANI if r[0] == _mp_g_il))
+            _mp_g_ilce = _mpg2.selectbox("İlçe", _mp_g_ilceler, key="mp_g_ilce")
+
+            st.markdown("**📍 Alıcı**")
+            _mpa1, _mpa2 = st.columns(2)
+            _mp_a_il = _mpa1.selectbox("İl", _mp_iller, key="mp_a_il")
+            _mp_a_ilceler = sorted(set(r[1] for r in DAGITIM_PLANI if r[0] == _mp_a_il))
+            _mp_a_ilce = _mpa2.selectbox("İlçe", _mp_a_ilceler, key="mp_a_ilce")
+            _mp_a_adres = st.text_area("Alıcı Adresi *", key="mp_a_adres", placeholder="Açık adres yazınız...", height=68)
+
+            # ── Gönderen → Alıcı arası mesafe + rota haritası ──────────────────
+            _mp_km = _il_mesafe_km(_mp_g_il, _mp_a_il)
+            if _mp_g_il == _mp_a_il:
+                st.success(f"📍 **{_mp_g_il}** içi teslimat — aynı il, kısa mesafe!")
+            elif _mp_km:
+                st.success(f"🛣️ **{_mp_g_il} → {_mp_a_il}** arası yaklaşık **{_mp_km} km** (kuş uçuşu)")
+            with st.expander("🗺️ Haritada Gör (yol tarifi)", expanded=False):
+                _mp_rota_sorgu = f"{_mp_g_il},Türkiye/{_mp_a_il},Türkiye".replace(" ", "+")
+                st.components.v1.iframe(
+                    f"https://www.google.com/maps?saddr={_mp_g_il}&daddr={_mp_a_il}&output=embed", height=320)
+
+            _aciklama, _sure = _dagitim_bilgisi(_mp_a_il, _mp_a_ilce)
+            if _aciklama:
+                st.info(f"🚚 **{_mp_a_ilce}** için teslim süresi: **{_sure}** · Dağıtım günü: **{_aciklama}**")
+
+            st.markdown("**📦 Kargo Bilgileri**")
+            _mpk1, _mpk2, _mpk3 = st.columns(3)
+            _mp_adet = _mpk1.number_input("Adet", min_value=1, value=1, step=1, key="mp_adet")
+            _mp_en   = _mpk2.number_input("En (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_en")
+            _mp_boy  = _mpk3.number_input("Boy (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_boy")
+            _mpk4, _mpk5 = st.columns(2)
+            _mp_yuk  = _mpk4.number_input("Yükseklik (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_yuk")
+            _mp_kg   = _mpk5.number_input("Kilo (kg)", min_value=0.0, value=0.0, step=1.0, key="mp_kg")
+
+            _mp_desi = (_mp_en * _mp_boy * _mp_yuk / 3000.0) * _mp_adet
+            _mp_toplam_kg = _mp_kg * _mp_adet
+            st.caption(f"📐 Hesaplanan Desi: **{_mp_desi:.1f}** · Toplam Kilo: **{_mp_toplam_kg:.1f}**")
+
+            # ── Fiyat hesabı: önce sözleşme/teklifte bu güzergah var mı bak, yoksa 6 TL/desi-kg ──
+            _mp_birim_fiyat = None
+            _mp_kaynak = "Standart (6 ₺/desi-kg)"
+            try:
+                if not _mp_ham.empty:
+                    for _, _mr2 in _mp_ham.iterrows():
+                        try:
+                            _p2 = _mpj.loads(_mr2.get("satirlar","{}"))
+                        except Exception:
+                            continue
+                        if _p2.get("tip") == "ozel":
+                            for _g in _p2.get("grp", []):
+                                for _s in _g.get("satirlar", []):
+                                    _cikis_l = [c.upper() for c in (_s.get("cikis") or [])] if isinstance(_s.get("cikis"),list) else [str(_s.get("cikis") or "").upper()]
+                                    _varis_l = [v.upper() for v in (_s.get("varis") or [])] if isinstance(_s.get("varis"),list) else [str(_s.get("varis") or "").upper()]
+                                    if _mp_g_il.upper() in _cikis_l and _mp_a_il.upper() in _varis_l:
+                                        _mp_birim_fiyat = float(_s.get("fiyat",0) or 0)
+                                        _mp_kaynak = "Özel Teklifinizdeki fiyat"
+            except Exception:
+                pass
+
+            if _mp_birim_fiyat:
+                _mp_hesaplanan_fiyat = _mp_birim_fiyat
+            else:
+                _mp_hesaplanan_fiyat = max(_mp_desi, _mp_toplam_kg) * 6
+
+            st.markdown("---")
+            _mps1, _mps2 = st.columns(2)
+            _mps1.metric("💰 Tahmini Fiyat", fmt_para(_mp_hesaplanan_fiyat))
+            _mps2.caption(f"Kaynak: {_mp_kaynak}")
+
+            # ── Bu fiyat sorgusunu otomatik kaydet (aynısını tekrar tekrar kaydetme) ──
+            if _mp_desi > 0 or _mp_toplam_kg > 0:
+                _mp_sorgu_imza = f"{_mp_g_il}|{_mp_a_il}|{_mp_adet}|{_mp_en}|{_mp_boy}|{_mp_yuk}|{_mp_kg}"
+                _mp_kayitli_sorgular = st.session_state.setdefault("_mp_fiyat_takip", set())
+                if _mp_sorgu_imza not in _mp_kayitli_sorgular:
+                    try:
+                        if _mp_sb:
+                            _mp_sb.table("teklifler").insert({
+                                "musteri_id": _mp_cari_id, "musteri_adi": _mp_firma_adi,
+                                "satirlar": _mpj.dumps({"tip":"fiyat_sorgu","veri":{
+                                    "gonderen_il": _mp_g_il, "gonderen_ilce": _mp_g_ilce,
+                                    "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce,
+                                    "km": _mp_km, "adet": _mp_adet, "desi": round(_mp_desi,1),
+                                    "toplam_kg": round(_mp_toplam_kg,1), "fiyat": round(_mp_hesaplanan_fiyat,2),
+                                    "fiyat_kaynak": _mp_kaynak, "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                                }}, ensure_ascii=False),
+                                "toplam_tutar": _mp_hesaplanan_fiyat,
+                                "olusturan": st.session_state.get("kullanici",""),
+                                "notlar": f"Fiyat Sorgusu · {_mp_g_il}→{_mp_a_il} · {fmt_para(_mp_hesaplanan_fiyat)}",
+                            }).execute()
+                        _mp_kayitli_sorgular.add(_mp_sorgu_imza)
+                    except Exception:
+                        pass
+
+            try:
+                _mp_gecmis_sorgular = []
+                if not _mp_ham.empty:
+                    for _, _gr in _mp_ham.iterrows():
+                        try:
+                            _gp = _mpj.loads(_gr.get("satirlar","{}"))
+                            if _gp.get("tip") == "fiyat_sorgu":
+                                _mp_gecmis_sorgular.append(_gp.get("veri",{}))
+                        except Exception:
+                            continue
+                if _mp_gecmis_sorgular:
+                    with st.expander(f"📜 Geçmiş Fiyat Sorgularım ({len(_mp_gecmis_sorgular)})", expanded=False):
+                        for _gs in _mp_gecmis_sorgular[:20]:
+                            _kmtxt = f" · {_gs.get('km')} km" if _gs.get("km") else ""
+                            st.caption(f"📅 {_gs.get('tarih','')} — {_gs.get('gonderen_il','')} → {_gs.get('alici_il','')}"
+                                       f"{_kmtxt} · {_gs.get('desi','')} desi/{_gs.get('toplam_kg','')} kg → **{fmt_para(_gs.get('fiyat',0))}**")
+            except Exception:
+                pass
+
+            if st.button("📦 Kargo İhbarı Ver", type="primary", use_container_width=True, key="mp_ihbar_ver"):
+                if not _mp_a_adres or not _mp_a_adres.strip():
+                    st.error("⚠️ Alıcı adresi zorunludur.")
+                elif _mp_desi <= 0 and _mp_toplam_kg <= 0:
+                    st.error("⚠️ Kargo ölçüleri veya kilosu girilmeli.")
+                else:
+                    try:
+                        _mp_ihbar_veri = {
+                            "musteri_firma": _mp_firma_adi, "gonderen_il": _mp_g_il, "gonderen_ilce": _mp_g_ilce,
+                            "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce, "alici_adres": _mp_a_adres,
+                            "adet": _mp_adet, "en": _mp_en, "boy": _mp_boy, "yukseklik": _mp_yuk, "kilo": _mp_kg,
+                            "desi": round(_mp_desi,1), "toplam_kg": round(_mp_toplam_kg,1),
+                            "fiyat": round(_mp_hesaplanan_fiyat,2), "fiyat_kaynak": _mp_kaynak,
+                            "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"), "durum": "yeni",
+                        }
+                        if _mp_sb:
+                            _mp_sb.table("teklifler").insert({
+                                "musteri_id": _mp_cari_id, "musteri_adi": _mp_firma_adi,
+                                "satirlar": _mpj.dumps({"tip":"kargo_ihbar","veri":_mp_ihbar_veri}, ensure_ascii=False),
+                                "toplam_tutar": _mp_hesaplanan_fiyat,
+                                "olusturan": st.session_state.get("kullanici",""),
+                                "notlar": f"Kargo İhbarı · {_mp_g_il}→{_mp_a_il} · {fmt_para(_mp_hesaplanan_fiyat)}",
+                            }).execute()
+                        st.success("✅ Kargo ihbarınız alındı! En kısa sürede size dönüş yapılacaktır.")
+                        st.info("📞 Acil durumlar için: **0540 034 42 28**")
+                    except Exception as _mpe:
+                        st.error(f"Hata: {_mpe}")
+
+            st.caption("📞 Alım ihbarı için bizi de arayabilirsiniz: **0540 034 42 28**")
 
 
 def giris_ekrani():
