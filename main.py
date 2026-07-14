@@ -1002,7 +1002,11 @@ def musteri_portal():
     st.markdown("""
 <style>
 section[data-testid="stSidebar"] { display: none !important; }
-div[data-testid="stAppViewContainer"] section.main .block-container {
+div[data-testid="stAppViewContainer"] section.main .block-container,
+div[data-testid="stAppViewContainer"] .block-container,
+section.main .block-container,
+.block-container,
+div[data-testid="stMainBlockContainer"] {
     max-width: 640px !important;
     margin-left: auto !important;
     margin-right: auto !important;
@@ -1095,17 +1099,14 @@ div[data-testid="stAppViewContainer"] section.main .block-container {
         with _mpt2:
             _mp_iller = sorted(set(r[0] for r in DAGITIM_PLANI))
 
-            st.markdown("**📍 Gönderen**")
-            _mpg1, _mpg2 = st.columns(2)
-            _mp_g_il = _mpg1.selectbox("İl", _mp_iller, key="mp_g_il")
+            st.markdown("**📍 Gönderen / Alıcı**")
+            _mpg1, _mpg2, _mpa1, _mpa2 = st.columns(4)
+            _mp_g_il = _mpg1.selectbox("Gönderen İl", _mp_iller, key="mp_g_il")
             _mp_g_ilceler = sorted(set(r[1] for r in DAGITIM_PLANI if r[0] == _mp_g_il))
-            _mp_g_ilce = _mpg2.selectbox("İlçe", _mp_g_ilceler, key="mp_g_ilce")
-
-            st.markdown("**📍 Alıcı**")
-            _mpa1, _mpa2 = st.columns(2)
-            _mp_a_il = _mpa1.selectbox("İl", _mp_iller, key="mp_a_il")
+            _mp_g_ilce = _mpg2.selectbox("Gönderen İlçe", _mp_g_ilceler, key="mp_g_ilce")
+            _mp_a_il = _mpa1.selectbox("Alıcı İl", _mp_iller, key="mp_a_il")
             _mp_a_ilceler = sorted(set(r[1] for r in DAGITIM_PLANI if r[0] == _mp_a_il))
-            _mp_a_ilce = _mpa2.selectbox("İlçe", _mp_a_ilceler, key="mp_a_ilce")
+            _mp_a_ilce = _mpa2.selectbox("Alıcı İlçe", _mp_a_ilceler, key="mp_a_ilce")
             _mp_a_adres = st.text_area("Alıcı Adresi *", key="mp_a_adres", placeholder="Açık adres yazınız...", height=68)
 
             # ── Gönderen → Alıcı arası mesafe + rota haritası ──────────────────
