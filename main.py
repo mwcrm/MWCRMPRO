@@ -1002,18 +1002,20 @@ def musteri_portal():
     st.markdown("""
 <style>
 section[data-testid="stSidebar"] { display: none !important; }
-div[data-testid="stAppViewContainer"] > section.main { max-width: 100% !important; }
+div[data-testid="stAppViewContainer"] section.main .block-container {
+    max-width: 640px !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
+}
 </style>
 <div style="text-align:center;padding:1.2rem 0 1rem;">
   <div style="font-size:22px;font-weight:600;color:#0f172a;">📦 Müşteri Paneli</div>
 </div>
 """, unsafe_allow_html=True)
 
-    _mp_mobil = st.session_state.get("_mobil_mod", False)
-    if _mp_mobil:
-        _mp_orta = st.container()  # mobilde tam genişlik — dar sütun mobilde her şeyi sıkıştırıp bozuyordu
-    else:
-        _mpw1, _mp_orta, _mpw3 = st.columns([1, 1.6, 1])
+    _mp_orta = st.container()
     with _mp_orta:
         _mp_c1, _mp_c2 = st.columns([5,1])
         with _mp_c2:
