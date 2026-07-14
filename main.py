@@ -1211,6 +1211,26 @@ div[data-testid="stMainBlockContainer"] {
             except Exception:
                 pass
 
+            try:
+                _mp_ihbarlarim = []
+                if not _mp_ham.empty:
+                    for _, _ir in _mp_ham.iterrows():
+                        try:
+                            _ip = _mpj.loads(_ir.get("satirlar","{}"))
+                            if _ip.get("tip") == "kargo_ihbar":
+                                _mp_ihbarlarim.append(_ip.get("veri",{}))
+                        except Exception:
+                            continue
+                if _mp_ihbarlarim:
+                    with st.expander(f"📦 Kargo İhbarlarım ({len(_mp_ihbarlarim)})", expanded=False):
+                        for _iv in _mp_ihbarlarim[:20]:
+                            _durum_v = _iv.get("durum","yeni")
+                            _durum_yazi = "✅ Onaylandı" if _durum_v == "onaylandı" else "⏳ Organize ediliyor"
+                            st.caption(f"📅 {_iv.get('tarih','')} — {_iv.get('gonderen_il','')} → {_iv.get('alici_il','')} "
+                                       f"· {fmt_para(_iv.get('fiyat',0))} · **{_durum_yazi}**")
+            except Exception:
+                pass
+
             if st.button("📦 Kargo İhbarı Ver", type="primary", use_container_width=True, key="mp_ihbar_ver"):
                 if not _mp_a_adres or not _mp_a_adres.strip():
                     st.error("⚠️ Alıcı adresi zorunludur.")
@@ -1235,7 +1255,7 @@ div[data-testid="stMainBlockContainer"] {
                                 "olusturan": st.session_state.get("kullanici",""),
                                 "notlar": f"Kargo İhbarı · {_mp_g_il}→{_mp_a_il} · {fmt_para(_mp_hesaplanan_fiyat)}",
                             }).execute()
-                        st.success("✅ Kargo ihbarınız alındı! En kısa sürede size dönüş yapılacaktır.")
+                        st.success("✅ Kargo ihbarınız alındı — Alımınız organize edilmektedir. Onaylandığında size e-posta ile bilgi verilecektir.")
                         st.info("📞 Acil durumlar için: **0540 034 42 28**")
                     except Exception as _mpe:
                         st.error(f"Hata: {_mpe}")
@@ -8393,8 +8413,32 @@ elif aktif == "kargo_ihbar":
     sayfa_log("kargo_ihbar")
     import json as _kij
 
+    def _ki_email_gonder(_alici_email, _konu, _govde):
+        """SMTP ile e-posta gönderir. Ayarlar → secrets.toml'da MAIL_HOST/MAIL_PORT/MAIL_USER/MAIL_PASS gerekir."""
+        try:
+            import smtplib
+            from email.mime.text import MIMEText
+            _host = st.secrets.get("MAIL_HOST", "")
+            _port = int(st.secrets.get("MAIL_PORT", 587))
+            _user = st.secrets.get("MAIL_USER", "")
+            _pw   = st.secrets.get("MAIL_PASS", "")
+            if not (_host and _user and _pw and _alici_email):
+                return False, "E-posta ayarları eksik (secrets.toml) veya müşterinin email adresi yok."
+            _msg = MIMEText(_govde, "plain", "utf-8")
+            _msg["Subject"] = _konu
+            _msg["From"] = _user
+            _msg["To"] = _alici_email
+            with smtplib.SMTP(_host, _port, timeout=15) as _srv:
+                _srv.starttls()
+                _srv.login(_user, _pw)
+                _srv.sendmail(_user, [_alici_email], _msg.as_string())
+            return True, "OK"
+        except Exception as _kie:
+            return False, str(_kie)
+
     st.markdown("## 📦 Kargo İhbarları")
-    st.caption("Müşteri panelinden gelen fiyat alma + kargo ihbarı taleplerinin tamamı burada listelenir.")
+    st.caption("Müşteri panelinden gelen fiyat alma + kargo ihbarı taleplerinin tamamı burada listelenir. "
+               "Onayladığında müşteriye otomatik e-posta gider.")
 
     try:
         _ki_sb = get_sb_client()
@@ -8411,6 +8455,7 @@ elif aktif == "kargo_ihbar":
                 continue
             _vv = _parsed.get("veri", {})
             _vv["id"] = _kr.get("id")
+            _vv["musteri_id"] = _kr.get("musteri_id")
             _ki_liste.append(_vv)
         except Exception:
             continue
@@ -8418,10 +8463,12 @@ elif aktif == "kargo_ihbar":
     if not _ki_liste:
         st.info("Henüz kargo ihbarı yok.")
     else:
-        st.warning(f"📬 Toplam {len(_ki_liste)} kargo ihbarı var.")
+        _ki_yeni_sayi = len([x for x in _ki_liste if x.get("durum","yeni") == "yeni"])
+        st.warning(f"📬 Toplam {len(_ki_liste)} kargo ihbarı var — {_ki_yeni_sayi} tanesi onay bekliyor.")
         for _kv in _ki_liste:
+            _durum = _kv.get("durum", "yeni")
             with st.container(border=True):
-                _kc1, _kc2, _kc3 = st.columns([2.2,1.5,1])
+                _kc1, _kc2, _kc3, _kc4 = st.columns([2.2,1.5,1,1])
                 _kc1.markdown(f"**{_kv.get('musteri_firma','')}**")
                 _kc1.caption(f"📍 {_kv.get('gonderen_il','')}/{_kv.get('gonderen_ilce','')} → "
                              f"{_kv.get('alici_il','')}/{_kv.get('alici_ilce','')}")
@@ -8431,6 +8478,47 @@ elif aktif == "kargo_ihbar":
                 _kc2.caption(f"📅 {_kv.get('tarih','')}")
                 _kc3.metric("Fiyat", fmt_para(_kv.get("fiyat",0)))
                 _kc3.caption(_kv.get("fiyat_kaynak",""))
+                if _durum == "onaylandı":
+                    _kc4.success("✅ Onaylandı")
+                else:
+                    if _kc4.button("✅ Onayla", key=f"ki_onay_{_kv['id']}", use_container_width=True, type="primary"):
+                        try:
+                            _kv_yeni = dict(_kv)
+                            _kv_yeni["durum"] = "onaylandı"
+                            _kv_yeni.pop("id", None); _kv_yeni.pop("musteri_id", None)
+                            _ki_sb.table("teklifler").update({
+                                "satirlar": _kij.dumps({"tip":"kargo_ihbar","veri":_kv_yeni}, ensure_ascii=False)
+                            }).eq("id", int(_kv["id"])).execute()
+
+                            # Müşterinin email'ini bul ve bildir
+                            _musteri_email = ""
+                            try:
+                                if _kv.get("musteri_id"):
+                                    _cr = _ki_sb.table("cari_kartlar").select("email").eq("id", int(_kv["musteri_id"])).execute()
+                                    if _cr.data:
+                                        _musteri_email = _cr.data[0].get("email","") or ""
+                            except Exception:
+                                pass
+
+                            if _musteri_email:
+                                _konu = "Kargo Alım Talebiniz Onaylandı"
+                                _govde = (f"Sayın {_kv.get('musteri_firma','')},\n\n"
+                                          f"{_kv.get('gonderen_il','')}/{_kv.get('gonderen_ilce','')} -> "
+                                          f"{_kv.get('alici_il','')}/{_kv.get('alici_ilce','')} güzergahı için "
+                                          f"verdiğiniz kargo alım talebiniz onaylanmıştır. Alımınız organize edilmektedir.\n\n"
+                                          f"Tutar: {fmt_para(_kv.get('fiyat',0))}\n\n"
+                                          f"Herhangi bir sorunuz için: 0540 034 42 28")
+                                _eok, _emsg = _ki_email_gonder(_musteri_email, _konu, _govde)
+                                if _eok:
+                                    st.toast(f"✅ Onaylandı, {_musteri_email} adresine bilgi gönderildi.", icon="✅")
+                                else:
+                                    st.warning(f"✅ Onaylandı ama e-posta gönderilemedi: {_emsg}")
+                            else:
+                                st.warning("✅ Onaylandı ama müşterinin kayıtlı email adresi yok — e-posta gönderilemedi.")
+                            st.cache_data.clear()
+                            st.rerun()
+                        except Exception as _kie2:
+                            st.error(f"Hata: {_kie2}")
 
 elif aktif == "excel":
     sayfa_log("excel")
