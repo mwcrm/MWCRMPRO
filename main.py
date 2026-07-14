@@ -1100,32 +1100,34 @@ div[data-testid="stMainBlockContainer"] {
             _mp_iller = sorted(set(r[0] for r in DAGITIM_PLANI))
 
             st.markdown("**📍 Gönderen / Alıcı**")
-            _mpg1, _mpg2, _mpa1, _mpa2 = st.columns(4)
+            _mpg1, _mpg2, _mpga, _mpa1, _mpa2, _mpaa, _mpmsg1, _mpmsg2 = st.columns(8)
             _mp_g_il = _mpg1.selectbox("Gönderen İl", _mp_iller, key="mp_g_il")
             _mp_g_ilceler = sorted(set(r[1] for r in DAGITIM_PLANI if r[0] == _mp_g_il))
             _mp_g_ilce = _mpg2.selectbox("Gönderen İlçe", _mp_g_ilceler, key="mp_g_ilce")
+            _mp_g_adres = _mpga.text_input("Gönderen Adresi *", key="mp_g_adres", placeholder="Açık adres...")
             _mp_a_il = _mpa1.selectbox("Alıcı İl", _mp_iller, key="mp_a_il")
             _mp_a_ilceler = sorted(set(r[1] for r in DAGITIM_PLANI if r[0] == _mp_a_il))
             _mp_a_ilce = _mpa2.selectbox("Alıcı İlçe", _mp_a_ilceler, key="mp_a_ilce")
-            _mp_a_adres = st.text_area("Alıcı Adresi *", key="mp_a_adres", placeholder="Açık adres yazınız...", height=68)
+            _mp_a_adres = _mpaa.text_input("Alıcı Adresi *", key="mp_a_adres", placeholder="Açık adres...")
 
-            # ── Gönderen → Alıcı arası mesafe + rota haritası ──────────────────
+            # ── Gönderen → Alıcı arası mesafe (aynı satırın hücresinde) ──────────
             _mp_km = _il_mesafe_km(_mp_g_il, _mp_a_il)
             if _mp_g_il == _mp_a_il:
-                st.success(f"📍 **{_mp_g_il}** içi teslimat — aynı il, kısa mesafe!")
+                _mpmsg1.success(f"📍 **{_mp_g_il}** içi — aynı il, kısa mesafe!")
             elif _mp_km:
-                st.success(f"🛣️ **{_mp_g_il} → {_mp_a_il}** arası yaklaşık **{_mp_km} km** (kuş uçuşu)")
+                _mpmsg1.success(f"🛣️ **{_mp_g_il}→{_mp_a_il}** ~**{_mp_km} km**")
+
+            _aciklama, _sure = _dagitim_bilgisi(_mp_a_il, _mp_a_ilce)
+            if _aciklama:
+                _mpmsg2.info(f"🚚 **{_mp_a_ilce}**: **{_sure}** · {_aciklama}")
+
             with st.expander("🗺️ Haritada Gör (yol tarifi)", expanded=False):
                 _mp_rota_sorgu = f"{_mp_g_il},Türkiye/{_mp_a_il},Türkiye".replace(" ", "+")
                 st.components.v1.iframe(
                     f"https://www.google.com/maps?saddr={_mp_g_il}&daddr={_mp_a_il}&output=embed", height=320)
 
-            _aciklama, _sure = _dagitim_bilgisi(_mp_a_il, _mp_a_ilce)
-            if _aciklama:
-                st.info(f"🚚 **{_mp_a_ilce}** için teslim süresi: **{_sure}** · Dağıtım günü: **{_aciklama}**")
-
             st.markdown("**📦 Kargo Bilgileri**")
-            _mpk1, _mpk2, _mpk3, _mpk4, _mpk5 = st.columns(5)
+            _mpk1, _mpk2, _mpk3, _mpk4, _mpk5, _mpkdesi, _mpkfiyat = st.columns(7)
             _mp_adet = _mpk1.number_input("Adet", min_value=1, value=1, step=1, key="mp_adet")
             _mp_en   = _mpk2.number_input("En (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_en")
             _mp_boy  = _mpk3.number_input("Boy (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_boy")
@@ -1134,7 +1136,7 @@ div[data-testid="stMainBlockContainer"] {
 
             _mp_desi = (_mp_en * _mp_boy * _mp_yuk / 3000.0) * _mp_adet
             _mp_toplam_kg = _mp_kg * _mp_adet
-            st.caption(f"📐 Hesaplanan Desi: **{_mp_desi:.1f}** · Toplam Kilo: **{_mp_toplam_kg:.1f}**")
+            _mpkdesi.caption(f"📐 Desi: **{_mp_desi:.1f}** · Kilo: **{_mp_toplam_kg:.1f}**")
 
             # ── Fiyat hesabı: önce sözleşme/teklifte bu güzergah var mı bak, yoksa 6 TL/desi-kg ──
             _mp_birim_fiyat = None
@@ -1162,8 +1164,8 @@ div[data-testid="stMainBlockContainer"] {
             else:
                 _mp_hesaplanan_fiyat = max(_mp_desi, _mp_toplam_kg) * 6
 
+            _mpkfiyat.caption(f"💰 **{fmt_para(_mp_hesaplanan_fiyat)}** · {_mp_kaynak}")
             st.markdown("---")
-            st.markdown(f"💰 **Tahmini Fiyat: {fmt_para(_mp_hesaplanan_fiyat)}** &nbsp;·&nbsp; *Kaynak: {_mp_kaynak}*", unsafe_allow_html=True)
 
             # ── Bu fiyat sorgusunu otomatik kaydet (aynısını tekrar tekrar kaydetme) ──
             if _mp_desi > 0 or _mp_toplam_kg > 0:
@@ -1217,6 +1219,7 @@ div[data-testid="stMainBlockContainer"] {
                     try:
                         _mp_ihbar_veri = {
                             "musteri_firma": _mp_firma_adi, "gonderen_il": _mp_g_il, "gonderen_ilce": _mp_g_ilce,
+                            "gonderen_adres": _mp_g_adres,
                             "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce, "alici_adres": _mp_a_adres,
                             "adet": _mp_adet, "en": _mp_en, "boy": _mp_boy, "yukseklik": _mp_yuk, "kilo": _mp_kg,
                             "desi": round(_mp_desi,1), "toplam_kg": round(_mp_toplam_kg,1),
@@ -8421,7 +8424,8 @@ elif aktif == "kargo_ihbar":
                 _kc1.markdown(f"**{_kv.get('musteri_firma','')}**")
                 _kc1.caption(f"📍 {_kv.get('gonderen_il','')}/{_kv.get('gonderen_ilce','')} → "
                              f"{_kv.get('alici_il','')}/{_kv.get('alici_ilce','')}")
-                _kc1.caption(f"🏠 {_kv.get('alici_adres','')}")
+                _kc1.caption(f"🏠 Gönderen: {_kv.get('gonderen_adres','—')}")
+                _kc1.caption(f"🏠 Alıcı: {_kv.get('alici_adres','')}")
                 _kc2.caption(f"📦 {_kv.get('adet','')} adet · {_kv.get('desi','')} desi · {_kv.get('toplam_kg','')} kg")
                 _kc2.caption(f"📅 {_kv.get('tarih','')}")
                 _kc3.metric("Fiyat", fmt_para(_kv.get("fiyat",0)))
