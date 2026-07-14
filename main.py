@@ -8,6 +8,147 @@ import re
 import json
 from datetime import datetime, timedelta
 
+# ── DAĞITIM PLANI (il/ilçe/gün/süre) — müşteri portalında kullanılır ──────────
+DAGITIM_PLANI = [
+    ('BURSA', 'GEMLİK', 'Pazartesi+Perşembe', '1 Gün'),
+    ('BURSA', 'GÜRSU', 'Standart Teslimat', '1 Gün'),
+    ('BURSA', 'İNEGÖL', 'Salı+Cuma', '1 Gün'),
+    ('BURSA', 'KESTEL', 'Standart Teslimat', '1 Gün'),
+    ('BURSA', 'MUDANYA', 'Standart Teslimat', '1 Gün'),
+    ('BURSA', 'NİLÜFER', 'Standart Teslimat', '1 Gün'),
+    ('BURSA', 'ORHANGAZİ', 'Pazartesi+Perşembe', '1 Gün'),
+    ('BURSA', 'YILDIRIM', 'Standart Teslimat', '1 Gün'),
+    ('BURSA', 'KARACABEY', 'Pazartesi+Çarşamba+Cuma', '1 Gün'),
+    ('BURSA', 'MUSTAFAKEMALPAŞA', 'Pazartesi+Çarşamba+Cuma', '1 Gün'),
+    ('BURSA', 'OSMANGAZİ', 'Standart Teslimat', '1 Gün'),
+    ('BİLECİK', 'BOZÜYÜK', 'Pazartesi+Perşembe', '1 Gün'),
+    ('BİLECİK', 'MERKEZ', 'Pazartesi+Perşembe', '1 Gün'),
+    ('İSTANBUL', 'ATAŞEHİR', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'BEYKOZ', 'Pazartesi+Çarşamba+Cuma', '1 Gün'),
+    ('İSTANBUL', 'ÇEKMEKÖY', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'KADIKÖY', 'Ertesi Gün', '1 Gün'),
+    ('İSTANBUL', 'KARTAL', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'MALTEPE', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'PENDİK', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'SANCAKTEPE', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'SULTANBEYLİ', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'TUZLA', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'ÜMRANİYE', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'ÜSKÜDAR', 'Ertesi Gün', '1 Gün'),
+    ('İSTANBUL', 'ARNAVUTKÖY', 'Ertesi Gün', '1 Gün'),
+    ('İSTANBUL', 'AVCILAR', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'BAĞCILAR', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'BAHÇELİEVLER', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'BAKIRKÖY', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'BAŞAKŞEHİR', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'BAYRAMPAŞA', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'BEŞİKTAŞ', 'Pazartesi+Perşembe', '1 Gün'),
+    ('İSTANBUL', 'BEYLİKDÜZÜ', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'BEYOĞLU', 'Ertesi Gün', '1 Gün'),
+    ('İSTANBUL', 'BÜYÜKÇEKMECE', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'ÇATALCA', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'ESENLER', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'ESENYURT', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'EYÜP', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'FATİH', 'Ertesi Gün', '1 Gün'),
+    ('İSTANBUL', 'GAZİOSMANPAŞA', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'GÜNGÖREN', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'KAĞITHANE', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'KÜÇÜKÇEKMECE', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'SARIYER', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'SİLİVRİ', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'SULTANGAZİ', 'Standart Teslimat', '1 Gün'),
+    ('İSTANBUL', 'ŞİŞLİ', 'Ertesi Gün', '1 Gün'),
+    ('İSTANBUL', 'ZEYTİNBURNU', 'Standart Teslimat', '1 Gün'),
+    ('İZMİR', 'BALÇOVA', 'Standart Teslimat', '1 Gün'),
+    ('İZMİR', 'BAYRAKLI', 'Standart Teslimat', '1 Gün'),
+    ('İZMİR', 'BORNOVA', 'Standart Teslimat', '1 Gün'),
+    ('İZMİR', 'BUCA', 'Standart Teslimat', '1 Gün'),
+    ('İZMİR', 'ÇEŞME', 'Pazartesi+Perşembe', '1 Gün'),
+    ('İZMİR', 'ÇİĞLİ', 'Standart Teslimat', '1 Gün'),
+    ('İZMİR', 'GAZİEMİR', 'Standart Teslimat', '1 Gün'),
+    ('İZMİR', 'GÜZELBAHÇE', 'Pazartesi+Perşembe', '1 Gün'),
+    ('İZMİR', 'KARŞIYAKA', 'Standart Teslimat', '1 Gün'),
+    ('İZMİR', 'KEMALPAŞA', 'Standart Teslimat', '1 Gün'),
+    ('İZMİR', 'KONAK', 'Standart Teslimat', '1 Gün'),
+    ('İZMİR', 'MENDERES', 'Standart Teslimat', '1 Gün'),
+    ('İZMİR', 'MENEMEN', 'Standart Teslimat', '1 Gün'),
+    ('İZMİR', 'NARLIDERE', 'Pazartesi+Perşembe', '1 Gün'),
+    ('İZMİR', 'TORBALI', 'Standart Teslimat', '1 Gün'),
+    ('İZMİR', 'URLA', 'Pazartesi+Perşembe', '1 Gün'),
+    ('İZMİR', 'KARABAĞLAR', 'Standart Teslimat', '1 Gün'),
+    ('İZMİR', 'BERGAMA', 'Pazartesi+Çarşamba+Cuma', '1 Gün'),
+    ('İZMİR', 'DİKİLİ', 'Pazartesi+Çarşamba+Cuma', '1 Gün'),
+    ('İZMİR', 'KINIK', 'Pazartesi+Çarşamba+Cuma', '1 Gün'),
+    ('İZMİR', 'ALİAĞA', 'Salı+Perşembe+Cumartesi', '1 Gün'),
+    ('İZMİR', 'ÖDEMİŞ', 'Standart Teslimat', '3 Gün'),
+    ('İZMİR', 'BAYINDIR', 'Standart Teslimat', '3 Gün'),
+    ('İZMİR', 'KİRAZ', 'Standart Teslimat', '3 Gün'),
+    ('İZMİR', 'TİRE', 'Standart Teslimat', '3 Gün'),
+    ('İZMİR', 'SELÇUK', 'Standart Teslimat', '3 Gün'),
+    ('MANİSA', 'ŞEHZADELER', 'Standart Teslimat', '1 Gün'),
+    ('MANİSA', 'YUNUSEMRE', 'Standart Teslimat', '1 Gün'),
+    ('MANİSA', 'TURGUTLU', 'Standart Teslimat', '1 Gün'),
+    ('MANİSA', 'AKHİSAR', 'Pazartesi+Çarşamba+Cuma', '2 Gün'),
+    ('MANİSA', 'SOMA', 'Pazartesi+Çarşamba+Cuma', '2 Gün'),
+    ('DÜZCE', 'CUMAYERİ', 'Standart Teslimat', '2 Gün'),
+    ('DÜZCE', 'MERKEZ', 'Standart Teslimat', '3 Gün'),
+    ('DÜZCE', 'ÇİLİMLİ', 'Standart Teslimat', '3 Gün'),
+    ('DÜZCE', 'GÜMÜŞOVA', 'Pazartesi+Salı+Çarşamba+Perşembe+Cuma', '2 Gün'),
+    ('SAKARYA', 'ADAPAZARI', 'Standart Teslimat', '1 Gün'),
+    ('SAKARYA', 'ARİFİYE', 'Standart Teslimat', '1 Gün'),
+    ('SAKARYA', 'SERDİVAN', 'Standart Teslimat', '1 Gün'),
+    ('SAKARYA', 'ERENLER', 'Standart Teslimat', '1 Gün'),
+    ('SAKARYA', 'SAPANCA', 'Standart Teslimat', '1 Gün'),
+    ('ISPARTA', 'MERKEZ', 'Standart Teslimat', '2 Gün'),
+    ('ESKİŞEHİR', 'ODUNPAZARI', 'Standart Teslimat', '1 Gün'),
+    ('ESKİŞEHİR', 'TEPEBAŞI', 'Standart Teslimat', '1 Gün'),
+    ('ANKARA', 'AKYURT', 'Standart Teslimat', '1 Gün'),
+    ('ANKARA', 'ALTINDAĞ', 'Standart Teslimat', '1 Gün'),
+    ('ANKARA', 'ÇANKAYA', 'Standart Teslimat', '1 Gün'),
+    ('ANKARA', 'ETİMESGUT', 'Standart Teslimat', '1 Gün'),
+    ('ANKARA', 'GÖLBAŞI', 'Pazartesi+Perşembe', '1 Gün'),
+    ('ANKARA', 'KAHRAMANKAZAN', 'Standart Teslimat', '1 Gün'),
+    ('ANKARA', 'KEÇİÖREN', 'Standart Teslimat', '1 Gün'),
+    ('ANKARA', 'MAMAK', 'Pazartesi+Çarşamba+Cuma', '1 Gün'),
+    ('ANKARA', 'PURSAKLAR', 'Standart Teslimat', '1 Gün'),
+    ('ANKARA', 'SİNCAN', 'Standart Teslimat', '1 Gün'),
+    ('ANKARA', 'YENİMAHALLE', 'Standart Teslimat', '1 Gün'),
+    ('KOCAELİ', 'BAŞİSKELE', 'Standart Teslimat', '1 Gün'),
+    ('KOCAELİ', 'ÇAYIROVA', 'Standart Teslimat', '1 Gün'),
+    ('KOCAELİ', 'DARICA', 'Standart Teslimat', '1 Gün'),
+    ('KOCAELİ', 'DERİNCE', 'Standart Teslimat', '1 Gün'),
+    ('KOCAELİ', 'DİLOVASI', 'Standart Teslimat', '1 Gün'),
+    ('KOCAELİ', 'GEBZE', 'Standart Teslimat', '1 Gün'),
+    ('KOCAELİ', 'İZMİT', 'Standart Teslimat', '1 Gün'),
+    ('KOCAELİ', 'KARTEPE', 'Standart Teslimat', '1 Gün'),
+    ('KOCAELİ', 'KÖRFEZ', 'Standart Teslimat', '1 Gün'),
+    ('KOCAELİ', 'GÖLCÜK', 'Pazartesi+Perşembe', '1 Gün'),
+    ('BALIK ESİR', 'ALTIEYLÜL', 'Standart Teslimat', '1 Gün'),
+    ('BALIK ESİR', 'AYVALIK', 'Pazartesi+Çarşamba+Cuma', '1 Gün'),
+    ('BALIK ESİR', 'BALYA', 'Standart Teslimat', '1 Gün'),
+    ('BALIK ESİR', 'BANDIRMA', 'Pazartesi+Çarşamba+Cuma', '1 Gün'),
+    ('BALIK ESİR', 'BURHANİYE', 'Pazartesi+Çarşamba+Cuma', '1 Gün'),
+    ('BALIK ESİR', 'EDREMİT', 'Pazartesi+Çarşamba+Cuma', '1 Gün'),
+    ('BALIK ESİR', 'ERDEK', 'Pazartesi+Çarşamba+Cuma', '1 Gün'),
+    ('BALIK ESİR', 'GÖNEN', 'Pazartesi+Çarşamba+Cuma', '1 Gün'),
+    ('BALIK ESİR', 'HAVRAN', 'Salı+Perşembe+Cumartesi', '1 Gün'),
+    ('BALIK ESİR', 'İVRİNDİ', 'Standart Teslimat', '1 Gün'),
+    ('BALIK ESİR', 'KARESİ', 'Standart Teslimat', '1 Gün'),
+    ('BALIK ESİR', 'SUSURLUK', 'Pazartesi+Çarşamba+Cuma', '1 Gün'),
+    ('BALIK ESİR', 'SINDIRGI', 'Cumartesi', '1 Gün'),
+    ('BALIK ESİR', 'MANYAS', 'Pazartesi+Çarşamba', '1 Gün'),
+    ('BALIK ESİR', 'KEPSUT', 'Salı+Cuma', '1 Gün'),
+    ('BALIK ESİR', 'BİGADİÇ', 'Salı+Cuma', '1 Gün'),
+    ('YALOVA', 'ALTINOVA', 'Pazartesi+Perşembe', '1 Gün'),
+    ('YALOVA', 'ÇİFTLİKKÖY', 'Pazartesi+Perşembe', '1 Gün'),
+    ('YALOVA', 'MERKEZ', 'Pazartesi+Perşembe', '1 Gün'),
+    ('YALOVA', 'TERMAL', 'Pazartesi+Perşembe', '1 Gün'),
+    ('AFYON', 'SİNANPAŞA', 'Standart Teslimat', '1 Gün'),
+    ('AFYON', 'MERKEZ', 'Standart Teslimat', '1 Gün'),
+]
+
+
 # ── SUPABASE BAĞLANTISI ───────────────────────────────────────────────────────
 def sb_or_sqlite():
     """Supabase varsa True, yoksa SQLite kullan"""
@@ -728,7 +869,7 @@ def sayfa_log(sayfa):
     # Sekme başlığını güncelle
     _menu_adlari = {
         "yeni": "Yeni Kart", "liste": "Cari Liste", "analiz": "Müşteri Analizi",
-        "randevu": "Randevular", "teklif": "Spot Teklif", "ozel_teklif": "Özel Teklif", "sozlesme": "Sözleşmeler", "fatura": "Faturalar",
+        "randevu": "Randevular", "teklif": "Spot Teklif", "ozel_teklif": "Özel Teklif", "sozlesme": "Sözleşmeler", "fatura": "Faturalar", "kargo_ihbar": "Kargo İhbarları",
         "rota_analiz": "Rota Analiz", "operasyon": "Operasyon", "kisiler": "Telefon Kişiler",
         "rapor": "Raporlar", "excel": "Excel", "kullanici": "Kullanıcılar",
         "admin_rapor": "Admin Rapor", "harita": "Müşteri Haritası", "patron": "Patron",
@@ -821,7 +962,203 @@ def _tanim_guncelle(tip, eski, yeni):
     except: pass
     return False
 
-def giris_ekrani():
+def _dagitim_bilgisi(il, ilce):
+    """Excel'den gelen dağıtım planında bu il/ilçe için gün ve süre bilgisini bulur"""
+    _il_n = str(il or "").strip().upper()
+    _ilce_n = str(ilce or "").strip().upper()
+    for _r_il, _r_ilce, _aciklama, _sure in DAGITIM_PLANI:
+        if _r_il.strip().upper() == _il_n and _r_ilce.strip().upper() == _ilce_n:
+            return _aciklama, _sure
+    return None, None
+
+
+def musteri_portal():
+    """Kısıtlı müşteri girişi — sadece kendi sözleşme/tekliflerini görür, fiyat alıp kargo ihbarı verebilir"""
+    import json as _mpj
+
+    st.markdown("""
+<div style="text-align:center;padding:1.2rem 0 1rem;">
+  <div style="font-size:22px;font-weight:600;color:#0f172a;">📦 Müşteri Paneli</div>
+</div>
+""", unsafe_allow_html=True)
+
+    _mp_c1, _mp_c2 = st.columns([5,1])
+    with _mp_c2:
+        if st.button("🚪 Çıkış", use_container_width=True):
+            st.session_state.clear()
+            st.rerun()
+
+    # Bağlı cari_id'yi yetkiler alanından çöz
+    _mp_cari_id = None
+    try:
+        _mp_yet = st.session_state.get("_yetki_listesi") or []
+        if isinstance(_mp_yet, list):
+            for _y in _mp_yet:
+                if str(_y).startswith("MUSTERI_CARI_ID:"):
+                    _mp_cari_id = int(str(_y).split(":")[1])
+    except Exception:
+        pass
+
+    if not _mp_cari_id:
+        st.error("⚠️ Hesabınız bir müşteri kaydına bağlı değil. Lütfen yöneticinizle iletişime geçin.")
+        st.stop()
+
+    _mp_sb = get_sb_client()
+    _mp_firma_adi = ""
+    try:
+        if _mp_sb:
+            _mp_cari_r = _mp_sb.table("cari_kartlar").select("firma").eq("id", _mp_cari_id).execute()
+            if _mp_cari_r.data:
+                _mp_firma_adi = _mp_cari_r.data[0].get("firma","")
+    except Exception:
+        pass
+
+    with _mp_c1:
+        st.markdown(f"#### 🏢 {_mp_firma_adi}")
+
+    _mpt1, _mpt2 = st.tabs(["📄 Sözleşmelerim / Tekliflerim", "💰 Fiyat Al"])
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SEKME 1 — Sözleşmelerim / Tekliflerim (salt okunur)
+    # ══════════════════════════════════════════════════════════════════════
+    with _mpt1:
+        try:
+            _mp_ham = pd.DataFrame(_mp_sb.table("teklifler").select("*").order("id", desc=True).execute().data) if _mp_sb else pd.DataFrame()
+            if not _mp_ham.empty:
+                _mp_ham = _mp_ham[_mp_ham["musteri_adi"].astype(str).str.strip().str.upper() == _mp_firma_adi.strip().upper()]
+        except Exception:
+            _mp_ham = pd.DataFrame()
+
+        if _mp_ham.empty:
+            st.info("Henüz size ait bir sözleşme veya teklif bulunmuyor.")
+        else:
+            for _, _mr in _mp_ham.iterrows():
+                try:
+                    _parsed = _mpj.loads(_mr.get("satirlar","{}"))
+                except Exception:
+                    continue
+                _tip = _parsed.get("tip","")
+                if _tip == "sozlesme":
+                    _v = _parsed.get("veri",{})
+                    with st.container(border=True):
+                        st.markdown(f"**📜 Sözleşme** — Geçerlilik: {_v.get('gecerlilik_tarihi','—')} · Vade: {_v.get('vade','—')}")
+                        for _g in _v.get("fiyat_gruplari",[]):
+                            st.caption(f"**{_g['baslik']}**")
+                            for _s in _g["satirlar"]:
+                                st.caption("　• " + _s)
+                elif _tip == "ozel":
+                    with st.container(border=True):
+                        st.markdown(f"**⭐ Özel Teklif** — {fmt_tarih(_mr.get('tarih',''))}")
+                        for _g in _parsed.get("grp", []):
+                            for _s in _g.get("satirlar", []):
+                                _cikis = ", ".join(_s.get("cikis",[])) if isinstance(_s.get("cikis"),list) else str(_s.get("cikis") or "")
+                                _varis = ", ".join(_s.get("varis",[])) if isinstance(_s.get("varis"),list) else str(_s.get("varis") or "")
+                                _tur = ", ".join(_s.get("tur",[]) or [])
+                                st.caption(f"　• {_cikis} → {_varis} · {_tur} · {fmt_para(_s.get('fiyat',0))}")
+
+    # ══════════════════════════════════════════════════════════════════════
+    # SEKME 2 — Fiyat Al
+    # ══════════════════════════════════════════════════════════════════════
+    with _mpt2:
+        _mp_iller = sorted(set(r[0] for r in DAGITIM_PLANI))
+
+        st.markdown("**📍 Gönderen**")
+        _mpg1, _mpg2 = st.columns(2)
+        _mp_g_il = _mpg1.selectbox("İl", _mp_iller, key="mp_g_il")
+        _mp_g_ilceler = sorted(set(r[1] for r in DAGITIM_PLANI if r[0] == _mp_g_il))
+        _mp_g_ilce = _mpg2.selectbox("İlçe", _mp_g_ilceler, key="mp_g_ilce")
+
+        st.markdown("**📍 Alıcı**")
+        _mpa1, _mpa2 = st.columns(2)
+        _mp_a_il = _mpa1.selectbox("İl", _mp_iller, key="mp_a_il")
+        _mp_a_ilceler = sorted(set(r[1] for r in DAGITIM_PLANI if r[0] == _mp_a_il))
+        _mp_a_ilce = _mpa2.selectbox("İlçe", _mp_a_ilceler, key="mp_a_ilce")
+        _mp_a_adres = st.text_area("Alıcı Adresi *", key="mp_a_adres", placeholder="Açık adres yazınız...")
+
+        if _mp_a_adres and _mp_a_adres.strip():
+            _mp_harita_sorgu = f"{_mp_a_adres}, {_mp_a_ilce}, {_mp_a_il}".replace(" ", "+")
+            st.components.v1.iframe(
+                f"https://www.google.com/maps?q={_mp_harita_sorgu}&output=embed", height=280)
+
+        _aciklama, _sure = _dagitim_bilgisi(_mp_a_il, _mp_a_ilce)
+        if _aciklama:
+            st.info(f"🚚 **{_mp_a_ilce}** için teslim süresi: **{_sure}** · Dağıtım günü: **{_aciklama}**")
+
+        st.markdown("**📦 Kargo Bilgileri**")
+        _mpk1, _mpk2, _mpk3, _mpk4, _mpk5 = st.columns(5)
+        _mp_adet = _mpk1.number_input("Adet", min_value=1, value=1, step=1, key="mp_adet")
+        _mp_en   = _mpk2.number_input("En (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_en")
+        _mp_boy  = _mpk3.number_input("Boy (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_boy")
+        _mp_yuk  = _mpk4.number_input("Yükseklik (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_yuk")
+        _mp_kg   = _mpk5.number_input("Kilo (kg)", min_value=0.0, value=0.0, step=1.0, key="mp_kg")
+
+        _mp_desi = (_mp_en * _mp_boy * _mp_yuk / 3000.0) * _mp_adet
+        _mp_toplam_kg = _mp_kg * _mp_adet
+        st.caption(f"📐 Hesaplanan Desi: **{_mp_desi:.1f}** · Toplam Kilo: **{_mp_toplam_kg:.1f}**")
+
+        # ── Fiyat hesabı: önce sözleşme/teklifte bu güzergah var mı bak, yoksa 6 TL/desi-kg ──
+        _mp_birim_fiyat = None
+        _mp_kaynak = "Standart (6 ₺/desi-kg)"
+        try:
+            if not _mp_ham.empty:
+                for _, _mr2 in _mp_ham.iterrows():
+                    try:
+                        _p2 = _mpj.loads(_mr2.get("satirlar","{}"))
+                    except Exception:
+                        continue
+                    if _p2.get("tip") == "ozel":
+                        for _g in _p2.get("grp", []):
+                            for _s in _g.get("satirlar", []):
+                                _cikis_l = [c.upper() for c in (_s.get("cikis") or [])] if isinstance(_s.get("cikis"),list) else [str(_s.get("cikis") or "").upper()]
+                                _varis_l = [v.upper() for v in (_s.get("varis") or [])] if isinstance(_s.get("varis"),list) else [str(_s.get("varis") or "").upper()]
+                                if _mp_g_il.upper() in _cikis_l and _mp_a_il.upper() in _varis_l:
+                                    _mp_birim_fiyat = float(_s.get("fiyat",0) or 0)
+                                    _mp_kaynak = "Özel Teklifinizdeki fiyat"
+        except Exception:
+            pass
+
+        if _mp_birim_fiyat:
+            _mp_hesaplanan_fiyat = _mp_birim_fiyat
+        else:
+            _mp_hesaplanan_fiyat = max(_mp_desi, _mp_toplam_kg) * 6
+
+        st.markdown("---")
+        _mps1, _mps2 = st.columns(2)
+        _mps1.metric("💰 Tahmini Fiyat", fmt_para(_mp_hesaplanan_fiyat))
+        _mps2.caption(f"Kaynak: {_mp_kaynak}")
+
+        if st.button("📦 Kargo İhbarı Ver", type="primary", use_container_width=True, key="mp_ihbar_ver"):
+            if not _mp_a_adres or not _mp_a_adres.strip():
+                st.error("⚠️ Alıcı adresi zorunludur.")
+            elif _mp_desi <= 0 and _mp_toplam_kg <= 0:
+                st.error("⚠️ Kargo ölçüleri veya kilosu girilmeli.")
+            else:
+                try:
+                    _mp_ihbar_veri = {
+                        "musteri_firma": _mp_firma_adi, "gonderen_il": _mp_g_il, "gonderen_ilce": _mp_g_ilce,
+                        "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce, "alici_adres": _mp_a_adres,
+                        "adet": _mp_adet, "en": _mp_en, "boy": _mp_boy, "yukseklik": _mp_yuk, "kilo": _mp_kg,
+                        "desi": round(_mp_desi,1), "toplam_kg": round(_mp_toplam_kg,1),
+                        "fiyat": round(_mp_hesaplanan_fiyat,2), "fiyat_kaynak": _mp_kaynak,
+                        "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"), "durum": "yeni",
+                    }
+                    if _mp_sb:
+                        _mp_sb.table("teklifler").insert({
+                            "musteri_id": _mp_cari_id, "musteri_adi": _mp_firma_adi,
+                            "satirlar": _mpj.dumps({"tip":"kargo_ihbar","veri":_mp_ihbar_veri}, ensure_ascii=False),
+                            "toplam_tutar": _mp_hesaplanan_fiyat,
+                            "olusturan": st.session_state.get("kullanici",""),
+                            "notlar": f"Kargo İhbarı · {_mp_g_il}→{_mp_a_il} · {fmt_para(_mp_hesaplanan_fiyat)}",
+                        }).execute()
+                    st.success("✅ Kargo ihbarınız alındı! En kısa sürede size dönüş yapılacaktır.")
+                    st.info("📞 Acil durumlar için: **0540 034 42 28**")
+                except Exception as _mpe:
+                    st.error(f"Hata: {_mpe}")
+
+        st.caption("📞 Alım ihbarı için bizi de arayabilirsiniz: **0540 034 42 28**")
+
+
+
     # ── LOGO ──────────────────────────────────────────────────────────────────
     st.markdown("""
 <div style="text-align:center;padding:2rem 0 1.5rem;">
@@ -963,7 +1300,7 @@ try{localStorage.removeItem('mwcrm_oturum');}catch(e){}
 # ── SESSION STATE ─────────────────────────────────────────────────────────────
 _sayfa_adlari_cfg = {
     "yeni":"Yeni Kart","liste":"Cari Liste","analiz":"Müşteri Analizi",
-    "randevu":"Randevular","teklif":"Spot Teklif","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler","fatura":"Faturalar",
+    "randevu":"Randevular","teklif":"Spot Teklif","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler","fatura":"Faturalar","kargo_ihbar":"Kargo İhbarları",
     "rota_analiz":"Rota Analiz","operasyon":"Operasyon","kisiler":"Telefon Kişiler",
     "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
     "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
@@ -976,7 +1313,7 @@ st.set_page_config(page_title=_baslik_cfg, layout="wide", initial_sidebar_state=
 # Sekme başlığını aktif menüye göre güncelle
 _sayfa_adlari = {
     "yeni":"Yeni Kart","liste":"Cari Liste","analiz":"Müşteri Analizi",
-    "randevu":"Randevular","teklif":"Spot Teklif","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler","fatura":"Faturalar",
+    "randevu":"Randevular","teklif":"Spot Teklif","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler","fatura":"Faturalar","kargo_ihbar":"Kargo İhbarları",
     "rota_analiz":"Rota Analiz","operasyon":"Operasyon","kisiler":"Telefon Kişiler",
     "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
     "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
@@ -1310,7 +1647,7 @@ function mwTab(tab) {
   var btns = window.parent.document.querySelectorAll('section[data-testid="stSidebar"] button');
   var tabMap = {
     'liste':'Cari Liste','analiz':'Müşteri Analizi','randevu':'Randevular',
-    'teklif':'Spot Teklif','ozel_teklif':'Özel Teklif','sozlesme':'Sözleşmeler','fatura':'Faturalar','harita':'Müşteri Haritası',
+    'teklif':'Spot Teklif','ozel_teklif':'Özel Teklif','sozlesme':'Sözleşmeler','fatura':'Faturalar','kargo_ihbar':'Kargo İhbarları','harita':'Müşteri Haritası',
     'rapor':'Raporlar','yeni':'Yeni Kart'
   };
   var hedef = tabMap[tab] || tab;
@@ -1733,7 +2070,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "sozlesme", "fatura", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "teklif", "ozel_teklif", "sozlesme", "fatura", "kargo_ihbar", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -1742,6 +2079,7 @@ _TAB_ETIKETLER = {
     "ozel_teklif": "⭐ Özel Teklif",
     "sozlesme": "📜 Sözleşmeler",
     "fatura": "💰 Faturalar",
+    "kargo_ihbar": "📦 Kargo İhbarları",
     "excel": "📥 Excel Aktar",
     "kisiler": "📞 Telefon Kişiler",
     "analiz": "🔍 Müşteri Analizi",
@@ -1920,6 +2258,11 @@ if not st.session_state.get("giris", False):
     giris_ekrani()
     st.stop()
 
+# ── MÜŞTERİ ROLÜ — kısıtlı portal, ana menü hiç kurulmaz ────────────────────
+if st.session_state.get("rol") == "musteri":
+    musteri_portal()
+    st.stop()
+
 
 
 
@@ -2093,6 +2436,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
         "ozel_teklif": "#7c3aed",
         "sozlesme":    "#9333ea",
         "fatura":      "#16a34a",
+        "kargo_ihbar": "#ea580c",
         "kisiler":     "#0f766e",
         "rapor":       "#6d28d9",
         "excel":       "#047857",
@@ -2155,6 +2499,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
         ("🔎 Analiz ve takip",   ["analiz", "islem_takip"]),
         ("📅 Randevu ve teklif", ["randevu", "teklif", "ozel_teklif", "sozlesme"]),
         ("💰 Faturalar",         ["fatura"]),
+        ("📦 Kargo İhbarları",   ["kargo_ihbar"]),
         ("🚚 Saha",              ["rota_analiz", "operasyon", "harita"]),
         ("⚙️ Yönetim",          ["kullanici", "patron", "musteri_atama"]),
         ("📊 Raporlar",          ["admin_rapor", "rapor"]),
@@ -2374,7 +2719,7 @@ st.markdown(f"""
   // Nav butonlarında aktif class güncelle
   var _cur = '{_aktif_tab_js}';
   var _tabMap = {{'liste':'liste','analiz':'analiz','randevu':'randevu',
-    'teklif':'teklif','ozel_teklif':'teklif','sozlesme':'teklif','fatura':'fatura','harita':'harita'}};
+    'teklif':'teklif','ozel_teklif':'teklif','sozlesme':'teklif','fatura':'fatura','kargo_ihbar':'kargo_ihbar','harita':'harita'}};
   var _curNav = _tabMap[_cur] || _cur;
   document.querySelectorAll('.mw-nav-btn').forEach(function(b){{
     var _fn = b.getAttribute('onclick') || '';
@@ -5016,6 +5361,9 @@ elif aktif == "kullanici":
 
     with kul_tab2:
         st.markdown("#### ➕ Yeni Kullanıcı")
+        _yk_musteri_dfm = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
+        _yk_musteri_opts = ["-- Bağlı değil --"] + ([f"[{int(r['id'])}] {r['firma']}" for _, r in _yk_musteri_dfm.iterrows()] if not _yk_musteri_dfm.empty else [])
+        yk_bagli_musteri = st.selectbox("🔗 Bağlı Müşteri (SADECE 'musteri' rolü için — bu kullanıcı sadece bu carinin bilgilerini görecek)", _yk_musteri_opts, key="yk_bagli_musteri")
         with st.form("yeni_kul_form"):
             f1,f2 = st.columns(2)
             yk_ad      = f1.text_input("Ad*")
@@ -5024,9 +5372,10 @@ elif aktif == "kullanici":
             yk_sifre   = f2.text_input("Şifre*", type="password")
             yk_email   = f1.text_input("Email")
             yk_tel     = f2.text_input("Telefon", placeholder="05xxxxxxxxx")
-            yk_rol     = f1.selectbox("Rol:", ["kullanici","admin"])
+            yk_rol     = f1.selectbox("Rol:", ["kullanici","admin","musteri"])
 
             st.markdown("#### 🔐 Menü Yetkileri")
+            st.caption("Not: Rol 'musteri' seçilirse menü yetkileri devre dışı kalır — müşteri sadece kendi kısıtlı portalını görür.")
             tam = st.checkbox("✅ Tam Yetki (Tümü)", value=True, key="yk_tam")
             secili_m = []
             if not tam:
@@ -5049,7 +5398,14 @@ elif aktif == "kullanici":
                         st.error(f"⚠️ '{yk_kadi}' kullanıcı adı zaten kayıtlı. Lütfen başka bir kullanıcı adı seçin.")
                         st.stop()
 
-                    yetki = "tam" if tam else json.dumps(secili_m)
+                    if yk_rol == "musteri":
+                        if yk_bagli_musteri == "-- Bağlı değil --":
+                            st.error("⚠️ 'musteri' rolü için bir Bağlı Müşteri seçmelisiniz.")
+                            st.stop()
+                        _yk_bagli_id = yk_bagli_musteri.split("]")[0].replace("[","").strip()
+                        yetki = json.dumps([f"MUSTERI_CARI_ID:{_yk_bagli_id}"])
+                    else:
+                        yetki = "tam" if tam else json.dumps(secili_m)
                     # Önce temel kolonlarla dene
                     veri = {"kullanici_adi": yk_kadi, "sifre": yk_sifre, "rol": yk_rol}
                     # Ek kolonları tek tek ekle
@@ -7866,6 +8222,48 @@ elif aktif == "fatura":
                     with st.expander("Kalemleri gör"):
                         for _k in _fv.get("kalemler", []):
                             st.caption(f"• {_k.get('aciklama','')} — {_k.get('miktar',0)} x {fmt_para(_k.get('birim_fiyat',0))}")
+
+elif aktif == "kargo_ihbar":
+    sayfa_log("kargo_ihbar")
+    import json as _kij
+
+    st.markdown("## 📦 Kargo İhbarları")
+    st.caption("Müşteri panelinden gelen fiyat alma + kargo ihbarı taleplerinin tamamı burada listelenir.")
+
+    try:
+        _ki_sb = get_sb_client()
+        _ki_ham = pd.DataFrame(_ki_sb.table("teklifler").select("*").order("id", desc=True).execute().data) if _ki_sb else pd.DataFrame()
+        _ki_ham = _ki_ham[_ki_ham["satirlar"].astype(str).str.contains("kargo_ihbar", case=False, na=False)] if not _ki_ham.empty else pd.DataFrame()
+    except Exception:
+        _ki_ham = pd.DataFrame()
+
+    _ki_liste = []
+    for _, _kr in _ki_ham.iterrows():
+        try:
+            _parsed = _kij.loads(_kr.get("satirlar","{}"))
+            if _parsed.get("tip") != "kargo_ihbar":
+                continue
+            _vv = _parsed.get("veri", {})
+            _vv["id"] = _kr.get("id")
+            _ki_liste.append(_vv)
+        except Exception:
+            continue
+
+    if not _ki_liste:
+        st.info("Henüz kargo ihbarı yok.")
+    else:
+        st.warning(f"📬 Toplam {len(_ki_liste)} kargo ihbarı var.")
+        for _kv in _ki_liste:
+            with st.container(border=True):
+                _kc1, _kc2, _kc3 = st.columns([2.2,1.5,1])
+                _kc1.markdown(f"**{_kv.get('musteri_firma','')}**")
+                _kc1.caption(f"📍 {_kv.get('gonderen_il','')}/{_kv.get('gonderen_ilce','')} → "
+                             f"{_kv.get('alici_il','')}/{_kv.get('alici_ilce','')}")
+                _kc1.caption(f"🏠 {_kv.get('alici_adres','')}")
+                _kc2.caption(f"📦 {_kv.get('adet','')} adet · {_kv.get('desi','')} desi · {_kv.get('toplam_kg','')} kg")
+                _kc2.caption(f"📅 {_kv.get('tarih','')}")
+                _kc3.metric("Fiyat", fmt_para(_kv.get("fiyat",0)))
+                _kc3.caption(_kv.get("fiyat_kaynak",""))
 
 elif aktif == "excel":
     sayfa_log("excel")
