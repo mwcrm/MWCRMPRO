@@ -1009,8 +1009,12 @@ div[data-testid="stAppViewContainer"] > section.main { max-width: 100% !importan
 </div>
 """, unsafe_allow_html=True)
 
-    _mpw1, _mpw2, _mpw3 = st.columns([1, 1.6, 1])
-    with _mpw2:
+    _mp_mobil = st.session_state.get("_mobil_mod", False)
+    if _mp_mobil:
+        _mp_orta = st.container()  # mobilde tam genişlik — dar sütun mobilde her şeyi sıkıştırıp bozuyordu
+    else:
+        _mpw1, _mp_orta, _mpw3 = st.columns([1, 1.6, 1])
+    with _mp_orta:
         _mp_c1, _mp_c2 = st.columns([5,1])
         with _mp_c2:
             if st.button("🚪 Çıkış", use_container_width=True):
