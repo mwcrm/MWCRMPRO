@@ -1100,7 +1100,7 @@ div[data-testid="stMainBlockContainer"] {
             _mp_iller = sorted(set(r[0] for r in DAGITIM_PLANI))
 
             st.markdown("**📍 Gönderen / Alıcı**")
-            _mpg1, _mpg2, _mpga, _mpa1, _mpa2, _mpaa, _mpmsg1, _mpmsg2 = st.columns(8)
+            _mpg1, _mpg2, _mpga, _mpa1, _mpa2, _mpaa = st.columns(6)
             _mp_g_il = _mpg1.selectbox("Gönderen İl", _mp_iller, key="mp_g_il")
             _mp_g_ilceler = sorted(set(r[1] for r in DAGITIM_PLANI if r[0] == _mp_g_il))
             _mp_g_ilce = _mpg2.selectbox("Gönderen İlçe", _mp_g_ilceler, key="mp_g_ilce")
@@ -1110,24 +1110,13 @@ div[data-testid="stMainBlockContainer"] {
             _mp_a_ilce = _mpa2.selectbox("Alıcı İlçe", _mp_a_ilceler, key="mp_a_ilce")
             _mp_a_adres = _mpaa.text_input("Alıcı Adresi *", key="mp_a_adres", placeholder="Açık adres...")
 
-            # ── Gönderen → Alıcı arası mesafe (aynı satırın hücresinde) ──────────
-            _mp_km = _il_mesafe_km(_mp_g_il, _mp_a_il)
-            if _mp_g_il == _mp_a_il:
-                _mpmsg1.success(f"📍 **{_mp_g_il}** içi — aynı il, kısa mesafe!")
-            elif _mp_km:
-                _mpmsg1.success(f"🛣️ **{_mp_g_il}→{_mp_a_il}** ~**{_mp_km} km**")
-
-            _aciklama, _sure = _dagitim_bilgisi(_mp_a_il, _mp_a_ilce)
-            if _aciklama:
-                _mpmsg2.info(f"🚚 **{_mp_a_ilce}**: **{_sure}** · {_aciklama}")
-
             with st.expander("🗺️ Haritada Gör (yol tarifi)", expanded=False):
                 _mp_rota_sorgu = f"{_mp_g_il},Türkiye/{_mp_a_il},Türkiye".replace(" ", "+")
                 st.components.v1.iframe(
                     f"https://www.google.com/maps?saddr={_mp_g_il}&daddr={_mp_a_il}&output=embed", height=320)
 
-            st.markdown("**📦 Kargo Bilgileri**")
-            _mpk1, _mpk2, _mpk3, _mpk4, _mpk5, _mpkdesi, _mpkfiyat = st.columns(7)
+            _mpk0, _mpk1, _mpk2, _mpk3, _mpk4, _mpk5, _mpkdesi, _mpkfiyat = st.columns(8)
+            _mpk0.markdown("<br>**📦 Kargo Bilgileri**", unsafe_allow_html=True)
             _mp_adet = _mpk1.number_input("Adet", min_value=1, value=1, step=1, key="mp_adet")
             _mp_en   = _mpk2.number_input("En (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_en")
             _mp_boy  = _mpk3.number_input("Boy (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_boy")
@@ -1165,6 +1154,18 @@ div[data-testid="stMainBlockContainer"] {
                 _mp_hesaplanan_fiyat = max(_mp_desi, _mp_toplam_kg) * 6
 
             _mpkfiyat.caption(f"💰 **{fmt_para(_mp_hesaplanan_fiyat)}** · {_mp_kaynak}")
+
+            # ── Mesafe ve teslim süresi mesajları — geniş, iki sütunlu ayrı satır ──
+            _mp_km = _il_mesafe_km(_mp_g_il, _mp_a_il)
+            _mpmsg1, _mpmsg2 = st.columns(2)
+            if _mp_g_il == _mp_a_il:
+                _mpmsg1.success(f"📍 **{_mp_g_il}** içi teslimat — aynı il, kısa mesafe!")
+            elif _mp_km:
+                _mpmsg1.success(f"🛣️ **{_mp_g_il} → {_mp_a_il}** arası yaklaşık **{_mp_km} km** (kuş uçuşu)")
+            _aciklama, _sure = _dagitim_bilgisi(_mp_a_il, _mp_a_ilce)
+            if _aciklama:
+                _mpmsg2.info(f"🚚 **{_mp_a_ilce}** için teslim süresi: **{_sure}** · Dağıtım günü: **{_aciklama}**")
+
             st.markdown("---")
 
             # ── Bu fiyat sorgusunu otomatik kaydet (aynısını tekrar tekrar kaydetme) ──
