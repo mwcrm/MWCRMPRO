@@ -2592,8 +2592,71 @@ elif aktif == "mukerrer":
     if _mk_df.empty or "firma" not in _mk_df.columns:
         st.caption("Veri yok.")
     else:
+        import re as _mkre
+
+        def _mk_norm_tel(s):
+            """Telefonu sadece rakamlara indirger, boşluk/parantez/tire farkını yok sayar, son 10 haneyi alır"""
+            _d = _mkre.sub(r"\D", "", str(s or ""))
+            return _d[-10:] if len(_d) >= 10 else (_d if _d else "")
+
+        def _mk_norm_isim(s):
+            """Firma adını karşılaştırmak için normalize eder: büyük harf, noktalama/boşluk sadeleştirme,
+            yaygın şirket eklerini (A.Ş, LTD, ŞTİ, TİC, SAN vb.) çıkarır — 'yakın isim' tespiti için"""
+            _s = str(s or "").upper()
+            _s = (_s.replace("İ","I").replace("Ş","S").replace("Ğ","G")
+                    .replace("Ü","U").replace("Ö","O").replace("Ç","C"))
+            _s = _mkre.sub(r"[^\w\s]", " ", _s)
+            _ekler = [" AS ", " A S ", " LTD ", " STI ", " SIRKETI ", " TIC ", " TICARET ", " SAN ", " SANAYI ",
+                      " PAZ ", " PAZARLAMA ", " ITH ", " IHR ", " ITHALAT ", " IHRACAT ", " CO ", " LIMITED ",
+                      " TAAHHUT ", " GIDA ", " INSAAT ", " NAKLIYAT ", " KARGO ", " LOJISTIK ", " GRUP ", " GROUP "]
+            _s = " " + _mkre.sub(r"\s+", " ", _s).strip() + " "
+            for _ek in _ekler:
+                _s = _s.replace(_ek, " ")
+            return _mkre.sub(r"\s+", " ", _s).strip()
+
         _mk_firma_gruplari = _mk_df.groupby(_mk_df["firma"].astype(str).str.strip().str.upper())["id"].apply(list)
         _mk_mukerrerler = {k: v for k, v in _mk_firma_gruplari.items() if len(v) > 1 and k not in ["", "NAN", "NONE"]}
+
+        # Mükerrer sebebini id -> [sebep,...] olarak topluyoruz
+        _mk_sebep = {}
+        for _k, _idler in _mk_mukerrerler.items():
+            for _i in _idler:
+                _mk_sebep.setdefault(int(_i), set()).add("Aynı İsim")
+
+        # ── Yakın isim (ek/boşluk farkı ile aynı) ──
+        _mk_df["_norm_isim"] = _mk_df["firma"].apply(_mk_norm_isim)
+        for _k, _grp in _mk_df[_mk_df["_norm_isim"] != ""].groupby("_norm_isim"):
+            _idler = _grp["id"].astype(int).tolist()
+            if len(_idler) > 1:
+                if _k not in _mk_mukerrerler:
+                    _mk_mukerrerler[_k] = _idler
+                for _i in _idler:
+                    _mk_sebep.setdefault(_i, set()).add("Yakın İsim")
+
+        # ── Aynı GSM ──
+        if "gsm" in _mk_df.columns:
+            _mk_df["_norm_gsm"] = _mk_df["gsm"].apply(_mk_norm_tel)
+            for _k, _grp in _mk_df[_mk_df["_norm_gsm"] != ""].groupby("_norm_gsm"):
+                _idler = _grp["id"].astype(int).tolist()
+                if len(_idler) > 1:
+                    _anahtar = "gsm_" + _k
+                    if _anahtar not in _mk_mukerrerler:
+                        _mk_mukerrerler[_anahtar] = _idler
+                    for _i in _idler:
+                        _mk_sebep.setdefault(_i, set()).add("Aynı Cep Tel")
+
+        # ── Aynı Sabit Hat ──
+        if "sabit" in _mk_df.columns:
+            _mk_df["_norm_sabit"] = _mk_df["sabit"].apply(_mk_norm_tel)
+            for _k, _grp in _mk_df[_mk_df["_norm_sabit"] != ""].groupby("_norm_sabit"):
+                _idler = _grp["id"].astype(int).tolist()
+                if len(_idler) > 1:
+                    _anahtar = "sabit_" + _k
+                    if _anahtar not in _mk_mukerrerler:
+                        _mk_mukerrerler[_anahtar] = _idler
+                    for _i in _idler:
+                        _mk_sebep.setdefault(_i, set()).add("Aynı Sabit Tel")
+
         if not _mk_mukerrerler:
             st.success("✅ Mükerrer müşteri bulunamadı.")
         else:
@@ -2637,6 +2700,8 @@ elif aktif == "mukerrer":
             _mk_tablo["Randevu"] = _mk_tablo["id"].apply(lambda x: _mk_rand_sayac.get(int(x), 0))
             _mk_tablo["Analiz"] = _mk_tablo["firma"].apply(
                 lambda x: "✅" if str(x).strip().upper() in _mk_analiz_set else "")
+            _mk_tablo["Neden Mükerrer?"] = _mk_tablo["id"].apply(
+                lambda x: ", ".join(sorted(_mk_sebep.get(int(x), []))) or "—")
 
             _mk_tablo.insert(0, "Seç", False)
 
@@ -2669,6 +2734,7 @@ elif aktif == "mukerrer":
                 "Notlar": st.column_config.NumberColumn("📨 Notlar", disabled=True, width=_mk_w("Notlar")),
                 "Randevu": st.column_config.NumberColumn("📅 Randevu", disabled=True, width=_mk_w("Randevu")),
                 "Analiz": st.column_config.TextColumn("✅ Analiz", disabled=True, width=_mk_w("Analiz")),
+                "Neden Mükerrer?": st.column_config.TextColumn("🔍 Neden Mükerrer?", disabled=True, width=140),
             }
 
             _mk_edited = st.data_editor(
