@@ -1127,9 +1127,15 @@ div[data-testid="stMainBlockContainer"] {
             _mp_toplam_kg = _mp_kg * _mp_adet
             _mpkdesi.caption(f"📐 Desi: **{_mp_desi:.1f}** · Kilo: **{_mp_toplam_kg:.1f}**")
 
-            # ── Fiyat hesabı: önce sözleşme/teklifte bu güzergah var mı bak, yoksa 6 TL/desi-kg ──
+            # ── Fiyat hesabı: önce SÖZLEŞME, sonra Özel Teklif, yoksa 6 TL/desi-kg ──
+            def _mp_tr_norm(s):
+                """Türkçe İ/I büyük harf sorununu (İzmir.upper()='İZMIR' ama 'İZMİR'≠'İZMIR') normalize eder"""
+                return str(s or "").strip().upper().replace("İ", "I").replace("Ş","S").replace("Ğ","G").replace("Ü","U").replace("Ö","O").replace("Ç","C")
+
             _mp_birim_fiyat = None
             _mp_kaynak = "Standart (6 ₺/desi-kg)"
+            _mp_g_il_n = _mp_tr_norm(_mp_g_il)
+            _mp_a_il_n = _mp_tr_norm(_mp_a_il)
             try:
                 if not _mp_ham.empty:
                     for _, _mr2 in _mp_ham.iterrows():
@@ -1137,12 +1143,36 @@ div[data-testid="stMainBlockContainer"] {
                             _p2 = _mpj.loads(_mr2.get("satirlar","{}"))
                         except Exception:
                             continue
-                        if _p2.get("tip") == "ozel":
+
+                        # ── SÖZLEŞME: "İstanbul → İstanbul, Tekirdağ..." başlığı + "Koli | 0-30 desi → 150 ₺" satırları ──
+                        if _p2.get("tip") == "sozlesme" and _mp_birim_fiyat is None:
+                            for _g in _p2.get("veri", {}).get("fiyat_gruplari", []):
+                                _baslik = _g.get("baslik", "")
+                                if "→" not in _baslik:
+                                    continue
+                                _cikis_kisim, _varis_kisim = _baslik.split("→", 1)
+                                if _mp_g_il_n not in _mp_tr_norm(_cikis_kisim) or _mp_a_il_n not in _mp_tr_norm(_varis_kisim):
+                                    continue
+                                for _satir in _g.get("satirlar", []):
+                                    _m = re.search(r"(\d+)\s*-\s*(\d+)\s*desi.*?([\d.,]+)\s*₺", _satir)
+                                    if _m:
+                                        _bas_desi = float(_m.group(1)); _bit_desi = float(_m.group(2))
+                                        _tutar = float(_m.group(3).replace(".", "").replace(",", "."))
+                                        _hedef_desi = max(_mp_desi, _mp_toplam_kg)
+                                        if _bas_desi <= _hedef_desi <= _bit_desi:
+                                            _mp_birim_fiyat = _tutar
+                                            _mp_kaynak = f"Sözleşmenizdeki fiyat ({_satir.strip()})"
+                                            break
+                                if _mp_birim_fiyat is not None:
+                                    break
+
+                        # ── ÖZEL TEKLİF ──
+                        if _p2.get("tip") == "ozel" and _mp_birim_fiyat is None:
                             for _g in _p2.get("grp", []):
                                 for _s in _g.get("satirlar", []):
-                                    _cikis_l = [c.upper() for c in (_s.get("cikis") or [])] if isinstance(_s.get("cikis"),list) else [str(_s.get("cikis") or "").upper()]
-                                    _varis_l = [v.upper() for v in (_s.get("varis") or [])] if isinstance(_s.get("varis"),list) else [str(_s.get("varis") or "").upper()]
-                                    if _mp_g_il.upper() in _cikis_l and _mp_a_il.upper() in _varis_l:
+                                    _cikis_l = [_mp_tr_norm(c) for c in (_s.get("cikis") or [])] if isinstance(_s.get("cikis"),list) else [_mp_tr_norm(_s.get("cikis") or "")]
+                                    _varis_l = [_mp_tr_norm(v) for v in (_s.get("varis") or [])] if isinstance(_s.get("varis"),list) else [_mp_tr_norm(_s.get("varis") or "")]
+                                    if _mp_g_il_n in _cikis_l and _mp_a_il_n in _varis_l:
                                         _mp_birim_fiyat = float(_s.get("fiyat",0) or 0)
                                         _mp_kaynak = "Özel Teklifinizdeki fiyat"
             except Exception:
@@ -1171,11 +1201,11 @@ div[data-testid="stMainBlockContainer"] {
             # ── Bu fiyat sorgusunu otomatik kaydet (aynısını tekrar tekrar kaydetme) ──
             if _mp_desi > 0 or _mp_toplam_kg > 0:
                 _mp_sorgu_imza = f"{_mp_g_il}|{_mp_a_il}|{_mp_adet}|{_mp_en}|{_mp_boy}|{_mp_yuk}|{_mp_kg}"
-                _mp_kayitli_sorgular = st.session_state.setdefault("_mp_fiyat_takip", set())
+                _mp_kayitli_sorgular = st.session_state.setdefault("_mp_fiyat_takip", {})
                 if _mp_sorgu_imza not in _mp_kayitli_sorgular:
                     try:
                         if _mp_sb:
-                            _mp_sb.table("teklifler").insert({
+                            _mp_ins_r = _mp_sb.table("teklifler").insert({
                                 "musteri_id": _mp_cari_id, "musteri_adi": _mp_firma_adi,
                                 "satirlar": _mpj.dumps({"tip":"fiyat_sorgu","veri":{
                                     "gonderen_il": _mp_g_il, "gonderen_ilce": _mp_g_ilce,
@@ -1188,46 +1218,37 @@ div[data-testid="stMainBlockContainer"] {
                                 "olusturan": st.session_state.get("kullanici",""),
                                 "notlar": f"Fiyat Sorgusu · {_mp_g_il}→{_mp_a_il} · {fmt_para(_mp_hesaplanan_fiyat)}",
                             }).execute()
-                        _mp_kayitli_sorgular.add(_mp_sorgu_imza)
+                            _mp_yeni_id = _mp_ins_r.data[0].get("id") if _mp_ins_r.data else None
+                            _mp_kayitli_sorgular[_mp_sorgu_imza] = _mp_yeni_id
                     except Exception:
                         pass
 
             try:
-                _mp_gecmis_sorgular = []
+                _mp_tum_kayitlar = []
                 if not _mp_ham.empty:
                     for _, _gr in _mp_ham.iterrows():
                         try:
                             _gp = _mpj.loads(_gr.get("satirlar","{}"))
-                            if _gp.get("tip") == "fiyat_sorgu":
-                                _mp_gecmis_sorgular.append(_gp.get("veri",{}))
+                            if _gp.get("tip") in ("fiyat_sorgu", "kargo_ihbar"):
+                                _mp_tum_kayitlar.append((_gp.get("tip"), _gp.get("veri",{})))
                         except Exception:
                             continue
-                if _mp_gecmis_sorgular:
-                    with st.expander(f"📜 Geçmiş Fiyat Sorgularım ({len(_mp_gecmis_sorgular)})", expanded=False):
-                        for _gs in _mp_gecmis_sorgular[:20]:
-                            _kmtxt = f" · {_gs.get('km')} km" if _gs.get("km") else ""
-                            st.caption(f"📅 {_gs.get('tarih','')} — {_gs.get('gonderen_il','')} → {_gs.get('alici_il','')}"
-                                       f"{_kmtxt} · {_gs.get('desi','')} desi/{_gs.get('toplam_kg','')} kg → **{fmt_para(_gs.get('fiyat',0))}**")
-            except Exception:
-                pass
-
-            try:
-                _mp_ihbarlarim = []
-                if not _mp_ham.empty:
-                    for _, _ir in _mp_ham.iterrows():
-                        try:
-                            _ip = _mpj.loads(_ir.get("satirlar","{}"))
-                            if _ip.get("tip") == "kargo_ihbar":
-                                _mp_ihbarlarim.append(_ip.get("veri",{}))
-                        except Exception:
-                            continue
-                if _mp_ihbarlarim:
-                    with st.expander(f"📦 Kargo İhbarlarım ({len(_mp_ihbarlarim)})", expanded=False):
-                        for _iv in _mp_ihbarlarim[:20]:
-                            _durum_v = _iv.get("durum","yeni")
-                            _durum_yazi = "✅ Onaylandı" if _durum_v == "onaylandı" else "⏳ Organize ediliyor"
-                            st.caption(f"📅 {_iv.get('tarih','')} — {_iv.get('gonderen_il','')} → {_iv.get('alici_il','')} "
-                                       f"· {fmt_para(_iv.get('fiyat',0))} · **{_durum_yazi}**")
+                if _mp_tum_kayitlar:
+                    with st.expander(f"📜 Fiyat Sorgularım / İhbarlarım ({len(_mp_tum_kayitlar)})", expanded=False):
+                        for _tip_v, _kayit in _mp_tum_kayitlar[:20]:
+                            if _tip_v == "fiyat_sorgu":
+                                _kmtxt = f" · {_kayit.get('km')} km" if _kayit.get("km") else ""
+                                st.caption(f"📅 {_kayit.get('tarih','')} — {_kayit.get('gonderen_il','')} → {_kayit.get('alici_il','')}"
+                                           f"{_kmtxt} · {_kayit.get('desi','')} desi/{_kayit.get('toplam_kg','')} kg → **{fmt_para(_kayit.get('fiyat',0))}**")
+                            else:
+                                _durum_v = _kayit.get("durum","beklemede")
+                                if _durum_v == "onaylandı":
+                                    _plaka_v = _kayit.get("plaka","")
+                                    _durum_yazi = f"🚚 Organize Ediliyor" + (f" (Plaka: {_plaka_v})" if _plaka_v else "")
+                                else:
+                                    _durum_yazi = "⏳ Beklemede (onay bekliyor)"
+                                st.caption(f"📅 {_kayit.get('tarih','')} — {_kayit.get('gonderen_il','')} → {_kayit.get('alici_il','')} "
+                                           f"· {fmt_para(_kayit.get('fiyat',0))} · **{_durum_yazi}**")
             except Exception:
                 pass
 
@@ -1245,9 +1266,18 @@ div[data-testid="stMainBlockContainer"] {
                             "adet": _mp_adet, "en": _mp_en, "boy": _mp_boy, "yukseklik": _mp_yuk, "kilo": _mp_kg,
                             "desi": round(_mp_desi,1), "toplam_kg": round(_mp_toplam_kg,1),
                             "fiyat": round(_mp_hesaplanan_fiyat,2), "fiyat_kaynak": _mp_kaynak,
-                            "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"), "durum": "yeni",
+                            "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"), "durum": "beklemede",
                         }
-                        if _mp_sb:
+                        # Aynı sorgu zaten kaydedilmişse (fiyat_sorgu) o kaydı ihbara ÇEVİR — mükerrer satır oluşmasın
+                        _mp_sorgu_imza2 = f"{_mp_g_il}|{_mp_a_il}|{_mp_adet}|{_mp_en}|{_mp_boy}|{_mp_yuk}|{_mp_kg}"
+                        _mp_mevcut_id = st.session_state.get("_mp_fiyat_takip", {}).get(_mp_sorgu_imza2)
+                        if _mp_sb and _mp_mevcut_id:
+                            _mp_sb.table("teklifler").update({
+                                "satirlar": _mpj.dumps({"tip":"kargo_ihbar","veri":_mp_ihbar_veri}, ensure_ascii=False),
+                                "toplam_tutar": _mp_hesaplanan_fiyat,
+                                "notlar": f"Kargo İhbarı · {_mp_g_il}→{_mp_a_il} · {fmt_para(_mp_hesaplanan_fiyat)}",
+                            }).eq("id", int(_mp_mevcut_id)).execute()
+                        elif _mp_sb:
                             _mp_sb.table("teklifler").insert({
                                 "musteri_id": _mp_cari_id, "musteri_adi": _mp_firma_adi,
                                 "satirlar": _mpj.dumps({"tip":"kargo_ihbar","veri":_mp_ihbar_veri}, ensure_ascii=False),
@@ -1255,8 +1285,9 @@ div[data-testid="stMainBlockContainer"] {
                                 "olusturan": st.session_state.get("kullanici",""),
                                 "notlar": f"Kargo İhbarı · {_mp_g_il}→{_mp_a_il} · {fmt_para(_mp_hesaplanan_fiyat)}",
                             }).execute()
-                        st.success("✅ Kargo ihbarınız alındı — Alımınız organize edilmektedir. Onaylandığında size e-posta ile bilgi verilecektir.")
+                        st.success("✅ Kargo ihbarınız alındı — Beklemede, yönetici onayı bekleniyor. Onaylandığında size e-posta ile bilgi verilecektir.")
                         st.info("📞 Acil durumlar için: **0540 034 42 28**")
+                        st.cache_data.clear()
                     except Exception as _mpe:
                         st.error(f"Hata: {_mpe}")
 
@@ -8463,12 +8494,12 @@ elif aktif == "kargo_ihbar":
     if not _ki_liste:
         st.info("Henüz kargo ihbarı yok.")
     else:
-        _ki_yeni_sayi = len([x for x in _ki_liste if x.get("durum","yeni") == "yeni"])
+        _ki_yeni_sayi = len([x for x in _ki_liste if x.get("durum","beklemede") != "onaylandı"])
         st.warning(f"📬 Toplam {len(_ki_liste)} kargo ihbarı var — {_ki_yeni_sayi} tanesi onay bekliyor.")
         for _kv in _ki_liste:
-            _durum = _kv.get("durum", "yeni")
+            _durum = _kv.get("durum", "beklemede")
             with st.container(border=True):
-                _kc1, _kc2, _kc3, _kc4 = st.columns([2.2,1.5,1,1])
+                _kc1, _kc2, _kc3, _kc4 = st.columns([2.2,1.5,1,1.3])
                 _kc1.markdown(f"**{_kv.get('musteri_firma','')}**")
                 _kc1.caption(f"📍 {_kv.get('gonderen_il','')}/{_kv.get('gonderen_ilce','')} → "
                              f"{_kv.get('alici_il','')}/{_kv.get('alici_ilce','')}")
@@ -8479,46 +8510,55 @@ elif aktif == "kargo_ihbar":
                 _kc3.metric("Fiyat", fmt_para(_kv.get("fiyat",0)))
                 _kc3.caption(_kv.get("fiyat_kaynak",""))
                 if _durum == "onaylandı":
-                    _kc4.success("✅ Onaylandı")
+                    _kc4.success(f"🚚 Organize Ediliyor")
+                    if _kv.get("plaka"):
+                        _kc4.caption(f"Plaka: {_kv.get('plaka')}")
                 else:
+                    _kc4.caption("⏳ Beklemede")
+                    _plaka_gir = _kc4.text_input("Araç/Sürücü Plakası", key=f"ki_plaka_{_kv['id']}", placeholder="34 ABC 123", label_visibility="collapsed")
                     if _kc4.button("✅ Onayla", key=f"ki_onay_{_kv['id']}", use_container_width=True, type="primary"):
-                        try:
-                            _kv_yeni = dict(_kv)
-                            _kv_yeni["durum"] = "onaylandı"
-                            _kv_yeni.pop("id", None); _kv_yeni.pop("musteri_id", None)
-                            _ki_sb.table("teklifler").update({
-                                "satirlar": _kij.dumps({"tip":"kargo_ihbar","veri":_kv_yeni}, ensure_ascii=False)
-                            }).eq("id", int(_kv["id"])).execute()
-
-                            # Müşterinin email'ini bul ve bildir
-                            _musteri_email = ""
+                        if not _plaka_gir or not _plaka_gir.strip():
+                            st.error("⚠️ Onaylamak için araç/sürücü plakası girmelisiniz.")
+                        else:
                             try:
-                                if _kv.get("musteri_id"):
-                                    _cr = _ki_sb.table("cari_kartlar").select("email").eq("id", int(_kv["musteri_id"])).execute()
-                                    if _cr.data:
-                                        _musteri_email = _cr.data[0].get("email","") or ""
-                            except Exception:
-                                pass
+                                _kv_yeni = dict(_kv)
+                                _kv_yeni["durum"] = "onaylandı"
+                                _kv_yeni["plaka"] = _plaka_gir.strip()
+                                _kv_yeni.pop("id", None); _kv_yeni.pop("musteri_id", None)
+                                _ki_sb.table("teklifler").update({
+                                    "satirlar": _kij.dumps({"tip":"kargo_ihbar","veri":_kv_yeni}, ensure_ascii=False)
+                                }).eq("id", int(_kv["id"])).execute()
 
-                            if _musteri_email:
-                                _konu = "Kargo Alım Talebiniz Onaylandı"
-                                _govde = (f"Sayın {_kv.get('musteri_firma','')},\n\n"
-                                          f"{_kv.get('gonderen_il','')}/{_kv.get('gonderen_ilce','')} -> "
-                                          f"{_kv.get('alici_il','')}/{_kv.get('alici_ilce','')} güzergahı için "
-                                          f"verdiğiniz kargo alım talebiniz onaylanmıştır. Alımınız organize edilmektedir.\n\n"
-                                          f"Tutar: {fmt_para(_kv.get('fiyat',0))}\n\n"
-                                          f"Herhangi bir sorunuz için: 0540 034 42 28")
-                                _eok, _emsg = _ki_email_gonder(_musteri_email, _konu, _govde)
-                                if _eok:
-                                    st.toast(f"✅ Onaylandı, {_musteri_email} adresine bilgi gönderildi.", icon="✅")
+                                # Müşterinin email'ini bul ve bildir
+                                _musteri_email = ""
+                                try:
+                                    if _kv.get("musteri_id"):
+                                        _cr = _ki_sb.table("cari_kartlar").select("email").eq("id", int(_kv["musteri_id"])).execute()
+                                        if _cr.data:
+                                            _musteri_email = _cr.data[0].get("email","") or ""
+                                except Exception:
+                                    pass
+
+                                if _musteri_email:
+                                    _konu = "Kargo Alım Talebiniz Onaylandı"
+                                    _govde = (f"Sayın {_kv.get('musteri_firma','')},\n\n"
+                                              f"{_kv.get('gonderen_il','')}/{_kv.get('gonderen_ilce','')} -> "
+                                              f"{_kv.get('alici_il','')}/{_kv.get('alici_ilce','')} güzergahı için "
+                                              f"verdiğiniz kargo alım talebiniz onaylanmıştır. Alımınız organize edilmektedir.\n"
+                                              f"Araç/Sürücü Plakası: {_plaka_gir.strip()}\n\n"
+                                              f"Tutar: {fmt_para(_kv.get('fiyat',0))}\n\n"
+                                              f"Herhangi bir sorunuz için: 0540 034 42 28")
+                                    _eok, _emsg = _ki_email_gonder(_musteri_email, _konu, _govde)
+                                    if _eok:
+                                        st.toast(f"✅ Onaylandı, {_musteri_email} adresine bilgi gönderildi.", icon="✅")
+                                    else:
+                                        st.warning(f"✅ Onaylandı ama e-posta gönderilemedi: {_emsg}")
                                 else:
-                                    st.warning(f"✅ Onaylandı ama e-posta gönderilemedi: {_emsg}")
-                            else:
-                                st.warning("✅ Onaylandı ama müşterinin kayıtlı email adresi yok — e-posta gönderilemedi.")
-                            st.cache_data.clear()
-                            st.rerun()
-                        except Exception as _kie2:
-                            st.error(f"Hata: {_kie2}")
+                                    st.warning("✅ Onaylandı ama müşterinin kayıtlı email adresi yok — e-posta gönderilemedi.")
+                                st.cache_data.clear()
+                                st.rerun()
+                            except Exception as _kie2:
+                                st.error(f"Hata: {_kie2}")
 
 elif aktif == "excel":
     sayfa_log("excel")
