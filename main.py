@@ -1163,9 +1163,7 @@ div[data-testid="stMainBlockContainer"] {
                 _mp_hesaplanan_fiyat = max(_mp_desi, _mp_toplam_kg) * 6
 
             st.markdown("---")
-            _mps1, _mps2 = st.columns(2)
-            _mps1.metric("💰 Tahmini Fiyat", fmt_para(_mp_hesaplanan_fiyat))
-            _mps2.caption(f"Kaynak: {_mp_kaynak}")
+            st.markdown(f"💰 **Tahmini Fiyat: {fmt_para(_mp_hesaplanan_fiyat)}** &nbsp;·&nbsp; *Kaynak: {_mp_kaynak}*", unsafe_allow_html=True)
 
             # ── Bu fiyat sorgusunu otomatik kaydet (aynısını tekrar tekrar kaydetme) ──
             if _mp_desi > 0 or _mp_toplam_kg > 0:
