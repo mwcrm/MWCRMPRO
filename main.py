@@ -1125,11 +1125,10 @@ div[data-testid="stMainBlockContainer"] {
                 st.info(f"🚚 **{_mp_a_ilce}** için teslim süresi: **{_sure}** · Dağıtım günü: **{_aciklama}**")
 
             st.markdown("**📦 Kargo Bilgileri**")
-            _mpk1, _mpk2, _mpk3 = st.columns(3)
+            _mpk1, _mpk2, _mpk3, _mpk4, _mpk5 = st.columns(5)
             _mp_adet = _mpk1.number_input("Adet", min_value=1, value=1, step=1, key="mp_adet")
             _mp_en   = _mpk2.number_input("En (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_en")
             _mp_boy  = _mpk3.number_input("Boy (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_boy")
-            _mpk4, _mpk5 = st.columns(2)
             _mp_yuk  = _mpk4.number_input("Yükseklik (cm)", min_value=0.0, value=0.0, step=1.0, key="mp_yuk")
             _mp_kg   = _mpk5.number_input("Kilo (kg)", min_value=0.0, value=0.0, step=1.0, key="mp_kg")
 
