@@ -1264,19 +1264,18 @@ div[data-testid="stMainBlockContainer"] {
                 if _mp_tum_kayitlar:
                     with st.expander(f"📜 Fiyat Sorgularım / İhbarlarım ({len(_mp_tum_kayitlar)})", expanded=False):
                         for _tip_v, _kayit in _mp_tum_kayitlar[:20]:
-                            if _tip_v == "fiyat_sorgu":
-                                _kmtxt = f" · {_kayit.get('km')} km" if _kayit.get("km") else ""
-                                st.caption(f"📅 {_kayit.get('tarih','')} — {_kayit.get('gonderen_il','')} → {_kayit.get('alici_il','')}"
-                                           f"{_kmtxt} · {_kayit.get('desi','')} desi/{_kayit.get('toplam_kg','')} kg → **{fmt_para(_kayit.get('fiyat',0))}**")
-                            else:
+                            _kmtxt = f" · {_kayit.get('km')} km" if _kayit.get("km") else ""
+                            _satir = (f"📅 {_kayit.get('tarih','')} — {_kayit.get('gonderen_il','')} → {_kayit.get('alici_il','')}"
+                                      f"{_kmtxt} · {_kayit.get('desi','')} desi/{_kayit.get('toplam_kg','')} kg → **{fmt_para(_kayit.get('fiyat',0))}**")
+                            if _tip_v == "kargo_ihbar":
                                 _durum_v = _kayit.get("durum","beklemede")
                                 if _durum_v == "onaylandı":
                                     _plaka_v = _kayit.get("plaka","")
-                                    _durum_yazi = f"🚚 Organize Ediliyor" + (f" (Plaka: {_plaka_v})" if _plaka_v else "")
+                                    _durum_yazi = "🚚 Organize Ediliyor" + (f" (Plaka: {_plaka_v})" if _plaka_v else "")
                                 else:
                                     _durum_yazi = "⏳ Beklemede (onay bekliyor)"
-                                st.caption(f"📅 {_kayit.get('tarih','')} — {_kayit.get('gonderen_il','')} → {_kayit.get('alici_il','')} "
-                                           f"· {fmt_para(_kayit.get('fiyat',0))} · **{_durum_yazi}**")
+                                _satir += f" · {_durum_yazi}"
+                            st.caption(_satir)
             except Exception:
                 pass
 
@@ -1292,7 +1291,7 @@ div[data-testid="stMainBlockContainer"] {
                             "gonderen_adres": _mp_g_adres,
                             "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce, "alici_adres": _mp_a_adres,
                             "adet": _mp_adet, "en": _mp_en, "boy": _mp_boy, "yukseklik": _mp_yuk, "kilo": _mp_kg,
-                            "desi": round(_mp_desi,1), "toplam_kg": round(_mp_toplam_kg,1),
+                            "desi": round(_mp_desi,1), "toplam_kg": round(_mp_toplam_kg,1), "km": _mp_km,
                             "fiyat": round(_mp_hesaplanan_fiyat,2), "fiyat_kaynak": _mp_kaynak,
                             "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"), "durum": "beklemede",
                         }
