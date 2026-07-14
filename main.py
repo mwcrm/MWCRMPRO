@@ -4554,8 +4554,11 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                         # ARTIK GİZLEMİYORUZ — hata varsa ekranda görünsün ki nedenini bulabilelim
                         st.error(f"⚠️ '{_anlik_firma}' notu arşivlenemedi: {_ac_hata}")
                 if _yeni_arsivlendi:
-                    # Widget'ı tamamen sıfırla — tek tek hücre silmeye çalışmak güvenilir değildi
-                    st.session_state.pop("cari_editor", None)
+                    # ÖNEMLİ: Widget'ı ARTIK tam sıfırlamıyoruz — bu, aynı satırda henüz
+                    # "Kaydet"e basılmamış BAŞKA hücrelerdeki (Ara İşlem, Durum vb.) yazılmış
+                    # ama kaydedilmemiş değişiklikleri sessizce siliyordu. Not zaten DB'de güvende
+                    # (arşivlendi + idempotency takibi var) — hücre görsel olarak eski metni
+                    # göstermeye devam edebilir ama tekrar arşivlenmez, veri kaybı olmaz.
                     try: st.cache_data.clear()
                     except: pass
                     st.toast("✅ Arşivlendi: " + ", ".join(_yeni_arsivlendi), icon="✅")
