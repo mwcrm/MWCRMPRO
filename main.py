@@ -1202,6 +1202,24 @@ div[data-testid="stMainBlockContainer"] {
             if _mp_desi > 0 or _mp_toplam_kg > 0:
                 _mp_sorgu_imza = f"{_mp_g_il}|{_mp_a_il}|{_mp_adet}|{_mp_en}|{_mp_boy}|{_mp_yuk}|{_mp_kg}"
                 _mp_kayitli_sorgular = st.session_state.setdefault("_mp_fiyat_takip", {})
+
+                # Sadece oturum hafızasına değil, VERİTABANINDAKİ mevcut kayıtlara da bak —
+                # sayfa yenilenince oturum hafızası sıfırlanıyor, DB kontrolü olmazsa mükerrer satır oluşuyor.
+                if _mp_sorgu_imza not in _mp_kayitli_sorgular and not _mp_ham.empty:
+                    for _, _dr in _mp_ham.iterrows():
+                        try:
+                            _dp = _mpj.loads(_dr.get("satirlar","{}"))
+                            if _dp.get("tip") not in ("fiyat_sorgu", "kargo_ihbar"):
+                                continue
+                            _dv = _dp.get("veri", {})
+                            _db_imza = (f"{_dv.get('gonderen_il','')}|{_dv.get('alici_il','')}|{_dv.get('adet','')}|"
+                                        f"{_dv.get('en','')}|{_dv.get('boy','')}|{_dv.get('yukseklik','')}|{_dv.get('kilo','')}")
+                            if _db_imza == _mp_sorgu_imza:
+                                _mp_kayitli_sorgular[_mp_sorgu_imza] = _dr.get("id")
+                                break
+                        except Exception:
+                            continue
+
                 if _mp_sorgu_imza not in _mp_kayitli_sorgular:
                     try:
                         if _mp_sb:
@@ -1210,8 +1228,8 @@ div[data-testid="stMainBlockContainer"] {
                                 "satirlar": _mpj.dumps({"tip":"fiyat_sorgu","veri":{
                                     "gonderen_il": _mp_g_il, "gonderen_ilce": _mp_g_ilce,
                                     "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce,
-                                    "km": _mp_km, "adet": _mp_adet, "desi": round(_mp_desi,1),
-                                    "toplam_kg": round(_mp_toplam_kg,1), "fiyat": round(_mp_hesaplanan_fiyat,2),
+                                    "km": _mp_km, "adet": _mp_adet, "en": _mp_en, "boy": _mp_boy, "yukseklik": _mp_yuk, "kilo": _mp_kg,
+                                    "desi": round(_mp_desi,1), "toplam_kg": round(_mp_toplam_kg,1), "fiyat": round(_mp_hesaplanan_fiyat,2),
                                     "fiyat_kaynak": _mp_kaynak, "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"),
                                 }}, ensure_ascii=False),
                                 "toplam_tutar": _mp_hesaplanan_fiyat,
