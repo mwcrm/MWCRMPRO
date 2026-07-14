@@ -2841,6 +2841,50 @@ if aktif == "yeni":
     asama_idx = _asama_base.index(_asama_default) if _asama_default and _asama_default in _asama_base else 0
     asama    = r2c6.selectbox("İşlem Aşaması", _asama_base, index=asama_idx, key=f"yeni_asama_dis_{_form_id}")
 
+    def _musteri_giris_bul(cari_id):
+        """Bu cariye bağlı portal kullanıcısı var mı diye 'kullanicilar' tablosuna bakar"""
+        if not cari_id:
+            return None
+        try:
+            _dfk = db_read("kullanicilar", extra_sql="")
+            if _dfk.empty or "yetkiler" not in _dfk.columns:
+                return None
+            _hedef = f"MUSTERI_CARI_ID:{int(cari_id)}"
+            for _, _r in _dfk.iterrows():
+                if _hedef in str(_r.get("yetkiler","") or ""):
+                    return _r
+        except Exception:
+            pass
+        return None
+
+    def _musteri_giris_kaydet(cari_id, kadi, sifre):
+        """Cariye bağlı portal kullanıcısını oluşturur veya günceller"""
+        try:
+            _sb_mg = get_sb_client()
+            _mevcut = _musteri_giris_bul(cari_id)
+            _yetki_json = json.dumps([f"MUSTERI_CARI_ID:{int(cari_id)}"])
+            if _mevcut is not None:
+                _veri = {"kullanici_adi": kadi, "rol": "musteri", "yetkiler": _yetki_json}
+                if sifre:
+                    _veri["sifre"] = sifre
+                if _sb_mg:
+                    _sb_mg.table("kullanicilar").update(_veri).eq("id", int(_mevcut["id"])).execute()
+                else:
+                    db_update("kullanicilar", _veri, "id", int(_mevcut["id"]))
+            else:
+                if not sifre:
+                    return False, "Yeni portal hesabı için şifre gerekli."
+                _veri = {"kullanici_adi": kadi, "sifre": sifre, "rol": "musteri", "yetkiler": _yetki_json}
+                if _sb_mg:
+                    _sb_mg.table("kullanicilar").insert(_veri).execute()
+                else:
+                    db_insert("kullanicilar", _veri)
+            return True, "OK"
+        except Exception as _mge:
+            return False, str(_mge)
+
+    _mevcut_portal_kul = _musteri_giris_bul(duzenle.get("id")) if duzenle else None
+
     with st.form("yeni_kart_form"):
         # ── SATIR 1: Rakip Firma, Firma, Yetkili, GSM, Sabit Tel, E-Mail ─────
         r1c0,r1c1,r1c2,r1c3,r1c4,r1c5 = st.columns(6)
@@ -2870,6 +2914,17 @@ if aktif == "yeni":
         cc3.metric("Fark (₺)", fmt_para(fark))
         cc4.metric("Gerçekleşme %", f"%{yuzde:.1f}".replace(".",","))
 
+        st.markdown("---")
+        st.markdown("**🔑 Müşteri Portal Girişi** — buraya kullanıcı adı/şifre girip müşteriye link+bilgileri verirsen, kendi paneline (sadece kendi sözleşme/teklifi + fiyat alma) bağlanabilir.")
+        _pc1, _pc2 = st.columns(2)
+        _portal_kadi_v = _mevcut_portal_kul.get("kullanici_adi","") if _mevcut_portal_kul is not None else ""
+        portal_kadi  = _pc1.text_input("Portal Kullanıcı Adı", value=_portal_kadi_v, placeholder="örn: asilkimya", key=f"yeni_pkadi_{_form_id}")
+        portal_sifre = _pc2.text_input("Portal Şifre", value="", placeholder="Yeni şifre (boş bırakılırsa değişmez)" if _mevcut_portal_kul is not None else "Zorunlu (yeni hesap)", key=f"yeni_psifre_{_form_id}")
+        if _mevcut_portal_kul is not None:
+            st.caption(f"✅ Bu müşteriye bağlı portal hesabı zaten var: **{_portal_kadi_v}**")
+        st.caption("ℹ️ Müşteriye vermeniz gereken: bu kullanıcı adı/şifre **+** uygulamanın linki (örn. mwcrmpro.streamlit.app). "
+                   "Aynı linkten, bu bilgilerle giriş yapınca otomatik olarak kısıtlı kendi paneline düşer.")
+
         btn_label = "💾 Güncelle" if duzenle else "💾 Cari Kartı Kaydet"
         if st.form_submit_button(btn_label, type="primary", use_container_width=True):
             # Form dışındaki değerleri session_state'den al
@@ -2895,6 +2950,10 @@ if aktif == "yeni":
                     "segment": _seg_kayit, "aciklama": notlar_v,
                     "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro
                 }, "id", duzenle.get("id"))
+                if portal_kadi and portal_kadi.strip():
+                    _pok, _pomsg = _musteri_giris_kaydet(duzenle.get("id"), portal_kadi.strip(), portal_sifre.strip())
+                    if not _pok:
+                        st.warning(f"⚠️ Portal hesabı kaydedilemedi: {_pomsg}")
                 try: db_read.clear()
                 except: pass
                 st.session_state.pop("duzenle_musteri", None)
@@ -2902,7 +2961,7 @@ if aktif == "yeni":
                 st.session_state["kayit_mesaj"] = f"✅ '{firma}' güncellendi!"
                 st.rerun()
             else:
-                ok = db_insert("cari_kartlar", {
+                _yeni_cari_veri = {
                     "tarih": datetime.now().isoformat(),
                     "firma": firma, "rakip_firma": rakip_firma, "yetkili": yetkili, "gsm": gsm,
                     "sabit": sabit, "email": email, "adres": adres,
@@ -2912,7 +2971,29 @@ if aktif == "yeni":
                     "silindi": 0, "olusturan": st.session_state["kullanici"],
                     "beklenen_ciro": beklenen_ciro, "gerceklesen_ciro": gerceklesen_ciro,
                     "atanan_kullanici": st.session_state.get("kullanici","")
-                })
+                }
+                _yeni_cari_id = None
+                if portal_kadi and portal_kadi.strip():
+                    # Portal hesabı da açılacaksa, yeni cari'nin id'sini geri almamız lazım
+                    try:
+                        _sb_yc = get_sb_client()
+                        if _sb_yc:
+                            _yc_res = _sb_yc.table("cari_kartlar").insert(_yeni_cari_veri).execute()
+                            ok = bool(_yc_res.data)
+                            if _yc_res.data:
+                                _yeni_cari_id = _yc_res.data[0].get("id")
+                        else:
+                            ok = db_insert("cari_kartlar", _yeni_cari_veri)
+                    except Exception as _yce:
+                        ok = False
+                        st.error(f"Hata: {_yce}")
+                else:
+                    ok = db_insert("cari_kartlar", _yeni_cari_veri)
+
+                if portal_kadi and portal_kadi.strip() and _yeni_cari_id:
+                    _pok2, _pomsg2 = _musteri_giris_kaydet(_yeni_cari_id, portal_kadi.strip(), portal_sifre.strip())
+                    if not _pok2:
+                        st.warning(f"⚠️ Portal hesabı kaydedilemedi: {_pomsg2}")
                 try: db_read.clear()
                 except: pass
                 st.session_state["aktif_tab"] = "liste"
