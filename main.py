@@ -4117,7 +4117,7 @@ section[data-testid="stSidebar"] { display: none !important; }
     _aktif_fil_asama = st.session_state.get("_cl_fil_asama_multi", [])
     _toplam_aktif_flag = st.session_state.get("_toplam_aktif", False)
     _grp_gizli = set(st.session_state.get("_rbar_grp_gizli", []))
-    _grp_sira_def = ["genel","iletisim","yesil_arama","asama1","asama2","asama3","sonuc"]
+    _grp_sira_def = ["genel","iletisim","asama1","asama2","asama3","sonuc"]
     _grp_sira = list(st.session_state.get("_rbar_grp_sira", _grp_sira_def.copy()))
     for _gs in _grp_sira_def:
         if _gs not in _grp_sira: _grp_sira.append(_gs)
@@ -4207,8 +4207,7 @@ section[data-testid="stSidebar"] { display: none !important; }
     _grp_data = {
         "genel":    ("📊","GENEL",    None, _genel_items),
         "genel":    ("📊","GENEL",    None, _genel_items),
-        "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama]),
-        "yesil_arama": ("📞","YEŞİL ARAMA", None, [("📞","Arama", _yesil_arama_sayisi(), "yesil_arama_notlar", False)]),
+        "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama] + [("📞","Aranan", _yesil_arama_sayisi(), "yesil_arama_notlar", "__YESIL__")]),
         "asama1":   ("📅","1. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama1",a),f"asama1_{a}",False)) for a in _grp2_asama]),
         "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama2",a),f"asama2_{a}",False)) for a in _grp3_asama]),
         "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama3",a),f"asama3_{a}",False)) for a in _grp4_asama]),
@@ -4266,8 +4265,8 @@ section[data-testid="stSidebar"] { display: none !important; }
         if not _items: continue
         _grp_ilk = True
         for _ic, _ad, _sayi, _key, _aktif in _items:
-            if _gid == "yesil_arama":
-                _bg = "background:#dcfce7;" if not _aktif else "background:#86efac;"
+            if _aktif == "__YESIL__":
+                _bg = "background:#dcfce7;"
                 _tc = "color:#15803d;font-weight:700;"
             else:
                 _bg = "background:#dbeafe;" if _aktif else "background:#fff;"
@@ -5037,7 +5036,7 @@ function kartSec(id){
         "firma":90,"rakip_firma":90,"yetkili":90,"gsm":100,"sabit":90,"email":90,
         "adres":110,"il":70,"ilce":60,"durum":80,"temsilci":80,
         "islem_asamasi":80,"aciklama":110,"📅 Son Randevu":170,"📨 Notlar":50,"id":40,
-        "beklenen_ciro":70,"gerceklesen_ciro":70,"✅ Analiz":70,
+        "beklenen_ciro":70,"gerceklesen_ciro":70,"✅ Analiz":70,"📞 Arama":60,
         "asama1":90,"asama2":90,"asama3":90,"sonuc":90,"ara_islem":90
     }
     # Gizli kolonları DB'den yükle
@@ -5107,6 +5106,7 @@ function kartSec(id){
         "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
         "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=True, width=_w("✅ Analiz")),
+        "📞 Arama":      st.column_config.NumberColumn("📞 Arama", disabled=True, width=_w("📞 Arama")),
         "🧾 Teklif":     st.column_config.TextColumn("🧾 Teklif", disabled=True, width="small"),
         "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=True, width="small"),
         "asama1":        st.column_config.SelectboxColumn("1. Aşama", options=_asama_secenek_guvenli("asama1", ["", "Randevu"]), width=_w("asama1")),
@@ -5119,7 +5119,7 @@ function kartSec(id){
     # Gsm, S.Tel, E-Mail, Adres, İlçe, İl, Hedef(+Gerçek), Durum, Analiz, Aşama, 1-2-3.Aşama,
     # Açıklama, Notlar, Son Randevu, Teklif, Mesaj, Sonuç. Temsilci silinmedi, en sona eklendi.
     col_order = ["Seç","tarih","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
-                 "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","islem_asamasi",
+                 "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","📞 Arama","islem_asamasi",
                  "asama1","asama2","asama3","aciklama","📨 Notlar","📅 Son Randevu",
                  "🧾 Teklif","💬 Mesaj","ara_islem","sonuc","temsilci"]
     # Gizli kolonları çıkar
@@ -5127,7 +5127,7 @@ function kartSec(id){
                       "adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci",
                       "islem_asamasi":"islem_asamasi","aciklama":"aciklama","tarih":"tarih",
                       "📅 Son Randevu":"📅 Son Randevu","📨 Notlar":"📨 Notlar","id":"id",
-                      "beklenen_ciro":"beklenen_ciro","gerceklesen_ciro":"gerceklesen_ciro","✅ Analiz":"✅ Analiz",
+                      "beklenen_ciro":"beklenen_ciro","gerceklesen_ciro":"gerceklesen_ciro","✅ Analiz":"✅ Analiz","📞 Arama":"📞 Arama",
                       "🧾 Teklif":"🧾 Teklif","💬 Mesaj":"💬 Mesaj",
                       "asama1":"asama1","asama2":"asama2","asama3":"asama3","sonuc":"sonuc","ara_islem":"ara_islem"}
     col_order = [c for c in col_order if not any(c == _kol_gizli_map.get(g,g) for g in _GIZLI_KOLONLAR)]
@@ -5253,18 +5253,34 @@ function kartSec(id){
                 if "id" in df_edit.columns:
                     df_edit["📨 Notlar"] = df_edit["id"].apply(lambda x: f"📨 {_not_sayac.get(str(int(x)),0)}" if _not_sayac.get(str(int(x)),0) > 0 else "")
                     df_edit["_not_sayi"] = df_edit["id"].apply(lambda x: _not_sayac.get(str(int(x)),0))
+
+                    # Kişi bazlı ARAMA sayısı — aynı notlardan, ##YETKILI## ve 'ziyaret' geçenler hariç
+                    import collections as _arcoll
+                    _arama_sayac = _arcoll.Counter()
+                    for _nr2 in _res_notlar_data:
+                        _metin2 = str(_nr2.get("aciklama","") or "")
+                        if _metin2.startswith("##YETKILI##") or not _metin2.strip():
+                            continue
+                        if "ziyaret" in _metin2.lower():
+                            continue
+                        _arama_sayac[str(_nr2.get("cari_id",""))] += 1
+                    df_edit["📞 Arama"] = df_edit["id"].apply(lambda x: int(_arama_sayac.get(str(int(x)), 0)))
                 else:
                     df_edit["📨 Notlar"] = ""
                     df_edit["_not_sayi"] = 0
+                    df_edit["📞 Arama"] = 0
                 if "_not_sayi" in df_edit.columns:
                     df_edit = df_edit.sort_values("_not_sayi", ascending=False).drop(columns=["_not_sayi"]).reset_index(drop=True)
             else:
                 df_edit["📨 Notlar"] = ""
+                df_edit["📞 Arama"] = 0
         except Exception as _not_err:
             df_edit["📨 Notlar"] = ""
+            df_edit["📞 Arama"] = 0
             st.warning(f"Not yükleme hatası: {_not_err}")
     else:
         df_edit["📨 Notlar"] = ""
+        df_edit["📞 Arama"] = 0
 
     # ── Teklif sayısı (yeni sütun, Notlar ile aynı mantık) ──
     _tek_sayac_cl = {}
