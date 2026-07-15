@@ -5129,7 +5129,7 @@ function kartSec(id){
         "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=True, width=_w("✅ Analiz")),
         "📞 Arama":      st.column_config.NumberColumn("📞 Arama", disabled=True, width=_w("📞 Arama")),
         "🧾 Teklif":     st.column_config.TextColumn("🧾 Teklif", disabled=True, width="small"),
-        "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=True, width="small"),
+        "💬 Mesaj":      st.column_config.TextColumn("🟢 Mesaj", disabled=True, width="small"),
         "asama1":        st.column_config.SelectboxColumn("1. Aşama", options=_asama_secenek_guvenli("asama1", ["", "Randevu"]), width=_w("asama1")),
         "asama2":        st.column_config.SelectboxColumn("2. Aşama", options=_asama_secenek_guvenli("asama2", ["", "Teklif"]), width=_w("asama2")),
         "asama3":        st.column_config.SelectboxColumn("3. Aşama", options=_asama_secenek_guvenli("asama3", ["Tümü", "Deneme", "TAKİP", "Fiyat Hazırla", "Sözleşme"]), width=_w("asama3")),
@@ -5344,8 +5344,26 @@ function kartSec(id){
                 _mesaj_sayac_cl = _colmsg_cl.Counter([str(r.get("musteri_id","")) for r in _res_mesaj_data_cl])
         except Exception:
             _mesaj_sayac_cl = {}
+
+    # ── Notlardan da mesaj/whatsapp/sms geçen kayıtları say, eski sayaca EKLE ──
+    try:
+        if "_res_notlar_data" in dir() and _res_notlar_data:
+            import collections as _colmsg_not
+            _mesaj_not_sayac = _colmsg_not.Counter()
+            for _nr3 in _res_notlar_data:
+                _metin3 = str(_nr3.get("aciklama","") or "")
+                if _metin3.startswith("##YETKILI##") or not _metin3.strip():
+                    continue
+                _metin3_l = _metin3.lower()
+                if ("mesaj" in _metin3_l) or ("whatsapp" in _metin3_l) or ("wsap" in _metin3_l) or ("sms" in _metin3_l):
+                    _mesaj_not_sayac[str(_nr3.get("cari_id",""))] += 1
+            for _ncid2, _nadet2 in _mesaj_not_sayac.items():
+                _mesaj_sayac_cl[_ncid2] = _mesaj_sayac_cl.get(_ncid2, 0) + _nadet2
+    except Exception:
+        pass
+
     if "id" in df_edit.columns:
-        df_edit["💬 Mesaj"] = df_edit["id"].apply(lambda x: f"💬 {_mesaj_sayac_cl.get(str(int(x)),0)}" if _mesaj_sayac_cl.get(str(int(x)),0) > 0 else "")
+        df_edit["💬 Mesaj"] = df_edit["id"].apply(lambda x: f"🟢 {_mesaj_sayac_cl.get(str(int(x)),0)}" if _mesaj_sayac_cl.get(str(int(x)),0) > 0 else "")
     else:
         df_edit["💬 Mesaj"] = ""
 
