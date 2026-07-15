@@ -4251,13 +4251,25 @@ section[data-testid="stSidebar"] { display: none !important; }
         """Notlardan toplam arama sayısı — 'ziyaret' geçenler hariç"""
         return _not_anahtar_sayisi(_haric=["ziyaret"])
 
+    def _gercek_gonderim_sayisi(_islem_turu):
+        """'islem_kaydi' tablosundan gerçek gönderim (WhatsApp Teklif / Email Teklif) sayısı —
+        'Mesaj' sütununun kullandığı kaynakla aynı, üst raporun da bunu içermesi için."""
+        try:
+            _sbg = get_sb_client()
+            if not _sbg:
+                return 0
+            _rg = _sbg.table("islem_kaydi").select("id").eq("islem_turu", _islem_turu).execute()
+            return len(_rg.data or [])
+        except Exception:
+            return 0
+
     def _email_not_sayisi():
-        """Notlarda 'email'/'e-mail'/'mail' geçen kayıt sayısı"""
-        return _not_anahtar_sayisi(_icerir=["email","e-mail","mail"])
+        """Notlarda 'email'/'e-mail'/'mail' geçen kayıt sayısı + gerçekten gönderilen Email Teklif sayısı"""
+        return _not_anahtar_sayisi(_icerir=["email","e-mail","mail"]) + _gercek_gonderim_sayisi("Email Teklif")
 
     def _whatsapp_not_sayisi():
-        """Notlarda 'whatsapp' geçen kayıt sayısı"""
-        return _not_anahtar_sayisi(_icerir=["whatsapp"])
+        """Notlarda 'whatsapp' geçen kayıt sayısı + gerçekten gönderilen WhatsApp Teklif sayısı"""
+        return _not_anahtar_sayisi(_icerir=["whatsapp"]) + _gercek_gonderim_sayisi("WhatsApp Teklif")
 
     def _randevu_kayit_sayisi():
         """'Randevular' tablosundaki, SADECE randevu tarihi dolu olan gerçek randevu
