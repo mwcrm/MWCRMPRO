@@ -869,7 +869,7 @@ def sayfa_log(sayfa):
     # Sekme başlığını güncelle
     _menu_adlari = {
         "yeni": "Yeni Kart", "liste": "Cari Liste", "analiz": "Müşteri Analizi",
-        "randevu": "Randevular", "ozel_teklif": "Özel Teklif", "sozlesme": "Sözleşmeler", "fatura": "Faturalar", "kargo_ihbar": "Kargo İhbarları",
+        "randevu": "Randevular", "ozel_teklif": "Özel Teklif", "sozlesme": "Sözleşmeler", "fatura": "Faturalar", "kargo_ihbar": "Kargo İhbarları", "otomatik_arama": "Telefon Entegrasyonu",
         "rota_analiz": "Rota Analiz", "operasyon": "Operasyon", "kisiler": "Telefon Kişiler",
         "rapor": "Raporlar", "excel": "Excel", "kullanici": "Kullanıcılar",
         "admin_rapor": "Admin Rapor", "harita": "Müşteri Haritası", "patron": "Patron",
@@ -1540,7 +1540,7 @@ try{localStorage.removeItem('mwcrm_oturum');}catch(e){}
 # ── SESSION STATE ─────────────────────────────────────────────────────────────
 _sayfa_adlari_cfg = {
     "yeni":"Yeni Kart","liste":"Cari Liste","analiz":"Müşteri Analizi",
-    "randevu":"Randevular","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler","fatura":"Faturalar","kargo_ihbar":"Kargo İhbarları",
+    "randevu":"Randevular","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler","fatura":"Faturalar","kargo_ihbar":"Kargo İhbarları","otomatik_arama":"Telefon Entegrasyonu",
     "rota_analiz":"Rota Analiz","operasyon":"Operasyon","kisiler":"Telefon Kişiler",
     "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
     "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
@@ -1553,7 +1553,7 @@ st.set_page_config(page_title=_baslik_cfg, layout="wide", initial_sidebar_state=
 # Sekme başlığını aktif menüye göre güncelle
 _sayfa_adlari = {
     "yeni":"Yeni Kart","liste":"Cari Liste","analiz":"Müşteri Analizi",
-    "randevu":"Randevular","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler","fatura":"Faturalar","kargo_ihbar":"Kargo İhbarları",
+    "randevu":"Randevular","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler","fatura":"Faturalar","kargo_ihbar":"Kargo İhbarları","otomatik_arama":"Telefon Entegrasyonu",
     "rota_analiz":"Rota Analiz","operasyon":"Operasyon","kisiler":"Telefon Kişiler",
     "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
     "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
@@ -2371,7 +2371,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "ozel_teklif", "sozlesme", "fatura", "kargo_ihbar", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "ozel_teklif", "sozlesme", "fatura", "kargo_ihbar", "otomatik_arama", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -2799,6 +2799,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
         ("📅 Randevu ve teklif", ["randevu", "ozel_teklif", "sozlesme"]),
         ("💰 Faturalar",         ["fatura"]),
         ("📦 Kargo İhbarları",   ["kargo_ihbar"]),
+        ("📱 Telefon Entegrasyonu", ["otomatik_arama"]),
         ("🚚 Saha",              ["rota_analiz", "operasyon", "harita"]),
         ("⚙️ Yönetim",          ["kullanici", "patron", "musteri_atama"]),
         ("📊 Raporlar",          ["admin_rapor", "rapor"]),
@@ -8496,6 +8497,116 @@ elif aktif == "fatura":
                     with st.expander("Kalemleri gör"):
                         for _k in _fv.get("kalemler", []):
                             st.caption(f"• {_k.get('aciklama','')} — {_k.get('miktar',0)} x {fmt_para(_k.get('birim_fiyat',0))}")
+
+elif aktif == "otomatik_arama":
+    sayfa_log("otomatik_arama")
+    import re as _oare
+
+    st.markdown("## 📱 Otomatik Aramalar (Telefon Entegrasyonu)")
+    st.caption("MacroDroid'den gelen arama kayıtları burada işlenir — telefon numarası eşleşirse otomatik not düşülür.")
+
+    def _oa_norm_tel(s):
+        _d = _oare.sub(r"\D", "", str(s or ""))
+        return _d[-10:] if len(_d) >= 7 else ""
+
+    try:
+        _oa_sb = get_sb_client()
+        _oa_ham = pd.DataFrame(_oa_sb.table("islem_kaydi").select("*").eq("islem_turu", "Otomatik Arama").order("id", desc=True).execute().data) if _oa_sb else pd.DataFrame()
+    except Exception:
+        _oa_ham = pd.DataFrame()
+
+    if _oa_ham.empty:
+        st.info("Henüz hiç otomatik arama kaydı gelmedi. MacroDroid kurulumunu tamamladıktan sonra burada görünecek.")
+    else:
+        _oa_bekleyen = _oa_ham[_oa_ham["musteri_id"].fillna(0).astype(int) == 0]
+        _oa_islenen = _oa_ham[_oa_ham["musteri_id"].fillna(0).astype(int) != 0]
+
+        # ── Bekleyenleri otomatik eşleştirmeyi dene ──
+        if not _oa_bekleyen.empty:
+            _oa_caridf = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+            _oa_tel_harita = {}
+            if not _oa_caridf.empty:
+                for _, _ocr in _oa_caridf.iterrows():
+                    for _oalan in ["gsm", "sabit"]:
+                        _ot = _oa_norm_tel(_ocr.get(_oalan, ""))
+                        if _ot:
+                            _oa_tel_harita[_ot] = (_ocr.get("id"), _ocr.get("firma",""))
+
+            _oa_eslesen = 0
+            for _, _obr in _oa_bekleyen.iterrows():
+                _gelen_tel = _oa_norm_tel(_obr.get("icerik",""))
+                if _gelen_tel and _gelen_tel in _oa_tel_harita:
+                    _oa_mid, _oa_mfirma = _oa_tel_harita[_gelen_tel]
+                    try:
+                        _oa_sb.table("islem_kaydi").update({"musteri_id": int(_oa_mid), "musteri_adi": _oa_mfirma}).eq("id", int(_obr["id"])).execute()
+                        _oa_sb.table("cari_aciklamalar").insert({
+                            "cari_id": int(_oa_mid), "cari_adi": _oa_mfirma,
+                            "aciklama": f"📞 Otomatik arama kaydı — {_obr.get('gonderim_bilgisi','')} · {_obr.get('created_at', _obr.get('id',''))}",
+                            "olusturan": "MacroDroid (Otomatik)",
+                        }).execute()
+                        _oa_eslesen += 1
+                    except Exception:
+                        pass
+            if _oa_eslesen:
+                st.success(f"✅ {_oa_eslesen} arama otomatik eşleştirildi ve not olarak düşüldü.")
+                st.cache_data.clear()
+                st.rerun()
+
+        st.markdown(f"### ⚠️ Eşleşmeyen Aramalar ({len(_oa_bekleyen)})")
+        if _oa_bekleyen.empty:
+            st.caption("Bekleyen yok — hepsi eşleşti.")
+        else:
+            st.caption("Bu numaralar hiçbir müşteri kartındaki GSM/Sabit Tel ile eşleşmedi. Manuel bağlayabilirsin.")
+            _oa_carilistesi = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
+            _oa_opts = ["-- Seç --"] + [f"[{int(r['id'])}] {r['firma']}" for _, r in _oa_carilistesi.iterrows()] if not _oa_carilistesi.empty else ["-- Seç --"]
+            for _, _obr2 in _oa_bekleyen.iterrows():
+                with st.container(border=True):
+                    _oc1, _oc2, _oc3 = st.columns([1.5, 1, 2])
+                    _oc1.markdown(f"**{_obr2.get('icerik','')}**")
+                    _oc2.caption(f"⏱️ {_obr2.get('gonderim_bilgisi','')}")
+                    _oa_secim = _oc3.selectbox("Müşteriye bağla", _oa_opts, key=f"oa_sec_{_obr2['id']}", label_visibility="collapsed")
+                    if _oa_secim != "-- Seç --":
+                        if st.button("🔗 Bağla ve Not Düş", key=f"oa_bagla_{_obr2['id']}"):
+                            try:
+                                _oa_mid2 = int(_oa_secim.split("]")[0].replace("[","").strip())
+                                _oa_mfirma2 = _oa_secim.split("]")[1].strip()
+                                _oa_sb.table("islem_kaydi").update({"musteri_id": _oa_mid2, "musteri_adi": _oa_mfirma2}).eq("id", int(_obr2["id"])).execute()
+                                _oa_sb.table("cari_aciklamalar").insert({
+                                    "cari_id": _oa_mid2, "cari_adi": _oa_mfirma2,
+                                    "aciklama": f"📞 Otomatik arama kaydı (manuel bağlandı) — {_obr2.get('gonderim_bilgisi','')}",
+                                    "olusturan": "MacroDroid (Manuel Eşleşme)",
+                                }).execute()
+                                st.success("✅ Bağlandı!")
+                                st.cache_data.clear()
+                                st.rerun()
+                            except Exception as _oae2:
+                                st.error(f"Hata: {_oae2}")
+
+        with st.expander(f"✅ Eşleşmiş Aramalar ({len(_oa_islenen)})", expanded=False):
+            for _, _oir in _oa_islenen.head(30).iterrows():
+                st.caption(f"📞 {_oir.get('musteri_adi','')} — {_oir.get('icerik','')} · {_oir.get('gonderim_bilgisi','')}")
+
+    st.markdown("---")
+    with st.expander("⚙️ MacroDroid Kurulum Bilgisi"):
+        st.caption("MacroDroid'de 'HTTP İsteği Gönder' (Webhook) eylemi için gereken bilgiler — Streamlit Cloud "
+                   "Secrets sayfandan SUPABASE_URL ve SUPABASE_KEY değerlerini bulup aşağıdaki şablona kendin ekle:")
+        st.code(
+            "URL: [SUPABASE_URL]/rest/v1/islem_kaydi\n"
+            "Method: POST\n"
+            "Headers:\n"
+            "  apikey: [SUPABASE_KEY]\n"
+            "  Authorization: Bearer [SUPABASE_KEY]\n"
+            "  Content-Type: application/json\n"
+            "  Prefer: return=minimal\n"
+            "Body (JSON):\n"
+            '{\n'
+            '  "musteri_id": 0,\n'
+            '  "musteri_adi": "",\n'
+            '  "islem_turu": "Otomatik Arama",\n'
+            '  "icerik": "[cn]",\n'
+            '  "gonderim_bilgisi": "[call_duration] sn",\n'
+            '  "olusturan": "MacroDroid"\n'
+            '}', language="text")
 
 elif aktif == "kargo_ihbar":
     sayfa_log("kargo_ihbar")
