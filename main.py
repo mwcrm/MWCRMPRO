@@ -1014,8 +1014,19 @@ div[data-testid="stMainBlockContainer"] {
     padding-right: 1rem !important;
 }
 </style>
-<div style="text-align:center;padding:1.2rem 0 1rem;">
-  <div style="font-size:22px;font-weight:600;color:#0f172a;">📦 Müşteri Paneli</div>
+<div style="text-align:center;padding:1.5rem 0 1rem;">
+  <div style="width:56px;height:56px;background:#1d4ed8;border-radius:14px;
+       display:inline-flex;align-items:center;justify-content:center;margin-bottom:10px;">
+    <svg width="32" height="32" viewBox="0 0 36 36" fill="none">
+      <rect x="4" y="4" width="12" height="12" rx="2" fill="white" opacity=".9"/>
+      <rect x="20" y="4" width="12" height="12" rx="2" fill="white" opacity=".7"/>
+      <rect x="4" y="20" width="12" height="12" rx="2" fill="white" opacity=".7"/>
+      <rect x="20" y="20" width="12" height="12" rx="2" fill="white" opacity=".5"/>
+    </svg>
+  </div>
+  <div style="font-size:22px;font-weight:600;color:#0f172a;letter-spacing:-.5px;">MWCRMPRO</div>
+  <div style="font-size:12px;color:#64748b;margin-top:2px;">Cari Yönetim Sistemi</div>
+  <div style="font-size:15px;font-weight:500;color:#334155;margin-top:10px;">📦 Müşteri Paneli</div>
 </div>
 """, unsafe_allow_html=True)
 
