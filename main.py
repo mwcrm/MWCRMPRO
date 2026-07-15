@@ -4242,6 +4242,33 @@ section[data-testid="stSidebar"] { display: none !important; }
         """Notlarda 'whatsapp' geçen kayıt sayısı"""
         return _not_anahtar_sayisi(_icerir=["whatsapp"])
 
+    def _randevu_kayit_sayisi():
+        """'Randevular' tablosundaki gerçek randevu KAYIT sayısı — 1. Aşama alanındaki
+        müşteri sayısıyla karıştırılmasın diye ayrı, gerçek kaynaktan sayılır."""
+        try:
+            _rd = db_read("randevular", extra_sql="")
+            if _rd.empty:
+                return 0
+            if "musteri_adi" in _rd.columns:
+                _ratan = _get_atanmis_firmalar()
+                if _ratan is not None and "firmalar" in _ratan:
+                    def _rn_gv(s): return str(s or "").strip().upper()
+                    _rd = _rd[_rd["musteri_adi"].apply(lambda x: _rn_gv(x) in _ratan["firmalar"])]
+            return len(_rd)
+        except Exception:
+            return 0
+
+    def _sozlesme_kayit_sayisi():
+        """'Sözleşmeler' sayfasındaki (teklifler tablosu, tip='sozlesme') gerçek sözleşme
+        kayıt sayısı — 3. Aşama alanındaki müşteri sayısıyla karıştırılmasın diye ayrı sayılır."""
+        try:
+            _sz = db_read("teklifler", extra_sql="")
+            if _sz.empty or "satirlar" not in _sz.columns:
+                return 0
+            return int(_sz["satirlar"].astype(str).str.contains("sozlesme", case=False, na=False).sum())
+        except Exception:
+            return 0
+
     # grp1 = islem_asamasi (Arama, Tekrar Ara, E-Mail)
     _grp1_toplam = sum(_asama_sayi(a) for a in _grp1_asama)
     # grp2 = asama1 (Randevu)
@@ -4271,9 +4298,9 @@ section[data-testid="stSidebar"] { display: none !important; }
                      + [('<i class="ti ti-phone" style="color:#16a34a;font-size:26px;line-height:1;"></i>',"Aranan", _yesil_arama_sayisi(), "yesil_arama_notlar", False)]
                      + [('<i class="ti ti-mail" style="color:#0284c7;font-size:26px;line-height:1;"></i>',"E-Mail", _email_not_sayisi(), "email_not_sayisi", False)]
                      + [('<i class="ti ti-brand-whatsapp" style="color:#22c55e;font-size:26px;line-height:1;"></i>',"Whatsapp", _whatsapp_not_sayisi(), "whatsapp_not_sayisi", False)]),
-        "asama1":   ("📅","1. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama1",a),f"asama1_{a}",False)) for a in _grp2_asama]),
+        "asama1":   ("📅","1. AŞAMA", None, [((_asama_ikon(a),a,(_randevu_kayit_sayisi() if a=="Randevu" else _kolon_sayi("asama1",a)),f"asama1_{a}",False)) for a in _grp2_asama]),
         "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama2",a),f"asama2_{a}",False)) for a in _grp3_asama]),
-        "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama3",a),f"asama3_{a}",False)) for a in _grp4_asama]),
+        "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,(_sozlesme_kayit_sayisi() if a=="Sözleşme" else _kolon_sayi("asama3",a)),f"asama3_{a}",False)) for a in _grp4_asama]),
         "sonuc":    ("🏆","SONUÇ",    None, [((_asama_ikon(a),a,_kolon_sayi("sonuc",a),f"sonuc_{a}",False)) for a in _grp5_asama]),
     }
     # HTML oluştur - 2 satırlı tablo
