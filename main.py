@@ -8538,6 +8538,7 @@ elif aktif == "otomatik_arama":
             _oa_kisiler_tel_harita = {}
             try:
                 _oa_kisdf = db_read("kisiler", extra_sql="")
+                st.caption(f"🔧 Teşhis: 'kisiler' tablosunda {len(_oa_kisdf)} kayıt okundu.")
                 if not _oa_kisdf.empty:
                     _oa_cari_isim_harita = {str(r.get("firma","")).strip().upper(): (r.get("id"), r.get("firma",""))
                                              for _, r in _oa_caridf.iterrows()} if not _oa_caridf.empty else {}
@@ -8551,8 +8552,9 @@ elif aktif == "otomatik_arama":
                         # Kişinin firması bir cari kartla eşleşiyorsa, numarayı doğrudan o cariye bağla
                         if _okt not in _oa_tel_harita and _ok_firma.strip().upper() in _oa_cari_isim_harita:
                             _oa_tel_harita[_okt] = _oa_cari_isim_harita[_ok_firma.strip().upper()]
-            except Exception:
-                pass
+                    st.caption(f"🔧 Teşhis: {len(_oa_kisiler_tel_harita)} telefon numarası rehberden haritalandı.")
+            except Exception as _oa_kis_hata:
+                st.warning(f"🔧 Teşhis: 'kisiler' tablosu okunamadı — {_oa_kis_hata}")
 
             _oa_eslesen = 0
             for _, _obr in _oa_bekleyen.iterrows():
@@ -8587,6 +8589,7 @@ elif aktif == "otomatik_arama":
                     _obr2_tel_norm = _oa_norm_tel(_obr2.get("icerik",""))
                     _obr2_kisi = _oa_kisiler_tel_harita.get(_obr2_tel_norm) if '_oa_kisiler_tel_harita' in dir() else None
                     _oc1.markdown(f"**{_obr2.get('icerik','')}**")
+                    _oc1.caption(f"🔧 Teşhis: normalize=`{_obr2_tel_norm}`")
                     if _obr2_kisi and _obr2_kisi[0].strip():
                         _oc1.caption(f"👤 Rehberde: {_obr2_kisi[0]}" + (f" · {_obr2_kisi[1]}" if _obr2_kisi[1] else ""))
                     _oc2.caption(f"⏱️ {_obr2.get('gonderim_bilgisi','')}")
