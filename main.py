@@ -1256,6 +1256,38 @@ div[data-testid="stMainBlockContainer"] {
                         except Exception:
                             continue
 
+                # ── TEK, KALICI HARİTA — tüm teslimat (alıcı) noktaları, ikon + üstünde alıcı adı ──
+                if _mp_tum_kayitlar:
+                    import pydeck as _mppdk
+                    _mp_noktalar = []
+                    _mp_gorulen = set()
+                    for _tv, _kv in _mp_tum_kayitlar:
+                        _koor = IL_KOORDINAT.get(str(_kv.get("alici_il","")).strip().upper())
+                        if not _koor:
+                            continue
+                        _etiket = _kv.get("alici_firma") or _kv.get("alici_il","Alıcı")
+                        _anahtar = (_koor, _etiket)
+                        if _anahtar in _mp_gorulen:
+                            continue
+                        _mp_gorulen.add(_anahtar)
+                        _mp_noktalar.append({"lat": _koor[0], "lon": _koor[1], "isim": _etiket})
+
+                    if _mp_noktalar:
+                        st.markdown("**🗺️ Teslimat Noktalarım**")
+                        _mp_df_nokta = pd.DataFrame(_mp_noktalar)
+                        _mp_scatter = _mppdk.Layer("ScatterplotLayer", data=_mp_df_nokta, get_position="[lon, lat]",
+                                                    get_color="[220, 38, 38, 210]", get_radius=12000,
+                                                    stroked=True, get_line_color="[255,255,255,255]", line_width_min_pixels=2,
+                                                    pickable=True)
+                        _mp_text = _mppdk.Layer("TextLayer", data=_mp_df_nokta, get_position="[lon, lat]", get_text="isim",
+                                                 get_size=15, get_color="[15,23,42,255]", get_alignment_baseline="'bottom'",
+                                                 get_pixel_offset=[0, -16], font_family="Arial")
+                        _mp_lat_ort = _mp_df_nokta["lat"].mean()
+                        _mp_lon_ort = _mp_df_nokta["lon"].mean()
+                        _mp_view = _mppdk.ViewState(latitude=_mp_lat_ort, longitude=_mp_lon_ort, zoom=5.3)
+                        st.pydeck_chart(_mppdk.Deck(layers=[_mp_scatter, _mp_text], initial_view_state=_mp_view,
+                                                     map_style=None, tooltip={"text": "{isim}"}))
+
                 if _mp_tum_kayitlar:
                     with st.expander(f"📜 Fiyat Sorgularım / İhbarlarım — Harita ve Liste ({len(_mp_tum_kayitlar)})", expanded=False):
                         # ── Tarih bazlı çoklu seçim filtresi ──
