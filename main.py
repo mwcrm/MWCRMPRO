@@ -5304,6 +5304,8 @@ function kartSec(id){
         df_edit["📞 Arama"] = 0
 
     # ── Teklif sayısı (yeni sütun, Notlar ile aynı mantık) ──
+    # Müşteri portalından otomatik oluşan "fiyat_sorgu" ve "kargo_ihbar" kayıtları
+    # gerçek teklif değildir, bu sayaca dahil edilmez.
     _tek_sayac_cl = {}
     if sb_liste:
         try:
@@ -5311,13 +5313,24 @@ function kartSec(id){
             def _tum_teklif_sayac_yukle():
                 _sb3 = get_sb_client()
                 if _sb3:
-                    _r3 = _sb3.table("teklifler").select("musteri_id").execute()
+                    _r3 = _sb3.table("teklifler").select("musteri_id,satirlar").execute()
                     return _r3.data or []
                 return []
             _res_tek_data_cl = _tum_teklif_sayac_yukle()
             if _res_tek_data_cl:
                 import collections as _coltek_cl
-                _tek_sayac_cl = _coltek_cl.Counter([str(r.get("musteri_id","")) for r in _res_tek_data_cl])
+                import json as _tekj_cl
+                _tek_gecerli_idler = []
+                for _rtk in _res_tek_data_cl:
+                    _tip_tk = ""
+                    try:
+                        _tip_tk = _tekj_cl.loads(_rtk.get("satirlar","{}") or "{}").get("tip","")
+                    except Exception:
+                        _tip_tk = ""
+                    if _tip_tk in ("fiyat_sorgu", "kargo_ihbar"):
+                        continue  # müşteri portalı otomatik kaydı — gerçek teklif değil
+                    _tek_gecerli_idler.append(str(_rtk.get("musteri_id","")))
+                _tek_sayac_cl = _coltek_cl.Counter(_tek_gecerli_idler)
         except Exception:
             _tek_sayac_cl = {}
     if "id" in df_edit.columns:
