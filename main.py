@@ -4243,12 +4243,15 @@ section[data-testid="stSidebar"] { display: none !important; }
         return _not_anahtar_sayisi(_icerir=["whatsapp"])
 
     def _randevu_kayit_sayisi():
-        """'Randevular' tablosundaki gerçek randevu KAYIT sayısı — 1. Aşama alanındaki
-        müşteri sayısıyla karıştırılmasın diye ayrı, gerçek kaynaktan sayılır."""
+        """'Randevular' tablosundaki, SADECE randevu tarihi dolu olan gerçek randevu
+        KAYIT sayısı — 1. Aşama alanındaki müşteri sayısıyla karıştırılmasın diye ayrı sayılır."""
         try:
             _rd = db_read("randevular", extra_sql="")
             if _rd.empty:
                 return 0
+            if "randevu_tarihi" in _rd.columns:
+                _rd = _rd[_rd["randevu_tarihi"].notna()]
+                _rd = _rd[_rd["randevu_tarihi"].astype(str).str.strip().replace("nan","") != ""]
             if "musteri_adi" in _rd.columns:
                 _ratan = _get_atanmis_firmalar()
                 if _ratan is not None and "firmalar" in _ratan:
