@@ -3905,6 +3905,8 @@ section[data-testid="stSidebar"] { display: none !important; }
     # filtre kutusunda seçilebilir olsun diye garanti ediyoruz
     if "Devam Ediyor" not in tum_asama_opts:
         tum_asama_opts.append("Devam Ediyor")
+    # "Tekrar Ara" seçeneği kaldırıldı — hem üst raporda hem seçim kutularında görünmesin
+    tum_asama_opts = [a for a in tum_asama_opts if str(a).strip().upper().replace("İ","I") != "TEKRAR ARA"]
     # NOT: df'de olan ama tanımlardan silinmiş durum/aşamalar eklenmez
     # Sadece tanımlar tablosundakiler gösterilir
 
@@ -4070,7 +4072,7 @@ section[data-testid="stSidebar"] { display: none !important; }
     # Kazanıldı, Kaybedildi, Devam Ediyor
 
     # AŞAMA grubu — iletişim aşamaları
-    _grp1_asama = [a for a in tum_asama_opts if a in ["Arama","Tekrar Ara","E-Mail","Mail","Mesaj","Whatsapp Mesaj"]]
+    _grp1_asama = [a for a in tum_asama_opts if a in ["Arama","E-Mail","Mail","Mesaj","Whatsapp Mesaj"]]
 
     # 1. AŞAMA — Randevu
     _grp2_asama = [a for a in tum_asama_opts if a in ["Randevu"]]
@@ -4167,9 +4169,10 @@ section[data-testid="stSidebar"] { display: none !important; }
                 _mask = _mask & (df[_k].isna() | df[_k].astype(str).str.strip().isin(["","None","nan"]))
         return int(_mask.sum())
 
-    def _yesil_arama_sayisi():
-        """Notlardan (cari_aciklamalar) toplam arama sayısı — bir müşteri birden fazla aranmışsa hepsi sayılır.
-        'ziyaret' geçen notlar arama değil ziyaret kaydı sayılıp hariç tutulur. Yetkili kayıtları da hariç."""
+    def _not_anahtar_sayisi(_icerir=None, _haric=None):
+        """Notlardan (cari_aciklamalar) belirli bir anahtar kelime geçen kayıtları sayar.
+        _icerir: bu kelime(ler)den biri geçmeli (liste). _haric: bu kelime geçerse sayılmaz.
+        Yetkili kayıtları her zaman hariç tutulur."""
         try:
             _ya_df = db_read("cari_aciklamalar", extra_sql="")
             if _ya_df.empty or "aciklama" not in _ya_df.columns:
@@ -4177,10 +4180,29 @@ section[data-testid="stSidebar"] { display: none !important; }
             _ya_notlar = _ya_df["aciklama"].fillna("").astype(str)
             _ya_notlar = _ya_notlar[~_ya_notlar.str.startswith("##YETKILI##")]
             _ya_notlar = _ya_notlar[_ya_notlar.str.strip() != ""]
-            _ya_ziyaretsiz = _ya_notlar[~_ya_notlar.str.contains("ziyaret", case=False, na=False)]
-            return int(len(_ya_ziyaretsiz))
+            if _haric:
+                for _h in _haric:
+                    _ya_notlar = _ya_notlar[~_ya_notlar.str.contains(_h, case=False, na=False)]
+            if _icerir:
+                _mask = pd.Series([False]*len(_ya_notlar), index=_ya_notlar.index)
+                for _i in _icerir:
+                    _mask = _mask | _ya_notlar.str.contains(_i, case=False, na=False)
+                _ya_notlar = _ya_notlar[_mask]
+            return int(len(_ya_notlar))
         except Exception:
             return 0
+
+    def _yesil_arama_sayisi():
+        """Notlardan toplam arama sayısı — 'ziyaret' geçenler hariç"""
+        return _not_anahtar_sayisi(_haric=["ziyaret"])
+
+    def _email_not_sayisi():
+        """Notlarda 'email'/'e-mail'/'mail' geçen kayıt sayısı"""
+        return _not_anahtar_sayisi(_icerir=["email","e-mail","mail"])
+
+    def _whatsapp_not_sayisi():
+        """Notlarda 'whatsapp' geçen kayıt sayısı"""
+        return _not_anahtar_sayisi(_icerir=["whatsapp"])
 
     # grp1 = islem_asamasi (Arama, Tekrar Ara, E-Mail)
     _grp1_toplam = sum(_asama_sayi(a) for a in _grp1_asama)
@@ -4207,7 +4229,10 @@ section[data-testid="stSidebar"] { display: none !important; }
     _grp_data = {
         "genel":    ("📊","GENEL",    None, _genel_items),
         "genel":    ("📊","GENEL",    None, _genel_items),
-        "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama] + [("📞","Aranan", _yesil_arama_sayisi(), "yesil_arama_notlar", "__YESIL__")]),
+        "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama]
+                     + [('<i class="ti ti-phone" style="color:#16a34a;font-size:18px;"></i>',"Aranan", _yesil_arama_sayisi(), "yesil_arama_notlar", "__YESIL__")]
+                     + [('<i class="ti ti-mail" style="color:#0284c7;font-size:18px;"></i>',"E-Mail", _email_not_sayisi(), "email_not_sayisi", "__YESIL__")]
+                     + [('<i class="ti ti-brand-whatsapp" style="color:#22c55e;font-size:18px;"></i>',"Whatsapp", _whatsapp_not_sayisi(), "whatsapp_not_sayisi", "__YESIL__")]),
         "asama1":   ("📅","1. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama1",a),f"asama1_{a}",False)) for a in _grp2_asama]),
         "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama2",a),f"asama2_{a}",False)) for a in _grp3_asama]),
         "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama3",a),f"asama3_{a}",False)) for a in _grp4_asama]),
