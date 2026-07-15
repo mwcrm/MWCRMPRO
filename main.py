@@ -3287,11 +3287,17 @@ elif aktif == "mukerrer":
         _mk_firma_gruplari = _mk_df.groupby(_mk_df["firma"].astype(str).str.strip().str.upper())["id"].apply(list)
         _mk_mukerrerler = {k: v for k, v in _mk_firma_gruplari.items() if len(v) > 1 and k not in ["", "NAN", "NONE"]}
 
-        # Mükerrer sebebini id -> [sebep,...] olarak topluyoruz
+        # id -> firma adı sözlüğü (hangi firmayla eşleştiğini göstermek için)
+        _mk_id_firma = dict(zip(_mk_df["id"].astype(int), _mk_df["firma"].astype(str)))
+
+        def _mk_diger_firmalar(_bu_id, _idler):
+            return sorted(set(_mk_id_firma.get(int(_x), "") for _x in _idler if int(_x) != int(_bu_id) and _mk_id_firma.get(int(_x))))
+
+        # Mükerrer sebebini id -> {kategori: {diğer firmalar}} olarak topluyoruz
         _mk_sebep = {}
         for _k, _idler in _mk_mukerrerler.items():
             for _i in _idler:
-                _mk_sebep.setdefault(int(_i), set()).add("Aynı İsim")
+                _mk_sebep.setdefault(int(_i), {}).setdefault("Aynı İsim", set()).update(_mk_diger_firmalar(_i, _idler))
 
         # ── Yakın isim (ek/boşluk farkı ile aynı) ──
         _mk_df["_norm_isim"] = _mk_df["firma"].apply(_mk_norm_isim)
@@ -3301,7 +3307,7 @@ elif aktif == "mukerrer":
                 if _k not in _mk_mukerrerler:
                     _mk_mukerrerler[_k] = _idler
                 for _i in _idler:
-                    _mk_sebep.setdefault(_i, set()).add("Yakın İsim")
+                    _mk_sebep.setdefault(_i, {}).setdefault("Yakın İsim", set()).update(_mk_diger_firmalar(_i, _idler))
 
         # ── Aynı GSM ──
         if "gsm" in _mk_df.columns:
@@ -3313,7 +3319,7 @@ elif aktif == "mukerrer":
                     if _anahtar not in _mk_mukerrerler:
                         _mk_mukerrerler[_anahtar] = _idler
                     for _i in _idler:
-                        _mk_sebep.setdefault(_i, set()).add("Aynı Cep Tel")
+                        _mk_sebep.setdefault(_i, {}).setdefault("Aynı Cep Tel", set()).update(_mk_diger_firmalar(_i, _idler))
 
         # ── Aynı Sabit Hat ──
         if "sabit" in _mk_df.columns:
@@ -3325,7 +3331,7 @@ elif aktif == "mukerrer":
                     if _anahtar not in _mk_mukerrerler:
                         _mk_mukerrerler[_anahtar] = _idler
                     for _i in _idler:
-                        _mk_sebep.setdefault(_i, set()).add("Aynı Sabit Tel")
+                        _mk_sebep.setdefault(_i, {}).setdefault("Aynı Sabit Tel", set()).update(_mk_diger_firmalar(_i, _idler))
 
         if not _mk_mukerrerler:
             st.success("✅ Mükerrer müşteri bulunamadı.")
@@ -3370,8 +3376,20 @@ elif aktif == "mukerrer":
             _mk_tablo["Randevu"] = _mk_tablo["id"].apply(lambda x: _mk_rand_sayac.get(int(x), 0))
             _mk_tablo["Analiz"] = _mk_tablo["firma"].apply(
                 lambda x: "✅" if str(x).strip().upper() in _mk_analiz_set else "")
-            _mk_tablo["Neden Mükerrer?"] = _mk_tablo["id"].apply(
-                lambda x: ", ".join(sorted(_mk_sebep.get(int(x), []))) or "—")
+            def _mk_sebep_metni(_x):
+                _kayit = _mk_sebep.get(int(_x), {})
+                if not _kayit:
+                    return "—"
+                _parcalar = []
+                for _kategori, _digerleri in _kayit.items():
+                    _digerleri = [d for d in _digerleri if d]
+                    if _digerleri:
+                        _parcalar.append(f"{_kategori} (İLE: {', '.join(sorted(_digerleri)[:3])})")
+                    else:
+                        _parcalar.append(_kategori)
+                return " · ".join(_parcalar)
+
+            _mk_tablo["Neden Mükerrer?"] = _mk_tablo["id"].apply(_mk_sebep_metni)
 
             _mk_tablo.insert(0, "Seç", False)
 
@@ -3404,7 +3422,7 @@ elif aktif == "mukerrer":
                 "Notlar": st.column_config.NumberColumn("📨 Notlar", disabled=True, width=_mk_w("Notlar")),
                 "Randevu": st.column_config.NumberColumn("📅 Randevu", disabled=True, width=_mk_w("Randevu")),
                 "Analiz": st.column_config.TextColumn("✅ Analiz", disabled=True, width=_mk_w("Analiz")),
-                "Neden Mükerrer?": st.column_config.TextColumn("🔍 Neden Mükerrer?", disabled=True, width=140),
+                "Neden Mükerrer?": st.column_config.TextColumn("🔍 Neden Mükerrer?", disabled=True, width=260),
             }
 
             _mk_edited = st.data_editor(
