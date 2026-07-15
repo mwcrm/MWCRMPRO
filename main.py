@@ -1289,13 +1289,25 @@ div[data-testid="stMainBlockContainer"] {
                                 _mp_secili_kayitlar.append(_kayit)
 
                         if _mp_secili_kayitlar:
-                            st.markdown(f"**🗺️ Seçilen {len(_mp_secili_kayitlar)} rota:**")
+                            st.markdown(f"**🗺️ Seçilen {len(_mp_secili_kayitlar)} rota (tek haritada):**")
                             for _sk in _mp_secili_kayitlar:
                                 _firma_baslik = f" — 🏢 {_sk.get('alici_firma')}" if _sk.get("alici_firma") else ""
                                 st.caption(f"📅 {_sk.get('tarih','')} · {_sk.get('gonderen_il','')} → {_sk.get('alici_il','')}{_firma_baslik}")
+
+                            # ── Tüm seçili noktaları TEK haritada, art arda duraklar (waypoint) olarak birleştir ──
+                            _mp_nokta_zinciri = []
+                            for _sk in _mp_secili_kayitlar:
+                                _g_nokta = f"{_sk.get('gonderen_il','')},Türkiye"
+                                _a_nokta = f"{_sk.get('alici_il','')},Türkiye"
+                                if not _mp_nokta_zinciri or _mp_nokta_zinciri[-1] != _g_nokta:
+                                    _mp_nokta_zinciri.append(_g_nokta)
+                                _mp_nokta_zinciri.append(_a_nokta)
+                            if len(_mp_nokta_zinciri) >= 2:
+                                _mp_bas_nokta = _mp_nokta_zinciri[0]
+                                _mp_ara_duraklar = "+to:".join(_mp_nokta_zinciri[1:])
                                 st.components.v1.iframe(
-                                    f"https://www.google.com/maps?saddr={_sk.get('gonderen_il','')}&daddr={_sk.get('alici_il','')}&output=embed",
-                                    height=250)
+                                    f"https://www.google.com/maps?saddr={_mp_bas_nokta}&daddr={_mp_ara_duraklar}&output=embed",
+                                    height=420)
             except Exception:
                 pass
 
