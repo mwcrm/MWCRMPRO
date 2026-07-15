@@ -8532,6 +8532,28 @@ elif aktif == "otomatik_arama":
                         if _ot:
                             _oa_tel_harita[_ot] = (_ocr.get("id"), _ocr.get("firma",""))
 
+            # ── "📞 Telefon Kişiler" (rehber) tablosunu da eşleştirmeye dahil et ──
+            # Kişinin "firma" alanı bir cari kartla birebir eşleşirse otomatik cari'ye bağlanır;
+            # eşleşmezse en azından arayan kişinin ADI eşleşmeyenler listesinde gösterilir.
+            _oa_kisiler_tel_harita = {}
+            try:
+                _oa_kisdf = db_read("kisiler", extra_sql="")
+                if not _oa_kisdf.empty:
+                    _oa_cari_isim_harita = {str(r.get("firma","")).strip().upper(): (r.get("id"), r.get("firma",""))
+                                             for _, r in _oa_caridf.iterrows()} if not _oa_caridf.empty else {}
+                    for _, _okr in _oa_kisdf.iterrows():
+                        _okt = _oa_norm_tel(_okr.get("telefon",""))
+                        if not _okt:
+                            continue
+                        _ok_ad = f"{_okr.get('ad','')} {_okr.get('soyad','')}".strip()
+                        _ok_firma = str(_okr.get("firma","") or "")
+                        _oa_kisiler_tel_harita[_okt] = (_ok_ad, _ok_firma)
+                        # Kişinin firması bir cari kartla eşleşiyorsa, numarayı doğrudan o cariye bağla
+                        if _okt not in _oa_tel_harita and _ok_firma.strip().upper() in _oa_cari_isim_harita:
+                            _oa_tel_harita[_okt] = _oa_cari_isim_harita[_ok_firma.strip().upper()]
+            except Exception:
+                pass
+
             _oa_eslesen = 0
             for _, _obr in _oa_bekleyen.iterrows():
                 _gelen_tel = _oa_norm_tel(_obr.get("icerik",""))
@@ -8562,7 +8584,11 @@ elif aktif == "otomatik_arama":
             for _, _obr2 in _oa_bekleyen.iterrows():
                 with st.container(border=True):
                     _oc1, _oc2, _oc3 = st.columns([1.5, 1, 2])
+                    _obr2_tel_norm = _oa_norm_tel(_obr2.get("icerik",""))
+                    _obr2_kisi = _oa_kisiler_tel_harita.get(_obr2_tel_norm) if '_oa_kisiler_tel_harita' in dir() else None
                     _oc1.markdown(f"**{_obr2.get('icerik','')}**")
+                    if _obr2_kisi and _obr2_kisi[0].strip():
+                        _oc1.caption(f"👤 Rehberde: {_obr2_kisi[0]}" + (f" · {_obr2_kisi[1]}" if _obr2_kisi[1] else ""))
                     _oc2.caption(f"⏱️ {_obr2.get('gonderim_bilgisi','')}")
                     _oa_secim = _oc3.selectbox("Müşteriye bağla", _oa_opts, key=f"oa_sec_{_obr2['id']}", label_visibility="collapsed")
                     if _oa_secim != "-- Seç --":
