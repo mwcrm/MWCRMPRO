@@ -3906,7 +3906,7 @@ section[data-testid="stSidebar"] { display: none !important; }
     if "Devam Ediyor" not in tum_asama_opts:
         tum_asama_opts.append("Devam Ediyor")
     # "Tekrar Ara" seçeneği kaldırıldı — hem üst raporda hem seçim kutularında görünmesin
-    tum_asama_opts = [a for a in tum_asama_opts if str(a).strip().upper().replace("İ","I") != "TEKRAR ARA"]
+    tum_asama_opts = [a for a in tum_asama_opts if str(a).strip().upper().replace("İ","I") not in ["TEKRAR ARA","E-MAIL","MAIL"]]
     # NOT: df'de olan ama tanımlardan silinmiş durum/aşamalar eklenmez
     # Sadece tanımlar tablosundakiler gösterilir
 
