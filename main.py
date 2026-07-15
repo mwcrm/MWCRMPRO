@@ -4230,9 +4230,9 @@ section[data-testid="stSidebar"] { display: none !important; }
         "genel":    ("📊","GENEL",    None, _genel_items),
         "genel":    ("📊","GENEL",    None, _genel_items),
         "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama]
-                     + [('<i class="ti ti-phone" style="color:#16a34a;"></i>',"Aranan", _yesil_arama_sayisi(), "yesil_arama_notlar", False)]
-                     + [('<i class="ti ti-mail" style="color:#0284c7;"></i>',"E-Mail", _email_not_sayisi(), "email_not_sayisi", False)]
-                     + [('<i class="ti ti-brand-whatsapp" style="color:#22c55e;"></i>',"Whatsapp", _whatsapp_not_sayisi(), "whatsapp_not_sayisi", False)]),
+                     + [('<i class="ti ti-phone" style="color:#16a34a;font-size:26px;line-height:1;"></i>',"Aranan", _yesil_arama_sayisi(), "yesil_arama_notlar", False)]
+                     + [('<i class="ti ti-mail" style="color:#0284c7;font-size:26px;line-height:1;"></i>',"E-Mail", _email_not_sayisi(), "email_not_sayisi", False)]
+                     + [('<i class="ti ti-brand-whatsapp" style="color:#22c55e;font-size:26px;line-height:1;"></i>',"Whatsapp", _whatsapp_not_sayisi(), "whatsapp_not_sayisi", False)]),
         "asama1":   ("📅","1. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama1",a),f"asama1_{a}",False)) for a in _grp2_asama]),
         "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama2",a),f"asama2_{a}",False)) for a in _grp3_asama]),
         "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama3",a),f"asama3_{a}",False)) for a in _grp4_asama]),
