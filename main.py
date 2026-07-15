@@ -3522,12 +3522,15 @@ elif aktif == "mukerrer":
                 "Neden Mükerrer?": st.column_config.TextColumn("🔍 Neden Mükerrer?", disabled=True, width=260),
             }
 
+            _mk_ust_buton_alani = st.container()  # Kaydet/Sil butonları burada (tablonun ÜSTÜNDE) görünecek
+
             _mk_edited = st.data_editor(
                 _mk_tablo, use_container_width=True, hide_index=True,
                 column_config=_mk_col_config, key="mk_editor",
                 height=min(600, 80 + 35 * len(_mk_tablo)))
 
-            _mkc1, _mkc2 = st.columns([2,1])
+            with _mk_ust_buton_alani:
+                _mkc1, _mkc2 = st.columns([2,1])
             with _mkc1:
                 if st.button("💾 Kaydet", type="primary", use_container_width=True, key="mk_kaydet_btn"):
                     _mk_sb = get_sb_client()
