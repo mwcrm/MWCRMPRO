@@ -4230,9 +4230,9 @@ section[data-testid="stSidebar"] { display: none !important; }
         "genel":    ("📊","GENEL",    None, _genel_items),
         "genel":    ("📊","GENEL",    None, _genel_items),
         "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama]
-                     + [('<i class="ti ti-phone" style="color:#16a34a;font-size:18px;"></i>',"Aranan", _yesil_arama_sayisi(), "yesil_arama_notlar", "__YESIL__")]
-                     + [('<i class="ti ti-mail" style="color:#0284c7;font-size:18px;"></i>',"E-Mail", _email_not_sayisi(), "email_not_sayisi", "__YESIL__")]
-                     + [('<i class="ti ti-brand-whatsapp" style="color:#22c55e;font-size:18px;"></i>',"Whatsapp", _whatsapp_not_sayisi(), "whatsapp_not_sayisi", "__YESIL__")]),
+                     + [('<i class="ti ti-phone" style="color:#16a34a;"></i>',"Aranan", _yesil_arama_sayisi(), "yesil_arama_notlar", False)]
+                     + [('<i class="ti ti-mail" style="color:#0284c7;"></i>',"E-Mail", _email_not_sayisi(), "email_not_sayisi", False)]
+                     + [('<i class="ti ti-brand-whatsapp" style="color:#22c55e;"></i>',"Whatsapp", _whatsapp_not_sayisi(), "whatsapp_not_sayisi", False)]),
         "asama1":   ("📅","1. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama1",a),f"asama1_{a}",False)) for a in _grp2_asama]),
         "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama2",a),f"asama2_{a}",False)) for a in _grp3_asama]),
         "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama3",a),f"asama3_{a}",False)) for a in _grp4_asama]),
@@ -4290,12 +4290,8 @@ section[data-testid="stSidebar"] { display: none !important; }
         if not _items: continue
         _grp_ilk = True
         for _ic, _ad, _sayi, _key, _aktif in _items:
-            if _aktif == "__YESIL__":
-                _bg = "background:#dcfce7;"
-                _tc = "color:#15803d;font-weight:700;"
-            else:
-                _bg = "background:#dbeafe;" if _aktif else "background:#fff;"
-                _tc = "color:#1d4ed8;font-weight:700;" if _aktif else "color:#0f172a;"
+            _bg = "background:#dbeafe;" if _aktif else "background:#fff;"
+            _tc = "color:#1d4ed8;font-weight:700;" if _aktif else "color:#0f172a;"
             _border_l2 = ("border-left:2px solid #cbd5e1;" if not _ilk2 and _grp_ilk else "")
             _td_onclick = f"sf('{_key}')"
             _html += f'<td onclick="{_td_onclick}" style="border:0.5px solid #f1f5f9;{_border_l2}padding:4px 7px;text-align:center;cursor:pointer;white-space:nowrap;{_bg}vertical-align:middle;min-width:50px;">'
