@@ -4117,7 +4117,7 @@ section[data-testid="stSidebar"] { display: none !important; }
     _aktif_fil_asama = st.session_state.get("_cl_fil_asama_multi", [])
     _toplam_aktif_flag = st.session_state.get("_toplam_aktif", False)
     _grp_gizli = set(st.session_state.get("_rbar_grp_gizli", []))
-    _grp_sira_def = ["genel","iletisim","asama1","asama2","asama3","sonuc"]
+    _grp_sira_def = ["genel","iletisim","yesil_arama","asama1","asama2","asama3","sonuc"]
     _grp_sira = list(st.session_state.get("_rbar_grp_sira", _grp_sira_def.copy()))
     for _gs in _grp_sira_def:
         if _gs not in _grp_sira: _grp_sira.append(_gs)
@@ -4167,6 +4167,21 @@ section[data-testid="stSidebar"] { display: none !important; }
                 _mask = _mask & (df[_k].isna() | df[_k].astype(str).str.strip().isin(["","None","nan"]))
         return int(_mask.sum())
 
+    def _yesil_arama_sayisi():
+        """Notlardan (cari_aciklamalar) toplam arama sayısı — bir müşteri birden fazla aranmışsa hepsi sayılır.
+        'ziyaret' geçen notlar arama değil ziyaret kaydı sayılıp hariç tutulur. Yetkili kayıtları da hariç."""
+        try:
+            _ya_df = db_read("cari_aciklamalar", extra_sql="")
+            if _ya_df.empty or "aciklama" not in _ya_df.columns:
+                return 0
+            _ya_notlar = _ya_df["aciklama"].fillna("").astype(str)
+            _ya_notlar = _ya_notlar[~_ya_notlar.str.startswith("##YETKILI##")]
+            _ya_notlar = _ya_notlar[_ya_notlar.str.strip() != ""]
+            _ya_ziyaretsiz = _ya_notlar[~_ya_notlar.str.contains("ziyaret", case=False, na=False)]
+            return int(len(_ya_ziyaretsiz))
+        except Exception:
+            return 0
+
     # grp1 = islem_asamasi (Arama, Tekrar Ara, E-Mail)
     _grp1_toplam = sum(_asama_sayi(a) for a in _grp1_asama)
     # grp2 = asama1 (Randevu)
@@ -4193,6 +4208,7 @@ section[data-testid="stSidebar"] { display: none !important; }
         "genel":    ("📊","GENEL",    None, _genel_items),
         "genel":    ("📊","GENEL",    None, _genel_items),
         "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama]),
+        "yesil_arama": ("📞","YEŞİL ARAMA", None, [("📞","Arama", _yesil_arama_sayisi(), "yesil_arama_notlar", False)]),
         "asama1":   ("📅","1. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama1",a),f"asama1_{a}",False)) for a in _grp2_asama]),
         "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama2",a),f"asama2_{a}",False)) for a in _grp3_asama]),
         "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama3",a),f"asama3_{a}",False)) for a in _grp4_asama]),
@@ -4250,8 +4266,12 @@ section[data-testid="stSidebar"] { display: none !important; }
         if not _items: continue
         _grp_ilk = True
         for _ic, _ad, _sayi, _key, _aktif in _items:
-            _bg = "background:#dbeafe;" if _aktif else "background:#fff;"
-            _tc = "color:#1d4ed8;font-weight:700;" if _aktif else "color:#0f172a;"
+            if _gid == "yesil_arama":
+                _bg = "background:#dcfce7;" if not _aktif else "background:#86efac;"
+                _tc = "color:#15803d;font-weight:700;"
+            else:
+                _bg = "background:#dbeafe;" if _aktif else "background:#fff;"
+                _tc = "color:#1d4ed8;font-weight:700;" if _aktif else "color:#0f172a;"
             _border_l2 = ("border-left:2px solid #cbd5e1;" if not _ilk2 and _grp_ilk else "")
             _td_onclick = f"sf('{_key}')"
             _html += f'<td onclick="{_td_onclick}" style="border:0.5px solid #f1f5f9;{_border_l2}padding:4px 7px;text-align:center;cursor:pointer;white-space:nowrap;{_bg}vertical-align:middle;min-width:50px;">'
