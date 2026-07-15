@@ -2213,6 +2213,44 @@ def not_dialog(cari_id, firma_adi=""):
                 except Exception as _yee:
                     st.error(f"Hata: {_yee}")
     with _tab_teklif:
+        # ── Bu müşterinin gerçek teklif geçmişi — fiyat_sorgu/kargo_ihbar hariç ──
+        try:
+            import json as _dlgtj
+            _dlg_sb = get_sb_client()
+            _dlg_tekdf = pd.DataFrame(_dlg_sb.table("teklifler").select("*").eq("musteri_adi", firma_adi).order("id", desc=True).execute().data) if _dlg_sb else pd.DataFrame()
+        except Exception:
+            _dlg_tekdf = pd.DataFrame()
+
+        _dlg_gercek_teklifler = []
+        for _, _dtr in _dlg_tekdf.iterrows():
+            try:
+                _dtp = _dlgtj.loads(_dtr.get("satirlar","{}"))
+                if _dtp.get("tip") in ("fiyat_sorgu", "kargo_ihbar"):
+                    continue
+                _dlg_gercek_teklifler.append((_dtr.get("id"), _dtp, _dtr.get("tarih","")))
+            except Exception:
+                continue
+
+        if _dlg_gercek_teklifler:
+            st.markdown(f"**📋 {firma_adi} — {len(_dlg_gercek_teklifler)} teklif/sözleşme kaydı:**")
+            for _tid, _tp, _ttarih in _dlg_gercek_teklifler[:10]:
+                _ttip = _tp.get("tip","")
+                if _ttip == "ozel":
+                    with st.expander(f"⭐ Özel Teklif — {fmt_tarih(_ttarih)}"):
+                        for _g in _tp.get("grp", []):
+                            for _s in _g.get("satirlar", []):
+                                _c = ", ".join(_s.get("cikis",[])) if isinstance(_s.get("cikis"),list) else str(_s.get("cikis") or "")
+                                _v = ", ".join(_s.get("varis",[])) if isinstance(_s.get("varis"),list) else str(_s.get("varis") or "")
+                                st.caption(f"　• {_c} → {_v} · {fmt_para(_s.get('fiyat',0))}")
+                elif _ttip == "sozlesme":
+                    _tv = _tp.get("veri",{})
+                    st.caption(f"📜 Sözleşme — Geçerlilik: {_tv.get('gecerlilik_tarihi','—')} · Vade: {_tv.get('vade','—')}")
+                else:
+                    st.caption(f"📄 {_ttip or 'Teklif'} — {fmt_tarih(_ttarih)}")
+            st.markdown("---")
+        else:
+            st.caption("Bu müşteri için henüz gerçek bir teklif/sözleşme kaydı yok.")
+
         st.caption(f"**{firma_adi}** için özel teklif oluştur — müşteri otomatik seçili şekilde Özel Teklif sayfası açılır.")
         if st.button("⭐ Özel Teklif Sayfasını Aç", key=f"dlg_ozel_teklif_{cari_id}", type="primary", use_container_width=True):
             st.session_state["aktif_tab"] = "ozel_teklif"
@@ -7501,6 +7539,7 @@ elif aktif == "teklif":
                     if _ak4.button("🗑️ Sil",key=f"tek_sil_{_tek_id}",use_container_width=True,type="primary"):
                         _sb_d=get_sb_client()
                         if _sb_d: _sb_d.table("teklifler").delete().eq("id",_tek_id).execute()
+                        st.cache_data.clear()
                         st.success("🗑️ Silindi!"); st.rerun()
         except Exception as _e:
             st.error(f"Hata: {_e}")
@@ -7969,6 +8008,7 @@ elif aktif == "ozel_teklif":
                     if _eak4.button("🗑️ Sil",key="oz2_tek_sil",use_container_width=True):
                         _sb_d=get_sb_client()
                         if _sb_d: _sb_d.table("teklifler").delete().eq("id",_oz_tid).execute()
+                        st.cache_data.clear()
                         st.success("🗑️ Silindi!"); st.rerun()
                     if st.session_state.get("oz2_duz_id") == _oz_tid:
                         st.info("⚠️ Düzenleme modu aktif — yukarıda değişiklik yapıp kaydedin.")
