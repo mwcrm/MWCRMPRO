@@ -5167,7 +5167,7 @@ function kartSec(id){
         "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=True, width=_w("✅ Analiz")),
         "📞 Arama":      st.column_config.NumberColumn("📞 Arama", disabled=True, width=_w("📞 Arama")),
         "🧾 Teklif":     st.column_config.TextColumn("🧾 Teklif", disabled=True, width="small"),
-        "💬 Mesaj":      st.column_config.TextColumn("🟢 Mesaj", disabled=True, width="small"),
+        "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=True, width="small"),
         "asama1":        st.column_config.SelectboxColumn("1. Aşama", options=_asama_secenek_guvenli("asama1", ["", "Randevu"]), width=_w("asama1")),
         "asama2":        st.column_config.SelectboxColumn("2. Aşama", options=_asama_secenek_guvenli("asama2", ["", "Teklif"]), width=_w("asama2")),
         "asama3":        st.column_config.SelectboxColumn("3. Aşama", options=_asama_secenek_guvenli("asama3", ["Tümü", "Deneme", "TAKİP", "Fiyat Hazırla", "Sözleşme"]), width=_w("asama3")),
@@ -5408,7 +5408,7 @@ function kartSec(id){
         pass
 
     if "id" in df_edit.columns:
-        df_edit["💬 Mesaj"] = df_edit["id"].apply(lambda x: f"🟢 {_mesaj_sayac_cl.get(str(int(x)),0)}" if _mesaj_sayac_cl.get(str(int(x)),0) > 0 else "")
+        df_edit["💬 Mesaj"] = df_edit["id"].apply(lambda x: f"💬 {_mesaj_sayac_cl.get(str(int(x)),0)}" if _mesaj_sayac_cl.get(str(int(x)),0) > 0 else "")
     else:
         df_edit["💬 Mesaj"] = ""
 
