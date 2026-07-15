@@ -2012,6 +2012,29 @@ def _notlar_yukle(cari_id):
 @st.dialog("📋 Notlar & Randevu", width="large")
 def not_dialog(cari_id, firma_adi=""):
     """Ekran ortasında açılan not + randevu + silme + düzenleme penceresi"""
+    # ── Kardeş firma bağlantısı varsa en üstte hatırlat ──
+    try:
+        import json as _ndj
+        _nd_sb = get_sb_client()
+        if _nd_sb:
+            _nd_r = _nd_sb.table("kullanici_tercih").select("deger").eq("kullanici","__sistem__").eq("anahtar","kardes_firmalar").execute()
+            if _nd_r.data:
+                _nd_harita = _ndj.loads(_nd_r.data[0]["deger"])
+                _nd_kardes_idler = _nd_harita.get(str(int(cari_id)), [])
+                if _nd_kardes_idler:
+                    _nd_isimler = []
+                    for _nkid in _nd_kardes_idler:
+                        try:
+                            _nkr = _nd_sb.table("cari_kartlar").select("firma").eq("id", int(_nkid)).execute()
+                            if _nkr.data:
+                                _nd_isimler.append(_nkr.data[0].get("firma",""))
+                        except Exception:
+                            pass
+                    if _nd_isimler:
+                        st.warning(f"🔗 **Kardeş Firma(lar):** {', '.join(_nd_isimler)} — bu firmaya işlem yaparken onları da kontrol etmeyi unutma!")
+    except Exception:
+        pass
+
     _tab_not, _tab_rdv, _tab_yetkili, _tab_teklif, _tab_sozlesme, _tab_analiz, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "🔍 Analiz", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
     with _tab_not:
         not_paneli(cari_id, firma_adi, key_prefix="dlg")
@@ -3259,6 +3282,52 @@ elif aktif == "mukerrer":
         st.caption("Veri yok.")
     else:
         import re as _mkre
+        import json as _mkj
+
+        # ── "Bunlar farklı firma" diye işaretlenmiş grupları yükle (kullanici_tercih tablosu, yeni tablo gerekmez) ──
+        try:
+            _mk_yoksay_df = db_read("kullanici_tercih", extra_sql="")
+            _mk_yoksay_satir = _mk_yoksay_df[(_mk_yoksay_df["kullanici"]=="__sistem__") & (_mk_yoksay_df["anahtar"]=="mukerrer_yoksay")] if not _mk_yoksay_df.empty else None
+            _mk_yoksay_liste = set(_mkj.loads(_mk_yoksay_satir.iloc[0]["deger"])) if _mk_yoksay_satir is not None and not _mk_yoksay_satir.empty else set()
+        except Exception:
+            _mk_yoksay_liste = set()
+
+        def _mk_yoksay_kaydet(_liste):
+            try:
+                _mk_sb_y = get_sb_client()
+                _yeni_deger = _mkj.dumps(sorted(_liste))
+                if _mk_sb_y:
+                    _mevcut = _mk_sb_y.table("kullanici_tercih").select("id").eq("kullanici","__sistem__").eq("anahtar","mukerrer_yoksay").execute()
+                    if _mevcut.data:
+                        _mk_sb_y.table("kullanici_tercih").update({"deger": _yeni_deger}).eq("id", _mevcut.data[0]["id"]).execute()
+                    else:
+                        _mk_sb_y.table("kullanici_tercih").insert({"kullanici":"__sistem__","anahtar":"mukerrer_yoksay","deger":_yeni_deger}).execute()
+                return True
+            except Exception:
+                return False
+
+        def _mk_kardes_kaydet(_id_grubu):
+            """Bu id'leri birbirine 'kardeş firma' olarak bağlar — biri işlem görürken diğeri de hatırlansın diye"""
+            try:
+                _mk_sb_k = get_sb_client()
+                if not _mk_sb_k:
+                    return False
+                _mevcut = _mk_sb_k.table("kullanici_tercih").select("id,deger").eq("kullanici","__sistem__").eq("anahtar","kardes_firmalar").execute()
+                _harita = _mkj.loads(_mevcut.data[0]["deger"]) if _mevcut.data else {}
+                _id_grubu_str = [str(int(x)) for x in _id_grubu]
+                for _kid in _id_grubu_str:
+                    _diger = [x for x in _id_grubu_str if x != _kid]
+                    _mevcut_liste = set(_harita.get(_kid, []))
+                    _mevcut_liste.update(_diger)
+                    _harita[_kid] = sorted(_mevcut_liste)
+                _yeni_deger = _mkj.dumps(_harita)
+                if _mevcut.data:
+                    _mk_sb_k.table("kullanici_tercih").update({"deger": _yeni_deger}).eq("id", _mevcut.data[0]["id"]).execute()
+                else:
+                    _mk_sb_k.table("kullanici_tercih").insert({"kullanici":"__sistem__","anahtar":"kardes_firmalar","deger":_yeni_deger}).execute()
+                return True
+            except Exception:
+                return False
 
         def _mk_norm_tel(s):
             """Telefonu sadece rakamlara indirger, boşluk/parantez/tire farkını yok sayar, son 10 haneyi alır.
@@ -3332,6 +3401,34 @@ elif aktif == "mukerrer":
                         _mk_mukerrerler[_anahtar] = _idler
                     for _i in _idler:
                         _mk_sebep.setdefault(_i, {}).setdefault("Aynı Sabit Tel", set()).update(_mk_diger_firmalar(_i, _idler))
+
+        # ── "Bunlar farklı firma" diye işaretlenmiş grupları listeden çıkar ──
+        _mk_mukerrerler = {k: v for k, v in _mk_mukerrerler.items() if k not in _mk_yoksay_liste}
+        # Sebep bilgisinden de bu grupların katkısını temizle (başka bir grup üzerinden hâlâ mükerrerse o kalır)
+        _mk_gecerli_idler_seti = set(int(i) for _v in _mk_mukerrerler.values() for i in _v)
+        _mk_sebep = {k: v for k, v in _mk_sebep.items() if k in _mk_gecerli_idler_seti}
+
+        # ── Telefon bazlı eşleşen gruplar — "Bunlar farklı firma, yoksay" seçeneği ──
+        _mk_tel_gruplari = {k: v for k, v in _mk_mukerrerler.items() if k.startswith("gsm_") or k.startswith("sabit_")}
+        if _mk_tel_gruplari:
+            with st.expander(f"📞 Telefon Bazlı Eşleşen Gruplar ({len(_mk_tel_gruplari)}) — Kardeş/Bağlı Firmalar mı?", expanded=False):
+                st.caption("Aynı numarayı kullanan ama gerçekten FARKLI (örn. kardeş) firmalarsa 'Yoksay' de — "
+                           "numaralar aynen kalır, firmalar ayrı ayrı durur, sadece bu listeye bir daha düşmezler.")
+                for _tk, _tv in _mk_tel_gruplari.items():
+                    _tel_firmalar = sorted(set(_mk_id_firma.get(int(i), "") for i in _tv if _mk_id_firma.get(int(i))))
+                    _ttc1, _ttc2 = st.columns([4, 1.3])
+                    _tur_adi = "Cep Tel" if _tk.startswith("gsm_") else "Sabit Tel"
+                    _ttc1.caption(f"☎️ **{_tur_adi}** — {' · '.join(_tel_firmalar)}")
+                    if _ttc2.button("✅ Farklı Firma, Yoksay", key=f"mk_yoksay_{_tk}", use_container_width=True):
+                        _mk_yoksay_liste.add(_tk)
+                        _mk_ok1 = _mk_yoksay_kaydet(_mk_yoksay_liste)
+                        _mk_ok2 = _mk_kardes_kaydet(_tv)
+                        if _mk_ok1 and _mk_ok2:
+                            st.success("✅ Kaydedildi — bu grup artık listede görünmeyecek VE kardeş firma olarak bağlandı, "
+                                       "birine işlem yaparken diğerini de görüp hatırlayacaksın.")
+                            st.rerun()
+                        else:
+                            st.error("Kaydedilemedi, tekrar dener misin?")
 
         if not _mk_mukerrerler:
             st.success("✅ Mükerrer müşteri bulunamadı.")
