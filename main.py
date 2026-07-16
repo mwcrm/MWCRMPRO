@@ -8584,47 +8584,29 @@ elif aktif == "otomatik_arama":
                 _oa_tel_c = st.text_input("Telefon Numarası *", value=st.session_state.get("oa_secili_tel",""), key="oa_cevir_tel", placeholder="05XX XXX XX XX")
 
                 _oa_tel_link_c = _oa_tel_c.strip()
+                _oa_mid_c, _oa_mfirma_c = 0, ""
                 if not _oa_tel_link_c and _oa_musteri_c != "-- Müşteri Seç --" and not _oa_caridf_menu.empty:
                     _oa_mid_link_c = int(_oa_musteri_c.split("]")[0].replace("[","").strip())
                     _oa_row_link_c = _oa_caridf_menu[_oa_caridf_menu["id"] == _oa_mid_link_c]
                     if not _oa_row_link_c.empty:
                         _oa_tel_link_c = str(_oa_row_link_c.iloc[0].get("gsm","") or _oa_row_link_c.iloc[0].get("sabit",""))
+                if _oa_musteri_c != "-- Müşteri Seç --":
+                    _oa_mid_c = int(_oa_musteri_c.split("]")[0].replace("[","").strip())
+                    _oa_mfirma_c = _oa_musteri_c.split("]")[1].strip()
 
-                st.markdown("**📱 Telefonundan kullanıyorsan:** aşağıdaki butona bas, telefonun arama ekranı anında açılır.")
-                if _oa_tel_link_c.strip():
-                    _oa_tel_temiz_c = _oare.sub(r"[^\d+]", "", _oa_tel_link_c)
-                    st.markdown(f"""
-<a href="tel:{_oa_tel_temiz_c}" style="display:inline-block;padding:10px 22px;background:#16a34a;color:white;
-   border-radius:8px;text-decoration:none;font-weight:700;margin:6px 0;">☎️ Şimdi Ara — {_oa_tel_link_c}</a>
-""", unsafe_allow_html=True)
-                else:
-                    st.caption("Numara yazınca burada anında arama butonu görünecek.")
-
-                st.markdown("---")
-                st.caption("**💻 Bilgisayardan kullanıyorsan:** telefonundaki MacroDroid birkaç dakika içinde otomatik arayacak (sadece çevirir, konuşmayı sen yaparsın).")
-                if st.button("☎️ Kuyruğa Ekle (Ara)", type="primary", key="oa_cevir_ekle"):
-                    _oa_tel_son_c = _oa_tel_c.strip()
-                    _oa_mid_c, _oa_mfirma_c = 0, ""
-                    if _oa_musteri_c != "-- Müşteri Seç --":
-                        _oa_mid_c = int(_oa_musteri_c.split("]")[0].replace("[","").strip())
-                        _oa_mfirma_c = _oa_musteri_c.split("]")[1].strip()
-                        if not _oa_tel_son_c and not _oa_caridf_menu.empty:
-                            _oa_row_c = _oa_caridf_menu[_oa_caridf_menu["id"] == _oa_mid_c]
-                            if not _oa_row_c.empty:
-                                _oa_tel_son_c = str(_oa_row_c.iloc[0].get("gsm","") or _oa_row_c.iloc[0].get("sabit",""))
-                    if not _oa_tel_son_c.strip():
+                if st.button("☎️ Şimdi Ara", type="primary", key="oa_cevir_simdi_ara"):
+                    if not _oa_tel_link_c.strip():
                         st.error("⚠️ Telefon numarası zorunlu.")
                     else:
-                        if db_insert("islem_kaydi", {
+                        db_insert("islem_kaydi", {
                             "musteri_id": _oa_mid_c, "musteri_adi": _oa_mfirma_c or st.session_state.get("oa_secili_isim",""),
-                            "islem_turu": "Arama Kuyruk", "icerik": _oa_tel_son_c.strip(),
+                            "islem_turu": "Arama Tamamlandı", "icerik": _oa_tel_link_c.strip(),
                             "gonderim_bilgisi": "", "olusturan": st.session_state.get("kullanici",""),
-                        }):
-                            st.success("✅ Kuyruğa eklendi.")
-                            st.session_state["oa_secili_tel"] = ""
-                            st.session_state["oa_secili_isim"] = ""
-                            st.cache_data.clear()
-                            st.rerun()
+                        })
+                        st.cache_data.clear()
+                        _oa_tel_temiz_c = _oare.sub(r"[^\d+]", "", _oa_tel_link_c)
+                        st.markdown(f'<meta http-equiv="refresh" content="0; url=tel:{_oa_tel_temiz_c}">', unsafe_allow_html=True)
+                        st.success(f"✅ GİDEN ARAMA'ya kaydedildi, arama ekranı açılıyor — {_oa_tel_link_c}")
 
         # ---- MESAJ YAZ ----
         elif _oa_panel == "mesaj":
@@ -8894,35 +8876,18 @@ elif aktif == "gonderim_kuyrugu":
         _gk_tel_manuel2 = st.text_input("Telefon Numarası *", key="gk_arm_tel", placeholder="05XX XXX XX XX (müşteri seçtiysen boş bırakabilirsin)")
 
         _gk_tel_link2 = _gk_tel_manuel2.strip()
+        _gk_mid2, _gk_mfirma2 = 0, ""
         if not _gk_tel_link2 and _gk_musteri2 != "-- Müşteri Seç --" and not _gk_caridf.empty:
             _gk_mid_link2 = int(_gk_musteri2.split("]")[0].replace("[","").strip())
             _gk_row_link2 = _gk_caridf[_gk_caridf["id"] == _gk_mid_link2]
             if not _gk_row_link2.empty:
                 _gk_tel_link2 = str(_gk_row_link2.iloc[0].get("gsm","") or _gk_row_link2.iloc[0].get("sabit",""))
+        if _gk_musteri2 != "-- Müşteri Seç --":
+            _gk_mid2 = int(_gk_musteri2.split("]")[0].replace("[","").strip())
+            _gk_mfirma2 = _gk_musteri2.split("]")[1].strip()
 
-        st.markdown("**📱 Telefonundan kullanıyorsan:** aşağıdaki butona bas, telefonun arama ekranı anında açılır.")
-        if _gk_tel_link2.strip():
-            _gk_tel_temiz2 = _gkre.sub(r"[^\d+]", "", _gk_tel_link2)
-            st.markdown(f"""
-<a href="tel:{_gk_tel_temiz2}" style="display:inline-block;padding:10px 22px;background:#16a34a;color:white;
-   border-radius:8px;text-decoration:none;font-weight:700;margin:6px 0;">☎️ Şimdi Ara — {_gk_tel_link2}</a>
-""", unsafe_allow_html=True)
-        else:
-            st.caption("Numara yazınca burada anında arama butonu görünecek.")
-
-        st.markdown("---")
-        st.caption("**💻 Bilgisayardan kullanıyorsan:** telefonundaki MacroDroid birkaç dakika içinde otomatik arayacak (sadece çevirir, konuşmayı sen yaparsın).")
-        if st.button("📞 Kuyruğa Ekle (Arama)", type="primary", key="gk_arm_ekle"):
-            _gk_tel_son2 = _gk_tel_manuel2.strip()
-            _gk_mid2, _gk_mfirma2 = 0, ""
-            if _gk_musteri2 != "-- Müşteri Seç --":
-                _gk_mid2 = int(_gk_musteri2.split("]")[0].replace("[","").strip())
-                _gk_mfirma2 = _gk_musteri2.split("]")[1].strip()
-                if not _gk_tel_son2 and not _gk_caridf.empty:
-                    _gk_row2 = _gk_caridf[_gk_caridf["id"] == _gk_mid2]
-                    if not _gk_row2.empty:
-                        _gk_tel_son2 = str(_gk_row2.iloc[0].get("gsm","") or _gk_row2.iloc[0].get("sabit",""))
-            if not _gk_tel_son2.strip():
+        if st.button("☎️ Şimdi Ara", type="primary", key="gk_arm_simdi_ara"):
+            if not _gk_tel_link2.strip():
                 st.error("⚠️ Telefon numarası zorunlu.")
             else:
                 try:
@@ -8930,11 +8895,13 @@ elif aktif == "gonderim_kuyrugu":
                     if _gk_sb2:
                         _gk_sb2.table("islem_kaydi").insert({
                             "musteri_id": _gk_mid2, "musteri_adi": _gk_mfirma2,
-                            "islem_turu": "Arama Kuyruk", "icerik": _gk_tel_son2.strip(),
+                            "islem_turu": "Arama Tamamlandı", "icerik": _gk_tel_link2.strip(),
                             "gonderim_bilgisi": "", "olusturan": st.session_state.get("kullanici",""),
                         }).execute()
-                        st.success("✅ Kuyruğa eklendi — telefonundaki MacroDroid birkaç dakika içinde otomatik arayacak (sadece çevirir, konuşmayı sen yaparsın).")
                         st.cache_data.clear()
+                        _gk_tel_temiz2 = _gkre.sub(r"[^\d+]", "", _gk_tel_link2)
+                        st.markdown(f'<meta http-equiv="refresh" content="0; url=tel:{_gk_tel_temiz2}">', unsafe_allow_html=True)
+                        st.success(f"✅ GİDEN ARAMA'ya kaydedildi, arama ekranı açılıyor — {_gk_tel_link2}")
                 except Exception as _gke2:
                     st.error(f"Hata: {_gke2}")
 
