@@ -8636,33 +8636,34 @@ elif aktif == "otomatik_arama":
         elif _oa_panel == "mesaj":
             with st.container(border=True):
                 st.markdown("##### 💬 Mesaj Yaz")
-                st.caption("Telefonundaki MacroDroid birkaç dakika içinde otomatik gönderecek.")
                 _oa_musteri_m = st.selectbox("Müşteri (opsiyonel)", _oa_musteri_opts, key="oa_mesaj_musteri")
                 _oa_tel_m = st.text_input("Telefon Numarası *", value=st.session_state.get("oa_secili_tel",""), key="oa_mesaj_tel", placeholder="05XX XXX XX XX")
                 _oa_mesaj_m = st.text_area("Mesaj *", key="oa_mesaj_metin", height=100, placeholder="Gönderilecek SMS metni...")
-                if st.button("📤 Kuyruğa Ekle (SMS)", type="primary", key="oa_mesaj_ekle"):
-                    _oa_tel_son_m = _oa_tel_m.strip()
-                    _oa_mid_m, _oa_mfirma_m = 0, ""
-                    if _oa_musteri_m != "-- Müşteri Seç --":
-                        _oa_mid_m = int(_oa_musteri_m.split("]")[0].replace("[","").strip())
-                        _oa_mfirma_m = _oa_musteri_m.split("]")[1].strip()
-                        if not _oa_tel_son_m and not _oa_caridf_menu.empty:
-                            _oa_row_m = _oa_caridf_menu[_oa_caridf_menu["id"] == _oa_mid_m]
-                            if not _oa_row_m.empty:
-                                _oa_tel_son_m = str(_oa_row_m.iloc[0].get("gsm","") or _oa_row_m.iloc[0].get("sabit",""))
-                    if not _oa_tel_son_m.strip() or not _oa_mesaj_m.strip():
+                _oa_mid_m, _oa_mfirma_m = 0, ""
+                if _oa_musteri_m != "-- Müşteri Seç --":
+                    _oa_mid_m = int(_oa_musteri_m.split("]")[0].replace("[","").strip())
+                    _oa_mfirma_m = _oa_musteri_m.split("]")[1].strip()
+                    if not _oa_tel_m.strip() and not _oa_caridf_menu.empty:
+                        _oa_row_m = _oa_caridf_menu[_oa_caridf_menu["id"] == _oa_mid_m]
+                        if not _oa_row_m.empty:
+                            _oa_tel_m = str(_oa_row_m.iloc[0].get("gsm","") or _oa_row_m.iloc[0].get("sabit",""))
+                if st.button("📤 Şimdi Gönder", type="primary", key="oa_mesaj_gonder"):
+                    if not _oa_tel_m.strip() or not _oa_mesaj_m.strip():
                         st.error("⚠️ Telefon numarası ve mesaj metni zorunlu.")
                     else:
-                        if db_insert("islem_kaydi", {
+                        db_insert("islem_kaydi", {
                             "musteri_id": _oa_mid_m, "musteri_adi": _oa_mfirma_m or st.session_state.get("oa_secili_isim",""),
-                            "islem_turu": "SMS Kuyruk", "icerik": _oa_tel_son_m.strip(),
+                            "islem_turu": "Giden SMS", "icerik": _oa_tel_m.strip(),
                             "gonderim_bilgisi": _oa_mesaj_m.strip(), "olusturan": st.session_state.get("kullanici",""),
-                        }):
-                            st.success("✅ Kuyruğa eklendi.")
-                            st.session_state["oa_secili_tel"] = ""
-                            st.session_state["oa_secili_isim"] = ""
-                            st.cache_data.clear()
-                            st.rerun()
+                        })
+                        st.cache_data.clear()
+                        _oa_tel_temiz_m = _oare.sub(r"[^\d+]", "", _oa_tel_m)
+                        import urllib.parse as _oa_up
+                        _oa_mesaj_enc = _oa_up.quote(_oa_mesaj_m.strip())
+                        st.markdown(f'<meta http-equiv="refresh" content="0; url=sms:{_oa_tel_temiz_m}?body={_oa_mesaj_enc}">', unsafe_allow_html=True)
+                        st.success(f"✅ GİDEN SMS'e kaydedildi, mesaj uygulaması açılıyor — {_oa_tel_m}")
+                        st.session_state["oa_secili_tel"] = ""
+                        st.session_state["oa_secili_isim"] = ""
 
         # ================== 4 KOLONLU GELEN / GİDEN ARAMA-SMS TAKİP ==================
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
@@ -8877,7 +8878,7 @@ elif aktif == "gonderim_kuyrugu":
     import re as _gkre
 
     st.markdown("## 📤 Mesaj/Arama Gönder")
-    st.caption("Buraya eklediğin SMS/arama isteği, telefonundaki MacroDroid birkaç dakikada bir kontrol edip otomatik yapacak.")
+    st.caption("Numara/müşteri seçip butona basınca telefonunun mesaj/arama uygulaması anında açılır.")
 
     def _gk_norm_tel(s):
         _d = _gkre.sub(r"\D", "", str(s or ""))
@@ -8893,16 +8894,16 @@ elif aktif == "gonderim_kuyrugu":
         _gk_musteri = st.selectbox("Müşteri (opsiyonel)", _gk_opts, key="gk_sms_musteri")
         _gk_tel_manuel = st.text_input("Telefon Numarası *", key="gk_sms_tel", placeholder="05XX XXX XX XX (müşteri seçtiysen boş bırakabilirsin)")
         _gk_mesaj = st.text_area("Mesaj *", key="gk_sms_mesaj", height=100, placeholder="Gönderilecek SMS metni...")
-        if st.button("📤 Kuyruğa Ekle (SMS)", type="primary", key="gk_sms_ekle"):
-            _gk_tel_son = _gk_tel_manuel.strip()
-            _gk_mid, _gk_mfirma = 0, ""
-            if _gk_musteri != "-- Müşteri Seç --":
-                _gk_mid = int(_gk_musteri.split("]")[0].replace("[","").strip())
-                _gk_mfirma = _gk_musteri.split("]")[1].strip()
-                if not _gk_tel_son and not _gk_caridf.empty:
-                    _gk_row = _gk_caridf[_gk_caridf["id"] == _gk_mid]
-                    if not _gk_row.empty:
-                        _gk_tel_son = str(_gk_row.iloc[0].get("gsm","") or _gk_row.iloc[0].get("sabit",""))
+        _gk_mid, _gk_mfirma = 0, ""
+        _gk_tel_son = _gk_tel_manuel.strip()
+        if _gk_musteri != "-- Müşteri Seç --":
+            _gk_mid = int(_gk_musteri.split("]")[0].replace("[","").strip())
+            _gk_mfirma = _gk_musteri.split("]")[1].strip()
+            if not _gk_tel_son and not _gk_caridf.empty:
+                _gk_row = _gk_caridf[_gk_caridf["id"] == _gk_mid]
+                if not _gk_row.empty:
+                    _gk_tel_son = str(_gk_row.iloc[0].get("gsm","") or _gk_row.iloc[0].get("sabit",""))
+        if st.button("📤 Şimdi Gönder", type="primary", key="gk_sms_gonder"):
             if not _gk_tel_son.strip() or not _gk_mesaj.strip():
                 st.error("⚠️ Telefon numarası ve mesaj metni zorunlu.")
             else:
@@ -8911,11 +8912,15 @@ elif aktif == "gonderim_kuyrugu":
                     if _gk_sb:
                         _gk_sb.table("islem_kaydi").insert({
                             "musteri_id": _gk_mid, "musteri_adi": _gk_mfirma,
-                            "islem_turu": "SMS Kuyruk", "icerik": _gk_tel_son.strip(),
+                            "islem_turu": "Giden SMS", "icerik": _gk_tel_son.strip(),
                             "gonderim_bilgisi": _gk_mesaj.strip(), "olusturan": st.session_state.get("kullanici",""),
                         }).execute()
-                        st.success("✅ Kuyruğa eklendi — telefonundaki MacroDroid birkaç dakika içinde otomatik gönderecek.")
                         st.cache_data.clear()
+                        _gk_tel_temiz = _gkre.sub(r"[^\d+]", "", _gk_tel_son)
+                        import urllib.parse as _gk_up
+                        _gk_mesaj_enc = _gk_up.quote(_gk_mesaj.strip())
+                        st.markdown(f'<meta http-equiv="refresh" content="0; url=sms:{_gk_tel_temiz}?body={_gk_mesaj_enc}">', unsafe_allow_html=True)
+                        st.success(f"✅ GİDEN SMS'e kaydedildi, mesaj uygulaması açılıyor — {_gk_tel_son}")
                 except Exception as _gke:
                     st.error(f"Hata: {_gke}")
 
