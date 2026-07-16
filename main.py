@@ -869,7 +869,7 @@ def sayfa_log(sayfa):
     # Sekme başlığını güncelle
     _menu_adlari = {
         "yeni": "Yeni Kart", "liste": "Cari Liste", "analiz": "Müşteri Analizi",
-        "randevu": "Randevular", "ozel_teklif": "Özel Teklif", "sozlesme": "Sözleşmeler", "fatura": "Faturalar", "kargo_ihbar": "Kargo İhbarları", "otomatik_arama": "Telefon Entegrasyonu",
+        "randevu": "Randevular", "ozel_teklif": "Özel Teklif", "sozlesme": "Sözleşmeler", "fatura": "Faturalar", "kargo_ihbar": "Kargo İhbarları", "otomatik_arama": "Telefon Entegrasyonu", "gonderim_kuyrugu": "Mesaj/Arama Gönder",
         "rota_analiz": "Rota Analiz", "operasyon": "Operasyon", "kisiler": "Telefon Kişiler",
         "rapor": "Raporlar", "excel": "Excel", "kullanici": "Kullanıcılar",
         "admin_rapor": "Admin Rapor", "harita": "Müşteri Haritası", "patron": "Patron",
@@ -1540,7 +1540,7 @@ try{localStorage.removeItem('mwcrm_oturum');}catch(e){}
 # ── SESSION STATE ─────────────────────────────────────────────────────────────
 _sayfa_adlari_cfg = {
     "yeni":"Yeni Kart","liste":"Cari Liste","analiz":"Müşteri Analizi",
-    "randevu":"Randevular","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler","fatura":"Faturalar","kargo_ihbar":"Kargo İhbarları","otomatik_arama":"Telefon Entegrasyonu",
+    "randevu":"Randevular","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler","fatura":"Faturalar","kargo_ihbar":"Kargo İhbarları","otomatik_arama":"Telefon Entegrasyonu","gonderim_kuyrugu":"Mesaj/Arama Gönder",
     "rota_analiz":"Rota Analiz","operasyon":"Operasyon","kisiler":"Telefon Kişiler",
     "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
     "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
@@ -1553,7 +1553,7 @@ st.set_page_config(page_title=_baslik_cfg, layout="wide", initial_sidebar_state=
 # Sekme başlığını aktif menüye göre güncelle
 _sayfa_adlari = {
     "yeni":"Yeni Kart","liste":"Cari Liste","analiz":"Müşteri Analizi",
-    "randevu":"Randevular","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler","fatura":"Faturalar","kargo_ihbar":"Kargo İhbarları","otomatik_arama":"Telefon Entegrasyonu",
+    "randevu":"Randevular","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler","fatura":"Faturalar","kargo_ihbar":"Kargo İhbarları","otomatik_arama":"Telefon Entegrasyonu","gonderim_kuyrugu":"Mesaj/Arama Gönder",
     "rota_analiz":"Rota Analiz","operasyon":"Operasyon","kisiler":"Telefon Kişiler",
     "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
     "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
@@ -2371,7 +2371,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "ozel_teklif", "sozlesme", "fatura", "kargo_ihbar", "otomatik_arama", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "ozel_teklif", "sozlesme", "fatura", "kargo_ihbar", "otomatik_arama", "gonderim_kuyrugu", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -2799,7 +2799,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
         ("📅 Randevu ve teklif", ["randevu", "ozel_teklif", "sozlesme"]),
         ("💰 Faturalar",         ["fatura"]),
         ("📦 Kargo İhbarları",   ["kargo_ihbar"]),
-        ("📱 Telefon Entegrasyonu", ["otomatik_arama"]),
+        ("📱 Telefon Entegrasyonu", ["otomatik_arama", "gonderim_kuyrugu"]),
         ("🚚 Saha",              ["rota_analiz", "operasyon", "harita"]),
         ("⚙️ Yönetim",          ["kullanici", "patron", "musteri_atama"]),
         ("📊 Raporlar",          ["admin_rapor", "rapor"]),
@@ -8659,6 +8659,110 @@ elif aktif == "otomatik_arama":
             '  "gonderim_bilgisi": "[call_duration] sn",\n'
             '  "olusturan": "MacroDroid"\n'
             '}', language="text")
+
+elif aktif == "gonderim_kuyrugu":
+    sayfa_log("gonderim_kuyrugu")
+    import re as _gkre
+
+    st.markdown("## 📤 Mesaj/Arama Gönder")
+    st.caption("Buraya eklediğin SMS/arama isteği, telefonundaki MacroDroid birkaç dakikada bir kontrol edip otomatik yapacak.")
+
+    def _gk_norm_tel(s):
+        _d = _gkre.sub(r"\D", "", str(s or ""))
+        return _d[-10:] if len(_d) >= 7 else ""
+
+    _gk_tab1, _gk_tab2 = st.tabs(["✉️ SMS Gönder", "📞 Arama Yap"])
+
+    _gk_caridf = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
+    _gk_opts = ["-- Müşteri Seç --"] + [f"[{int(r['id'])}] {r['firma']}" for _, r in _gk_caridf.iterrows()] if not _gk_caridf.empty else ["-- Müşteri Seç --"]
+
+    with _gk_tab1:
+        st.caption("Müşteri seçmek zorunda değilsin — sadece telefon numarası yazıp mesaj gönderebilirsin.")
+        _gk_musteri = st.selectbox("Müşteri (opsiyonel)", _gk_opts, key="gk_sms_musteri")
+        _gk_tel_manuel = st.text_input("Telefon Numarası *", key="gk_sms_tel", placeholder="05XX XXX XX XX (müşteri seçtiysen boş bırakabilirsin)")
+        _gk_mesaj = st.text_area("Mesaj *", key="gk_sms_mesaj", height=100, placeholder="Gönderilecek SMS metni...")
+        if st.button("📤 Kuyruğa Ekle (SMS)", type="primary", key="gk_sms_ekle"):
+            _gk_tel_son = _gk_tel_manuel.strip()
+            _gk_mid, _gk_mfirma = 0, ""
+            if _gk_musteri != "-- Müşteri Seç --":
+                _gk_mid = int(_gk_musteri.split("]")[0].replace("[","").strip())
+                _gk_mfirma = _gk_musteri.split("]")[1].strip()
+                if not _gk_tel_son and not _gk_caridf.empty:
+                    _gk_row = _gk_caridf[_gk_caridf["id"] == _gk_mid]
+                    if not _gk_row.empty:
+                        _gk_tel_son = str(_gk_row.iloc[0].get("gsm","") or _gk_row.iloc[0].get("sabit",""))
+            if not _gk_tel_son.strip() or not _gk_mesaj.strip():
+                st.error("⚠️ Telefon numarası ve mesaj metni zorunlu.")
+            else:
+                try:
+                    _gk_sb = get_sb_client()
+                    if _gk_sb:
+                        _gk_sb.table("islem_kaydi").insert({
+                            "musteri_id": _gk_mid, "musteri_adi": _gk_mfirma,
+                            "islem_turu": "SMS Kuyruk", "icerik": _gk_tel_son.strip(),
+                            "gonderim_bilgisi": _gk_mesaj.strip(), "olusturan": st.session_state.get("kullanici",""),
+                        }).execute()
+                        st.success("✅ Kuyruğa eklendi — telefonundaki MacroDroid birkaç dakika içinde otomatik gönderecek.")
+                        st.cache_data.clear()
+                except Exception as _gke:
+                    st.error(f"Hata: {_gke}")
+
+    with _gk_tab2:
+        st.caption("Müşteri seçmek zorunda değilsin — sadece telefon numarası yazıp arama tuşletebilirsin.")
+        _gk_musteri2 = st.selectbox("Müşteri (opsiyonel)", _gk_opts, key="gk_arm_musteri")
+        _gk_tel_manuel2 = st.text_input("Telefon Numarası *", key="gk_arm_tel", placeholder="05XX XXX XX XX (müşteri seçtiysen boş bırakabilirsin)")
+        if st.button("📞 Kuyruğa Ekle (Arama)", type="primary", key="gk_arm_ekle"):
+            _gk_tel_son2 = _gk_tel_manuel2.strip()
+            _gk_mid2, _gk_mfirma2 = 0, ""
+            if _gk_musteri2 != "-- Müşteri Seç --":
+                _gk_mid2 = int(_gk_musteri2.split("]")[0].replace("[","").strip())
+                _gk_mfirma2 = _gk_musteri2.split("]")[1].strip()
+                if not _gk_tel_son2 and not _gk_caridf.empty:
+                    _gk_row2 = _gk_caridf[_gk_caridf["id"] == _gk_mid2]
+                    if not _gk_row2.empty:
+                        _gk_tel_son2 = str(_gk_row2.iloc[0].get("gsm","") or _gk_row2.iloc[0].get("sabit",""))
+            if not _gk_tel_son2.strip():
+                st.error("⚠️ Telefon numarası zorunlu.")
+            else:
+                try:
+                    _gk_sb2 = get_sb_client()
+                    if _gk_sb2:
+                        _gk_sb2.table("islem_kaydi").insert({
+                            "musteri_id": _gk_mid2, "musteri_adi": _gk_mfirma2,
+                            "islem_turu": "Arama Kuyruk", "icerik": _gk_tel_son2.strip(),
+                            "gonderim_bilgisi": "", "olusturan": st.session_state.get("kullanici",""),
+                        }).execute()
+                        st.success("✅ Kuyruğa eklendi — telefonundaki MacroDroid birkaç dakika içinde otomatik arayacak (sadece çevirir, konuşmayı sen yaparsın).")
+                        st.cache_data.clear()
+                except Exception as _gke2:
+                    st.error(f"Hata: {_gke2}")
+
+    st.markdown("---")
+    st.markdown("### 📋 Bekleyen / Gönderilmiş Kayıtlar")
+    try:
+        _gk_sb3 = get_sb_client()
+        _gk_ham = pd.DataFrame(_gk_sb3.table("islem_kaydi").select("*").in_(
+            "islem_turu", ["SMS Kuyruk", "SMS Tamamlandı", "Arama Kuyruk", "Arama Tamamlandı"]
+        ).order("id", desc=True).limit(50).execute().data) if _gk_sb3 else pd.DataFrame()
+    except Exception:
+        _gk_ham = pd.DataFrame()
+
+    if _gk_ham.empty:
+        st.caption("Henüz kayıt yok.")
+    else:
+        for _, _gr in _gk_ham.iterrows():
+            _gk_beklemede = _gr.get("islem_turu") in ("SMS Kuyruk", "Arama Kuyruk")
+            _gk_renk = "#fef3c7" if _gk_beklemede else "#dcfce7"
+            _gk_yazi = "⏳ Beklemede" if _gk_beklemede else "✅ Tamamlandı"
+            _gk_ikon = "✉️" if "SMS" in str(_gr.get("islem_turu","")) else "📞"
+            st.markdown(f"""
+<div style="display:flex;align-items:center;gap:10px;padding:8px 14px;margin-bottom:4px;
+     background:{_gk_renk}55;border-radius:8px;">
+  <span style="font-weight:700;">{_gk_ikon} {_gr.get('musteri_adi','') or _gr.get('icerik','')}</span>
+  <span style="color:#64748b;font-size:12.5px;">{_gr.get('icerik','')}</span>
+  <span style="color:#475569;font-size:12.5px;flex:1;">{_gr.get('gonderim_bilgisi','')[:50]}</span>
+  <span style="font-size:11.5px;font-weight:600;">{_gk_yazi}</span>
+</div>""", unsafe_allow_html=True)
 
 elif aktif == "kargo_ihbar":
     sayfa_log("kargo_ihbar")
