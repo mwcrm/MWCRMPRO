@@ -8545,7 +8545,6 @@ elif aktif == "otomatik_arama":
             _oa_kisiler_tel_harita = {}
             try:
                 _oa_kisdf = db_read("kisiler", extra_sql="")
-                st.caption(f"🔧 Teşhis: 'kisiler' tablosunda {len(_oa_kisdf)} kayıt okundu.")
                 if not _oa_kisdf.empty:
                     _oa_cari_isim_harita = {str(r.get("firma","")).strip().upper(): (r.get("id"), r.get("firma",""))
                                              for _, r in _oa_caridf.iterrows()} if not _oa_caridf.empty else {}
@@ -8559,9 +8558,8 @@ elif aktif == "otomatik_arama":
                         # Kişinin firması bir cari kartla eşleşiyorsa, numarayı doğrudan o cariye bağla
                         if _okt not in _oa_tel_harita and _ok_firma.strip().upper() in _oa_cari_isim_harita:
                             _oa_tel_harita[_okt] = _oa_cari_isim_harita[_ok_firma.strip().upper()]
-                    st.caption(f"🔧 Teşhis: {len(_oa_kisiler_tel_harita)} telefon numarası rehberden haritalandı.")
-            except Exception as _oa_kis_hata:
-                st.warning(f"🔧 Teşhis: 'kisiler' tablosu okunamadı — {_oa_kis_hata}")
+            except Exception:
+                pass
 
             _oa_eslesen = 0
             for _, _obr in _oa_bekleyen.iterrows():
@@ -8591,37 +8589,49 @@ elif aktif == "otomatik_arama":
             st.caption("Bu numaralar hiçbir müşteri kartındaki GSM/Sabit Tel ile eşleşmedi. Manuel bağlayabilirsin.")
             _oa_carilistesi = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
             _oa_opts = ["-- Seç --"] + [f"[{int(r['id'])}] {r['firma']}" for _, r in _oa_carilistesi.iterrows()] if not _oa_carilistesi.empty else ["-- Seç --"]
+
+            _oa_renk_harita = {"Otomatik Arama": ("#2563eb", "#eff6ff"), "Otomatik SMS": ("#16a34a", "#f0fdf4"), "Otomatik Email": ("#ea580c", "#fff7ed")}
+
             for _, _obr2 in _oa_bekleyen.iterrows():
-                with st.container(border=True):
-                    _oc1, _oc2, _oc3 = st.columns([1.5, 1, 2])
-                    _obr2_tel_norm = _oa_norm_tel(_obr2.get("icerik",""))
-                    _obr2_kisi = _oa_kisiler_tel_harita.get(_obr2_tel_norm) if '_oa_kisiler_tel_harita' in dir() else None
-                    _oc1.markdown(f"**{_obr2.get('icerik','')}**")
-                    _oc1.caption(f"🔧 Teşhis: normalize=`{_obr2_tel_norm}`")
-                    if _obr2_kisi and _obr2_kisi[0].strip():
-                        _oc1.caption(f"👤 Rehberde: {_obr2_kisi[0]}" + (f" · {_obr2_kisi[1]}" if _obr2_kisi[1] else ""))
-                    _oa_ikon2_e, _oa_ikon2_b = _oa_tur_bilgi(_obr2.get("islem_turu"))
-                    _oa_ikon2 = f"{_oa_ikon2_e} {_oa_ikon2_b.replace('Otomatik ','').replace(' kaydı','')}"
-                    _oc2.caption(f"{_oa_ikon2}")
-                    _oc2.caption(f"⏱️ {_obr2.get('gonderim_bilgisi','')}")
-                    _oa_secim = _oc3.selectbox("Müşteriye bağla", _oa_opts, key=f"oa_sec_{_obr2['id']}", label_visibility="collapsed")
-                    if _oa_secim != "-- Seç --":
-                        if st.button("🔗 Bağla ve Not Düş", key=f"oa_bagla_{_obr2['id']}"):
-                            try:
-                                _oa_mid2 = int(_oa_secim.split("]")[0].replace("[","").strip())
-                                _oa_mfirma2 = _oa_secim.split("]")[1].strip()
-                                _oa_ikon_not2, _oa_baslik_not2 = _oa_tur_bilgi(_obr2.get("islem_turu"))
-                                _oa_sb.table("islem_kaydi").update({"musteri_id": _oa_mid2, "musteri_adi": _oa_mfirma2}).eq("id", int(_obr2["id"])).execute()
-                                _oa_sb.table("cari_aciklamalar").insert({
-                                    "cari_id": _oa_mid2, "cari_adi": _oa_mfirma2,
-                                    "aciklama": f"{_oa_ikon_not2} {_oa_baslik_not2} (manuel bağlandı) — {_obr2.get('gonderim_bilgisi','')}",
-                                    "olusturan": "MacroDroid (Manuel Eşleşme)",
-                                }).execute()
-                                st.success("✅ Bağlandı!")
-                                st.cache_data.clear()
-                                st.rerun()
-                            except Exception as _oae2:
-                                st.error(f"Hata: {_oae2}")
+                _obr2_tel_norm = _oa_norm_tel(_obr2.get("icerik",""))
+                _obr2_kisi = _oa_kisiler_tel_harita.get(_obr2_tel_norm) if '_oa_kisiler_tel_harita' in dir() else None
+                _oa_ikon2_e, _oa_ikon2_b = _oa_tur_bilgi(_obr2.get("islem_turu"))
+                _oa_tur_kisa = _oa_ikon2_b.replace('Otomatik ','').replace(' kaydı','')
+                _oa_renk, _oa_bg = _oa_renk_harita.get(_obr2.get("islem_turu"), ("#64748b","#f8fafc"))
+                _oa_isim_gosterim = _obr2_kisi[0] if (_obr2_kisi and _obr2_kisi[0].strip()) else "Kayıtsız numara"
+                _oa_firma_gosterim = f" · {_obr2_kisi[1]}" if (_obr2_kisi and _obr2_kisi[1]) else ""
+
+                st.markdown(f"""
+<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;margin-bottom:4px;
+     background:{_oa_bg};border:1px solid {_oa_renk}22;border-radius:10px;">
+  <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;
+       box-shadow:0 0 0 3px #22c55e33;flex-shrink:0;"></span>
+  <span style="background:{_oa_renk};color:#fff;font-size:11px;font-weight:700;padding:2px 9px;
+       border-radius:20px;flex-shrink:0;">{_oa_ikon2_e} {_oa_tur_kisa}</span>
+  <span style="font-weight:700;color:#0f172a;font-size:14px;">{_obr2.get('icerik','')}</span>
+  <span style="color:#64748b;font-size:12.5px;">{_oa_isim_gosterim}{_oa_firma_gosterim}</span>
+  <span style="margin-left:auto;color:#94a3b8;font-size:11.5px;">⏱️ {_obr2.get('gonderim_bilgisi','')}</span>
+</div>""", unsafe_allow_html=True)
+
+                _oc3, _oc4 = st.columns([3, 1.2])
+                _oa_secim = _oc3.selectbox("Müşteriye bağla", _oa_opts, key=f"oa_sec_{_obr2['id']}", label_visibility="collapsed")
+                if _oa_secim != "-- Seç --":
+                    if _oc4.button("🔗 Bağla", key=f"oa_bagla_{_obr2['id']}", use_container_width=True):
+                        try:
+                            _oa_mid2 = int(_oa_secim.split("]")[0].replace("[","").strip())
+                            _oa_mfirma2 = _oa_secim.split("]")[1].strip()
+                            _oa_ikon_not2, _oa_baslik_not2 = _oa_tur_bilgi(_obr2.get("islem_turu"))
+                            _oa_sb.table("islem_kaydi").update({"musteri_id": _oa_mid2, "musteri_adi": _oa_mfirma2}).eq("id", int(_obr2["id"])).execute()
+                            _oa_sb.table("cari_aciklamalar").insert({
+                                "cari_id": _oa_mid2, "cari_adi": _oa_mfirma2,
+                                "aciklama": f"{_oa_ikon_not2} {_oa_baslik_not2} (manuel bağlandı) — {_obr2.get('gonderim_bilgisi','')}",
+                                "olusturan": "MacroDroid (Manuel Eşleşme)",
+                            }).execute()
+                            st.success("✅ Bağlandı!")
+                            st.cache_data.clear()
+                            st.rerun()
+                        except Exception as _oae2:
+                            st.error(f"Hata: {_oae2}")
 
         with st.expander(f"✅ Eşleşmiş Kayıtlar ({len(_oa_islenen)})", expanded=False):
             for _, _oir in _oa_islenen.head(30).iterrows():
