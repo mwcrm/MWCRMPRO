@@ -8667,6 +8667,31 @@ elif aktif == "otomatik_arama":
         # ================== 4 KOLONLU GELEN / GİDEN ARAMA-SMS TAKİP ==================
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
+        _oa_temizle_c1, _oa_temizle_c2 = st.columns([5, 1])
+        with _oa_temizle_c2:
+            if st.button("🗑️ Tümünü Temizle", key="oa_tumunu_temizle", help="Aşağıdaki 4 kolondaki tüm arama/SMS kayıtlarını siler"):
+                st.session_state["oa_temizle_onay"] = True
+        if st.session_state.get("oa_temizle_onay"):
+            st.warning("⚠️ Bu, GELEN/GİDEN ARAMA ve SMS kolonlarındaki TÜM kayıtları kalıcı olarak silecek. Emin misin?")
+            _oa_oc1, _oa_oc2 = st.columns(2)
+            if _oa_oc1.button("✅ Evet, hepsini sil", key="oa_temizle_evet", type="primary"):
+                try:
+                    _oa_sb_tem = get_sb_client()
+                    if _oa_sb_tem:
+                        _oa_sb_tem.table("islem_kaydi").delete().in_("islem_turu", [
+                            "Otomatik Arama", "Gelen Arama", "Arama Kuyruk", "Arama Tamamlandı", "Giden Arama",
+                            "Otomatik SMS", "Gelen SMS", "SMS Kuyruk", "SMS Tamamlandı", "Giden SMS", "Otomatik Email"
+                        ]).execute()
+                        st.success("✅ Tüm kayıtlar silindi.")
+                        st.session_state["oa_temizle_onay"] = False
+                        st.cache_data.clear()
+                        st.rerun()
+                except Exception as _oe_tem:
+                    st.error(f"Silinemedi: {_oe_tem}")
+            if _oa_oc2.button("❌ Vazgeç", key="oa_temizle_vazgec"):
+                st.session_state["oa_temizle_onay"] = False
+                st.rerun()
+
         def _oa_satir_render(ikon, tarih_str, numara_str, sag_metin):
             st.markdown(f"""
 <div style="padding:6px 8px;margin-bottom:5px;border-bottom:1px solid #e2e8f0;font-size:12.5px;">
