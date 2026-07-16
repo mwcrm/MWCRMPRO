@@ -8503,23 +8503,47 @@ elif aktif == "otomatik_arama":
     import re as _oare
 
     st.markdown("## 📱 Otomatik Aramalar & SMS (Telefon Entegrasyonu)")
-    st.caption("MacroDroid'den gelen arama/SMS kayıtları burada işlenir — telefon numarası eşleşirse otomatik not düşülür.")
+    st.caption("MacroDroid'den gelen arama/SMS kayıtları burada işlenir — telefon numarası rehberde ya da carilerde kayıtlıysa ismi otomatik gösterilir.")
 
     def _oa_norm_tel(s):
         _d = _oare.sub(r"\D", "", str(s or ""))
         return _d[-10:] if len(_d) >= 7 else ""
 
-    def _oa_tur_bilgi(turu):
-        if turu == "Otomatik SMS":
-            return "💬", "Otomatik SMS"
-        if turu == "Otomatik Email":
-            return "📧", "Otomatik Email"
-        return "📞", "Otomatik arama kaydı"
+    @st.cache_data(ttl=60)
+    def _oa_isim_haritasi():
+        _harita = {}
+        try:
+            _oa_kis = db_read("kisiler")
+            if not _oa_kis.empty:
+                for _, _kr in _oa_kis.iterrows():
+                    _n = _oa_norm_tel(_kr.get("telefon", ""))
+                    if _n:
+                        _ad = f"{_kr.get('ad','')} {_kr.get('soyad','')}".strip()
+                        _harita[_n] = _ad + (f" ({_kr.get('firma','')})" if _kr.get("firma") else "")
+        except Exception:
+            pass
+        try:
+            _oa_car = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+            if not _oa_car.empty:
+                for _, _cr in _oa_car.iterrows():
+                    for _telalan in ("gsm", "sabit"):
+                        _n = _oa_norm_tel(_cr.get(_telalan, ""))
+                        if _n and _n not in _harita:
+                            _harita[_n] = str(_cr.get("firma", ""))
+        except Exception:
+            pass
+        return _harita
+
+    _OA_ISIM_HARITA = _oa_isim_haritasi()
+
+    def _oa_isim_bul(numara):
+        _n = _oa_norm_tel(numara)
+        return _OA_ISIM_HARITA.get(_n, "")
 
     try:
         _oa_sb = get_sb_client()
         _oa_tumu = pd.DataFrame(_oa_sb.table("islem_kaydi").select("*").in_(
-            "islem_turu", ["Otomatik Arama", "Otomatik SMS", "Otomatik Email",
+            "islem_turu", ["Otomatik Arama", "Otomatik SMS", "Otomatik Email", "Gelen Arama", "Giden Arama", "Gelen SMS", "Giden SMS",
                             "Arama Kuyruk", "Arama Tamamlandı", "SMS Kuyruk", "SMS Tamamlandı"]
         ).order("id", desc=True).limit(300).execute().data) if _oa_sb else pd.DataFrame()
     except Exception:
@@ -8652,10 +8676,10 @@ elif aktif == "otomatik_arama":
   <span style="color:#94a3b8;float:right;text-align:right;">{sag_metin}</span>
 </div>""", unsafe_allow_html=True)
 
-        _oa_gelen_arama = _oa_tumu[_oa_tumu["islem_turu"] == "Otomatik Arama"] if not _oa_tumu.empty else pd.DataFrame()
-        _oa_giden_arama = _oa_tumu[_oa_tumu["islem_turu"].isin(["Arama Kuyruk", "Arama Tamamlandı"])] if not _oa_tumu.empty else pd.DataFrame()
-        _oa_gelen_sms = _oa_tumu[_oa_tumu["islem_turu"] == "Otomatik SMS"] if not _oa_tumu.empty else pd.DataFrame()
-        _oa_giden_sms = _oa_tumu[_oa_tumu["islem_turu"].isin(["SMS Kuyruk", "SMS Tamamlandı"])] if not _oa_tumu.empty else pd.DataFrame()
+        _oa_gelen_arama = _oa_tumu[_oa_tumu["islem_turu"].isin(["Otomatik Arama", "Gelen Arama"])] if not _oa_tumu.empty else pd.DataFrame()
+        _oa_giden_arama = _oa_tumu[_oa_tumu["islem_turu"].isin(["Arama Kuyruk", "Arama Tamamlandı", "Giden Arama"])] if not _oa_tumu.empty else pd.DataFrame()
+        _oa_gelen_sms = _oa_tumu[_oa_tumu["islem_turu"].isin(["Otomatik SMS", "Gelen SMS"])] if not _oa_tumu.empty else pd.DataFrame()
+        _oa_giden_sms = _oa_tumu[_oa_tumu["islem_turu"].isin(["SMS Kuyruk", "SMS Tamamlandı", "Giden SMS"])] if not _oa_tumu.empty else pd.DataFrame()
 
         _oa_k1, _oa_k2, _oa_k3, _oa_k4 = st.columns(4)
         _oa_kolon_tanim = [
@@ -8673,14 +8697,13 @@ elif aktif == "otomatik_arama":
                     else:
                         for _, _oa_r in _oa_df_k.head(25).iterrows():
                             try:
-                                _oa_tarih_g = pd.to_datetime(_oa_r.get("tarih")).strftime("%d.%m.%Y")
+                                _oa_tarih_g = pd.to_datetime(_oa_r.get("tarih")).strftime("%d.%m.%Y %H:%M")
                             except Exception:
-                                _oa_tarih_g = str(_oa_r.get("tarih",""))[:10] or "-"
+                                _oa_tarih_g = str(_oa_r.get("tarih",""))[:16] or "-"
                             _oa_numara_g = _oa_r.get("icerik","")
-                            _oa_musteri_g = _oa_r.get("musteri_adi","") or "Kayıtsız numara"
-                            _oa_durum_g = "✅ Tamamlandı" if str(_oa_r.get("islem_turu","")).endswith("Tamamlandı") else (
-                                          "⏳ Kuyrukta" if "Kuyruk" in str(_oa_r.get("islem_turu","")) else "🕐 Kaydedildi")
-                            _oa_satir_render(_oa_ikon_k, _oa_tarih_g, _oa_numara_g, f"{_oa_musteri_g}<br>{_oa_durum_g}")
+                            _oa_isim_g = _oa_r.get("musteri_adi","") or _oa_isim_bul(_oa_numara_g) or "Kayıtsız numara"
+                            _oa_ek_g = _oa_r.get("gonderim_bilgisi","") or ""
+                            _oa_satir_render(_oa_ikon_k, _oa_tarih_g, _oa_numara_g, f"{_oa_isim_g}<br><span style='font-size:11px;'>{_oa_ek_g[:40]}</span>")
 
     st.markdown("---")
 
