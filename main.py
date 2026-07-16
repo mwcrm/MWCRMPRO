@@ -2801,11 +2801,10 @@ button[data-testid="manage-app-button"] { display: none !important; }
         ("📅 Randevu ve teklif", ["randevu", "ozel_teklif", "sozlesme"]),
         ("💰 Faturalar",         ["fatura"]),
         ("📦 Kargo İhbarları",   ["kargo_ihbar"]),
-        ("📱 Telefon Entegrasyonu", ["otomatik_arama", "gonderim_kuyrugu"]),
+        ("📱 Telefon Entegrasyonu", ["otomatik_arama", "gonderim_kuyrugu", "kisiler"]),
         ("🚚 Saha",              ["rota_analiz", "operasyon", "harita"]),
         ("⚙️ Yönetim",          ["kullanici", "patron", "musteri_atama"]),
         ("📊 Raporlar",          ["admin_rapor", "rapor"]),
-        ("📞 Telefon Kişiler",   ["kisiler"]),
     ]
 
     if "_acik_grup" not in st.session_state:
