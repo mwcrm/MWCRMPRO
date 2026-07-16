@@ -8737,7 +8737,7 @@ elif aktif == "otomatik_arama":
 
     # ================== EŞLEŞTİRME MOTORU (mevcut, dokunulmadı) ==================
     if _oa_ham.empty:
-        st.info("Henüz hiç otomatik arama kaydı gelmedi. MacroDroid kurulumunu tamamladıktan sonra burada görünecek.")
+        pass
     else:
         _oa_bekleyen = _oa_ham[_oa_ham["musteri_id"].fillna(0).astype(int) == 0]
         _oa_islenen = _oa_ham[_oa_ham["musteri_id"].fillna(0).astype(int) != 0]
@@ -8851,28 +8851,6 @@ elif aktif == "otomatik_arama":
             for _, _oir in _oa_islenen.head(30).iterrows():
                 _oa_ikon3, _oa_ikon3_b = _oa_tur_bilgi(_oir.get("islem_turu"))
                 st.caption(f"{_oa_ikon3} {_oir.get('musteri_adi','')} — {_oir.get('icerik','')} · {_oir.get('gonderim_bilgisi','')}")
-
-    st.markdown("---")
-    with st.expander("⚙️ MacroDroid Kurulum Bilgisi"):
-        st.caption("MacroDroid'de 'HTTP İsteği Gönder' (Webhook) eylemi için gereken bilgiler — Streamlit Cloud "
-                   "Secrets sayfandan SUPABASE_URL ve SUPABASE_KEY değerlerini bulup aşağıdaki şablona kendin ekle:")
-        st.code(
-            "URL: [SUPABASE_URL]/rest/v1/islem_kaydi\n"
-            "Method: POST\n"
-            "Headers:\n"
-            "  apikey: [SUPABASE_KEY]\n"
-            "  Authorization: Bearer [SUPABASE_KEY]\n"
-            "  Content-Type: application/json\n"
-            "  Prefer: return=minimal\n"
-            "Body (JSON):\n"
-            '{\n'
-            '  "musteri_id": 0,\n'
-            '  "musteri_adi": "",\n'
-            '  "islem_turu": "Otomatik Arama",\n'
-            '  "icerik": "[cn]",\n'
-            '  "gonderim_bilgisi": "[call_duration] sn",\n'
-            '  "olusturan": "MacroDroid"\n'
-            '}', language="text")
 
 elif aktif == "gonderim_kuyrugu":
     sayfa_log("gonderim_kuyrugu")
