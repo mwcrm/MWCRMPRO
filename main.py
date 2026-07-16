@@ -2380,6 +2380,8 @@ _TAB_ETIKETLER = {
     "sozlesme": "📜 Sözleşmeler",
     "fatura": "💰 Faturalar",
     "kargo_ihbar": "📦 Kargo İhbarları",
+    "otomatik_arama": "📱 Arama & SMS Takip",
+    "gonderim_kuyrugu": "📤 Mesaj/Arama Gönder",
     "excel": "📥 Excel Aktar",
     "kisiler": "📞 Telefon Kişiler",
     "analiz": "🔍 Müşteri Analizi",
