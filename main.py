@@ -8502,8 +8502,8 @@ elif aktif == "otomatik_arama":
     sayfa_log("otomatik_arama")
     import re as _oare
 
-    st.markdown("## 📱 Otomatik Aramalar (Telefon Entegrasyonu)")
-    st.caption("MacroDroid'den gelen arama kayıtları burada işlenir — telefon numarası eşleşirse otomatik not düşülür.")
+    st.markdown("## 📱 Otomatik Aramalar & SMS (Telefon Entegrasyonu)")
+    st.caption("MacroDroid'den gelen arama/SMS kayıtları burada işlenir — telefon numarası eşleşirse otomatik not düşülür.")
 
     def _oa_norm_tel(s):
         _d = _oare.sub(r"\D", "", str(s or ""))
@@ -8511,7 +8511,7 @@ elif aktif == "otomatik_arama":
 
     try:
         _oa_sb = get_sb_client()
-        _oa_ham = pd.DataFrame(_oa_sb.table("islem_kaydi").select("*").eq("islem_turu", "Otomatik Arama").order("id", desc=True).execute().data) if _oa_sb else pd.DataFrame()
+        _oa_ham = pd.DataFrame(_oa_sb.table("islem_kaydi").select("*").in_("islem_turu", ["Otomatik Arama", "Otomatik SMS"]).order("id", desc=True).execute().data) if _oa_sb else pd.DataFrame()
     except Exception:
         _oa_ham = pd.DataFrame()
 
@@ -8561,11 +8561,13 @@ elif aktif == "otomatik_arama":
                 _gelen_tel = _oa_norm_tel(_obr.get("icerik",""))
                 if _gelen_tel and _gelen_tel in _oa_tel_harita:
                     _oa_mid, _oa_mfirma = _oa_tel_harita[_gelen_tel]
+                    _oa_ikon_not = "💬" if _obr.get("islem_turu") == "Otomatik SMS" else "📞"
+                    _oa_baslik_not = "Otomatik SMS" if _obr.get("islem_turu") == "Otomatik SMS" else "Otomatik arama kaydı"
                     try:
                         _oa_sb.table("islem_kaydi").update({"musteri_id": int(_oa_mid), "musteri_adi": _oa_mfirma}).eq("id", int(_obr["id"])).execute()
                         _oa_sb.table("cari_aciklamalar").insert({
                             "cari_id": int(_oa_mid), "cari_adi": _oa_mfirma,
-                            "aciklama": f"📞 Otomatik arama kaydı — {_obr.get('gonderim_bilgisi','')} · {_obr.get('created_at', _obr.get('id',''))}",
+                            "aciklama": f"{_oa_ikon_not} {_oa_baslik_not} — {_obr.get('gonderim_bilgisi','')} · {_obr.get('created_at', _obr.get('id',''))}",
                             "olusturan": "MacroDroid (Otomatik)",
                         }).execute()
                         _oa_eslesen += 1
@@ -8592,6 +8594,8 @@ elif aktif == "otomatik_arama":
                     _oc1.caption(f"🔧 Teşhis: normalize=`{_obr2_tel_norm}`")
                     if _obr2_kisi and _obr2_kisi[0].strip():
                         _oc1.caption(f"👤 Rehberde: {_obr2_kisi[0]}" + (f" · {_obr2_kisi[1]}" if _obr2_kisi[1] else ""))
+                    _oa_ikon2 = "💬 SMS" if _obr2.get("islem_turu") == "Otomatik SMS" else "📞 Arama"
+                    _oc2.caption(f"{_oa_ikon2}")
                     _oc2.caption(f"⏱️ {_obr2.get('gonderim_bilgisi','')}")
                     _oa_secim = _oc3.selectbox("Müşteriye bağla", _oa_opts, key=f"oa_sec_{_obr2['id']}", label_visibility="collapsed")
                     if _oa_secim != "-- Seç --":
@@ -8599,10 +8603,12 @@ elif aktif == "otomatik_arama":
                             try:
                                 _oa_mid2 = int(_oa_secim.split("]")[0].replace("[","").strip())
                                 _oa_mfirma2 = _oa_secim.split("]")[1].strip()
+                                _oa_ikon_not2 = "💬" if _obr2.get("islem_turu") == "Otomatik SMS" else "📞"
+                                _oa_baslik_not2 = "Otomatik SMS" if _obr2.get("islem_turu") == "Otomatik SMS" else "Otomatik arama kaydı"
                                 _oa_sb.table("islem_kaydi").update({"musteri_id": _oa_mid2, "musteri_adi": _oa_mfirma2}).eq("id", int(_obr2["id"])).execute()
                                 _oa_sb.table("cari_aciklamalar").insert({
                                     "cari_id": _oa_mid2, "cari_adi": _oa_mfirma2,
-                                    "aciklama": f"📞 Otomatik arama kaydı (manuel bağlandı) — {_obr2.get('gonderim_bilgisi','')}",
+                                    "aciklama": f"{_oa_ikon_not2} {_oa_baslik_not2} (manuel bağlandı) — {_obr2.get('gonderim_bilgisi','')}",
                                     "olusturan": "MacroDroid (Manuel Eşleşme)",
                                 }).execute()
                                 st.success("✅ Bağlandı!")
@@ -8611,9 +8617,10 @@ elif aktif == "otomatik_arama":
                             except Exception as _oae2:
                                 st.error(f"Hata: {_oae2}")
 
-        with st.expander(f"✅ Eşleşmiş Aramalar ({len(_oa_islenen)})", expanded=False):
+        with st.expander(f"✅ Eşleşmiş Kayıtlar ({len(_oa_islenen)})", expanded=False):
             for _, _oir in _oa_islenen.head(30).iterrows():
-                st.caption(f"📞 {_oir.get('musteri_adi','')} — {_oir.get('icerik','')} · {_oir.get('gonderim_bilgisi','')}")
+                _oa_ikon3 = "💬" if _oir.get("islem_turu") == "Otomatik SMS" else "📞"
+                st.caption(f"{_oa_ikon3} {_oir.get('musteri_adi','')} — {_oir.get('icerik','')} · {_oir.get('gonderim_bilgisi','')}")
 
     st.markdown("---")
     with st.expander("⚙️ MacroDroid Kurulum Bilgisi"):
