@@ -8518,10 +8518,172 @@ elif aktif == "otomatik_arama":
 
     try:
         _oa_sb = get_sb_client()
-        _oa_ham = pd.DataFrame(_oa_sb.table("islem_kaydi").select("*").in_("islem_turu", ["Otomatik Arama", "Otomatik SMS", "Otomatik Email"]).order("id", desc=True).execute().data) if _oa_sb else pd.DataFrame()
+        _oa_tumu = pd.DataFrame(_oa_sb.table("islem_kaydi").select("*").in_(
+            "islem_turu", ["Otomatik Arama", "Otomatik SMS", "Otomatik Email",
+                            "Arama Kuyruk", "Arama Tamamlandı", "SMS Kuyruk", "SMS Tamamlandı"]
+        ).order("id", desc=True).limit(300).execute().data) if _oa_sb else pd.DataFrame()
     except Exception:
-        _oa_ham = pd.DataFrame()
+        _oa_tumu = pd.DataFrame()
 
+    _oa_ham = _oa_tumu[_oa_tumu["islem_turu"].isin(["Otomatik Arama", "Otomatik SMS", "Otomatik Email"])].copy() if not _oa_tumu.empty else pd.DataFrame()
+
+    # ================== SOL MENÜ + SAĞ İÇERİK (Numara Çevir / Rehberde Kişi Seç / Mesaj Yaz) ==================
+    _oa_col_menu, _oa_col_icerik = st.columns([1, 4.2])
+
+    with _oa_col_menu:
+        st.markdown("#### Menü")
+        if st.button("☎️ Numara Çevir", use_container_width=True, key="oa_btn_cevir"):
+            st.session_state["oa_panel"] = "" if st.session_state.get("oa_panel") == "cevir" else "cevir"
+        if st.button("👤 Rehberde Kişi Seç", use_container_width=True, key="oa_btn_kisi"):
+            st.session_state["oa_panel"] = "" if st.session_state.get("oa_panel") == "kisi" else "kisi"
+        if st.button("💬 Mesaj Yaz", use_container_width=True, key="oa_btn_mesaj"):
+            st.session_state["oa_panel"] = "" if st.session_state.get("oa_panel") == "mesaj" else "mesaj"
+
+    with _oa_col_icerik:
+        _oa_panel = st.session_state.get("oa_panel", "")
+
+        _oa_caridf_menu = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
+        _oa_musteri_opts = ["-- Müşteri Seç --"] + [f"[{int(r['id'])}] {r['firma']}" for _, r in _oa_caridf_menu.iterrows()] if not _oa_caridf_menu.empty else ["-- Müşteri Seç --"]
+
+        # ---- REHBERDE KİŞİ SEÇ ----
+        if _oa_panel == "kisi":
+            with st.container(border=True):
+                st.markdown("##### 👤 Rehberde Kişi Seç")
+                try:
+                    _oa_kisdf_menu = db_read("kisiler", extra_sql="ORDER BY ad")
+                except Exception:
+                    _oa_kisdf_menu = pd.DataFrame()
+                _oa_kisi_opts = ["-- Kişi Seç --"]
+                _oa_kisi_harita = {}
+                if not _oa_kisdf_menu.empty:
+                    for _, _okr3 in _oa_kisdf_menu.iterrows():
+                        _oad = f"{_okr3.get('ad','')} {_okr3.get('soyad','')}".strip()
+                        _otel = str(_okr3.get('telefon','') or '')
+                        _label = f"{_oad} — {_otel}" + (f" ({_okr3.get('firma','')})" if _okr3.get('firma') else "")
+                        _oa_kisi_opts.append(_label)
+                        _oa_kisi_harita[_label] = (_oad, _otel)
+                _oa_secim_kisi = st.selectbox("Kişi", _oa_kisi_opts, key="oa_kisi_secim")
+                if _oa_secim_kisi != "-- Kişi Seç --":
+                    _oa_isim_sel, _oa_tel_sel = _oa_kisi_harita[_oa_secim_kisi]
+                    st.session_state["oa_secili_tel"] = _oa_tel_sel
+                    st.session_state["oa_secili_isim"] = _oa_isim_sel
+                    st.success(f"Seçildi: {_oa_isim_sel} — {_oa_tel_sel}")
+                    _okc1, _okc2 = st.columns(2)
+                    if _okc1.button("☎️ Bu Numarayı Ara", use_container_width=True, key="oa_kisi_ara"):
+                        st.session_state["oa_panel"] = "cevir"
+                        st.rerun()
+                    if _okc2.button("💬 Bu Numaraya Mesaj Yaz", use_container_width=True, key="oa_kisi_mesaj"):
+                        st.session_state["oa_panel"] = "mesaj"
+                        st.rerun()
+
+        # ---- NUMARA ÇEVİR ----
+        elif _oa_panel == "cevir":
+            with st.container(border=True):
+                st.markdown("##### ☎️ Numara Çevir")
+                st.caption("Telefonundaki MacroDroid birkaç dakika içinde otomatik arayacak (sadece çevirir, konuşmayı sen yaparsın).")
+                _oa_musteri_c = st.selectbox("Müşteri (opsiyonel)", _oa_musteri_opts, key="oa_cevir_musteri")
+                _oa_tel_c = st.text_input("Telefon Numarası *", value=st.session_state.get("oa_secili_tel",""), key="oa_cevir_tel", placeholder="05XX XXX XX XX")
+                if st.button("☎️ Kuyruğa Ekle (Ara)", type="primary", key="oa_cevir_ekle"):
+                    _oa_tel_son_c = _oa_tel_c.strip()
+                    _oa_mid_c, _oa_mfirma_c = 0, ""
+                    if _oa_musteri_c != "-- Müşteri Seç --":
+                        _oa_mid_c = int(_oa_musteri_c.split("]")[0].replace("[","").strip())
+                        _oa_mfirma_c = _oa_musteri_c.split("]")[1].strip()
+                        if not _oa_tel_son_c and not _oa_caridf_menu.empty:
+                            _oa_row_c = _oa_caridf_menu[_oa_caridf_menu["id"] == _oa_mid_c]
+                            if not _oa_row_c.empty:
+                                _oa_tel_son_c = str(_oa_row_c.iloc[0].get("gsm","") or _oa_row_c.iloc[0].get("sabit",""))
+                    if not _oa_tel_son_c.strip():
+                        st.error("⚠️ Telefon numarası zorunlu.")
+                    else:
+                        if db_insert("islem_kaydi", {
+                            "musteri_id": _oa_mid_c, "musteri_adi": _oa_mfirma_c or st.session_state.get("oa_secili_isim",""),
+                            "islem_turu": "Arama Kuyruk", "icerik": _oa_tel_son_c.strip(),
+                            "gonderim_bilgisi": "", "olusturan": st.session_state.get("kullanici",""),
+                        }):
+                            st.success("✅ Kuyruğa eklendi.")
+                            st.session_state["oa_secili_tel"] = ""
+                            st.session_state["oa_secili_isim"] = ""
+                            st.cache_data.clear()
+                            st.rerun()
+
+        # ---- MESAJ YAZ ----
+        elif _oa_panel == "mesaj":
+            with st.container(border=True):
+                st.markdown("##### 💬 Mesaj Yaz")
+                st.caption("Telefonundaki MacroDroid birkaç dakika içinde otomatik gönderecek.")
+                _oa_musteri_m = st.selectbox("Müşteri (opsiyonel)", _oa_musteri_opts, key="oa_mesaj_musteri")
+                _oa_tel_m = st.text_input("Telefon Numarası *", value=st.session_state.get("oa_secili_tel",""), key="oa_mesaj_tel", placeholder="05XX XXX XX XX")
+                _oa_mesaj_m = st.text_area("Mesaj *", key="oa_mesaj_metin", height=100, placeholder="Gönderilecek SMS metni...")
+                if st.button("📤 Kuyruğa Ekle (SMS)", type="primary", key="oa_mesaj_ekle"):
+                    _oa_tel_son_m = _oa_tel_m.strip()
+                    _oa_mid_m, _oa_mfirma_m = 0, ""
+                    if _oa_musteri_m != "-- Müşteri Seç --":
+                        _oa_mid_m = int(_oa_musteri_m.split("]")[0].replace("[","").strip())
+                        _oa_mfirma_m = _oa_musteri_m.split("]")[1].strip()
+                        if not _oa_tel_son_m and not _oa_caridf_menu.empty:
+                            _oa_row_m = _oa_caridf_menu[_oa_caridf_menu["id"] == _oa_mid_m]
+                            if not _oa_row_m.empty:
+                                _oa_tel_son_m = str(_oa_row_m.iloc[0].get("gsm","") or _oa_row_m.iloc[0].get("sabit",""))
+                    if not _oa_tel_son_m.strip() or not _oa_mesaj_m.strip():
+                        st.error("⚠️ Telefon numarası ve mesaj metni zorunlu.")
+                    else:
+                        if db_insert("islem_kaydi", {
+                            "musteri_id": _oa_mid_m, "musteri_adi": _oa_mfirma_m or st.session_state.get("oa_secili_isim",""),
+                            "islem_turu": "SMS Kuyruk", "icerik": _oa_tel_son_m.strip(),
+                            "gonderim_bilgisi": _oa_mesaj_m.strip(), "olusturan": st.session_state.get("kullanici",""),
+                        }):
+                            st.success("✅ Kuyruğa eklendi.")
+                            st.session_state["oa_secili_tel"] = ""
+                            st.session_state["oa_secili_isim"] = ""
+                            st.cache_data.clear()
+                            st.rerun()
+
+        # ================== 4 KOLONLU GELEN / GİDEN ARAMA-SMS TAKİP ==================
+        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+
+        def _oa_satir_render(ikon, tarih_str, numara_str, sag_metin):
+            st.markdown(f"""
+<div style="padding:6px 8px;margin-bottom:5px;border-bottom:1px solid #e2e8f0;font-size:12.5px;">
+  <span style="color:#64748b;">{tarih_str}</span>
+  <span style="margin:0 4px;">{ikon}</span>
+  <span style="font-weight:600;color:#0f172a;">{numara_str}</span>
+  <span style="color:#94a3b8;float:right;text-align:right;">{sag_metin}</span>
+</div>""", unsafe_allow_html=True)
+
+        _oa_gelen_arama = _oa_tumu[_oa_tumu["islem_turu"] == "Otomatik Arama"] if not _oa_tumu.empty else pd.DataFrame()
+        _oa_giden_arama = _oa_tumu[_oa_tumu["islem_turu"].isin(["Arama Kuyruk", "Arama Tamamlandı"])] if not _oa_tumu.empty else pd.DataFrame()
+        _oa_gelen_sms = _oa_tumu[_oa_tumu["islem_turu"] == "Otomatik SMS"] if not _oa_tumu.empty else pd.DataFrame()
+        _oa_giden_sms = _oa_tumu[_oa_tumu["islem_turu"].isin(["SMS Kuyruk", "SMS Tamamlandı"])] if not _oa_tumu.empty else pd.DataFrame()
+
+        _oa_k1, _oa_k2, _oa_k3, _oa_k4 = st.columns(4)
+        _oa_kolon_tanim = [
+            (_oa_k1, "GELEN ARAMA", _oa_gelen_arama, "📞"),
+            (_oa_k2, "GİDEN ARAMA", _oa_giden_arama, "📞"),
+            (_oa_k3, "GELEN SMS", _oa_gelen_sms, "💬"),
+            (_oa_k4, "GİDEN SMS", _oa_giden_sms, "💬"),
+        ]
+        for _oa_kol, _oa_baslik, _oa_df_k, _oa_ikon_k in _oa_kolon_tanim:
+            with _oa_kol:
+                with st.container(border=True):
+                    st.markdown(f"<div style='text-align:center;font-weight:700;font-size:13px;border-bottom:2px solid #0f172a;padding-bottom:6px;margin-bottom:8px;'>{_oa_baslik}</div>", unsafe_allow_html=True)
+                    if _oa_df_k.empty:
+                        st.caption("Kayıt yok.")
+                    else:
+                        for _, _oa_r in _oa_df_k.head(25).iterrows():
+                            try:
+                                _oa_tarih_g = pd.to_datetime(_oa_r.get("tarih")).strftime("%d.%m.%Y")
+                            except Exception:
+                                _oa_tarih_g = str(_oa_r.get("tarih",""))[:10] or "-"
+                            _oa_numara_g = _oa_r.get("icerik","")
+                            _oa_musteri_g = _oa_r.get("musteri_adi","") or "Kayıtsız numara"
+                            _oa_durum_g = "✅ Tamamlandı" if str(_oa_r.get("islem_turu","")).endswith("Tamamlandı") else (
+                                          "⏳ Kuyrukta" if "Kuyruk" in str(_oa_r.get("islem_turu","")) else "🕐 Kaydedildi")
+                            _oa_satir_render(_oa_ikon_k, _oa_tarih_g, _oa_numara_g, f"{_oa_musteri_g}<br>{_oa_durum_g}")
+
+    st.markdown("---")
+
+    # ================== EŞLEŞTİRME MOTORU (mevcut, dokunulmadı) ==================
     if _oa_ham.empty:
         st.info("Henüz hiç otomatik arama kaydı gelmedi. MacroDroid kurulumunu tamamladıktan sonra burada görünecek.")
     else:
