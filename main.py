@@ -8917,7 +8917,10 @@ elif aktif == "gonderim_kuyrugu":
             _gk_renk = "#fef3c7" if _gk_beklemede else "#dcfce7"
             _gk_yazi = "⏳ Beklemede" if _gk_beklemede else "✅ Tamamlandı"
             _gk_ikon = "✉️" if "SMS" in str(_gr.get("islem_turu","")) else "📞"
-            st.markdown(f"""
+            _gk_rid = int(_gr.get("id"))
+            _gk_col_bilgi, _gk_col_sil = st.columns([9, 1])
+            with _gk_col_bilgi:
+                st.markdown(f"""
 <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;margin-bottom:4px;
      background:{_gk_renk}55;border-radius:8px;">
   <span style="font-weight:700;">{_gk_ikon} {_gr.get('musteri_adi','') or _gr.get('icerik','')}</span>
@@ -8925,6 +8928,17 @@ elif aktif == "gonderim_kuyrugu":
   <span style="color:#475569;font-size:12.5px;flex:1;">{_gr.get('gonderim_bilgisi','')[:50]}</span>
   <span style="font-size:11.5px;font-weight:600;">{_gk_yazi}</span>
 </div>""", unsafe_allow_html=True)
+            with _gk_col_sil:
+                if st.button("🗑️", key=f"gk_sil_{_gk_rid}", help="Bu kaydı sil"):
+                    try:
+                        _gk_sb_sil = get_sb_client()
+                        if _gk_sb_sil:
+                            _gk_sb_sil.table("islem_kaydi").delete().eq("id", _gk_rid).execute()
+                            st.success("✅ Kayıt silindi.")
+                            st.cache_data.clear()
+                            st.rerun()
+                    except Exception as _gke_sil:
+                        st.error(f"Silinemedi: {_gke_sil}")
 
 elif aktif == "kargo_ihbar":
     sayfa_log("kargo_ihbar")
