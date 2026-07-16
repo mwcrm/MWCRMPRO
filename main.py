@@ -8667,29 +8667,30 @@ elif aktif == "otomatik_arama":
         # ================== 4 KOLONLU GELEN / GİDEN ARAMA-SMS TAKİP ==================
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
 
-        _oa_temizle_c1, _oa_temizle_c2 = st.columns([5, 1])
-        with _oa_temizle_c2:
-            if st.button("🗑️ Tümünü Temizle", key="oa_tumunu_temizle", help="Aşağıdaki 4 kolondaki tüm arama/SMS kayıtlarını siler"):
-                st.session_state["oa_temizle_onay"] = True
-        if st.session_state.get("oa_temizle_onay"):
-            st.warning("⚠️ Bu, GELEN/GİDEN ARAMA ve SMS kolonlarındaki TÜM kayıtları kalıcı olarak silecek. Emin misin?")
-            _oa_oc1, _oa_oc2 = st.columns(2)
-            if _oa_oc1.button("✅ Evet, hepsini sil", key="oa_temizle_evet", type="primary"):
-                try:
-                    _oa_sb_tem = get_sb_client()
-                    if _oa_sb_tem:
-                        _oa_sb_tem.table("islem_kaydi").delete().in_("islem_turu", [
-                            "Otomatik Arama", "Gelen Arama", "Arama Kuyruk", "Arama Tamamlandı", "Giden Arama",
-                            "Otomatik SMS", "Gelen SMS", "SMS Kuyruk", "SMS Tamamlandı", "Giden SMS", "Otomatik Email"
-                        ]).execute()
-                        st.success("✅ Tüm kayıtlar silindi.")
-                        st.session_state["oa_temizle_onay"] = False
-                        st.cache_data.clear()
-                        st.rerun()
-                except Exception as _oe_tem:
-                    st.error(f"Silinemedi: {_oe_tem}")
-            if _oa_oc2.button("❌ Vazgeç", key="oa_temizle_vazgec"):
-                st.session_state["oa_temizle_onay"] = False
+        if st.session_state.get("rol") == "admin":
+            _oa_temizle_c1, _oa_temizle_c2 = st.columns([5, 1])
+            with _oa_temizle_c2:
+                if st.button("🗑️ Tümünü Temizle", key="oa_tumunu_temizle", help="Aşağıdaki 4 kolondaki tüm arama/SMS kayıtlarını siler (sadece admin)"):
+                    st.session_state["oa_temizle_onay"] = True
+            if st.session_state.get("oa_temizle_onay"):
+                st.warning("⚠️ Bu, GELEN/GİDEN ARAMA ve SMS kolonlarındaki TÜM kayıtları kalıcı olarak silecek. Emin misin?")
+                _oa_oc1, _oa_oc2 = st.columns(2)
+                if _oa_oc1.button("✅ Evet, hepsini sil", key="oa_temizle_evet", type="primary"):
+                    try:
+                        _oa_sb_tem = get_sb_client()
+                        if _oa_sb_tem:
+                            _oa_sb_tem.table("islem_kaydi").delete().in_("islem_turu", [
+                                "Otomatik Arama", "Gelen Arama", "Arama Kuyruk", "Arama Tamamlandı", "Giden Arama",
+                                "Otomatik SMS", "Gelen SMS", "SMS Kuyruk", "SMS Tamamlandı", "Giden SMS", "Otomatik Email"
+                            ]).execute()
+                            st.success("✅ Tüm kayıtlar silindi.")
+                            st.session_state["oa_temizle_onay"] = False
+                            st.cache_data.clear()
+                            st.rerun()
+                    except Exception as _oe_tem:
+                        st.error(f"Silinemedi: {_oe_tem}")
+                if _oa_oc2.button("❌ Vazgeç", key="oa_temizle_vazgec"):
+                    st.session_state["oa_temizle_onay"] = False
                 st.rerun()
 
         def _oa_satir_render(ikon, tarih_str, numara_str, sag_metin):
@@ -8966,13 +8967,17 @@ elif aktif == "gonderim_kuyrugu":
     if _gk_ham.empty:
         st.caption("Henüz kayıt yok.")
     else:
+        _gk_admin_mi = st.session_state.get("rol") == "admin"
         for _, _gr in _gk_ham.iterrows():
             _gk_beklemede = _gr.get("islem_turu") in ("SMS Kuyruk", "Arama Kuyruk")
             _gk_renk = "#fef3c7" if _gk_beklemede else "#dcfce7"
             _gk_yazi = "⏳ Beklemede" if _gk_beklemede else "✅ Tamamlandı"
             _gk_ikon = "✉️" if "SMS" in str(_gr.get("islem_turu","")) else "📞"
             _gk_rid = int(_gr.get("id"))
-            _gk_col_bilgi, _gk_col_sil = st.columns([9, 1])
+            if _gk_admin_mi:
+                _gk_col_bilgi, _gk_col_sil = st.columns([9, 1])
+            else:
+                _gk_col_bilgi = st.container()
             with _gk_col_bilgi:
                 st.markdown(f"""
 <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;margin-bottom:4px;
@@ -8982,17 +8987,18 @@ elif aktif == "gonderim_kuyrugu":
   <span style="color:#475569;font-size:12.5px;flex:1;">{_gr.get('gonderim_bilgisi','')[:50]}</span>
   <span style="font-size:11.5px;font-weight:600;">{_gk_yazi}</span>
 </div>""", unsafe_allow_html=True)
-            with _gk_col_sil:
-                if st.button("🗑️", key=f"gk_sil_{_gk_rid}", help="Bu kaydı sil"):
-                    try:
-                        _gk_sb_sil = get_sb_client()
-                        if _gk_sb_sil:
-                            _gk_sb_sil.table("islem_kaydi").delete().eq("id", _gk_rid).execute()
-                            st.success("✅ Kayıt silindi.")
-                            st.cache_data.clear()
-                            st.rerun()
-                    except Exception as _gke_sil:
-                        st.error(f"Silinemedi: {_gke_sil}")
+            if _gk_admin_mi:
+                with _gk_col_sil:
+                    if st.button("🗑️", key=f"gk_sil_{_gk_rid}", help="Bu kaydı sil (sadece admin)"):
+                        try:
+                            _gk_sb_sil = get_sb_client()
+                            if _gk_sb_sil:
+                                _gk_sb_sil.table("islem_kaydi").delete().eq("id", _gk_rid).execute()
+                                st.success("✅ Kayıt silindi.")
+                                st.cache_data.clear()
+                                st.rerun()
+                        except Exception as _gke_sil:
+                            st.error(f"Silinemedi: {_gke_sil}")
 
 elif aktif == "kargo_ihbar":
     sayfa_log("kargo_ihbar")
