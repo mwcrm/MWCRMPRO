@@ -2035,7 +2035,7 @@ def not_dialog(cari_id, firma_adi=""):
     except Exception:
         pass
 
-    _tab_not, _tab_rdv, _tab_yetkili, _tab_teklif, _tab_sozlesme, _tab_analiz, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "🔍 Analiz", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
+    _tab_not, _tab_rdv, _tab_yetkili, _tab_iletisim, _tab_teklif, _tab_sozlesme, _tab_analiz, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "📞 Arama/Mesaj", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "🔍 Analiz", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
     with _tab_not:
         not_paneli(cari_id, firma_adi, key_prefix="dlg")
     with _tab_rdv:
@@ -2212,6 +2212,73 @@ def not_dialog(cari_id, firma_adi=""):
                     st.rerun()
                 except Exception as _yee:
                     st.error(f"Hata: {_yee}")
+
+    with _tab_iletisim:
+        st.caption(f"**{firma_adi}** ile yapılan tüm arama ve SMS kayıtları (rehber/cari eşleşmesiyle otomatik toplanır).")
+        import re as _ilre
+
+        def _il_norm_tel(s):
+            _d = _ilre.sub(r"\D", "", str(s or ""))
+            return _d[-10:] if len(_d) >= 7 else ""
+
+        try:
+            _il_sb = get_sb_client()
+            _il_numaralar = set()
+            _il_kart_r = _il_sb.table("cari_kartlar").select("gsm,sabit").eq("id", int(cari_id)).execute() if _il_sb else None
+            if _il_kart_r and _il_kart_r.data:
+                for _tk in ("gsm", "sabit"):
+                    _n = _il_norm_tel(_il_kart_r.data[0].get(_tk, ""))
+                    if _n:
+                        _il_numaralar.add(_n)
+            _il_yet_r = _il_sb.table("cari_aciklamalar").select("aciklama").eq("cari_id", int(cari_id)).execute() if _il_sb else None
+            if _il_yet_r and _il_yet_r.data:
+                import json as _ilj
+                for _yr in _il_yet_r.data:
+                    _metin = str(_yr.get("aciklama","") or "")
+                    if _metin.startswith("##YETKILI##"):
+                        try:
+                            _kayit = _ilj.loads(_metin[len("##YETKILI##"):])
+                            for _tk in ("gsm", "sabit_tel"):
+                                _n = _il_norm_tel(_kayit.get(_tk, ""))
+                                if _n:
+                                    _il_numaralar.add(_n)
+                        except Exception:
+                            pass
+
+            if not _il_numaralar:
+                st.info("Bu carinin kayıtlı bir telefon numarası yok, arama/mesaj geçmişi gösterilemiyor.")
+            else:
+                _il_tumu = pd.DataFrame(_il_sb.table("islem_kaydi").select("*").in_(
+                    "islem_turu", ["Otomatik Arama", "Gelen Arama", "Arama Kuyruk", "Arama Tamamlandı", "Giden Arama",
+                                    "Otomatik SMS", "Gelen SMS", "SMS Kuyruk", "SMS Tamamlandı", "Giden SMS"]
+                ).order("id", desc=True).limit(500).execute().data) if _il_sb else pd.DataFrame()
+                if _il_tumu.empty:
+                    st.caption("Henüz kayıt yok.")
+                else:
+                    _il_tumu["_norm"] = _il_tumu["icerik"].apply(_il_norm_tel)
+                    _il_filtreli = _il_tumu[_il_tumu["_norm"].isin(_il_numaralar)]
+                    if _il_filtreli.empty:
+                        st.caption("Bu cariye ait arama/mesaj kaydı bulunamadı.")
+                    else:
+                        for _, _ilr in _il_filtreli.head(50).iterrows():
+                            _il_turu = str(_ilr.get("islem_turu",""))
+                            _il_ikon = "💬" if "SMS" in _il_turu else "📞"
+                            _il_yon = "Gelen" if "Gelen" in _il_turu or _il_turu == "Otomatik Arama" or _il_turu == "Otomatik SMS" else "Giden"
+                            try:
+                                _il_tarih = pd.to_datetime(_ilr.get("tarih")).strftime("%d.%m.%Y %H:%M")
+                            except Exception:
+                                _il_tarih = str(_ilr.get("tarih",""))[:16]
+                            st.markdown(f"""
+<div style="padding:6px 10px;margin-bottom:4px;border-left:3px solid {'#16a34a' if _il_yon=='Gelen' else '#2563eb'};background:#f8fafc;border-radius:4px;">
+  <span style="color:#64748b;font-size:12px;">{_il_tarih}</span>
+  <span style="margin:0 6px;">{_il_ikon}</span>
+  <span style="font-weight:600;">{_il_yon}</span>
+  <span style="color:#64748b;"> — {_ilr.get('icerik','')}</span>
+  {f"<div style='font-size:12px;color:#475569;margin-top:2px;'>{_ilr.get('gonderim_bilgisi','')}</div>" if _ilr.get('gonderim_bilgisi') else ""}
+</div>""", unsafe_allow_html=True)
+        except Exception as _ile:
+            st.error(f"Arama/mesaj geçmişi yüklenemedi: {_ile}")
+
     with _tab_teklif:
         # ── Bu müşterinin gerçek teklif geçmişi — fiyat_sorgu/kargo_ihbar hariç ──
         try:
@@ -8524,13 +8591,38 @@ elif aktif == "otomatik_arama":
         except Exception:
             pass
         try:
-            _oa_car = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+            _oa_sb_isim = get_sb_client()
+            _oa_car = pd.DataFrame(_oa_sb_isim.table("cari_kartlar").select("id,firma,gsm,sabit,silindi").execute().data) if _oa_sb_isim else pd.DataFrame()
             if not _oa_car.empty:
+                if "silindi" in _oa_car.columns:
+                    _oa_car = _oa_car[_oa_car["silindi"].fillna(0).astype(str).isin(["0", "0.0", "False", "false"])]
                 for _, _cr in _oa_car.iterrows():
                     for _telalan in ("gsm", "sabit"):
                         _n = _oa_norm_tel(_cr.get(_telalan, ""))
                         if _n and _n not in _harita:
                             _harita[_n] = str(_cr.get("firma", ""))
+        except Exception:
+            pass
+        # ── Yetkililer (cari_aciklamalar içinde ##YETKILI## etiketiyle saklanan kişiler) ──
+        try:
+            import json as _oayj
+            _oa_sb_yet = get_sb_client()
+            _oa_yet_ham = pd.DataFrame(_oa_sb_yet.table("cari_aciklamalar").select("cari_id,cari_adi,aciklama").execute().data) if _oa_sb_yet else pd.DataFrame()
+            if not _oa_yet_ham.empty:
+                for _, _yr in _oa_yet_ham.iterrows():
+                    _metin = str(_yr.get("aciklama","") or "")
+                    if _metin.startswith("##YETKILI##"):
+                        try:
+                            _kayit = _oayj.loads(_metin[len("##YETKILI##"):])
+                        except Exception:
+                            continue
+                        _firma_adi = _yr.get("cari_adi","") or ""
+                        _kisi_adi = _kayit.get("ad","")
+                        _etiket = f"{_kisi_adi} ({_firma_adi})" if _kisi_adi else _firma_adi
+                        for _telalan in ("gsm", "sabit_tel"):
+                            _n = _oa_norm_tel(_kayit.get(_telalan, ""))
+                            if _n:
+                                _harita[_n] = _etiket
         except Exception:
             pass
         return _harita
@@ -8630,8 +8722,15 @@ elif aktif == "otomatik_arama":
                         })
                         st.cache_data.clear()
                         _oa_tel_temiz_c = _oare.sub(r"[^\d+]", "", _oa_tel_link_c)
-                        st.markdown(f'<meta http-equiv="refresh" content="0; url=tel:{_oa_tel_temiz_c}">', unsafe_allow_html=True)
-                        st.success(f"✅ GİDEN ARAMA'ya kaydedildi, arama ekranı açılıyor — {_oa_tel_link_c}")
+                        st.session_state["oa_cevir_hazir_tel"] = _oa_tel_temiz_c
+                        st.success(f"✅ GİDEN ARAMA'ya kaydedildi.")
+
+                if st.session_state.get("oa_cevir_hazir_tel"):
+                    st.markdown(f"""
+<a href="tel:{st.session_state['oa_cevir_hazir_tel']}" target="_top" style="display:inline-block;padding:10px 22px;
+   background:#16a34a;color:white;border-radius:8px;text-decoration:none;font-weight:700;margin:6px 0;">
+   ☎️ Aramayı Başlat — {st.session_state['oa_cevir_hazir_tel']}</a>
+""", unsafe_allow_html=True)
 
         # ---- MESAJ YAZ ----
         elif _oa_panel == "mesaj":
@@ -8661,10 +8760,18 @@ elif aktif == "otomatik_arama":
                         _oa_tel_temiz_m = _oare.sub(r"[^\d+]", "", _oa_tel_m)
                         import urllib.parse as _oa_up
                         _oa_mesaj_enc = _oa_up.quote(_oa_mesaj_m.strip())
-                        st.markdown(f'<meta http-equiv="refresh" content="0; url=sms:{_oa_tel_temiz_m}?body={_oa_mesaj_enc}">', unsafe_allow_html=True)
-                        st.success(f"✅ GİDEN SMS'e kaydedildi, mesaj uygulaması açılıyor — {_oa_tel_m}")
+                        st.session_state["oa_mesaj_hazir_link"] = f"sms:{_oa_tel_temiz_m}?body={_oa_mesaj_enc}"
+                        st.session_state["oa_mesaj_hazir_tel"] = _oa_tel_m
+                        st.success(f"✅ GİDEN SMS'e kaydedildi.")
                         st.session_state["oa_secili_tel"] = ""
                         st.session_state["oa_secili_isim"] = ""
+
+                if st.session_state.get("oa_mesaj_hazir_link"):
+                    st.markdown(f"""
+<a href="{st.session_state['oa_mesaj_hazir_link']}" target="_top" style="display:inline-block;padding:10px 22px;
+   background:#16a34a;color:white;border-radius:8px;text-decoration:none;font-weight:700;margin:6px 0;">
+   📤 Mesaj Uygulamasını Aç — {st.session_state.get('oa_mesaj_hazir_tel','')}</a>
+""", unsafe_allow_html=True)
 
         # ================== 4 KOLONLU GELEN / GİDEN ARAMA-SMS TAKİP ==================
         st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
@@ -8693,16 +8800,75 @@ elif aktif == "otomatik_arama":
                         st.error(f"Silinemedi: {_oe_tem}")
                 if _oa_oc2.button("❌ Vazgeç", key="oa_temizle_vazgec"):
                     st.session_state["oa_temizle_onay"] = False
-                st.rerun()
+                    st.rerun()
 
-        def _oa_satir_render(ikon, tarih_str, numara_str, sag_metin):
-            st.markdown(f"""
-<div style="padding:6px 8px;margin-bottom:5px;border-bottom:1px solid #e2e8f0;font-size:12.5px;">
-  <span style="color:#64748b;">{tarih_str}</span>
-  <span style="margin:0 4px;">{ikon}</span>
-  <span style="font-weight:600;color:#0f172a;">{numara_str}</span>
-  <span style="color:#94a3b8;float:right;text-align:right;">{sag_metin}</span>
+        _oa_admin_mi = st.session_state.get("rol") == "admin"
+
+        def _oa_gunlere_ayir(df_k):
+            """DataFrame'i tarihe göre gün gruplarına ayırır, {gun_str: alt_df} döner (en yeni gün önce)."""
+            if df_k.empty:
+                return {}
+            _df2 = df_k.copy()
+            try:
+                _df2["_gun"] = pd.to_datetime(_df2["tarih"]).dt.strftime("%d.%m.%Y")
+            except Exception:
+                _df2["_gun"] = _df2["tarih"].astype(str).str[:10]
+            _gunler = {}
+            for _g in _df2["_gun"].unique():
+                _gunler[_g] = _df2[_df2["_gun"] == _g]
+            return _gunler
+
+        def _oa_kolon_render(kolon_key, baslik, df_k, ikon_k):
+            with st.container(border=True):
+                st.markdown(f"<div style='text-align:center;font-weight:700;font-size:13px;border-bottom:2px solid #0f172a;padding-bottom:6px;margin-bottom:8px;'>{baslik}</div>", unsafe_allow_html=True)
+                if df_k.empty:
+                    st.caption("Kayıt yok.")
+                    return
+                _gunler = _oa_gunlere_ayir(df_k)
+                for _gun_str, _gun_df in _gunler.items():
+                    with st.expander(f"📅 {_gun_str} ({len(_gun_df)})", expanded=(_gun_str == pd.Timestamp.now().strftime("%d.%m.%Y"))):
+                        _secililer = []
+                        for _, _oa_r in _gun_df.head(50).iterrows():
+                            try:
+                                _oa_saat_g = pd.to_datetime(_oa_r.get("tarih")).strftime("%H:%M")
+                            except Exception:
+                                _oa_saat_g = ""
+                            _oa_numara_g = _oa_r.get("icerik","")
+                            _oa_isim_g = _oa_r.get("musteri_adi","") or _oa_isim_bul(_oa_numara_g) or "Kayıtsız numara"
+                            _oa_ek_g = _oa_r.get("gonderim_bilgisi","") or ""
+                            _oa_rid = _oa_r.get("id")
+                            if _oa_admin_mi:
+                                _cc1, _cc2 = st.columns([0.4, 9.6])
+                                with _cc1:
+                                    if st.checkbox("", key=f"oa_chk_{kolon_key}_{_oa_rid}", label_visibility="collapsed"):
+                                        _secililer.append(_oa_rid)
+                                with _cc2:
+                                    st.markdown(f"""
+<div style="padding:4px 8px;font-size:12.5px;">
+  <span style="color:#64748b;">{_oa_saat_g}</span>
+  <span style="margin:0 4px;">{ikon_k}</span>
+  <span style="font-weight:600;color:#0f172a;">{_oa_numara_g}</span>
+  <span style="color:#94a3b8;float:right;text-align:right;">{_oa_isim_g}<br><span style="font-size:11px;">{_oa_ek_g[:40]}</span></span>
 </div>""", unsafe_allow_html=True)
+                            else:
+                                st.markdown(f"""
+<div style="padding:4px 8px;border-bottom:1px solid #e2e8f0;font-size:12.5px;">
+  <span style="color:#64748b;">{_oa_saat_g}</span>
+  <span style="margin:0 4px;">{ikon_k}</span>
+  <span style="font-weight:600;color:#0f172a;">{_oa_numara_g}</span>
+  <span style="color:#94a3b8;float:right;text-align:right;">{_oa_isim_g}<br><span style="font-size:11px;">{_oa_ek_g[:40]}</span></span>
+</div>""", unsafe_allow_html=True)
+                        if _oa_admin_mi and _secililer:
+                            if st.button(f"🗑️ Seçilenleri Sil ({len(_secililer)})", key=f"oa_sec_sil_{kolon_key}_{_gun_str}"):
+                                try:
+                                    _oa_sb_ss = get_sb_client()
+                                    if _oa_sb_ss:
+                                        _oa_sb_ss.table("islem_kaydi").delete().in_("id", [int(x) for x in _secililer]).execute()
+                                        st.success(f"✅ {len(_secililer)} kayıt silindi.")
+                                        st.cache_data.clear()
+                                        st.rerun()
+                                except Exception as _oe_ss:
+                                    st.error(f"Silinemedi: {_oe_ss}")
 
         _oa_gelen_arama = _oa_tumu[_oa_tumu["islem_turu"].isin(["Otomatik Arama", "Gelen Arama"])] if not _oa_tumu.empty else pd.DataFrame()
         _oa_giden_arama = _oa_tumu[_oa_tumu["islem_turu"].isin(["Arama Kuyruk", "Arama Tamamlandı", "Giden Arama"])] if not _oa_tumu.empty else pd.DataFrame()
@@ -8710,28 +8876,14 @@ elif aktif == "otomatik_arama":
         _oa_giden_sms = _oa_tumu[_oa_tumu["islem_turu"].isin(["SMS Kuyruk", "SMS Tamamlandı", "Giden SMS"])] if not _oa_tumu.empty else pd.DataFrame()
 
         _oa_k1, _oa_k2, _oa_k3, _oa_k4 = st.columns(4)
-        _oa_kolon_tanim = [
-            (_oa_k1, "GELEN ARAMA", _oa_gelen_arama, "📞"),
-            (_oa_k2, "GİDEN ARAMA", _oa_giden_arama, "📞"),
-            (_oa_k3, "GELEN SMS", _oa_gelen_sms, "💬"),
-            (_oa_k4, "GİDEN SMS", _oa_giden_sms, "💬"),
-        ]
-        for _oa_kol, _oa_baslik, _oa_df_k, _oa_ikon_k in _oa_kolon_tanim:
-            with _oa_kol:
-                with st.container(border=True):
-                    st.markdown(f"<div style='text-align:center;font-weight:700;font-size:13px;border-bottom:2px solid #0f172a;padding-bottom:6px;margin-bottom:8px;'>{_oa_baslik}</div>", unsafe_allow_html=True)
-                    if _oa_df_k.empty:
-                        st.caption("Kayıt yok.")
-                    else:
-                        for _, _oa_r in _oa_df_k.head(25).iterrows():
-                            try:
-                                _oa_tarih_g = pd.to_datetime(_oa_r.get("tarih")).strftime("%d.%m.%Y %H:%M")
-                            except Exception:
-                                _oa_tarih_g = str(_oa_r.get("tarih",""))[:16] or "-"
-                            _oa_numara_g = _oa_r.get("icerik","")
-                            _oa_isim_g = _oa_r.get("musteri_adi","") or _oa_isim_bul(_oa_numara_g) or "Kayıtsız numara"
-                            _oa_ek_g = _oa_r.get("gonderim_bilgisi","") or ""
-                            _oa_satir_render(_oa_ikon_k, _oa_tarih_g, _oa_numara_g, f"{_oa_isim_g}<br><span style='font-size:11px;'>{_oa_ek_g[:40]}</span>")
+        with _oa_k1:
+            _oa_kolon_render("gelenarama", "GELEN ARAMA", _oa_gelen_arama, "📞")
+        with _oa_k2:
+            _oa_kolon_render("gidenarama", "GİDEN ARAMA", _oa_giden_arama, "📞")
+        with _oa_k3:
+            _oa_kolon_render("gelensms", "GELEN SMS", _oa_gelen_sms, "💬")
+        with _oa_k4:
+            _oa_kolon_render("gidensms", "GİDEN SMS", _oa_giden_sms, "💬")
 
     st.markdown("---")
 
@@ -8898,10 +9050,18 @@ elif aktif == "gonderim_kuyrugu":
                         _gk_tel_temiz = _gkre.sub(r"[^\d+]", "", _gk_tel_son)
                         import urllib.parse as _gk_up
                         _gk_mesaj_enc = _gk_up.quote(_gk_mesaj.strip())
-                        st.markdown(f'<meta http-equiv="refresh" content="0; url=sms:{_gk_tel_temiz}?body={_gk_mesaj_enc}">', unsafe_allow_html=True)
-                        st.success(f"✅ GİDEN SMS'e kaydedildi, mesaj uygulaması açılıyor — {_gk_tel_son}")
+                        st.session_state["gk_sms_hazir_link"] = f"sms:{_gk_tel_temiz}?body={_gk_mesaj_enc}"
+                        st.session_state["gk_sms_hazir_tel"] = _gk_tel_son
+                        st.success(f"✅ GİDEN SMS'e kaydedildi.")
                 except Exception as _gke:
                     st.error(f"Hata: {_gke}")
+
+        if st.session_state.get("gk_sms_hazir_link"):
+            st.markdown(f"""
+<a href="{st.session_state['gk_sms_hazir_link']}" target="_top" style="display:inline-block;padding:10px 22px;
+   background:#16a34a;color:white;border-radius:8px;text-decoration:none;font-weight:700;margin:6px 0;">
+   📤 Mesaj Uygulamasını Aç — {st.session_state.get('gk_sms_hazir_tel','')}</a>
+""", unsafe_allow_html=True)
 
     with _gk_tab2:
         st.caption("Müşteri seçmek zorunda değilsin — sadece telefon numarası yazıp arama tuşletebilirsin.")
@@ -8933,10 +9093,17 @@ elif aktif == "gonderim_kuyrugu":
                         }).execute()
                         st.cache_data.clear()
                         _gk_tel_temiz2 = _gkre.sub(r"[^\d+]", "", _gk_tel_link2)
-                        st.markdown(f'<meta http-equiv="refresh" content="0; url=tel:{_gk_tel_temiz2}">', unsafe_allow_html=True)
-                        st.success(f"✅ GİDEN ARAMA'ya kaydedildi, arama ekranı açılıyor — {_gk_tel_link2}")
+                        st.session_state["gk_arm_hazir_tel"] = _gk_tel_temiz2
+                        st.success(f"✅ GİDEN ARAMA'ya kaydedildi.")
                 except Exception as _gke2:
                     st.error(f"Hata: {_gke2}")
+
+        if st.session_state.get("gk_arm_hazir_tel"):
+            st.markdown(f"""
+<a href="tel:{st.session_state['gk_arm_hazir_tel']}" target="_top" style="display:inline-block;padding:10px 22px;
+   background:#16a34a;color:white;border-radius:8px;text-decoration:none;font-weight:700;margin:6px 0;">
+   ☎️ Aramayı Başlat — {st.session_state['gk_arm_hazir_tel']}</a>
+""", unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown("### 📋 Bekleyen / Gönderilmiş Kayıtlar")
