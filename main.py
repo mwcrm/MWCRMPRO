@@ -9019,6 +9019,8 @@ elif aktif == "otomatik_arama":
 
         # ── Bekleyenleri otomatik eşleştirmeyi dene ──
         if not _oa_bekleyen.empty:
+            _oa_ilerleme = st.progress(0, text="🔍 Cari Kartlar (GSM/Sabit) taranıyor...")
+
             _oa_caridf = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
             if not _oa_caridf.empty and "silindi" in _oa_caridf.columns:
                 _oa_caridf = _oa_caridf[_oa_caridf["silindi"].fillna(0).astype(str).isin(["0", "0.0", "False", "false"])]
@@ -9029,10 +9031,13 @@ elif aktif == "otomatik_arama":
                         for _ot in _oa_norm_tel_adaylari(_ocr.get(_oalan, "")):
                             _oa_tel_harita[_ot] = (_ocr.get("id"), _ocr.get("firma",""))
 
+            _oa_ilerleme.progress(35, text=f"📇 Cari Kartlar tarandı ({len(_oa_caridf)} kayıt) — şimdi Telefon Kişiler taranıyor...")
+
             # ── "📞 Telefon Kişiler" (rehber) tablosunu da eşleştirmeye dahil et ──
             # Kişinin "firma" alanı bir cari kartla birebir eşleşirse otomatik cari'ye bağlanır;
             # eşleşmezse en azından arayan kişinin ADI eşleşmeyenler listesinde gösterilir.
             _oa_kisiler_tel_harita = {}
+            _oa_kis_hata = None
             try:
                 _oa_kisdf = db_read("kisiler", extra_sql="")
                 if not _oa_kisdf.empty:
@@ -9049,11 +9054,14 @@ elif aktif == "otomatik_arama":
                             # Kişinin firması bir cari kartla eşleşiyorsa, numarayı doğrudan o cariye bağla
                             if _okt not in _oa_tel_harita and _ok_firma.strip().upper() in _oa_cari_isim_harita:
                                 _oa_tel_harita[_okt] = _oa_cari_isim_harita[_ok_firma.strip().upper()]
-            except Exception:
-                pass
+            except Exception as _oa_kis_e:
+                _oa_kis_hata = str(_oa_kis_e)
+
+            _oa_kis_n = len(_oa_kisiler_tel_harita)
+            _oa_ilerleme.progress(70, text=f"📞 Telefon Kişiler tarandı ({_oa_kis_n} numara) — {len(_oa_bekleyen)} kayıt eşleştiriliyor...")
 
             _oa_eslesen = 0
-            for _, _obr in _oa_bekleyen.iterrows():
+            for _ix_e, (_, _obr) in enumerate(_oa_bekleyen.iterrows()):
                 _oa_eslesme = _oa_harita_bul(_obr.get("icerik",""), _oa_tel_harita)
                 if _oa_eslesme:
                     _oa_mid, _oa_mfirma = _oa_eslesme
@@ -9068,25 +9076,25 @@ elif aktif == "otomatik_arama":
                         _oa_eslesen += 1
                     except Exception:
                         pass
+                _oa_ilerleme.progress(70 + int(30 * (_ix_e + 1) / max(len(_oa_bekleyen), 1)), text=f"⚙️ Eşleştiriliyor... ({_ix_e + 1}/{len(_oa_bekleyen)})")
+            _oa_ilerleme.empty()
             if _oa_eslesen:
                 st.success(f"✅ {_oa_eslesen} arama otomatik eşleştirildi ve not olarak düşüldü.")
                 st.cache_data.clear()
                 st.rerun()
+            else:
+                st.info(f"ℹ️ Bu turda otomatik eşleşme bulunamadı. Taranan: {len(_oa_caridf)} cari kart, {_oa_kis_n} rehber numarası, {len(_oa_bekleyen)} bekleyen kayıt.")
 
         _oa_es_acik_key = "_oa_eslesmeyen_acik"
         if _oa_es_acik_key not in st.session_state:
             st.session_state[_oa_es_acik_key] = False
-        _oa_es_c1, _oa_es_c2, _oa_es_c3 = st.columns([0.05, 0.72, 0.23])
+        _oa_es_c1, _oa_es_c2 = st.columns([0.05, 0.95])
         with _oa_es_c1:
             if st.button("🔽" if st.session_state[_oa_es_acik_key] else "▶️", key="_oa_es_toggle_btn"):
                 st.session_state[_oa_es_acik_key] = not st.session_state[_oa_es_acik_key]
                 st.rerun()
         with _oa_es_c2:
             st.markdown(f"### ⚠️ Eşleşmeyen Aramalar ({len(_oa_bekleyen)})")
-        with _oa_es_c3:
-            if st.button("🔄 Eşleştir", key="oa_es_btn_ic", use_container_width=True, type="primary"):
-                st.cache_data.clear()
-                st.rerun()
 
         if st.session_state[_oa_es_acik_key]:
           if _oa_bekleyen.empty:
@@ -9103,12 +9111,11 @@ elif aktif == "otomatik_arama":
             for _oa_es_gun_str, _oa_es_gun_df in _oa_es_gunler.items():
               with st.expander(f"📅 {_oa_es_gun_str} ({len(_oa_es_gun_df)})", expanded=(_oa_es_gun_str == pd.Timestamp(_tr_simdi()).strftime("%d.%m.%Y"))):
                 # Tablo başlığı
-                st.markdown("""
-<div style="display:flex;align-items:center;padding:4px 8px;border-bottom:2px solid #0f172a;
-     font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;">
-  <div style="width:230px;flex-shrink:0;">Tür / Numara</div>
-  <div style="flex:1;">İçerik</div>
-</div>""", unsafe_allow_html=True)
+                _oh1, _oh2, _oh3, _oh4 = st.columns([2.6, 1.9, 1.9, 0.9])
+                _oh1.markdown("<div style='font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:2px solid #0f172a;padding-bottom:3px;'>Tür / Numara</div>", unsafe_allow_html=True)
+                _oh2.markdown("<div style='font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:2px solid #0f172a;padding-bottom:3px;'>Cari Seç</div>", unsafe_allow_html=True)
+                _oh3.markdown("<div style='font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:2px solid #0f172a;padding-bottom:3px;'>Manuel İsim/Firma</div>", unsafe_allow_html=True)
+                _oh4.markdown("<div style='font-size:10.5px;font-weight:700;color:#64748b;text-transform:uppercase;border-bottom:2px solid #0f172a;padding-bottom:3px;'>&nbsp;</div>", unsafe_allow_html=True)
                 for _ix2, (_, _obr2) in enumerate(_oa_es_gun_df.iterrows()):
                     _oa_ikon2_e, _oa_ikon2_b = _oa_tur_bilgi(_obr2.get("islem_turu"))
                     _oa_tur_kisa = _oa_ikon2_b.replace('Otomatik ','').replace(' kaydı','')
@@ -9119,18 +9126,15 @@ elif aktif == "otomatik_arama":
                     except Exception:
                         _oa_saat_es = ""
 
-                    st.markdown(f"""
+                    _oc1, _oc3, _oc3b, _oc4 = st.columns([2.6, 1.9, 1.9, 0.9])
+                    with _oc1:
+                        st.markdown(f"""
 <div style="display:flex;align-items:center;padding:5px 8px;background:{_oa_zebra};
-     border-bottom:1px solid #eef0f3;font-size:12.5px;">
-  <div style="width:230px;flex-shrink:0;display:flex;align-items:center;gap:6px;">
-    <span style="color:{_oa_renk};font-weight:700;">{_oa_ikon2_e} {_oa_tur_kisa}</span>
-    <span style="font-weight:700;color:#0f172a;">{_obr2.get('icerik','')}</span>
-    <span style="color:#94a3b8;font-size:10.5px;">{_oa_saat_es}</span>
-  </div>
-  <div style="flex:1;color:#64748b;font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{str(_obr2.get('gonderim_bilgisi','') or '')[:70]}</div>
+     border-bottom:1px solid #eef0f3;font-size:12.5px;height:38px;">
+  <span style="color:{_oa_renk};font-weight:700;margin-right:6px;">{_oa_ikon2_e} {_oa_tur_kisa}</span>
+  <span style="font-weight:700;color:#0f172a;margin-right:6px;">{_obr2.get('icerik','')}</span>
+  <span style="color:#94a3b8;font-size:10.5px;">{_oa_saat_es}</span>
 </div>""", unsafe_allow_html=True)
-
-                    _oc3, _oc3b, _oc4 = st.columns([2.4, 2.4, 1.0])
                     _oa_secim = _oc3.selectbox("Cari", _oa_opts, key=f"oa_sec_{_obr2['id']}", label_visibility="collapsed")
                     _oa_manuel_ad = _oc3b.text_input("Manuel", key=f"oa_manuel_{_obr2['id']}", placeholder="Firma/isim yazıp kaydet...", label_visibility="collapsed")
                     if _oc4.button("💾 Kaydet", key=f"oa_bagla_{_obr2['id']}", use_container_width=True):
