@@ -1562,6 +1562,19 @@ _sayfa_adlari = {
 _aktif_sayfa = st.session_state.get("aktif_tab","liste")
 _sayfa_adi = _sayfa_adlari.get(_aktif_sayfa, _aktif_sayfa)
 st.markdown(f"<script>document.title='MWCRMPRO | {_sayfa_adi}'</script>", unsafe_allow_html=True)
+# ── SON AKTİF SAYFAYI localStorage'A YAZ — oturum yenilendiğinde/yeniden girişte kaldığı yerden devam etsin
+st.markdown(f"""<script>
+try{{
+  var _mwRaw = localStorage.getItem('mwcrm_oturum');
+  if(_mwRaw){{
+    var _mwObj = JSON.parse(_mwRaw);
+    if(_mwObj.sayfa !== {json.dumps(_aktif_sayfa)}){{
+      _mwObj.sayfa = {json.dumps(_aktif_sayfa)};
+      localStorage.setItem('mwcrm_oturum', JSON.stringify(_mwObj));
+    }}
+  }}
+}}catch(e){{}}
+</script>""", unsafe_allow_html=True)
 st.markdown("""<style>
 section[data-testid="stSidebar"]{transform:none!important;display:flex!important;}
 button[data-testid="collapsedControl"]{display:none!important;}
@@ -2596,9 +2609,12 @@ if not st.session_state.get("giris", False):
                         _ag_yetki_val = str(_ag_row.get("yetkiler","tam") or "tam")
                         _ag_yetki = "tam" if _ag_yetki_val == "tam" else _agj.loads(_ag_yetki_val)
                     except: _ag_yetki = "tam"
+                    # Kaldığı sayfadan devam etsin — localStorage'da kayıtlı son sayfa geçerliyse onu kullan
+                    _ag_sayfa_kayitli = str(_ag_veri.get("sayfa","") or "")
+                    _ag_hedef_sayfa = _ag_sayfa_kayitli if _ag_sayfa_kayitli in _sayfa_adlari_cfg else "liste"
                     st.session_state.update({
                         "giris": True, "kullanici": _ag_kul, "kullanici_ad": _ag_kul,
-                        "rol": _ag_rol, "aktif_tab": "liste",
+                        "rol": _ag_rol, "aktif_tab": _ag_hedef_sayfa,
                         "_yetki_listesi": _ag_yetki,
                         "_mobil_mod": _ag_mob, "_ekran_kontrol": True,
                         "giris_cihaz": "mobil" if _ag_mob else "masaustu",
@@ -2621,6 +2637,26 @@ if not st.session_state.get("giris", False):
       window.parent.location.replace(url.toString());
     }
   }catch(e){}
+})();
+</script>""", unsafe_allow_html=True)
+
+    # ── ÇOKLU SEKME SENKRONİZASYONU ──────────────────────────────────────────
+    # Aynı tarayıcıda birden fazla sekme açıksa: birinde şifre girilip giriş yapılınca
+    # diğer sekmeler (oturumu düşmüş / giriş ekranında bekleyen) localStorage değişikliğini
+    # algılayıp otomatik olarak aynı oturuma geçer — tekrar şifre girmeye gerek kalmaz.
+    st.markdown("""<script>
+(function(){
+  if(window.__mwcrmStorListener) return;
+  window.__mwcrmStorListener = true;
+  window.addEventListener('storage', function(e){
+    try{
+      if(e.key === 'mwcrm_oturum' && e.newValue){
+        var url = new URL(window.parent.location.href);
+        url.searchParams.set('_ag', e.newValue);
+        window.parent.location.replace(url.toString());
+      }
+    }catch(err){}
+  });
 })();
 </script>""", unsafe_allow_html=True)
 
