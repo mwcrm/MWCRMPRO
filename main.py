@@ -9057,8 +9057,32 @@ elif aktif == "otomatik_arama":
             except Exception as _oa_kis_e:
                 _oa_kis_hata = str(_oa_kis_e)
 
+            # ── Yetkililer (cari_aciklamalar içinde ##YETKILI## etiketiyle saklanan kişiler) ──
+            # Bu kişiler doğrudan bir cari_id'ye bağlı; numaraları eşleşirse direkt o cariye bağlanır.
+            _oa_yet_n = 0
+            try:
+                import json as _oayj2
+                _oa_yet_ham2 = pd.DataFrame(_oa_sb.table("cari_aciklamalar").select("cari_id,cari_adi,aciklama").execute().data) if _oa_sb else pd.DataFrame()
+                if not _oa_yet_ham2.empty:
+                    for _, _yr2 in _oa_yet_ham2.iterrows():
+                        _metin2 = str(_yr2.get("aciklama","") or "")
+                        if _metin2.startswith("##YETKILI##"):
+                            try:
+                                _kayit2 = _oayj2.loads(_metin2[len("##YETKILI##"):])
+                            except Exception:
+                                continue
+                            _firma_adi2 = _yr2.get("cari_adi","") or ""
+                            _cari_id2 = _yr2.get("cari_id")
+                            for _telalan2 in ("gsm", "sabit_tel"):
+                                for _yt in _oa_norm_tel_adaylari(_kayit2.get(_telalan2, "")):
+                                    if _cari_id2 is not None:
+                                        _oa_tel_harita[_yt] = (_cari_id2, _firma_adi2)
+                                        _oa_yet_n += 1
+            except Exception:
+                pass
+
             _oa_kis_n = len(_oa_kisiler_tel_harita)
-            _oa_ilerleme.progress(70, text=f"📞 Telefon Kişiler tarandı ({_oa_kis_n} numara) — {len(_oa_bekleyen)} kayıt eşleştiriliyor...")
+            _oa_ilerleme.progress(70, text=f"📞 Telefon Kişiler ({_oa_kis_n}) + Yetkililer ({_oa_yet_n}) tarandı — {len(_oa_bekleyen)} kayıt eşleştiriliyor...")
 
             _oa_eslesen = 0
             _oa_eslesen_kisi = 0
@@ -9102,7 +9126,7 @@ elif aktif == "otomatik_arama":
                 st.cache_data.clear()
                 st.rerun()
             else:
-                st.info(f"ℹ️ Bu turda otomatik eşleşme bulunamadı. Taranan: {len(_oa_caridf)} cari kart, {_oa_kis_n} rehber numarası, {len(_oa_bekleyen)} bekleyen kayıt.")
+                st.info(f"ℹ️ Bu turda otomatik eşleşme bulunamadı. Taranan: {len(_oa_caridf)} cari kart, {_oa_kis_n} rehber numarası, {_oa_yet_n} yetkili numarası, {len(_oa_bekleyen)} bekleyen kayıt.")
 
         _oa_es_acik_key = "_oa_eslesmeyen_acik"
         if _oa_es_acik_key not in st.session_state:
