@@ -1501,9 +1501,26 @@ def giris_ekrani():
                     "giris_cihaz":      "mobil" if _mobil_secildi else "masaustu",
                 })
                 # localStorage'a kaydet — sayfa yenilenince otomatik giriş
+                # Önceki oturumda kayıtlı 'sayfa' bilgisi varsa koru (kaldığı sayfadan devam etsin),
+                # sonra _ag akışı üzerinden yönlendir (bu akış zaten kayıtlı sayfayı geri yükler).
                 _ls_veri = json.dumps({"kullanici": kullanici, "sifre": sifre, "mobil": _mobil_secildi})
                 st.markdown(f"""<script>
-try{{localStorage.setItem('mwcrm_oturum', {repr(_ls_veri)});}}catch(e){{}}
+(function(){{
+  try{{
+    var _prevRaw = localStorage.getItem('mwcrm_oturum');
+    var _prevSayfa = '';
+    if(_prevRaw){{
+      try{{ var _p = JSON.parse(_prevRaw); _prevSayfa = _p.sayfa || ''; }}catch(e){{}}
+    }}
+    var _newObj = JSON.parse({json.dumps(_ls_veri)});
+    if(_prevSayfa){{ _newObj.sayfa = _prevSayfa; }}
+    var _newStr = JSON.stringify(_newObj);
+    localStorage.setItem('mwcrm_oturum', _newStr);
+    var url = new URL(window.parent.location.href);
+    url.searchParams.set('_ag', _newStr);
+    window.parent.location.replace(url.toString());
+  }}catch(e){{}}
+}})();
 </script>""", unsafe_allow_html=True)
                 # Giriş logla
                 try:
