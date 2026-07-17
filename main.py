@@ -8655,14 +8655,20 @@ elif aktif == "otomatik_arama":
     @st.cache_data(ttl=60)
     def _oa_isim_haritasi():
         _harita = {}
+        def _ekle(numara, etiket, sadece_bos_ise=False):
+            if not etiket:
+                return
+            for _n in _oa_norm_tel_adaylari(numara):
+                if sadece_bos_ise and _n in _harita:
+                    continue
+                _harita[_n] = etiket
         try:
             _oa_kis = db_read("kisiler")
             if not _oa_kis.empty:
                 for _, _kr in _oa_kis.iterrows():
-                    _n = _oa_norm_tel(_kr.get("telefon", ""))
-                    if _n:
-                        _ad = f"{_kr.get('ad','')} {_kr.get('soyad','')}".strip()
-                        _harita[_n] = _ad + (f" ({_kr.get('firma','')})" if _kr.get("firma") else "")
+                    _ad = f"{_kr.get('ad','')} {_kr.get('soyad','')}".strip()
+                    _etiket = _ad + (f" ({_kr.get('firma','')})" if _kr.get("firma") else "")
+                    _ekle(_kr.get("telefon", ""), _etiket)
         except Exception:
             pass
         try:
@@ -8673,9 +8679,7 @@ elif aktif == "otomatik_arama":
                     _oa_car = _oa_car[_oa_car["silindi"].fillna(0).astype(str).isin(["0", "0.0", "False", "false"])]
                 for _, _cr in _oa_car.iterrows():
                     for _telalan in ("gsm", "sabit"):
-                        _n = _oa_norm_tel(_cr.get(_telalan, ""))
-                        if _n and _n not in _harita:
-                            _harita[_n] = str(_cr.get("firma", ""))
+                        _ekle(_cr.get(_telalan, ""), str(_cr.get("firma", "")), sadece_bos_ise=True)
         except Exception:
             pass
         # ── Yetkililer (cari_aciklamalar içinde ##YETKILI## etiketiyle saklanan kişiler) ──
@@ -8695,9 +8699,7 @@ elif aktif == "otomatik_arama":
                         _kisi_adi = _kayit.get("ad","")
                         _etiket = f"{_kisi_adi} ({_firma_adi})" if _kisi_adi else _firma_adi
                         for _telalan in ("gsm", "sabit_tel"):
-                            _n = _oa_norm_tel(_kayit.get(_telalan, ""))
-                            if _n:
-                                _harita[_n] = _etiket
+                            _ekle(_kayit.get(_telalan, ""), _etiket)
         except Exception:
             pass
         return _harita
@@ -8933,17 +8935,6 @@ elif aktif == "otomatik_arama":
                             _oa_isim_g = _oa_musteri_adi_db_g or _oa_bulunan_g or "Kayıtsız numara"
                             _oa_ek_g = _oa_r.get("gonderim_bilgisi","") or ""
                             _oa_rid = _oa_r.get("id")
-                            # ── TEŞHİS: eşleşmeyen numaranın HAM halini (gizli boşluk/karakterler dahil) göster ──
-                            _oa_teshis_g = ""
-                            if _oa_admin_mi and _oa_isim_g == "Kayıtsız numara":
-                                import html as _oahtml
-                                _oa_adaylar_g = _oa_norm_tel_adaylari(_oa_numara_g)
-                                _oa_teshis_g = (
-                                    f"<div style='font-family:monospace;font-size:10.5px;color:#dc2626;"
-                                    f"background:#fef2f2;padding:2px 6px;border-radius:4px;margin-top:2px;'>"
-                                    f"HAM: {_oahtml.escape(repr(_oa_numara_g))} · ADAY: {_oahtml.escape(str(_oa_adaylar_g))}"
-                                    f"</div>"
-                                )
                             if _oa_admin_mi:
                                 _cc1, _cc2 = st.columns([0.4, 9.6])
                                 with _cc1:
@@ -8956,7 +8947,7 @@ elif aktif == "otomatik_arama":
   <span style="margin:0 4px;">{ikon_k}</span>
   <span style="font-weight:600;color:#0f172a;">{_oa_numara_g}</span>
   <span style="color:#94a3b8;float:right;text-align:right;">{_oa_isim_g}<br><span style="font-size:11px;">{_oa_ek_g[:40]}</span></span>
-</div>{_oa_teshis_g}""", unsafe_allow_html=True)
+</div>""", unsafe_allow_html=True)
                             else:
                                 st.markdown(f"""
 <div style="padding:4px 8px;border-bottom:1px solid #e2e8f0;font-size:12.5px;">
@@ -9011,12 +9002,13 @@ elif aktif == "otomatik_arama":
         # ── Bekleyenleri otomatik eşleştirmeyi dene ──
         if not _oa_bekleyen.empty:
             _oa_caridf = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
+            if not _oa_caridf.empty and "silindi" in _oa_caridf.columns:
+                _oa_caridf = _oa_caridf[_oa_caridf["silindi"].fillna(0).astype(str).isin(["0", "0.0", "False", "false"])]
             _oa_tel_harita = {}
             if not _oa_caridf.empty:
                 for _, _ocr in _oa_caridf.iterrows():
                     for _oalan in ["gsm", "sabit"]:
-                        _ot = _oa_norm_tel(_ocr.get(_oalan, ""))
-                        if _ot:
+                        for _ot in _oa_norm_tel_adaylari(_ocr.get(_oalan, "")):
                             _oa_tel_harita[_ot] = (_ocr.get("id"), _ocr.get("firma",""))
 
             # ── "📞 Telefon Kişiler" (rehber) tablosunu da eşleştirmeye dahil et ──
@@ -9029,15 +9021,16 @@ elif aktif == "otomatik_arama":
                     _oa_cari_isim_harita = {str(r.get("firma","")).strip().upper(): (r.get("id"), r.get("firma",""))
                                              for _, r in _oa_caridf.iterrows()} if not _oa_caridf.empty else {}
                     for _, _okr in _oa_kisdf.iterrows():
-                        _okt = _oa_norm_tel(_okr.get("telefon",""))
-                        if not _okt:
+                        _okt_adaylar = _oa_norm_tel_adaylari(_okr.get("telefon",""))
+                        if not _okt_adaylar:
                             continue
                         _ok_ad = f"{_okr.get('ad','')} {_okr.get('soyad','')}".strip()
                         _ok_firma = str(_okr.get("firma","") or "")
-                        _oa_kisiler_tel_harita[_okt] = (_ok_ad, _ok_firma)
-                        # Kişinin firması bir cari kartla eşleşiyorsa, numarayı doğrudan o cariye bağla
-                        if _okt not in _oa_tel_harita and _ok_firma.strip().upper() in _oa_cari_isim_harita:
-                            _oa_tel_harita[_okt] = _oa_cari_isim_harita[_ok_firma.strip().upper()]
+                        for _okt in _okt_adaylar:
+                            _oa_kisiler_tel_harita[_okt] = (_ok_ad, _ok_firma)
+                            # Kişinin firması bir cari kartla eşleşiyorsa, numarayı doğrudan o cariye bağla
+                            if _okt not in _oa_tel_harita and _ok_firma.strip().upper() in _oa_cari_isim_harita:
+                                _oa_tel_harita[_okt] = _oa_cari_isim_harita[_ok_firma.strip().upper()]
             except Exception:
                 pass
 
