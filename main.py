@@ -9010,6 +9010,59 @@ elif aktif == "otomatik_arama":
             st.session_state["_oa_eslesmeyen_acik"] = True
             st.rerun()
 
+    # ── 🔍 NUMARA SORGULA: herhangi bir numarayı 3 kaynakta da (Cari/Kişiler/Yetkili) arayıp
+    # tam olarak nerede bulunduğunu (veya bulunmadığını) kanıtlarıyla gösterir ──
+    with st.expander("🔍 Bir numarayı 3 kaynakta da sorgula (kanıt aracı)"):
+        _oa_sorgu_num = st.text_input("Numara yaz (boşluk/tire/+90 fark etmez):", key="oa_sorgu_num_input", placeholder="Örn: 5307904329")
+        if st.button("Sorgula", key="oa_sorgu_btn") and _oa_sorgu_num.strip():
+            _oa_sorgu_adaylar = _oa_norm_tel_adaylari(_oa_sorgu_num)
+            st.caption(f"Aranan adaylar: {_oa_sorgu_adaylar}")
+            _oa_sonuc_bulundu = False
+            # 1) Cari Kartlar
+            try:
+                _oa_sq_car = db_read("cari_kartlar")
+                if not _oa_sq_car.empty and "silindi" in _oa_sq_car.columns:
+                    _oa_sq_car = _oa_sq_car[_oa_sq_car["silindi"].fillna(0).astype(str).isin(["0", "0.0", "False", "false"])]
+                for _, _sr in _oa_sq_car.iterrows():
+                    for _tk in ("gsm", "sabit"):
+                        for _sa in _oa_norm_tel_adaylari(_sr.get(_tk, "")):
+                            if _sa in _oa_sorgu_adaylar:
+                                st.success(f"✅ CARİ KARTLAR'da bulundu → [{_sr.get('id')}] {_sr.get('firma')} — alan: {_tk} — ham değer: '{_sr.get(_tk)}'")
+                                _oa_sonuc_bulundu = True
+            except Exception as _oa_sq_e1:
+                st.error(f"Cari Kartlar sorgu hatası: {_oa_sq_e1}")
+            # 2) Kişiler (rehber)
+            try:
+                _oa_sq_kis = db_read("kisiler")
+                for _, _sr2 in _oa_sq_kis.iterrows():
+                    for _sa2 in _oa_norm_tel_adaylari(_sr2.get("telefon", "")):
+                        if _sa2 in _oa_sorgu_adaylar:
+                            _ad_sq = f"{_sr2.get('ad','')} {_sr2.get('soyad','')}".strip()
+                            st.success(f"✅ TELEFON KİŞİLER'de bulundu → {_ad_sq or '(isimsiz)'} ({_sr2.get('firma','')}) — ham değer: '{_sr2.get('telefon')}'")
+                            _oa_sonuc_bulundu = True
+            except Exception as _oa_sq_e2:
+                st.error(f"Kişiler sorgu hatası: {_oa_sq_e2}")
+            # 3) Yetkililer
+            try:
+                import json as _oayj3
+                _oa_sq_yet = pd.DataFrame(_oa_sb.table("cari_aciklamalar").select("cari_id,cari_adi,aciklama").execute().data) if _oa_sb else pd.DataFrame()
+                for _, _sr3 in _oa_sq_yet.iterrows():
+                    _m3 = str(_sr3.get("aciklama","") or "")
+                    if _m3.startswith("##YETKILI##"):
+                        try:
+                            _k3 = _oayj3.loads(_m3[len("##YETKILI##"):])
+                        except Exception:
+                            continue
+                        for _tk3 in ("gsm", "sabit_tel"):
+                            for _sa3 in _oa_norm_tel_adaylari(_k3.get(_tk3, "")):
+                                if _sa3 in _oa_sorgu_adaylar:
+                                    st.success(f"✅ YETKİLİLER'de bulundu → {_k3.get('ad','')} ({_sr3.get('cari_adi','')}) — ham değer: '{_k3.get(_tk3)}'")
+                                    _oa_sonuc_bulundu = True
+            except Exception as _oa_sq_e3:
+                st.error(f"Yetkililer sorgu hatası: {_oa_sq_e3}")
+            if not _oa_sonuc_bulundu:
+                st.warning("❌ Bu numara Cari Kartlar, Kişiler ve Yetkililer'in HİÇBİRİNDE bulunamadı. Yani gerçekten sistemde kayıtlı değil — telefon rehberinde olabilir ama CRM'e hiç girilmemiş.")
+
     # ================== EŞLEŞTİRME MOTORU (mevcut, dokunulmadı) ==================
     if _oa_ham.empty:
         pass
