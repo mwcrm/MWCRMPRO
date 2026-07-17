@@ -8631,14 +8631,26 @@ elif aktif == "otomatik_arama":
     st.caption("MacroDroid'den gelen arama/SMS kayıtları burada işlenir — telefon numarası rehberde ya da carilerde kayıtlıysa ismi otomatik gösterilir.")
 
     def _oa_norm_tel(s):
-        # Rakamları tek parça birleştirmek yerine, metindeki ayrı rakam öbeklerini bulup
-        # 7+ haneli İLK öbeği (gerçek telefon numarası) alıyoruz. Böylece "icerik" alanında
-        # numaranın yanına tarih/saat gibi ek rakamlar karışmış olsa bile eşleşme bozulmuyor.
+        _d = _oare.sub(r"\D", "", str(s or ""))
+        return _d[-10:] if len(_d) >= 7 else ""
+
+    def _oa_norm_tel_adaylari(s):
+        """Eşleşme için birden çok normalize adayı üretir:
+        1) Klasik: tüm rakamları birleştir, son 10 haneyi al (boşluklu/tireli numaralar için doğru).
+        2) Öbek bazlı: metindeki 7+ haneli AYRI rakam öbeklerini dener (numaraya tarih/saat gibi
+           başka rakamlar karışmışsa bunları birbirine karıştırmaz).
+        """
         _s = str(s or "")
+        _adaylar = []
+        _klasik = _oa_norm_tel(_s)
+        if _klasik:
+            _adaylar.append(_klasik)
         for _parca in _oare.findall(r"\d+", _s):
             if len(_parca) >= 7:
-                return _parca[-10:]
-        return ""
+                _a = _parca[-10:]
+                if _a not in _adaylar:
+                    _adaylar.append(_a)
+        return _adaylar
 
     @st.cache_data(ttl=60)
     def _oa_isim_haritasi():
@@ -8693,8 +8705,10 @@ elif aktif == "otomatik_arama":
     _OA_ISIM_HARITA = _oa_isim_haritasi()
 
     def _oa_isim_bul(numara):
-        _n = _oa_norm_tel(numara)
-        return _OA_ISIM_HARITA.get(_n, "")
+        for _aday in _oa_norm_tel_adaylari(numara):
+            if _aday in _OA_ISIM_HARITA:
+                return _OA_ISIM_HARITA[_aday]
+        return ""
 
     try:
         _oa_sb = get_sb_client()
@@ -8948,6 +8962,13 @@ elif aktif == "otomatik_arama":
         with _oa_k4:
             _oa_kolon_render("gidensms", "GİDEN SMS", _oa_giden_sms, "💬")
 
+    def _oa_harita_bul(numara, harita):
+        """Verilen harita (dict) içinde, numaranın tüm normalize adaylarını sırayla dener."""
+        for _aday in _oa_norm_tel_adaylari(numara):
+            if _aday in harita:
+                return harita[_aday]
+        return None
+
     st.markdown("---")
 
     # ================== EŞLEŞTİRME MOTORU (mevcut, dokunulmadı) ==================
@@ -8992,9 +9013,9 @@ elif aktif == "otomatik_arama":
 
             _oa_eslesen = 0
             for _, _obr in _oa_bekleyen.iterrows():
-                _gelen_tel = _oa_norm_tel(_obr.get("icerik",""))
-                if _gelen_tel and _gelen_tel in _oa_tel_harita:
-                    _oa_mid, _oa_mfirma = _oa_tel_harita[_gelen_tel]
+                _oa_eslesme = _oa_harita_bul(_obr.get("icerik",""), _oa_tel_harita)
+                if _oa_eslesme:
+                    _oa_mid, _oa_mfirma = _oa_eslesme
                     _oa_ikon_not, _oa_baslik_not = _oa_tur_bilgi(_obr.get("islem_turu"))
                     try:
                         _oa_sb.table("islem_kaydi").update({"musteri_id": int(_oa_mid), "musteri_adi": _oa_mfirma}).eq("id", int(_obr["id"])).execute()
@@ -9022,8 +9043,7 @@ elif aktif == "otomatik_arama":
             _oa_renk_harita = {"Otomatik Arama": ("#2563eb", "#eff6ff"), "Otomatik SMS": ("#16a34a", "#f0fdf4"), "Otomatik Email": ("#ea580c", "#fff7ed")}
 
             for _, _obr2 in _oa_bekleyen.iterrows():
-                _obr2_tel_norm = _oa_norm_tel(_obr2.get("icerik",""))
-                _obr2_kisi = _oa_kisiler_tel_harita.get(_obr2_tel_norm) if '_oa_kisiler_tel_harita' in dir() else None
+                _obr2_kisi = _oa_harita_bul(_obr2.get("icerik",""), _oa_kisiler_tel_harita) if '_oa_kisiler_tel_harita' in dir() else None
                 _oa_ikon2_e, _oa_ikon2_b = _oa_tur_bilgi(_obr2.get("islem_turu"))
                 _oa_tur_kisa = _oa_ikon2_b.replace('Otomatik ','').replace(' kaydı','')
                 _oa_renk, _oa_bg = _oa_renk_harita.get(_obr2.get("islem_turu"), ("#64748b","#f8fafc"))
