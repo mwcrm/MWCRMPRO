@@ -9061,6 +9061,7 @@ elif aktif == "otomatik_arama":
             _oa_ilerleme.progress(70, text=f"📞 Telefon Kişiler tarandı ({_oa_kis_n} numara) — {len(_oa_bekleyen)} kayıt eşleştiriliyor...")
 
             _oa_eslesen = 0
+            _oa_eslesen_kisi = 0
             for _ix_e, (_, _obr) in enumerate(_oa_bekleyen.iterrows()):
                 _oa_eslesme = _oa_harita_bul(_obr.get("icerik",""), _oa_tel_harita)
                 if _oa_eslesme:
@@ -9076,10 +9077,28 @@ elif aktif == "otomatik_arama":
                         _oa_eslesen += 1
                     except Exception:
                         pass
+                else:
+                    # Cari kartla eşleşmedi — ama numara Telefon Kişiler (rehber)'de kayıtlıysa
+                    # yine de o kişinin adı/firmasıyla otomatik etiketle (cari bağlantısı şart değil)
+                    _oa_kisi_e = _oa_harita_bul(_obr.get("icerik",""), _oa_kisiler_tel_harita)
+                    if _oa_kisi_e:
+                        _oa_kad_e, _oa_kfirma_e = _oa_kisi_e
+                        _oa_etiket_e = f"{_oa_kad_e} ({_oa_kfirma_e})" if (_oa_kad_e and _oa_kfirma_e) else (_oa_kad_e or _oa_kfirma_e)
+                        if _oa_etiket_e:
+                            try:
+                                _oa_sb.table("islem_kaydi").update({"musteri_adi": _oa_etiket_e}).eq("id", int(_obr["id"])).execute()
+                                _oa_eslesen_kisi += 1
+                            except Exception:
+                                pass
                 _oa_ilerleme.progress(70 + int(30 * (_ix_e + 1) / max(len(_oa_bekleyen), 1)), text=f"⚙️ Eşleştiriliyor... ({_ix_e + 1}/{len(_oa_bekleyen)})")
             _oa_ilerleme.empty()
-            if _oa_eslesen:
-                st.success(f"✅ {_oa_eslesen} arama otomatik eşleştirildi ve not olarak düşüldü.")
+            if _oa_eslesen or _oa_eslesen_kisi:
+                _oa_msg_parts = []
+                if _oa_eslesen:
+                    _oa_msg_parts.append(f"{_oa_eslesen} kayıt cariye bağlandı")
+                if _oa_eslesen_kisi:
+                    _oa_msg_parts.append(f"{_oa_eslesen_kisi} kayıt rehberdeki kişiyle etiketlendi")
+                st.success("✅ " + " · ".join(_oa_msg_parts) + ".")
                 st.cache_data.clear()
                 st.rerun()
             else:
