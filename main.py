@@ -6,7 +6,15 @@ import os
 import io
 import re
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone as _dt_timezone
+
+# ── TÜRKİYE SAATİ ────────────────────────────────────────────────────────────
+# Streamlit Cloud sunucuları UTC saat dilimindedir; _tr_simdi()/pd.Timestamp(_tr_simdi())
+# doğrudan çağrıldığında Türkiye saatinden 3 saat geride kalıyordu. Türkiye 2016'dan beri
+# yaz saati uygulamıyor, sabit UTC+3. Tüm "şu an" çağrıları bu fonksiyona yönlendirildi.
+_TR_TZ = _dt_timezone(timedelta(hours=3))
+def _tr_simdi():
+    return datetime.now(_TR_TZ).replace(tzinfo=None)
 
 # ── DAĞITIM PLANI (il/ilçe/gün/süre) — müşteri portalında kullanılır ──────────
 DAGITIM_PLANI = [
@@ -828,7 +836,7 @@ def otomatik_yedek():
     try:
         if not os.path.exists("mw_crm.db"):
             return
-        bugun = datetime.now().strftime("%Y-%m-%d")
+        bugun = _tr_simdi().strftime("%Y-%m-%d")
         yedek_klasor = "backups"
         os.makedirs(yedek_klasor, exist_ok=True)
         db_yedek = os.path.join(yedek_klasor, f"mw_crm_{bugun}.db")
@@ -1229,7 +1237,7 @@ div[data-testid="stMainBlockContainer"] {
                     "alici_il": _mp_a_il, "alici_ilce": _mp_a_ilce, "alici_firma": _mp_alici_firma,
                     "km": _mp_km, "adet": _mp_adet, "en": _mp_en, "boy": _mp_boy, "yukseklik": _mp_yuk, "kilo": _mp_kg,
                     "desi": round(_mp_desi,1), "toplam_kg": round(_mp_toplam_kg,1), "fiyat": round(_mp_hesaplanan_fiyat,2),
-                    "fiyat_kaynak": _mp_kaynak, "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                    "fiyat_kaynak": _mp_kaynak, "tarih": _tr_simdi().strftime("%d/%m/%Y %H:%M"),
                 }
                 _mp_aktif_json = _mpj.dumps(_mp_aktif_veri, sort_keys=True, ensure_ascii=False)
                 if st.session_state.get("_mp_son_kaydedilen_json") != _mp_aktif_json:
@@ -1368,7 +1376,7 @@ div[data-testid="stMainBlockContainer"] {
                             "adet": _mp_adet, "en": _mp_en, "boy": _mp_boy, "yukseklik": _mp_yuk, "kilo": _mp_kg,
                             "desi": round(_mp_desi,1), "toplam_kg": round(_mp_toplam_kg,1), "km": _mp_km,
                             "fiyat": round(_mp_hesaplanan_fiyat,2), "fiyat_kaynak": _mp_kaynak,
-                            "tarih": datetime.now().strftime("%d/%m/%Y %H:%M"), "durum": "beklemede",
+                            "tarih": _tr_simdi().strftime("%d/%m/%Y %H:%M"), "durum": "beklemede",
                         }
                         # Aktif taslak satırı varsa onu ihbara ÇEVİR — mükerrer satır oluşmasın
                         _mp_mevcut_id = st.session_state.get("_mp_aktif_sorgu_id")
@@ -3383,7 +3391,7 @@ if aktif == "yeni":
                 st.rerun()
             else:
                 _yeni_cari_veri = {
-                    "tarih": datetime.now().isoformat(),
+                    "tarih": _tr_simdi().isoformat(),
                     "firma": firma, "rakip_firma": rakip_firma, "yetkili": yetkili, "gsm": gsm,
                     "sabit": sabit, "email": email, "adres": adres,
                     "ilce": _ilce_kayit, "il": _il_kayit, "durum": _durum_kayit,
@@ -6038,7 +6046,7 @@ elif aktif == "kullanici":
             else:
                 km1,km2,km3 = st.columns(3)
                 km1.metric("Toplam İşlem", len(_df_klog))
-                _bugun_k = len(_df_klog[pd.to_datetime(_df_klog["tarih"],errors="coerce").dt.date == pd.Timestamp.now().date()])
+                _bugun_k = len(_df_klog[pd.to_datetime(_df_klog["tarih"],errors="coerce").dt.date == pd.Timestamp(_tr_simdi()).date()])
                 km2.metric("Bugün", _bugun_k)
                 km3.metric("Son Giriş", str(_df_klog[_df_klog["islem"]=="GİRİŞ_YAPILDI"]["tarih"].max())[:16] if "GİRİŞ_YAPILDI" in _df_klog["islem"].values else "—")
                 st.dataframe(
@@ -6301,7 +6309,7 @@ elif aktif == "kullanici":
             lm1,lm2,lm3,lm4,lm5 = st.columns(5)
             lm1.metric("Toplam İşlem", len(_df_log))
             lm2.metric("Aktif Kullanıcı", _df_log["kullanici"].nunique())
-            _bugun = pd.Timestamp.now().date()
+            _bugun = pd.Timestamp(_tr_simdi()).date()
             _bugun_log = _df_log[pd.to_datetime(_df_log["tarih"],errors="coerce").dt.date == _bugun]
             lm3.metric("Bugün", len(_bugun_log))
             _giris_say = len(_df_log[_df_log["islem"]=="GİRİŞ_YAPILDI"])
@@ -6352,7 +6360,7 @@ elif aktif == "kullanici":
             st.download_button(
                 "📥 Log Excel İndir",
                 data=_buf_log,
-                file_name=f"kullanici_log_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                file_name=f"kullanici_log_{pd.Timestamp(_tr_simdi()).strftime('%Y%m%d_%H%M')}.xlsx",
                 use_container_width=True
             )
 
@@ -6363,7 +6371,7 @@ elif aktif == "kullanici":
                 if st.button("🗑️ Eski Logları Sil", type="primary"):
                     try:
                         from datetime import timedelta
-                        _esik = (pd.Timestamp.now() - timedelta(days=int(_sil_gun))).isoformat()
+                        _esik = (pd.Timestamp(_tr_simdi()) - timedelta(days=int(_sil_gun))).isoformat()
                         _sb_log.table("kullanici_log").delete().lt("tarih", _esik).execute()
                         st.success(f"✅ {_sil_gun} günden eski loglar silindi!")
                         st.rerun()
@@ -6602,7 +6610,7 @@ function updateBot(v){{
             st.markdown("### 🚀 Sürüm Yönetimi")
 
             _sb_sv = get_sb_client()
-            _simdi = pd.Timestamp.now().strftime("%d.%m.%Y %H:%M")
+            _simdi = pd.Timestamp(_tr_simdi()).strftime("%d.%m.%Y %H:%M")
 
             # Supabase'den stable bilgilerini çek
             try:
@@ -7372,7 +7380,7 @@ elif aktif == "rapor":
                         _dg2 = _dg.copy(); _dg2["Detay"] = _dg2["Detay"].astype(str).str[:80]
                         st.dataframe(_dg2[["Tarih","Müşteri","Kanal","Numara/Email","Gönderen","Detay"]], use_container_width=True, hide_index=True)
                         _buf=_rio2.BytesIO(); _dg.to_excel(_buf,index=False); _buf.seek(0)
-                        st.download_button("📥 Excel İndir",data=_buf,file_name=f"wa_email_{datetime.now().strftime('%Y%m%d')}.xlsx",use_container_width=True)
+                        st.download_button("📥 Excel İndir",data=_buf,file_name=f"wa_email_{_tr_simdi().strftime('%Y%m%d')}.xlsx",use_container_width=True)
                 except Exception as _e:
                     st.error(f"Hata: {_e}")
 
@@ -8922,7 +8930,7 @@ elif aktif == "otomatik_arama":
                     return
                 _gunler = _oa_gunlere_ayir(df_k)
                 for _gun_str, _gun_df in _gunler.items():
-                    with st.expander(f"📅 {_gun_str} ({len(_gun_df)})", expanded=(_gun_str == pd.Timestamp.now().strftime("%d.%m.%Y"))):
+                    with st.expander(f"📅 {_gun_str} ({len(_gun_df)})", expanded=(_gun_str == pd.Timestamp(_tr_simdi()).strftime("%d.%m.%Y"))):
                         _secililer = []
                         for _, _oa_r in _gun_df.head(50).iterrows():
                             try:
@@ -9072,52 +9080,68 @@ elif aktif == "otomatik_arama":
           else:
             st.caption("Bu numaralar hiçbir müşteri kartındaki GSM/Sabit Tel ile eşleşmedi. Manuel bağlayabilirsin.")
             _oa_carilistesi = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
-            _oa_opts = ["-- Seç --"] + [f"[{int(r['id'])}] {r['firma']}" for _, r in _oa_carilistesi.iterrows()] if not _oa_carilistesi.empty else ["-- Seç --"]
+            _oa_opts = ["-- Cari Seç --"] + [f"[{int(r['id'])}] {r['firma']}" for _, r in _oa_carilistesi.iterrows()] if not _oa_carilistesi.empty else ["-- Cari Seç --"]
 
             _oa_renk_harita = {"Otomatik Arama": ("#2563eb", "#eff6ff"), "Otomatik SMS": ("#16a34a", "#f0fdf4"), "Otomatik Email": ("#ea580c", "#fff7ed")}
 
             _oa_es_gunler = _oa_gunlere_ayir(_oa_bekleyen)
             for _oa_es_gun_str, _oa_es_gun_df in _oa_es_gunler.items():
-              with st.expander(f"📅 {_oa_es_gun_str} ({len(_oa_es_gun_df)})", expanded=(_oa_es_gun_str == pd.Timestamp.now().strftime("%d.%m.%Y"))):
+              with st.expander(f"📅 {_oa_es_gun_str} ({len(_oa_es_gun_df)})", expanded=(_oa_es_gun_str == pd.Timestamp(_tr_simdi()).strftime("%d.%m.%Y"))):
                 for _, _obr2 in _oa_es_gun_df.iterrows():
                     _obr2_kisi = _oa_harita_bul(_obr2.get("icerik",""), _oa_kisiler_tel_harita) if '_oa_kisiler_tel_harita' in dir() else None
                     _oa_ikon2_e, _oa_ikon2_b = _oa_tur_bilgi(_obr2.get("islem_turu"))
                     _oa_tur_kisa = _oa_ikon2_b.replace('Otomatik ','').replace(' kaydı','')
                     _oa_renk, _oa_bg = _oa_renk_harita.get(_obr2.get("islem_turu"), ("#64748b","#f8fafc"))
-                    _oa_isim_gosterim = _obr2_kisi[0] if (_obr2_kisi and _obr2_kisi[0].strip()) else "Kayıtsız numara"
-                    _oa_firma_gosterim = f" · {_obr2_kisi[1]}" if (_obr2_kisi and _obr2_kisi[1]) else ""
 
-                    st.markdown(f"""
-<div style="display:flex;align-items:center;gap:10px;padding:9px 14px;margin-bottom:4px;
-     background:{_oa_bg};border:1px solid {_oa_renk}22;border-radius:10px;">
-  <span style="width:8px;height:8px;border-radius:50%;background:#22c55e;display:inline-block;
-       box-shadow:0 0 0 3px #22c55e33;flex-shrink:0;"></span>
-  <span style="background:{_oa_renk};color:#fff;font-size:11px;font-weight:700;padding:2px 9px;
+                    # ── TEK SATIR: numara/tür bilgisi + cari seç + manuel isim/firma + kaydet ──
+                    _oc0, _oc3, _oc3b, _oc4 = st.columns([2.6, 2.1, 2.1, 1.0])
+                    with _oc0:
+                        st.markdown(f"""
+<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:{_oa_bg};
+     border:1px solid {_oa_renk}22;border-radius:8px;white-space:nowrap;overflow:hidden;">
+  <span style="background:{_oa_renk};color:#fff;font-size:10.5px;font-weight:700;padding:1px 7px;
        border-radius:20px;flex-shrink:0;">{_oa_ikon2_e} {_oa_tur_kisa}</span>
-  <span style="font-weight:700;color:#0f172a;font-size:14px;">{_obr2.get('icerik','')}</span>
-  <span style="color:#64748b;font-size:12.5px;">{_oa_isim_gosterim}{_oa_firma_gosterim}</span>
-  <span style="margin-left:auto;color:#94a3b8;font-size:11.5px;">⏱️ {_obr2.get('gonderim_bilgisi','')}</span>
+  <span style="font-weight:700;color:#0f172a;font-size:13px;">{_obr2.get('icerik','')}</span>
+  <span style="color:#94a3b8;font-size:10.5px;">⏱️ {_obr2.get('gonderim_bilgisi','')}</span>
 </div>""", unsafe_allow_html=True)
-
-                    _oc3, _oc4 = st.columns([3, 1.2])
-                    _oa_secim = _oc3.selectbox("Müşteriye bağla", _oa_opts, key=f"oa_sec_{_obr2['id']}", label_visibility="collapsed")
-                    if _oa_secim != "-- Seç --":
-                        if _oc4.button("🔗 Bağla", key=f"oa_bagla_{_obr2['id']}", use_container_width=True):
+                    _oa_secim = _oc3.selectbox("Cari", _oa_opts, key=f"oa_sec_{_obr2['id']}", label_visibility="collapsed")
+                    _oa_manuel_ad = _oc3b.text_input("Manuel", key=f"oa_manuel_{_obr2['id']}", placeholder="Firma/isim yazıp kaydet...", label_visibility="collapsed")
+                    if _oc4.button("💾 Kaydet", key=f"oa_bagla_{_obr2['id']}", use_container_width=True):
+                        _oa_ikon_not2, _oa_baslik_not2 = _oa_tur_bilgi(_obr2.get("islem_turu"))
+                        if _oa_secim != "-- Cari Seç --":
+                            # Mevcut cari ile eşleştir (var olan davranış — değişmedi)
                             try:
                                 _oa_mid2 = int(_oa_secim.split("]")[0].replace("[","").strip())
                                 _oa_mfirma2 = _oa_secim.split("]")[1].strip()
-                                _oa_ikon_not2, _oa_baslik_not2 = _oa_tur_bilgi(_obr2.get("islem_turu"))
                                 _oa_sb.table("islem_kaydi").update({"musteri_id": _oa_mid2, "musteri_adi": _oa_mfirma2}).eq("id", int(_obr2["id"])).execute()
                                 _oa_sb.table("cari_aciklamalar").insert({
                                     "cari_id": _oa_mid2, "cari_adi": _oa_mfirma2,
                                     "aciklama": f"{_oa_ikon_not2} {_oa_baslik_not2} (manuel bağlandı) — {_obr2.get('gonderim_bilgisi','')}",
                                     "olusturan": "MacroDroid (Manuel Eşleşme)",
                                 }).execute()
-                                st.success("✅ Bağlandı!")
+                                st.success("✅ Cariye bağlandı!")
                                 st.cache_data.clear()
                                 st.rerun()
                             except Exception as _oae2:
                                 st.error(f"Hata: {_oae2}")
+                        elif _oa_manuel_ad.strip():
+                            # Serbest isim/firma girişi: bu kaydı etiketle + numarayı "Telefon Kişiler"e
+                            # ekleyip sonraki aramalarda otomatik eşleşmesini sağla
+                            try:
+                                _oa_manuel_temiz = _oa_manuel_ad.strip()
+                                _oa_sb.table("islem_kaydi").update({"musteri_adi": _oa_manuel_temiz}).eq("id", int(_obr2["id"])).execute()
+                                _oa_norm_kayit = _oa_norm_tel(_obr2.get("icerik",""))
+                                if _oa_norm_kayit:
+                                    _oa_sb.table("kisiler").insert({
+                                        "ad": "", "soyad": "", "telefon": _oa_norm_kayit, "firma": _oa_manuel_temiz,
+                                    }).execute()
+                                st.success("✅ Kaydedildi — sonraki aramalarda otomatik tanınacak.")
+                                st.cache_data.clear()
+                                st.rerun()
+                            except Exception as _oae3:
+                                st.error(f"Hata: {_oae3}")
+                        else:
+                            st.warning("Bir cari seç veya isim/firma yaz.")
 
         with st.expander(f"✅ Eşleşmiş Kayıtlar ({len(_oa_islenen)})", expanded=False):
             for _, _oir in _oa_islenen.head(30).iterrows():
@@ -10558,7 +10582,7 @@ elif aktif == "whatsapp":
             gkayit_firma = gkayit_secim.split("] ")[1] if "] " in gkayit_secim else ""
 
         gc1, gc2 = st.columns(2)
-        gorusme_tarihi = gc1.date_input("Görüşme Tarihi:", value=datetime.now().date(), key="gorusme_tarihi")
+        gorusme_tarihi = gc1.date_input("Görüşme Tarihi:", value=_tr_simdi().date(), key="gorusme_tarihi")
         gorusme_turu = gc2.selectbox("Görüşme Türü:", ["WhatsApp", "Telefon", "Yüz Yüze", "Email", "Diğer"], key="gorusme_turu")
 
         gorusme_notu = st.text_area("Görüşme Notu:", height=150, key="gorusme_notu",
@@ -10608,7 +10632,7 @@ elif aktif == "whatsapp":
                 df_gecmis.to_excel(buf, index=False)
                 buf.seek(0)
                 st.download_button("📥 Excel İndir", data=buf,
-                    file_name=f"wa_gecmis_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                    file_name=f"wa_gecmis_{_tr_simdi().strftime('%Y%m%d')}.xlsx",
                     mime="application/vnd.ms-excel", use_container_width=True)
             else:
                 st.info("Kayıt bulunamadı.")
@@ -11033,7 +11057,7 @@ elif aktif == "randevu":
         if _rand_atanan is not None and "firmalar" in _rand_atanan:
             def _norm_r(s): return str(s or "").strip().upper()
             df_rand_all = df_rand_all[df_rand_all["musteri_adi"].apply(lambda x: _norm_r(x) in _rand_atanan["firmalar"])]
-    bugun_str = datetime.now().strftime("%Y-%m-%d")
+    bugun_str = _tr_simdi().strftime("%Y-%m-%d")
 
     # ── iki sekme ─────────────────────────────────────────────────────────────
     r_tab1, r_tab2, r_tab3, r_tab4, r_tab_rut = st.tabs(["📋 Liste & Düzenle", "➕ Yeni Randevu", "📂 Aşama Sayfaları", "⚙️ Yönetim", "🗺️ Rut Haritası"])
@@ -11068,9 +11092,9 @@ elif aktif == "randevu":
             _devam    = len(df_rand[df_rand["sonuc"]=="Devam Ediyor"]) if "sonuc" in df_rand.columns else 0
             _gidilmedi= len(df_rand[df_rand["sonuc"]=="Gidilmedi"]) if "sonuc" in df_rand.columns else 0
             _bugun    = len(df_rand[df_rand["randevu_tarihi"]==bugun_str]) if "randevu_tarihi" in df_rand.columns else 0
-            _bu_hafta_bitis = (datetime.now()+pd.Timedelta(days=7)).strftime("%Y-%m-%d")
+            _bu_hafta_bitis = (_tr_simdi()+pd.Timedelta(days=7)).strftime("%Y-%m-%d")
             _hafta    = len(df_rand[(df_rand["randevu_tarihi"]>=bugun_str)&(df_rand["randevu_tarihi"]<=_bu_hafta_bitis)]) if "randevu_tarihi" in df_rand.columns else 0
-            _bu_ay_bitis = datetime.now().strftime("%Y-%m-") + "31"
+            _bu_ay_bitis = _tr_simdi().strftime("%Y-%m-") + "31"
             _ay       = len(df_rand[(df_rand["randevu_tarihi"]>=bugun_str)&(df_rand["randevu_tarihi"]<=_bu_ay_bitis)]) if "randevu_tarihi" in df_rand.columns else 0
             _acik_say = len(df_rand[(df_rand["randevu_tarihi"]<bugun_str)&(~df_rand["sonuc"].isin(["Bitti","İptal","Gidilmedi"]))]) if "sonuc" in df_rand.columns else 0
             _basari   = f"%{int(_bitti/_toplam*100)}" if _toplam > 0 else "—"
@@ -11105,10 +11129,10 @@ elif aktif == "randevu":
             elif _aktif_fil == "gidilmedi":_df_detay = df_rand[df_rand["sonuc"]=="Gidilmedi"]
             elif _aktif_fil == "bugun":    _df_detay = df_rand[df_rand["randevu_tarihi"]==bugun_str]
             elif _aktif_fil == "hafta":
-                _hf_bitis = (datetime.now()+pd.Timedelta(days=7)).strftime("%Y-%m-%d")
+                _hf_bitis = (_tr_simdi()+pd.Timedelta(days=7)).strftime("%Y-%m-%d")
                 _df_detay = df_rand[(df_rand["randevu_tarihi"]>=bugun_str)&(df_rand["randevu_tarihi"]<=_hf_bitis)]
             elif _aktif_fil == "ay":
-                _ay_bitis = datetime.now().strftime("%Y-%m-") + "31"
+                _ay_bitis = _tr_simdi().strftime("%Y-%m-") + "31"
                 _df_detay = df_rand[(df_rand["randevu_tarihi"]>=bugun_str)&(df_rand["randevu_tarihi"]<=_ay_bitis)]
             elif _aktif_fil == "acik":
                 _df_detay = df_rand[(df_rand["randevu_tarihi"]<bugun_str)&(~df_rand["sonuc"].isin(["Bitti","İptal","Gidilmedi"]))]
@@ -11355,7 +11379,7 @@ elif aktif == "randevu":
             # Excel
             _buf_r = _rio.BytesIO(); df_rand.to_excel(_buf_r,index=False); _buf_r.seek(0)
             st.download_button("📥 Excel İndir",data=_buf_r,
-                file_name=f"randevular_{datetime.now().strftime('%Y%m%d')}.xlsx",
+                file_name=f"randevular_{_tr_simdi().strftime('%Y%m%d')}.xlsx",
                 use_container_width=True)
 
     with r_tab2:
@@ -11470,7 +11494,7 @@ elif aktif == "randevu":
 """, unsafe_allow_html=True)
 
         if "rand_tarih_deger" not in st.session_state:
-            st.session_state["rand_tarih_deger"] = datetime.now().date()
+            st.session_state["rand_tarih_deger"] = _tr_simdi().date()
 
         _rand_saat_opts = [f"{h:02d}:{m:02d}" for h in range(9,21) for m in (0,15,30,45)]
         _ay_tr_liste = ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"]
@@ -12147,7 +12171,7 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
             _buf_rp = __import__("io").BytesIO()
             df.to_excel(_buf_rp, index=False); _buf_rp.seek(0)
             st.download_button("📥 Excel'e Aktar", data=_buf_rp,
-                file_name=f"cari_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                file_name=f"cari_{_tr_simdi().strftime('%Y%m%d_%H%M')}.xlsx",
                 use_container_width=True, key="liste_excel_indir")
 
 
@@ -12225,7 +12249,7 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
         import json as _rj
 
         _rc1, _rc2, _rc3 = st.columns([1,1,2])
-        _rut_tarih = _rc1.date_input("Tarih", value=datetime.now().date(), key="rut_tarih")
+        _rut_tarih = _rc1.date_input("Tarih", value=_tr_simdi().date(), key="rut_tarih")
         _rut_tem_list = ["Tüm Temsilciler"]
         if not df_rand_all.empty and "temsilci" in df_rand_all.columns:
             _rut_tem_list += sorted(df_rand_all["temsilci"].dropna().unique().tolist())
@@ -12801,7 +12825,7 @@ elif aktif == "admin_rapor":
                 _buf = _ario.BytesIO()
                 _edited.to_excel(_buf, index=False); _buf.seek(0)
                 st.download_button("📥 Excel", data=_buf,
-                    file_name=f"rapor_{pd.Timestamp.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                    file_name=f"rapor_{pd.Timestamp(_tr_simdi()).strftime('%Y%m%d_%H%M')}.xlsx",
                     use_container_width=True)
             with a2:
                 st.download_button("📄 CSV",
@@ -13638,7 +13662,7 @@ elif aktif == "operasyon":
     # ── BAŞLIK ──────────────────────────────────────────────────────────────
     _hdr1, _hdr2 = st.columns([1, 1])
     _hdr1.markdown(
-        f"**Alım İhbar Kaydı** — {datetime.now().strftime('%d.%m.%Y')}"
+        f"**Alım İhbar Kaydı** — {_tr_simdi().strftime('%d.%m.%Y')}"
         + (f" — **{len(_op_df)} kayıt**" if not _op_df.empty else "")
     )
     if _op_admin and _hdr2.button("📦 Günü Kapat / Arşivle", key="op_arsiv"):
@@ -13667,7 +13691,7 @@ elif aktif == "operasyon":
         _op_alici_firmalar = _op_alici_firmalar["firma"].dropna().tolist() if not _op_alici_firmalar.empty else []
 
         _ac1.markdown(f"<span style='font-size:11px;color:var(--text-muted)'>👤 {_op_kul}</span>", unsafe_allow_html=True)
-        _ac2.markdown(f"<span style='font-size:11px;color:var(--text-muted)'>🕐 {datetime.now().strftime('%d.%m %H:%M')}</span>", unsafe_allow_html=True)
+        _ac2.markdown(f"<span style='font-size:11px;color:var(--text-muted)'>🕐 {_tr_simdi().strftime('%d.%m %H:%M')}</span>", unsafe_allow_html=True)
 
         _gon_sec = _ac3.selectbox("Gönderen", _op_gonderen_firmalar, key="op_gon_sec", label_visibility="collapsed")
         _gon_sube = _ac4.text_input("G.Şube", key="op_gon_sube", label_visibility="collapsed", placeholder="Gönderen şube")
@@ -13691,7 +13715,7 @@ elif aktif == "operasyon":
                     if _sb_op3:
                         _sb_op3.table("operasyon_ihbar").insert({
                             "personel": _op_kul,
-                            "tarih": datetime.now().isoformat(),
+                            "tarih": _tr_simdi().isoformat(),
                             "gonderen_musteri": _gon_sec,
                             "gonderen_sube": _gon_sube,
                             "alici_musteri": _ali_sec,
