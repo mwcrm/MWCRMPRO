@@ -8710,6 +8710,20 @@ elif aktif == "otomatik_arama":
                 return _OA_ISIM_HARITA[_aday]
         return ""
 
+    def _oa_tur_bilgi(tur):
+        """İşlem türüne göre (ikon, başlık) döner — not/etiket metinlerinde kullanılır."""
+        _tur = str(tur or "")
+        _ikonlar = {
+            "Otomatik Arama": "📞", "Gelen Arama": "📞", "Giden Arama": "📞",
+            "Arama Kuyruk": "📞", "Arama Tamamlandı": "📞",
+            "Otomatik SMS": "💬", "Gelen SMS": "💬", "Giden SMS": "💬",
+            "SMS Kuyruk": "💬", "SMS Tamamlandı": "💬",
+            "Otomatik Email": "📧",
+        }
+        _ikon = _ikonlar.get(_tur, "📌")
+        _baslik = f"{_tur} kaydı" if _tur else "İşlem kaydı"
+        return _ikon, _baslik
+
     try:
         _oa_sb = get_sb_client()
         _oa_tumu = pd.DataFrame(_oa_sb.table("islem_kaydi").select("*").in_(
@@ -8914,9 +8928,22 @@ elif aktif == "otomatik_arama":
                             except Exception:
                                 _oa_saat_g = ""
                             _oa_numara_g = _oa_r.get("icerik","")
-                            _oa_isim_g = _oa_r.get("musteri_adi","") or _oa_isim_bul(_oa_numara_g) or "Kayıtsız numara"
+                            _oa_musteri_adi_db_g = _oa_r.get("musteri_adi","")
+                            _oa_bulunan_g = _oa_isim_bul(_oa_numara_g) if not _oa_musteri_adi_db_g else ""
+                            _oa_isim_g = _oa_musteri_adi_db_g or _oa_bulunan_g or "Kayıtsız numara"
                             _oa_ek_g = _oa_r.get("gonderim_bilgisi","") or ""
                             _oa_rid = _oa_r.get("id")
+                            # ── TEŞHİS: eşleşmeyen numaranın HAM halini (gizli boşluk/karakterler dahil) göster ──
+                            _oa_teshis_g = ""
+                            if _oa_admin_mi and _oa_isim_g == "Kayıtsız numara":
+                                import html as _oahtml
+                                _oa_adaylar_g = _oa_norm_tel_adaylari(_oa_numara_g)
+                                _oa_teshis_g = (
+                                    f"<div style='font-family:monospace;font-size:10.5px;color:#dc2626;"
+                                    f"background:#fef2f2;padding:2px 6px;border-radius:4px;margin-top:2px;'>"
+                                    f"HAM: {_oahtml.escape(repr(_oa_numara_g))} · ADAY: {_oahtml.escape(str(_oa_adaylar_g))}"
+                                    f"</div>"
+                                )
                             if _oa_admin_mi:
                                 _cc1, _cc2 = st.columns([0.4, 9.6])
                                 with _cc1:
@@ -8929,7 +8956,7 @@ elif aktif == "otomatik_arama":
   <span style="margin:0 4px;">{ikon_k}</span>
   <span style="font-weight:600;color:#0f172a;">{_oa_numara_g}</span>
   <span style="color:#94a3b8;float:right;text-align:right;">{_oa_isim_g}<br><span style="font-size:11px;">{_oa_ek_g[:40]}</span></span>
-</div>""", unsafe_allow_html=True)
+</div>{_oa_teshis_g}""", unsafe_allow_html=True)
                             else:
                                 st.markdown(f"""
 <div style="padding:4px 8px;border-bottom:1px solid #e2e8f0;font-size:12.5px;">
