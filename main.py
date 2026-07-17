@@ -9171,9 +9171,19 @@ elif aktif == "otomatik_arama":
                             st.warning("Bir cari seç veya isim/firma yaz.")
 
         with st.expander(f"✅ Eşleşmiş Kayıtlar ({len(_oa_islenen)})", expanded=False):
-            for _, _oir in _oa_islenen.head(30).iterrows():
+            _oa_islenen_sirali = _oa_islenen.copy()
+            try:
+                _oa_islenen_sirali["_tsort"] = pd.to_datetime(_oa_islenen_sirali["tarih"], errors="coerce")
+                _oa_islenen_sirali = _oa_islenen_sirali.sort_values("_tsort", ascending=False)
+            except Exception:
+                pass
+            for _, _oir in _oa_islenen_sirali.head(50).iterrows():
                 _oa_ikon3, _oa_ikon3_b = _oa_tur_bilgi(_oir.get("islem_turu"))
-                st.caption(f"{_oa_ikon3} {_oir.get('musteri_adi','')} — {_oir.get('icerik','')} · {_oir.get('gonderim_bilgisi','')}")
+                try:
+                    _oa_tarih_saat3 = pd.to_datetime(_oir.get("tarih")).strftime("%d.%m.%Y %H:%M")
+                except Exception:
+                    _oa_tarih_saat3 = str(_oir.get("tarih","") or "")
+                st.caption(f"{_oa_ikon3} **{_oa_tarih_saat3}** — {_oir.get('musteri_adi','')} — {_oir.get('icerik','')} · {_oir.get('gonderim_bilgisi','')}")
 
 elif aktif == "gonderim_kuyrugu":
     sayfa_log("gonderim_kuyrugu")
