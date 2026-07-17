@@ -8714,6 +8714,49 @@ elif aktif == "otomatik_arama":
 
     _OA_ISIM_HARITA = _oa_isim_haritasi()
 
+    @st.cache_data(ttl=60)
+    def _oa_gevsek_harita():
+        """Son 7 haneye göre (daha gevşek) eşleştirme için ham numara + etiket haritası.
+        Tam eşleşme olmayan numaralar için 'kayıtlarda buna en yakın ne var' göstermeye yarar."""
+        _g = {}
+        def _ekle_g(ham_numara, etiket):
+            if not etiket:
+                return
+            _d = _oare.sub(r"\D", "", str(ham_numara or ""))
+            if len(_d) >= 7:
+                _k7 = _d[-7:]
+                if _k7 not in _g:
+                    _g[_k7] = (str(ham_numara), etiket)
+        try:
+            _oa_kis2 = db_read("kisiler")
+            if not _oa_kis2.empty:
+                for _, _kr in _oa_kis2.iterrows():
+                    _ad2 = f"{_kr.get('ad','')} {_kr.get('soyad','')}".strip()
+                    _etiket2 = _ad2 + (f" ({_kr.get('firma','')})" if _kr.get("firma") else "")
+                    _ekle_g(_kr.get("telefon", ""), _etiket2)
+        except Exception:
+            pass
+        try:
+            _oa_sb_g = get_sb_client()
+            _oa_car2 = pd.DataFrame(_oa_sb_g.table("cari_kartlar").select("firma,gsm,sabit,silindi").execute().data) if _oa_sb_g else pd.DataFrame()
+            if not _oa_car2.empty:
+                if "silindi" in _oa_car2.columns:
+                    _oa_car2 = _oa_car2[_oa_car2["silindi"].fillna(0).astype(str).isin(["0", "0.0", "False", "false"])]
+                for _, _cr in _oa_car2.iterrows():
+                    for _telalan in ("gsm", "sabit"):
+                        _ekle_g(_cr.get(_telalan, ""), str(_cr.get("firma", "")))
+        except Exception:
+            pass
+        return _g
+
+    def _oa_neden_eslesmedi(numara):
+        """Bir numara için: son 7 haneye göre kayıtlarda yakın bir eşleşme var mı, varsa ham hâlini döner."""
+        _d = _oare.sub(r"\D", "", str(numara or ""))
+        if len(_d) < 7:
+            return None
+        _k7 = _d[-7:]
+        return _oa_gevsek_harita().get(_k7)
+
     def _oa_isim_bul(numara):
         for _aday in _oa_norm_tel_adaylari(numara):
             if _aday in _OA_ISIM_HARITA:
@@ -9106,6 +9149,14 @@ elif aktif == "otomatik_arama":
 </div>""", unsafe_allow_html=True)
                     _oa_secim = _oc3.selectbox("Cari", _oa_opts, key=f"oa_sec_{_obr2['id']}", label_visibility="collapsed")
                     _oa_manuel_ad = _oc3b.text_input("Manuel", key=f"oa_manuel_{_obr2['id']}", placeholder="Firma/isim yazıp kaydet...", label_visibility="collapsed")
+
+                    # ── OTOMATİK TEŞHİS: kayıtlarda son 7 haneye göre yakın bir numara var mı? ──
+                    _oa_yakin = _oa_neden_eslesmedi(_obr2.get("icerik",""))
+                    if _oa_yakin:
+                        _oa_yakin_ham, _oa_yakin_etiket = _oa_yakin
+                        st.caption(f"🔍 Kayıtlarda buna yakın: **{_oa_yakin_ham}** → {_oa_yakin_etiket} — muhtemelen numara birkaç haneli farklı girilmiş, kontrol et.")
+                    else:
+                        st.caption("🔍 Bu numara ne Kişiler ne Cari Kartlar (GSM/Sabit) tablosunda hiç kayıtlı değil.")
                     if _oc4.button("💾 Kaydet", key=f"oa_bagla_{_obr2['id']}", use_container_width=True):
                         _oa_ikon_not2, _oa_baslik_not2 = _oa_tur_bilgi(_obr2.get("islem_turu"))
                         if _oa_secim != "-- Cari Seç --":
