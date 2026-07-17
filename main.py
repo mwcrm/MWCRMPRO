@@ -8631,8 +8631,14 @@ elif aktif == "otomatik_arama":
     st.caption("MacroDroid'den gelen arama/SMS kayıtları burada işlenir — telefon numarası rehberde ya da carilerde kayıtlıysa ismi otomatik gösterilir.")
 
     def _oa_norm_tel(s):
-        _d = _oare.sub(r"\D", "", str(s or ""))
-        return _d[-10:] if len(_d) >= 7 else ""
+        # Rakamları tek parça birleştirmek yerine, metindeki ayrı rakam öbeklerini bulup
+        # 7+ haneli İLK öbeği (gerçek telefon numarası) alıyoruz. Böylece "icerik" alanında
+        # numaranın yanına tarih/saat gibi ek rakamlar karışmış olsa bile eşleşme bozulmuyor.
+        _s = str(s or "")
+        for _parca in _oare.findall(r"\d+", _s):
+            if len(_parca) >= 7:
+                return _parca[-10:]
+        return ""
 
     @st.cache_data(ttl=60)
     def _oa_isim_haritasi():
