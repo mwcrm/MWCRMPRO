@@ -8719,7 +8719,10 @@ elif aktif == "otomatik_arama":
     except Exception:
         _oa_tumu = pd.DataFrame()
 
-    _oa_ham = _oa_tumu[_oa_tumu["islem_turu"].isin(["Otomatik Arama", "Otomatik SMS", "Otomatik Email"])].copy() if not _oa_tumu.empty else pd.DataFrame()
+    _oa_ham = _oa_tumu[_oa_tumu["islem_turu"].isin([
+        "Otomatik Arama", "Otomatik SMS", "Otomatik Email",
+        "Gelen Arama", "Giden Arama", "Gelen SMS", "Giden SMS",
+    ])].copy() if not _oa_tumu.empty else pd.DataFrame()
 
     # ================== SOL MENÜ + SAĞ İÇERİK (Numara Çevir / Rehberde Kişi Seç / Mesaj Yaz) ==================
     _oa_col_menu, _oa_col_icerik = st.columns([1, 4.2])
