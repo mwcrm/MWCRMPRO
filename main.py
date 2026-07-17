@@ -1977,6 +1977,66 @@ def fmt_tel(n):
         return s
     except: return ""
 
+def _norm_tel_10(s):
+    """Bir numarayı (boşluk/tire/+90/0 fark etmeksizin) son 10 haneye indirger."""
+    d = re.sub(r"\D", "", str(s or ""))
+    return d[-10:] if len(d) >= 7 else ""
+
+def cari_rehbere_toplu_ekle(cari_liste):
+    """cari_rehbere_ekle'nin toplu (verimli) hâli — çok sayıda cari için tek seferde
+    mevcut rehberi okuyup, sadece yeni olan numaraları tek seferde ekler."""
+    try:
+        sb = get_sb_client()
+        if not sb or not cari_liste:
+            return 0
+        _mevcut = pd.DataFrame(sb.table("kisiler").select("telefon").execute().data)
+        _mevcut_norm = set()
+        if not _mevcut.empty and "telefon" in _mevcut.columns:
+            for _t in _mevcut["telefon"].fillna("").astype(str):
+                _n = _norm_tel_10(_t)
+                if _n:
+                    _mevcut_norm.add(_n)
+        _eklenecek = []
+        for _c in cari_liste:
+            _firma_c = str(_c.get("firma","") or "").strip()
+            for _numara in (_c.get("gsm",""), _c.get("sabit","")):
+                _n = _norm_tel_10(_numara)
+                if _n and _n not in _mevcut_norm:
+                    _eklenecek.append({"ad": "", "soyad": "", "telefon": _n, "firma": _firma_c, "kaynak": "Cari Aktarım"})
+                    _mevcut_norm.add(_n)
+        for _bi in range(0, len(_eklenecek), 50):
+            sb.table("kisiler").insert(_eklenecek[_bi:_bi+50]).execute()
+        return len(_eklenecek)
+    except Exception:
+        return 0
+
+
+    """Bir cari kartın GSM/Sabit numaralarını 'kisiler' (Telefon Kişiler/Rehber) tablosuna aktarır.
+    Aynı numara rehberde zaten varsa tekrar eklemez — mükerrer kayıt oluşturmaz.
+    Cari kart açıldıkça (yeni kayıt / toplu aktarım) otomatik çağrılır."""
+    try:
+        sb = get_sb_client()
+        if not sb:
+            return 0
+        _mevcut = pd.DataFrame(sb.table("kisiler").select("telefon").execute().data)
+        _mevcut_norm = set()
+        if not _mevcut.empty and "telefon" in _mevcut.columns:
+            for _t in _mevcut["telefon"].fillna("").astype(str):
+                _n = _norm_tel_10(_t)
+                if _n:
+                    _mevcut_norm.add(_n)
+        _eklenecek = []
+        for _numara in (gsm, sabit):
+            _n = _norm_tel_10(_numara)
+            if _n and _n not in _mevcut_norm:
+                _eklenecek.append({"ad": "", "soyad": "", "telefon": _n, "firma": str(firma or "").strip(), "kaynak": "Cari Aktarım"})
+                _mevcut_norm.add(_n)  # aynı çağrı içinde tekrar eklenmesin
+        if _eklenecek:
+            sb.table("kisiler").insert(_eklenecek).execute()
+        return len(_eklenecek)
+    except Exception:
+        return 0
+
 def _duzenleme_form_key_temizle(fid):
     """Belirli bir müşteri ID'sine ait düzenleme formu widget key'lerini
     session_state'ten siler. Düzenle her tıklandığında çağrılmalı —
@@ -3423,6 +3483,8 @@ if aktif == "yeni":
                     _pok2, _pomsg2 = _musteri_giris_kaydet(_yeni_cari_id, portal_kadi.strip(), portal_sifre.strip())
                     if not _pok2:
                         st.warning(f"⚠️ Portal hesabı kaydedilemedi: {_pomsg2}")
+                if ok:
+                    cari_rehbere_ekle(firma, gsm, sabit)
                 try: db_read.clear()
                 except: pass
                 st.session_state["aktif_tab"] = "liste"
@@ -9698,6 +9760,9 @@ elif aktif == "excel":
                         durum_text.text(f"{min(i+BATCH,toplam)}/{toplam} işlendi, {basarili} eklendi")
 
                     st.success(f"🎉 Tamamlandı! {basarili}/{toplam} kayıt eklendi.")
+                    _rehber_eklenen = cari_rehbere_toplu_ekle(kayitlar)
+                    if _rehber_eklenen:
+                        st.success(f"📇 {_rehber_eklenen} numara da rehbere (Telefon Kişiler) aktarıldı.")
                     if hatalar:
                         st.error(f"❌ {len(hatalar)} grup hata verdi:")
                         for h in hatalar:
@@ -11047,6 +11112,21 @@ elif aktif == "kisiler":
 
     # ── TOPLU İÇE AKTAR ───────────────────────────────────────────────────────
     with tab_rehber3:
+        st.markdown("#### 📇 Cari Kartlar'dan Aktar")
+        st.caption("Sistemdeki TÜM cari kartların GSM/Sabit numaralarını, tek cari için tek satır olacak şekilde rehbere aktarır. Rehberde zaten olan numaralar tekrar eklenmez (mükerrer önleme).")
+        if st.button("📥 Tüm Cari Kartları Rehbere Aktar", key="cari_rehber_toplu_btn", type="primary"):
+            _cra_df = db_read("cari_kartlar")
+            if not _cra_df.empty and "silindi" in _cra_df.columns:
+                _cra_df = _cra_df[_cra_df["silindi"].fillna(0).astype(str).isin(["0", "0.0", "False", "false"])]
+            _cra_liste = _cra_df.to_dict("records") if not _cra_df.empty else []
+            with st.spinner(f"{len(_cra_liste)} cari kart taranıyor, rehbere aktarılıyor..."):
+                _cra_eklenen = cari_rehbere_toplu_ekle(_cra_liste)
+            st.success(f"✅ Tamamlandı! {_cra_eklenen} yeni numara rehbere eklendi (zaten kayıtlı olanlar atlandı).")
+            try: db_read.clear()
+            except: pass
+            st.rerun()
+
+        st.markdown("---")
         st.info("Excel şablonunu indirin, doldurun, yükleyin.")
         sablon_kis = pd.DataFrame([{
             "firma":"ABC Ltd.","ad":"Ahmet","soyad":"Yılmaz",
