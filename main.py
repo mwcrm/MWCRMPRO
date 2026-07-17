@@ -10820,6 +10820,30 @@ elif aktif == "kisiler":
     # ── KİŞİ LİSTESİ ──────────────────────────────────────────────────────────
     with tab_rehber1:
         df_kis = db_read("kisiler", extra_sql="ORDER BY firma, ad")
+
+        if st.session_state.get("rol") == "admin":
+            _kis_tem_c1, _kis_tem_c2 = st.columns([5, 1.6])
+            with _kis_tem_c2:
+                if st.button("🗑️ Tümünü Sil", key="kis_tumunu_sil_btn", use_container_width=True):
+                    st.session_state["_kis_tumunu_sil_onay"] = True
+            if st.session_state.get("_kis_tumunu_sil_onay"):
+                st.warning(f"⚠️ Bu, rehberdeki TÜM {len(df_kis)} kişiyi kalıcı olarak silecek. Emin misin?")
+                _kis_oc1, _kis_oc2 = st.columns(2)
+                if _kis_oc1.button("✅ Evet, hepsini sil", key="kis_tumunu_sil_evet", type="primary"):
+                    try:
+                        _kis_sb_tem = get_sb_client()
+                        if _kis_sb_tem:
+                            _kis_sb_tem.table("kisiler").delete().gte("id", 0).execute()
+                            st.success("✅ Rehberdeki tüm kişiler silindi.")
+                            st.session_state["_kis_tumunu_sil_onay"] = False
+                            st.cache_data.clear()
+                            st.rerun()
+                    except Exception as _kis_tem_e:
+                        st.error(f"Silinemedi: {_kis_tem_e}")
+                if _kis_oc2.button("❌ Vazgeç", key="kis_tumunu_sil_vazgec"):
+                    st.session_state["_kis_tumunu_sil_onay"] = False
+                    st.rerun()
+
         ara_kis = st.text_input("🔍 Ara:", key="kisiler_ara", placeholder="Ad, firma, tel, bölge...")
         if ara_kis:
             df_kis = df_kis[df_kis.apply(lambda r: ara_kis.lower() in str(r).lower(), axis=1)]
