@@ -457,6 +457,7 @@ def get_kullanici_listesi():
 def _cached_placeholder(): pass  # cache decorator boş bırakılamaz
 
 
+@st.cache_data(ttl=30)
 def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
     """Supabase veya SQLite'dan DataFrame döner"""
     sb = get_sb_client()
