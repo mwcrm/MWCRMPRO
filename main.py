@@ -8970,13 +8970,21 @@ elif aktif == "otomatik_arama":
 
         _oa_admin_mi = st.session_state.get("rol") == "admin"
 
+        def _oa_tr_saat(deger):
+            """MacroDroid kayıtları Supabase'in UTC saatiyle geliyor (Türkiye'den 3 saat geri).
+            Görüntülemeden önce +3 saat ekleyip Türkiye saatine çeviriyoruz."""
+            try:
+                return pd.to_datetime(deger) + timedelta(hours=3)
+            except Exception:
+                return None
+
         def _oa_gunlere_ayir(df_k):
             """DataFrame'i tarihe göre gün gruplarına ayırır, {gun_str: alt_df} döner (en yeni gün önce)."""
             if df_k.empty:
                 return {}
             _df2 = df_k.copy()
             try:
-                _df2["_gun"] = pd.to_datetime(_df2["tarih"]).dt.strftime("%d.%m.%Y")
+                _df2["_gun"] = (pd.to_datetime(_df2["tarih"]) + timedelta(hours=3)).dt.strftime("%d.%m.%Y")
             except Exception:
                 _df2["_gun"] = _df2["tarih"].astype(str).str[:10]
             _gunler = {}
@@ -8996,7 +9004,7 @@ elif aktif == "otomatik_arama":
                         _secililer = []
                         for _, _oa_r in _gun_df.head(50).iterrows():
                             try:
-                                _oa_saat_g = pd.to_datetime(_oa_r.get("tarih")).strftime("%H:%M")
+                                _oa_saat_g = _oa_tr_saat(_oa_r.get("tarih")).strftime("%H:%M")
                             except Exception:
                                 _oa_saat_g = ""
                             _oa_numara_g = _oa_r.get("icerik","")
@@ -9280,7 +9288,7 @@ elif aktif == "otomatik_arama":
                     _oa_renk = _oa_renk_harita.get(_obr2.get("islem_turu"), "#64748b")
                     _oa_zebra = "#f8fafc" if _ix2 % 2 == 0 else "#ffffff"
                     try:
-                        _oa_saat_es = pd.to_datetime(_obr2.get("tarih")).strftime("%H:%M")
+                        _oa_saat_es = _oa_tr_saat(_obr2.get("tarih")).strftime("%H:%M")
                     except Exception:
                         _oa_saat_es = ""
 
@@ -9342,7 +9350,7 @@ elif aktif == "otomatik_arama":
             for _, _oir in _oa_islenen_sirali.head(50).iterrows():
                 _oa_ikon3, _oa_ikon3_b = _oa_tur_bilgi(_oir.get("islem_turu"))
                 try:
-                    _oa_tarih_saat3 = pd.to_datetime(_oir.get("tarih")).strftime("%d.%m.%Y %H:%M")
+                    _oa_tarih_saat3 = _oa_tr_saat(_oir.get("tarih")).strftime("%d.%m.%Y %H:%M")
                 except Exception:
                     _oa_tarih_saat3 = str(_oir.get("tarih","") or "")
                 st.caption(f"{_oa_ikon3} **{_oa_tarih_saat3}** — {_oir.get('musteri_adi','')} — {_oir.get('icerik','')} · {_oir.get('gonderim_bilgisi','')}")
