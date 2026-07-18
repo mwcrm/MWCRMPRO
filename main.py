@@ -10809,7 +10809,29 @@ elif aktif == "whatsapp":
                 st.error("Not boş olamaz!")
             else:
                 icerik = f"[{gorusme_turu}] {gorusme_notu}\nSonraki: {sonraki_adim}\nHatırlatma: {hatirlatma}"
-                db_insert("islem_kaydi", {"musteri_id": 0, "musteri_adi": "kayit", "islem_turu": "kayit", "icerik": "kayit", "gonderim_bilgisi": "kayit", "olusturan": st.session_state["kullanici"]})
+                _gk_tur_ikon = {"WhatsApp": "💬", "Telefon": "📞", "Yüz Yüze": "🤝", "Email": "📧", "Diğer": "📝"}.get(gorusme_turu, "📝")
+                _gk_ok = db_insert("islem_kaydi", {
+                    "musteri_id": gkayit_musteri_id, "musteri_adi": gkayit_firma,
+                    "islem_turu": f"{gorusme_turu} Görüşme", "icerik": icerik,
+                    "gonderim_bilgisi": str(gorusme_tarihi), "olusturan": st.session_state["kullanici"],
+                })
+                # Cari kartın açıklamalar/zaman çizelgesinde de görünsün
+                try:
+                    _gk_sb = get_sb_client()
+                    if _gk_sb:
+                        _gk_sb.table("cari_aciklamalar").insert({
+                            "cari_id": gkayit_musteri_id, "cari_adi": gkayit_firma,
+                            "aciklama": f"{_gk_tur_ikon} {icerik}",
+                            "olusturan": st.session_state["kullanici"],
+                        }).execute()
+                except Exception:
+                    pass
+                if _gk_ok:
+                    st.success(f"✅ '{gkayit_firma}' için görüşme kaydedildi.")
+                    db_read.clear()
+                    st.rerun()
+                else:
+                    st.error("Kaydedilemedi, tekrar dene.")
 
         # Hatırlatmalar
         st.divider()
@@ -10878,9 +10900,9 @@ elif aktif == "kisiler":
 
     ben = st.session_state.get("kullanici","")
 
-    tab_rehber1, tab_rehber2, tab_rehber3, tab_rehber4, tab_rehber5, tab_rehber6 = st.tabs([
+    tab_rehber1, tab_rehber2, tab_rehber3, tab_rehber4, tab_rehber5, tab_rehber6, tab_rehber7 = st.tabs([
         "📋 Kişi Listesi", "➕ Kişi Ekle", "📥 Toplu İçe Aktar",
-        "📝 Kayıtlı Şablonlar", "📊 Mesaj Raporu", "👤 Satış Temsilcileri"
+        "📝 Kayıtlı Şablonlar", "📊 Mesaj Raporu", "👤 Satış Temsilcileri", "📦 Excel Depo"
     ])
 
     # Şablonları yükle (tüm tablar için)
@@ -11292,6 +11314,126 @@ elif aktif == "kisiler":
                     st.success(f"✅ {t_ad} eklendi!"); st.rerun()
                 else:
                     st.warning("Ad ve telefon zorunlu!")
+
+    # ── 📦 EXCEL DEPO — serbest formatta, ne kadar satır/sütun olursa olsun,
+    # formülleri bozmadan (dosyanın orijinal hâlini saklayarak) Excel dosyası yükle/sakla/indir.
+    # Yeni tablo gerekmez — mevcut "teklifler" tablosu, "tip":"excel_depo" işaretiyle kullanılıyor
+    # (aynı Sözleşmeler/Özel Teklif'in kullandığı depolama mantığı).
+    with tab_rehber7:
+        st.markdown("### 📦 Serbest Excel Depo")
+        st.caption("Herhangi bir Excel dosyasını (kaç satır/sütun olursa olsun) olduğu gibi, formülleri bozulmadan saklar. İhtiyaç olduğunda buradan indirebilirsin.")
+
+        import base64 as _ed_b64, io as _ed_io
+
+        _ed_yukle = st.file_uploader("Excel dosyası yükle (.xlsx / .xls):", type=["xlsx", "xls"], key="ed_yukle")
+        _ed_aciklama = st.text_input("Kısa açıklama (aranabilir olsun, ör: '2026 Temmuz Stok Listesi'):", key="ed_aciklama")
+
+        if _ed_yukle is not None:
+            try:
+                _ed_bytes = _ed_yukle.getvalue()
+                _ed_boyut_kb = round(len(_ed_bytes) / 1024, 1)
+                # Önizleme: kaç sayfa, kaç satır/sütun var — dosyanın kendi bilgisiyle
+                try:
+                    _ed_xl = pd.ExcelFile(_ed_io.BytesIO(_ed_bytes))
+                    _ed_sayfalar = _ed_xl.sheet_names
+                    _ed_onizleme = []
+                    for _ed_sn in _ed_sayfalar:
+                        _ed_df_prev = _ed_xl.parse(_ed_sn, header=None)
+                        _ed_onizleme.append(f"'{_ed_sn}': {_ed_df_prev.shape[0]} satır × {_ed_df_prev.shape[1]} sütun")
+                    st.info(f"📄 **{_ed_yukle.name}** ({_ed_boyut_kb} KB) — " + " · ".join(_ed_onizleme))
+                except Exception:
+                    st.info(f"📄 **{_ed_yukle.name}** ({_ed_boyut_kb} KB)")
+
+                if st.button("💾 Depoya Kaydet", type="primary", key="ed_kaydet_btn"):
+                    _ed_b64_str = _ed_b64.b64encode(_ed_bytes).decode("ascii")
+                    _ed_sb = get_sb_client()
+                    if _ed_sb:
+                        _ed_sb.table("teklifler").insert({
+                            "musteri_id": 0,
+                            "musteri_adi": _ed_yukle.name,
+                            "satirlar": __import__("json").dumps({
+                                "tip": "excel_depo",
+                                "dosya_adi": _ed_yukle.name,
+                                "boyut_kb": _ed_boyut_kb,
+                                "veri_b64": _ed_b64_str,
+                            }, ensure_ascii=False),
+                            "toplam_tutar": 0,
+                            "olusturan": st.session_state.get("kullanici", ""),
+                            "notlar": _ed_aciklama.strip() or _ed_yukle.name,
+                        }).execute()
+                        st.success(f"✅ '{_ed_yukle.name}' depoya kaydedildi — formülleri dahil, aynen saklandı.")
+                        try: db_read.clear()
+                        except: pass
+                        st.rerun()
+            except Exception as _ed_e:
+                st.error(f"Yüklenemedi: {_ed_e}")
+
+        st.divider()
+        st.markdown("#### 📚 Depodaki Dosyalar")
+        _ed_ara = st.text_input("🔍 Ara (dosya adı / açıklama):", key="ed_ara")
+        try:
+            import json as _ed_json
+            _ed_sb2 = get_sb_client()
+            _ed_ham = pd.DataFrame(_ed_sb2.table("teklifler").select("*").order("id", desc=True).execute().data) if _ed_sb2 else pd.DataFrame()
+            _ed_liste = []
+            if not _ed_ham.empty and "satirlar" in _ed_ham.columns:
+                for _, _ed_r in _ed_ham.iterrows():
+                    try:
+                        _ed_parsed = _ed_json.loads(_ed_r.get("satirlar", "") or "{}")
+                    except Exception:
+                        continue
+                    if _ed_parsed.get("tip") == "excel_depo":
+                        _ed_liste.append({
+                            "id": _ed_r.get("id"),
+                            "dosya_adi": _ed_parsed.get("dosya_adi", ""),
+                            "boyut_kb": _ed_parsed.get("boyut_kb", 0),
+                            "veri_b64": _ed_parsed.get("veri_b64", ""),
+                            "notlar": _ed_r.get("notlar", ""),
+                            "olusturan": _ed_r.get("olusturan", ""),
+                            "tarih": _ed_r.get("tarih", ""),
+                        })
+            if _ed_ara.strip():
+                _ed_arl = _ed_ara.strip().lower()
+                _ed_liste = [x for x in _ed_liste if _ed_arl in str(x["dosya_adi"]).lower() or _ed_arl in str(x["notlar"]).lower()]
+
+            if not _ed_liste:
+                st.caption("Depoda henüz dosya yok.")
+            else:
+                st.caption(f"{len(_ed_liste)} dosya bulundu.")
+                for _ed_item in _ed_liste:
+                    _edc1, _edc2, _edc3 = st.columns([4, 1.3, 0.8])
+                    with _edc1:
+                        try:
+                            _ed_tarih_g = _oa_tr_saat(_ed_item["tarih"]).strftime("%d.%m.%Y %H:%M") if "_oa_tr_saat" in dir() else str(_ed_item["tarih"])[:16]
+                        except Exception:
+                            _ed_tarih_g = str(_ed_item["tarih"])[:16]
+                        st.markdown(f"📄 **{_ed_item['dosya_adi']}** — {_ed_item['notlar']}  \n<span style='color:#94a3b8;font-size:11.5px;'>{_ed_tarih_g} · {_ed_item['boyut_kb']} KB · {_ed_item['olusturan']}</span>", unsafe_allow_html=True)
+                    with _edc2:
+                        try:
+                            _ed_dl_bytes = _ed_b64.b64decode(_ed_item["veri_b64"])
+                            st.download_button("⬇️ İndir", data=_ed_dl_bytes, file_name=_ed_item["dosya_adi"],
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key=f"ed_indir_{_ed_item['id']}", use_container_width=True)
+                        except Exception:
+                            st.caption("İndirme hatası")
+                    with _edc3:
+                        if st.session_state.get("rol") == "admin":
+                            if st.button("🗑️", key=f"ed_sil_btn_{_ed_item['id']}", use_container_width=True):
+                                st.session_state[f"_ed_sil_onay_{_ed_item['id']}"] = True
+                            if st.session_state.get(f"_ed_sil_onay_{_ed_item['id']}"):
+                                if st.button("✅ Emin misin?", key=f"ed_sil_onay_{_ed_item['id']}", use_container_width=True):
+                                    try:
+                                        _ed_sb2.table("teklifler").delete().eq("id", int(_ed_item["id"])).execute()
+                                        st.success("Silindi.")
+                                        st.session_state[f"_ed_sil_onay_{_ed_item['id']}"] = False
+                                        try: db_read.clear()
+                                        except: pass
+                                        st.rerun()
+                                    except Exception as _ed_se:
+                                        st.error(f"Silinemedi: {_ed_se}")
+                    st.markdown("<hr style='margin:4px 0;border-color:#eef0f3;'>", unsafe_allow_html=True)
+        except Exception as _ed_liste_e:
+            st.error(f"Depo listesi okunamadı: {_ed_liste_e}")
 
 
 elif aktif == "randevu":
