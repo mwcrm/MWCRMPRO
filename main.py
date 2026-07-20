@@ -11332,14 +11332,16 @@ elif aktif == "kisiler":
             try:
                 _ed_bytes = _ed_yukle.getvalue()
                 _ed_boyut_kb = round(len(_ed_bytes) / 1024, 1)
-                # Önizleme: kaç sayfa, kaç satır/sütun var — dosyanın kendi bilgisiyle
+                # Önizleme: kaç sayfa, kaç satır/sütun var — SADECE boyut bilgisini oku (veriyi
+                # yüklemeden), büyük dosyalarda (10+ MB) yavaşlığın sebebi buydu.
                 try:
-                    _ed_xl = pd.ExcelFile(_ed_io.BytesIO(_ed_bytes))
-                    _ed_sayfalar = _ed_xl.sheet_names
+                    import openpyxl as _ed_opx
+                    _ed_wb = _ed_opx.load_workbook(_ed_io.BytesIO(_ed_bytes), read_only=True, data_only=True)
                     _ed_onizleme = []
-                    for _ed_sn in _ed_sayfalar:
-                        _ed_df_prev = _ed_xl.parse(_ed_sn, header=None)
-                        _ed_onizleme.append(f"'{_ed_sn}': {_ed_df_prev.shape[0]} satır × {_ed_df_prev.shape[1]} sütun")
+                    for _ed_sn in _ed_wb.sheetnames:
+                        _ed_ws = _ed_wb[_ed_sn]
+                        _ed_onizleme.append(f"'{_ed_sn}': {_ed_ws.max_row} satır × {_ed_ws.max_column} sütun")
+                    _ed_wb.close()
                     st.info(f"📄 **{_ed_yukle.name}** ({_ed_boyut_kb} KB) — " + " · ".join(_ed_onizleme))
                 except Exception:
                     st.info(f"📄 **{_ed_yukle.name}** ({_ed_boyut_kb} KB)")
