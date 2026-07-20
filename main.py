@@ -11334,39 +11334,41 @@ elif aktif == "kisiler":
                 _ed_boyut_kb = round(len(_ed_bytes) / 1024, 1)
                 # Önizleme: kaç sayfa, kaç satır/sütun var — SADECE boyut bilgisini oku (veriyi
                 # yüklemeden), büyük dosyalarda (10+ MB) yavaşlığın sebebi buydu.
-                try:
-                    import openpyxl as _ed_opx
-                    _ed_wb = _ed_opx.load_workbook(_ed_io.BytesIO(_ed_bytes), read_only=True, data_only=True)
-                    _ed_onizleme = []
-                    for _ed_sn in _ed_wb.sheetnames:
-                        _ed_ws = _ed_wb[_ed_sn]
-                        _ed_onizleme.append(f"'{_ed_sn}': {_ed_ws.max_row} satır × {_ed_ws.max_column} sütun")
-                    _ed_wb.close()
-                    st.info(f"📄 **{_ed_yukle.name}** ({_ed_boyut_kb} KB) — " + " · ".join(_ed_onizleme))
-                except Exception:
-                    st.info(f"📄 **{_ed_yukle.name}** ({_ed_boyut_kb} KB)")
+                with st.spinner("⏳ Dosya taranıyor..."):
+                    try:
+                        import openpyxl as _ed_opx
+                        _ed_wb = _ed_opx.load_workbook(_ed_io.BytesIO(_ed_bytes), read_only=True, data_only=True)
+                        _ed_onizleme = []
+                        for _ed_sn in _ed_wb.sheetnames:
+                            _ed_ws = _ed_wb[_ed_sn]
+                            _ed_onizleme.append(f"'{_ed_sn}': {_ed_ws.max_row} satır × {_ed_ws.max_column} sütun")
+                        _ed_wb.close()
+                        st.info(f"📄 **{_ed_yukle.name}** ({_ed_boyut_kb} KB) — " + " · ".join(_ed_onizleme))
+                    except Exception:
+                        st.info(f"📄 **{_ed_yukle.name}** ({_ed_boyut_kb} KB)")
 
                 if st.button("💾 Depoya Kaydet", type="primary", key="ed_kaydet_btn"):
-                    _ed_b64_str = _ed_b64.b64encode(_ed_bytes).decode("ascii")
-                    _ed_sb = get_sb_client()
-                    if _ed_sb:
-                        _ed_sb.table("teklifler").insert({
-                            "musteri_id": 0,
-                            "musteri_adi": _ed_yukle.name,
-                            "satirlar": __import__("json").dumps({
-                                "tip": "excel_depo",
-                                "dosya_adi": _ed_yukle.name,
-                                "boyut_kb": _ed_boyut_kb,
-                                "veri_b64": _ed_b64_str,
-                            }, ensure_ascii=False),
-                            "toplam_tutar": 0,
-                            "olusturan": st.session_state.get("kullanici", ""),
-                            "notlar": _ed_aciklama.strip() or _ed_yukle.name,
-                        }).execute()
-                        st.success(f"✅ '{_ed_yukle.name}' depoya kaydedildi — formülleri dahil, aynen saklandı.")
-                        try: db_read.clear()
-                        except: pass
-                        st.rerun()
+                    with st.spinner("⏳ Depoya kaydediliyor, büyük dosyalarda biraz sürebilir..."):
+                        _ed_b64_str = _ed_b64.b64encode(_ed_bytes).decode("ascii")
+                        _ed_sb = get_sb_client()
+                        if _ed_sb:
+                            _ed_sb.table("teklifler").insert({
+                                "musteri_id": 0,
+                                "musteri_adi": _ed_yukle.name,
+                                "satirlar": __import__("json").dumps({
+                                    "tip": "excel_depo",
+                                    "dosya_adi": _ed_yukle.name,
+                                    "boyut_kb": _ed_boyut_kb,
+                                    "veri_b64": _ed_b64_str,
+                                }, ensure_ascii=False),
+                                "toplam_tutar": 0,
+                                "olusturan": st.session_state.get("kullanici", ""),
+                                "notlar": _ed_aciklama.strip() or _ed_yukle.name,
+                            }).execute()
+                    st.success(f"✅ '{_ed_yukle.name}' depoya kaydedildi — formülleri dahil, aynen saklandı.")
+                    try: db_read.clear()
+                    except: pass
+                    st.rerun()
             except Exception as _ed_e:
                 st.error(f"Yüklenemedi: {_ed_e}")
 
