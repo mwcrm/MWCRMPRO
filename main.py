@@ -11329,15 +11329,9 @@ elif aktif == "kisiler":
         _ED_BUCKET = "excel-depo"
 
         def _ed_bucket_hazir(sb):
-            """excel-depo isimli depolama alanı yoksa oluşturur (bir kereye mahsus, sorunsuzca)."""
-            try:
-                _mevcut = sb.storage.list_buckets()
-                _isimler = [getattr(b, "name", None) or (b.get("name") if isinstance(b, dict) else None) for b in (_mevcut or [])]
-                if _ED_BUCKET not in _isimler:
-                    sb.storage.create_bucket(_ED_BUCKET, options={"public": False})
-                return True
-            except Exception:
-                return False
+            """excel-depo bucket'ı Supabase panelinden elle oluşturulmuş olmalı (anon anahtar bucket oluşturamaz).
+            Burada sadece varlığını kontrol ediyoruz; yoksa kullanıcıya net talimat gösteriyoruz."""
+            return True  # Doğrudan yüklemeyi dene; bucket yoksa upload adımı zaten net hata verecek
 
         _ed_yukle = st.file_uploader("Excel dosyası yükle (.xlsx / .xls) — boyut sınırı yok:", type=["xlsx", "xls"], key="ed_yukle")
         _ed_aciklama = st.text_input("Kısa açıklama (aranabilir olsun, ör: '2026 Temmuz Stok Listesi'):", key="ed_aciklama")
@@ -11363,6 +11357,7 @@ elif aktif == "kisiler":
                 if _ed_sb:
                     with st.spinner("⏳ Depoya kaydediliyor..."):
                         # 1) ÖNCE: gerçek dosya depolama (Storage) — büyük dosyalar için doğru yöntem
+                        _ed_storage_hata = None
                         try:
                             if _ed_bucket_hazir(_ed_sb):
                                 _ed_sb.storage.from_(_ED_BUCKET).upload(
@@ -11380,8 +11375,16 @@ elif aktif == "kisiler":
                                 }).execute()
                                 _ed_kaydedildi = True
                                 _ed_yontem = "storage"
-                        except Exception:
+                            else:
+                                _ed_storage_hata = "Depolama alanı ('excel-depo') oluşturulamadı."
+                        except Exception as _ed_st_e:
                             _ed_kaydedildi = False
+                            _ed_storage_hata = str(_ed_st_e)
+                        if _ed_storage_hata:
+                            if "not found" in _ed_storage_hata.lower() or "bucket" in _ed_storage_hata.lower():
+                                st.warning("⚠️ 'excel-depo' adlı depolama alanı Supabase panelinde henüz oluşturulmamış. Supabase → Storage → New bucket → 'excel-depo' adıyla oluşturup tekrar dene.")
+                            else:
+                                st.warning(f"⚠️ Storage denemesi başarısız oldu, sebebi: {_ed_storage_hata}")
                         # 2) OLMAZSA: eski yöntem (veriyi metne çevirip tabloya göm) — SADECE küçük dosyalarda (2 MB altı).
                         # Büyük dosyalarda bu yöntem tabloyu şişirip veritabanını yavaşlatıyordu (zaman aşımı hatasının sebebi buydu).
                         if not _ed_kaydedildi:
