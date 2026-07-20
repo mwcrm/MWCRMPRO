@@ -10900,10 +10900,12 @@ elif aktif == "kisiler":
 
     ben = st.session_state.get("kullanici","")
 
-    tab_rehber1, tab_rehber2, tab_rehber3, tab_rehber4, tab_rehber5, tab_rehber6, tab_rehber7 = st.tabs([
+    _rehber_sekmeler = [
         "📋 Kişi Listesi", "➕ Kişi Ekle", "📥 Toplu İçe Aktar",
         "📝 Kayıtlı Şablonlar", "📊 Mesaj Raporu", "👤 Satış Temsilcileri", "📦 Excel Depo"
-    ])
+    ]
+    _rehber_sekme = st.radio("Rehber sekmesi", _rehber_sekmeler, horizontal=True, label_visibility="collapsed", key="_rehber_sekme_secim")
+    st.markdown("<hr style='margin-top:-8px;'>", unsafe_allow_html=True)
 
     # Şablonları yükle (tüm tablar için)
     try:
@@ -10914,7 +10916,7 @@ elif aktif == "kisiler":
         sablon_adlari = []
 
     # ── KİŞİ LİSTESİ ──────────────────────────────────────────────────────────
-    with tab_rehber1:
+    if _rehber_sekme == "📋 Kişi Listesi":
         df_kis = db_read("kisiler", extra_sql="ORDER BY firma, ad")
 
         if st.session_state.get("rol") == "admin":
@@ -11111,7 +11113,7 @@ elif aktif == "kisiler":
                             st.session_state.pop(f"kis_edit_{_kisi_id}",None); st.rerun()
 
     # ── KİŞİ EKLE ─────────────────────────────────────────────────────────────
-    with tab_rehber2:
+    if _rehber_sekme == "➕ Kişi Ekle":
         with st.form("kisi_ekle_form"):
             ke1, ke2, ke3 = st.columns(3)
             k_ad      = ke1.text_input("Ad*")
@@ -11142,7 +11144,7 @@ elif aktif == "kisiler":
                     st.warning("Ad ve telefon zorunlu!")
 
     # ── TOPLU İÇE AKTAR ───────────────────────────────────────────────────────
-    with tab_rehber3:
+    if _rehber_sekme == "📥 Toplu İçe Aktar":
         st.markdown("#### 📇 Cari Kartlar'dan Aktar")
         st.caption("Sistemdeki TÜM cari kartların GSM/Sabit numaralarını, tek cari için tek satır olacak şekilde rehbere aktarır. Rehberde zaten olan numaralar tekrar eklenmez (mükerrer önleme).")
         if st.button("📥 Tüm Cari Kartları Rehbere Aktar", key="cari_rehber_toplu_btn", type="primary"):
@@ -11205,7 +11207,7 @@ elif aktif == "kisiler":
                 st.success(f"✅ {basarili} kişi eklendi! {hatali} atlandı."); st.rerun()
 
     # ── KAYITLI ŞABLONLAR ─────────────────────────────────────────────────────
-    with tab_rehber4:
+    if _rehber_sekme == "📝 Kayıtlı Şablonlar":
         st.markdown("#### 📝 Kayıtlı Şablonlar")
         st.caption("💡 `{ad}` → kişi adı  `{firma}` → firma  `{yetkili}` → görevi")
         with st.form("sablon_kaydet_form"):
@@ -11256,7 +11258,7 @@ elif aktif == "kisiler":
             st.info("Henüz şablon yok. Yukarıdan ekleyin.")
 
     # ── MESAJ RAPORU ──────────────────────────────────────────────────────────
-    with tab_rehber5:
+    if _rehber_sekme == "📊 Mesaj Raporu":
         st.markdown("#### 📊 Mesaj Raporu")
         try:
             df_mlog_all = db_read("kisiler_mesaj_log", extra_sql="ORDER BY tarih DESC")
@@ -11291,7 +11293,7 @@ elif aktif == "kisiler":
             buf_ml = io.BytesIO(); df_mlog_all.to_excel(buf_ml, index=False); buf_ml.seek(0)
             st.download_button("📥 İndir", data=buf_ml, file_name="mesaj_raporu.xlsx", use_container_width=True)
 
-    with tab_rehber6:
+    if _rehber_sekme == "👤 Satış Temsilcileri":
         st.markdown("#### 👤 Satış Temsilcisi Kartları")
         df_tem = db_read("temsilciler", extra_sql="WHERE aktif=1 ORDER BY ad")
         if not df_tem.empty:
@@ -11319,7 +11321,7 @@ elif aktif == "kisiler":
     # formülleri bozmadan (dosyanın orijinal hâlini saklayarak) Excel dosyası yükle/sakla/indir.
     # Yeni tablo gerekmez — mevcut "teklifler" tablosu, "tip":"excel_depo" işaretiyle kullanılıyor
     # (aynı Sözleşmeler/Özel Teklif'in kullandığı depolama mantığı).
-    with tab_rehber7:
+    if _rehber_sekme == "📦 Excel Depo":
         st.markdown("### 📦 Serbest Excel Depo")
         st.caption("Herhangi bir boyutta Excel dosyasını (küçük ya da büyük, kaç satır/sütun olursa olsun) olduğu gibi, formülleri bozulmadan saklar.")
 
@@ -11444,7 +11446,7 @@ elif aktif == "kisiler":
             import json as _ed_json
             _ed_sb2 = get_sb_client()
             try:
-                _ed_ham = pd.DataFrame(_ed_sb2.table("teklifler").select("*").order("id", desc=True).limit(200).execute().data) if _ed_sb2 else pd.DataFrame()
+                _ed_ham = pd.DataFrame(_ed_sb2.table("teklifler").select("id,musteri_adi,satirlar,notlar,olusturan,tarih").ilike("satirlar", '%excel_depo%').order("id", desc=True).limit(200).execute().data) if _ed_sb2 else pd.DataFrame()
             except Exception as _ed_to:
                 if "57014" in str(_ed_to) or "timeout" in str(_ed_to).lower():
                     st.error("⏱️ Liste okunamadı (zaman aşımı) — büyük ihtimalle yukarıdaki '🧹 Bakım' aracıyla eski kayıtları temizlemen gerekiyor.")
