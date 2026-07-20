@@ -2941,6 +2941,12 @@ button[data-testid="manage-app-button"] { display: none !important; }
     if st.session_state.get("rol") != "admin":
         _sb_liste = [t for t in _sb_liste if t not in _SADECE_ADMIN]
 
+    # ── GERÇEK ERİŞİM KONTROLÜ — sadece menüde gizlemekle kalmaz, izinsiz sayfaya
+    # doğrudan geçilmeye çalışılırsa da erişimi engeller (admin hariç). ──────────
+    if st.session_state.get("rol") != "admin" and st.session_state.get("aktif_tab") not in _sb_liste and _sb_liste:
+        st.session_state["_erisim_engellendi"] = st.session_state.get("aktif_tab")
+        st.session_state["aktif_tab"] = _sb_liste[0]
+
     _TAB_RENKLER = {
         "yeni":        "#16a34a",
         "liste":       "#0369a1",
@@ -3214,6 +3220,10 @@ st.divider()
 if "aktif_tab" not in st.session_state:
     st.session_state["aktif_tab"] = "liste"
 aktif = st.session_state["aktif_tab"]
+
+if st.session_state.get("_erisim_engellendi"):
+    st.warning("⛔ Bu sayfaya erişim yetkin yok. Yöneticinle iletişime geç.")
+    del st.session_state["_erisim_engellendi"]
 
 
 # ── MOBİL MOD — body class + nav aktif ikon ──────────────────────────────────
@@ -13949,6 +13959,47 @@ elif aktif == "musteri_atama":
     _sc1.metric("Toplam Müşteri", len(_df_ma))
     _sc2.metric("Atanmış", _atanmis)
     _sc3.metric("Atanmamış", _atanmamis)
+
+    st.divider()
+
+    # ── 🗺️ BÖLGE BAZLI TOPLU ATAMA — tek tek müşteri değil, tüm bir ili bir kullanıcıya ver ──
+    with st.expander("🗺️ Bölge (İl) Bazlı Toplu Atama — bir ilin TÜM müşterilerini bir kullanıcıya ver"):
+        st.caption("Örnek: 'İzmir' seçip 'ahmet' kullanıcısına atarsan, İzmir'deki TÜM müşteriler tek seferde ahmet'e atanır. Kullanıcı, sadece atanan bölgelerdeki müşterileri görür (diğer her şey gizli kalır).")
+        _ma_il_listesi = sorted([x for x in _df_ma["il"].dropna().astype(str).unique() if x.strip()]) if "il" in _df_ma.columns else []
+        _mab1, _mab2, _mab3 = st.columns([2, 2, 1.2])
+        _ma_bolge_il = _mab1.selectbox("İl seç:", ["-- İl Seç --"] + _ma_il_listesi, key="ma_bolge_il_sec")
+        _ma_bolge_kul = _mab2.selectbox("Kullanıcı seç:", ["-- Kullanıcı Seç --"] + _kul_listesi, key="ma_bolge_kul_sec")
+        if _ma_bolge_il != "-- İl Seç --":
+            _ma_bolge_sayisi = len(_df_ma[_df_ma["il"].astype(str) == _ma_bolge_il])
+            st.caption(f"📍 '{_ma_bolge_il}' ilinde toplam **{_ma_bolge_sayisi}** müşteri var.")
+        with _mab3:
+            if st.button("✅ Bölgeyi Ata", type="primary", use_container_width=True, key="ma_bolge_ata_btn"):
+                if _ma_bolge_il == "-- İl Seç --" or _ma_bolge_kul == "-- Kullanıcı Seç --":
+                    st.warning("İl ve kullanıcı seçmelisin.")
+                else:
+                    st.session_state["_ma_bolge_onay"] = (_ma_bolge_il, _ma_bolge_kul)
+        if st.session_state.get("_ma_bolge_onay"):
+            _oil, _okul = st.session_state["_ma_bolge_onay"]
+            _osayi = len(_df_ma[_df_ma["il"].astype(str) == _oil])
+            st.warning(f"⚠️ '{_oil}' ilindeki **{_osayi} müşterinin tamamı** '{_okul}' kullanıcısına atanacak (varsa önceki ataması değişir). Onaylıyor musun?")
+            _moc1, _moc2 = st.columns(2)
+            if _moc1.button("✅ Evet, ata", key="ma_bolge_onay_evet"):
+                try:
+                    _ma_bolge_idler = _df_ma[_df_ma["il"].astype(str) == _oil]["id"].tolist()
+                    for _mid_b in _ma_bolge_idler:
+                        _sb_ma.table("cari_kartlar").update({"atanan_kullanici": _okul}).eq("id", int(_mid_b)).execute()
+                    st.success(f"✅ '{_oil}' ilindeki {len(_ma_bolge_idler)} müşteri '{_okul}' kullanıcısına atandı.")
+                    st.session_state["_ma_bolge_onay"] = None
+                    try: db_read.clear()
+                    except: pass
+                    try: get_cari_listesi.clear()
+                    except: pass
+                    st.rerun()
+                except Exception as _ma_be:
+                    st.error(f"Atanamadı: {_ma_be}")
+            if _moc2.button("❌ Vazgeç", key="ma_bolge_onay_hayir"):
+                st.session_state["_ma_bolge_onay"] = None
+                st.rerun()
 
     st.divider()
 
