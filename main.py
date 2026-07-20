@@ -286,10 +286,15 @@ def _get_atanmis_firmalar():
                 }
         return {"firmalar": set(), "idler": set()}  # boş — hiçbir şey görmesin
     except:
-        return None  # hata durumunda hepsini göster (güvenli taraf)
+        try:
+            if "admin" in str(st.session_state.get("rol","")).strip().lower():
+                return None
+        except:
+            pass
+        return {"firmalar": set(), "idler": set()}  # hata durumunda da güvenli taraf: hiçbir şey gösterme
 
 def _atama_filtresi_uygula(df):
-    """Admin hepsini görür, diğerleri sadece kendine atananları"""
+    """Admin hepsini görür, diğerleri SADECE kendine atananları görür (atanmamışlar dahil hiçbir başkasını görmez)."""
     try:
         _rol = str(st.session_state.get("rol","")).strip().lower()
         _kul = str(st.session_state.get("kullanici","")).strip()
@@ -297,15 +302,16 @@ def _atama_filtresi_uygula(df):
         if "admin" in _rol or _kul == "admin" or not _kul:
             return df
         if df.empty or "atanan_kullanici" not in df.columns:
-            return df
-        # Kullanıcıya atananlar VEYA atanmamışlar
-        return df[
-            (df["atanan_kullanici"].astype(str) == _kul) |
-            (df["atanan_kullanici"].isna()) |
-            (df["atanan_kullanici"].astype(str).isin(["None","nan",""]))
-        ]
+            return df.iloc[0:0]  # kolon yoksa güvenli taraf: hiçbir şey gösterme
+        # SADECE kullanıcıya birebir atananlar — atanmamışlar veya başkasına atananlar görünmez
+        return df[df["atanan_kullanici"].astype(str) == _kul]
     except:
-        return df
+        try:
+            if "admin" in str(st.session_state.get("rol","")).strip().lower():
+                return df
+            return df.iloc[0:0]
+        except:
+            return df
 
 # ── BÖLGE EŞLEŞTİRME (il + ilçe → bölge adı) ────────────────────────────────
 _BL_ISTANBUL_ANADOLU = {"adalar","atasehir","beykoz","cekmekoy","kadikoy","kartal",
@@ -5760,6 +5766,15 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
 
     _tbl_col = st.container()
     _not_col = None
+
+    # ── Metin (object) sütunlarındaki None değerleri "None" yazısı olarak görünmesin diye temizle ──
+    # (Sadece görüntüleme anında; veritabanındaki gerçek veriye veya sayısal sütunlara dokunmuyor.)
+    try:
+        for _col_temiz in df_edit.columns:
+            if df_edit[_col_temiz].dtype == object:
+                df_edit[_col_temiz] = df_edit[_col_temiz].apply(lambda _v: "" if _v is None else _v)
+    except Exception:
+        pass
 
     with _tbl_col:
         edited_df = st.data_editor(
