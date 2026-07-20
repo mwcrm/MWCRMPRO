@@ -1585,6 +1585,16 @@ _sayfa_adlari = {
     "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
     "musteri_atama":"Müşteri Atama","islem_takip":"İşlem Takip",
 }
+# ── Yeni sekmede doğrudan Excel Depo dosyası açma (ed_grup query param'ı ile) ──
+if st.query_params.get("ed_grup"):
+    st.session_state["aktif_tab"] = "kisiler"
+    st.session_state["_rehber_sekme_secim"] = "📦 Excel Depo"
+    st.session_state["_ed_url_grup"] = st.query_params.get("ed_grup")
+    try:
+        import base64 as _url_b64
+        st.session_state["_ed_url_ad"] = _url_b64.urlsafe_b64decode(st.query_params.get("ed_ad", "")).decode()
+    except Exception:
+        st.session_state["_ed_url_ad"] = "dosya.xlsx"
 _aktif_sayfa = st.session_state.get("aktif_tab","liste")
 _sayfa_adi = _sayfa_adlari.get(_aktif_sayfa, _aktif_sayfa)
 st.markdown(f"<script>document.title='MWCRMPRO | {_sayfa_adi}'</script>", unsafe_allow_html=True)
@@ -11335,6 +11345,35 @@ elif aktif == "kisiler":
         def _ed_parcala(b64_metin):
             return [b64_metin[i:i + _ED_PARCA_BOYUTU] for i in range(0, len(b64_metin), _ED_PARCA_BOYUTU)]
 
+        # ── Yeni sekmede doğrudan açılış: URL'de ed_grup varsa, dosyayı otomatik getir ──
+        if st.session_state.get("_ed_url_grup") and not st.session_state.get("_ed_acik_dosya"):
+            with st.spinner("⏳ Excel açılıyor..."):
+                try:
+                    _ed_sbu = get_sb_client()
+                    _ed_url_bytes = None
+                    if _ed_sbu:
+                        _ed_url_rows = _ed_sbu.table("teklifler").select("satirlar") \
+                            .eq("musteri_adi", st.session_state["_ed_url_grup"]).eq("toplam_tutar", _ED_TIP_PARCA).execute().data
+                        _ed_url_parcalar = []
+                        for _ed_upr in _ed_url_rows:
+                            try:
+                                _ed_upp = _ed_json.loads(_ed_upr.get("satirlar", "") or "{}")
+                                _ed_url_parcalar.append((_ed_upp.get("parca_no", 0), _ed_upp.get("veri_b64_parca", "")))
+                            except Exception:
+                                continue
+                        _ed_url_parcalar.sort(key=lambda x: x[0])
+                        _ed_url_b64 = "".join(p[1] for p in _ed_url_parcalar)
+                        _ed_url_bytes = _ed_b64.b64decode(_ed_url_b64)
+                    if _ed_url_bytes:
+                        st.session_state["_ed_acik_dosya"] = {
+                            "bytes": _ed_url_bytes, "adi": st.session_state.get("_ed_url_ad", "dosya.xlsx"),
+                            "grup_id": st.session_state["_ed_url_grup"], "notlar": "",
+                        }
+                except Exception as _ed_ue:
+                    st.error(f"Dosya otomatik açılamadı: {_ed_ue}")
+            del st.session_state["_ed_url_grup"]
+            st.query_params.clear()
+
         _ed_yukle = st.file_uploader("Excel dosyası yükle (.xlsx / .xls) — boyut sınırı yok:", type=["xlsx", "xls"], key="ed_yukle")
         _ed_aciklama = st.text_input("Kısa açıklama (aranabilir olsun, ör: '2026 Temmuz Stok Listesi'):", key="ed_aciklama")
 
@@ -11397,50 +11436,6 @@ elif aktif == "kisiler":
                         st.error(f"Kaydedilemedi: {_ed_e}")
 
         st.divider()
-        if st.session_state.get("rol") == "admin":
-            with st.expander("🔁 Eski (görünmeyen) dosyaları geri getir — veri kaybolmadı, sadece etiketi eski"):
-                st.caption("Bu araç, sistem güncellenmeden önce yüklediğin dosyaları SİLMEDEN, yeni sisteme taşır. Büyük dosyalarda (100+ parça) bu işlem yavaş olabilir, hatta zaman aşımına uğrayabilir — o durumda en garantili yol dosyayı tekrar yüklemektir (eskisi veritabanında kalır, sadece görünmez, zararsızdır).")
-                if st.button("🔍 Eski dosyaları bul", key="ed_tasima_bul"):
-                    try:
-                        _ed_sbm = get_sb_client()
-                        _ed_eski_meta = _ed_sbm.table("teklifler").select("id,musteri_adi,satirlar,notlar,olusturan,tarih") \
-                            .ilike("satirlar", '%"tip": "excel_depo_meta"%').execute().data
-                        st.session_state["_ed_tasima_liste"] = _ed_eski_meta or []
-                    except Exception as _ed_tbe:
-                        st.error(f"Aranamadı (zaman aşımı olabilir): {_ed_tbe}")
-                        st.session_state["_ed_tasima_liste"] = []
-                if st.session_state.get("_ed_tasima_liste"):
-                    st.info(f"{len(st.session_state['_ed_tasima_liste'])} eski dosya bulundu.")
-                    for _ed_em in st.session_state["_ed_tasima_liste"]:
-                        try:
-                            _ed_em_parsed = _ed_json.loads(_ed_em.get("satirlar", "") or "{}")
-                        except Exception:
-                            continue
-                        _ed_em_grup = _ed_em_parsed.get("grup_id", "")
-                        _ed_em_ad = _ed_em_parsed.get("dosya_adi", _ed_em.get("musteri_adi", ""))
-                        st.caption(f"📄 {_ed_em_ad}")
-                        if st.button(f"➡️ '{_ed_em_ad}' dosyasını yeni sisteme taşı", key=f"ed_tasi_{_ed_em['id']}"):
-                            with st.spinner("⏳ Taşınıyor (parçalar aranıyor, biraz sürebilir)..."):
-                                try:
-                                    _ed_sbm2 = get_sb_client()
-                                    # Eski format parçalarını bul (tek seferlik, bu yüzden yavaş olabilir ama kabul edilebilir)
-                                    _ed_eski_parcalar = _ed_sbm2.table("teklifler").select("id,satirlar") \
-                                        .ilike("satirlar", f'%"grup_id": "{_ed_em_grup}"%').ilike("satirlar", '%excel_depo_chunk%').execute().data
-                                    for _ed_epr in _ed_eski_parcalar:
-                                        _ed_sbm2.table("teklifler").update({
-                                            "musteri_adi": _ed_em_grup, "toplam_tutar": _ED_TIP_PARCA,
-                                        }).eq("id", _ed_epr["id"]).execute()
-                                    _ed_sbm2.table("teklifler").update({
-                                        "musteri_adi": _ed_em_grup, "toplam_tutar": _ED_TIP_META,
-                                    }).eq("id", _ed_em["id"]).execute()
-                                    st.success(f"✅ '{_ed_em_ad}' yeni sisteme taşındı, artık listede görünecek.")
-                                    st.session_state["_ed_tasima_liste"] = []
-                                    try: db_read.clear()
-                                    except: pass
-                                    st.rerun()
-                                except Exception as _ed_te:
-                                    st.error(f"Taşınamadı (muhtemelen zaman aşımı — bu dosyayı tekrar yüklemen en garantili yol): {_ed_te}")
-
         st.markdown("#### 📚 Depodaki Dosyalar")
         _ed_ara = st.text_input("🔍 Ara (dosya adı / açıklama):", key="ed_ara")
         try:
@@ -11510,17 +11505,19 @@ elif aktif == "kisiler":
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 key=f"ed_gercek_indir_{_ed_item['id']}", use_container_width=True)
                     with _edc4:
-                        if st.button("✏️ Aç", key=f"ed_ac_btn_{_ed_item['id']}", use_container_width=True):
-                            with st.spinner("⏳ Excel açılıyor..."):
-                                try:
-                                    _ed_acik_bytes = _ed_dosyayi_getir(_ed_item["grup_id"])
-                                    st.session_state["_ed_acik_dosya"] = {
-                                        "bytes": _ed_acik_bytes, "adi": _ed_item["dosya_adi"],
-                                        "grup_id": _ed_item["grup_id"], "notlar": _ed_item["notlar"],
-                                    }
-                                    st.rerun()
-                                except Exception as _ed_ae:
-                                    st.error(f"Açılamadı: {_ed_ae}")
+                        _ed_qs = f"ed_grup={_ed_item['grup_id']}&ed_ad={_ed_b64.urlsafe_b64encode(_ed_item['dosya_adi'].encode()).decode()}"
+                        st.markdown(f"""
+<div onclick="
+  try {{
+    var _u = new URL(window.parent.location.href);
+    _u.search = '{_ed_qs}';
+    window.open(_u.toString(), '_blank');
+  }} catch(e) {{
+    window.open('?{_ed_qs}', '_blank');
+  }}
+" style="text-align:center;padding:8px 4px;border:1px solid #d0d5dd;border-radius:8px;
+     background:#fff;color:#111827;font-size:14px;cursor:pointer;">✏️ Yeni Sekmede Aç</div>
+""", unsafe_allow_html=True)
                     with _edc3:
                         if st.session_state.get("rol") == "admin":
                             if st.button("🗑️", key=f"ed_sil_btn_{_ed_item['id']}", use_container_width=True):
