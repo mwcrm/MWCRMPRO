@@ -11323,15 +11323,15 @@ elif aktif == "kisiler":
     # (aynı Sözleşmeler/Özel Teklif'in kullandığı depolama mantığı).
     if _rehber_sekme == "📦 Excel Depo":
         st.markdown("### 📦 Serbest Excel Depo")
-        st.caption("Herhangi bir boyutta Excel dosyasını (küçük ya da büyük, kaç satır/sütun olursa olsun) olduğu gibi, formülleri bozulmadan saklar.")
+        st.caption("Herhangi bir boyutta Excel dosyasını (küçük ya da büyük, kaç satır/sütun olursa olsun) olduğu gibi, formülleri bozulmadan saklar. Hiçbir manuel kurulum gerekmez — sadece mevcut tabloyu kullanır.")
 
-        import base64 as _ed_b64, io as _ed_io, time as _ed_time
-        _ED_BUCKET = "excel-depo"
+        import base64 as _ed_b64, io as _ed_io, time as _ed_time, uuid as _ed_uuid, json as _ed_json
 
-        def _ed_bucket_hazir(sb):
-            """excel-depo bucket'ı Supabase panelinden elle oluşturulmuş olmalı (anon anahtar bucket oluşturamaz).
-            Burada sadece varlığını kontrol ediyoruz; yoksa kullanıcıya net talimat gösteriyoruz."""
-            return True  # Doğrudan yüklemeyi dene; bucket yoksa upload adımı zaten net hata verecek
+        _ED_PARCA_BOYUTU = 300_000   # base64 karakter (~225 KB ham veri) — her satır küçük kalsın, tablo yavaşlamasın
+        _ED_TOPLU_EKLE = 20          # her seferde kaç parçayı tek istekte gönderelim
+
+        def _ed_parcala(b64_metin):
+            return [b64_metin[i:i + _ED_PARCA_BOYUTU] for i in range(0, len(b64_metin), _ED_PARCA_BOYUTU)]
 
         _ed_yukle = st.file_uploader("Excel dosyası yükle (.xlsx / .xls) — boyut sınırı yok:", type=["xlsx", "xls"], key="ed_yukle")
         _ed_aciklama = st.text_input("Kısa açıklama (aranabilir olsun, ör: '2026 Temmuz Stok Listesi'):", key="ed_aciklama")
@@ -11351,111 +11351,57 @@ elif aktif == "kisiler":
 
             if st.button("💾 Depoya Kaydet", type="primary", key="ed_kaydet_btn"):
                 _ed_sb = get_sb_client()
-                _ed_kaydedildi = False
-                _ed_yontem = ""
-                _ed_yol = f"{int(_ed_time.time())}_{_ed_yukle.name}"
-                if _ed_sb:
-                    with st.spinner("⏳ Depoya kaydediliyor..."):
-                        # 1) ÖNCE: gerçek dosya depolama (Storage) — büyük dosyalar için doğru yöntem
-                        _ed_storage_hata = None
-                        try:
-                            if _ed_bucket_hazir(_ed_sb):
-                                _ed_sb.storage.from_(_ED_BUCKET).upload(
-                                    _ed_yol, _ed_bytes,
-                                    {"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}
-                                )
-                                _ed_sb.table("teklifler").insert({
-                                    "musteri_id": 0, "musteri_adi": _ed_yukle.name,
-                                    "satirlar": __import__("json").dumps({
-                                        "tip": "excel_depo_v2", "dosya_adi": _ed_yukle.name,
-                                        "boyut_kb": _ed_boyut_kb, "depo_yolu": _ed_yol,
-                                    }, ensure_ascii=False),
-                                    "toplam_tutar": 0, "olusturan": st.session_state.get("kullanici", ""),
-                                    "notlar": _ed_aciklama.strip() or _ed_yukle.name,
-                                }).execute()
-                                _ed_kaydedildi = True
-                                _ed_yontem = "storage"
-                            else:
-                                _ed_storage_hata = "Depolama alanı ('excel-depo') oluşturulamadı."
-                        except Exception as _ed_st_e:
-                            _ed_kaydedildi = False
-                            _ed_storage_hata = str(_ed_st_e)
-                        if _ed_storage_hata:
-                            if "not found" in _ed_storage_hata.lower() or "bucket" in _ed_storage_hata.lower():
-                                st.warning("⚠️ 'excel-depo' adlı depolama alanı Supabase panelinde henüz oluşturulmamış. Supabase → Storage → New bucket → 'excel-depo' adıyla oluşturup tekrar dene.")
-                            else:
-                                st.warning(f"⚠️ Storage denemesi başarısız oldu, sebebi: {_ed_storage_hata}")
-                        # 2) OLMAZSA: eski yöntem (veriyi metne çevirip tabloya göm) — SADECE küçük dosyalarda (2 MB altı).
-                        # Büyük dosyalarda bu yöntem tabloyu şişirip veritabanını yavaşlatıyordu (zaman aşımı hatasının sebebi buydu).
-                        if not _ed_kaydedildi:
-                            if _ed_boyut_kb > 2048:
-                                st.error("❌ Storage'a kaydedilemedi ve dosya 2 MB'dan büyük olduğu için yedek yönteme de kaydedilemez (veritabanını yavaşlatır). Storage bağlantısında bir sorun var — lütfen bildir, birlikte bakalım.")
-                            else:
-                                try:
-                                    _ed_b64_str = _ed_b64.b64encode(_ed_bytes).decode("ascii")
-                                    _ed_sb.table("teklifler").insert({
-                                        "musteri_id": 0, "musteri_adi": _ed_yukle.name,
-                                        "satirlar": __import__("json").dumps({
-                                            "tip": "excel_depo", "dosya_adi": _ed_yukle.name,
-                                            "boyut_kb": _ed_boyut_kb, "veri_b64": _ed_b64_str,
-                                        }, ensure_ascii=False),
-                                        "toplam_tutar": 0, "olusturan": st.session_state.get("kullanici", ""),
-                                        "notlar": _ed_aciklama.strip() or _ed_yukle.name,
-                                    }).execute()
-                                    _ed_kaydedildi = True
-                                    _ed_yontem = "yedek"
-                                except Exception as _ed_e2:
-                                    st.error(f"Kaydedilemedi: {_ed_e2}")
-                if _ed_kaydedildi:
-                    st.success(f"✅ '{_ed_yukle.name}' depoya kaydedildi" + (" (Storage)" if _ed_yontem == "storage" else " (yedek yöntem)") + " — formülleri dahil, aynen saklandı.")
-                    try: db_read.clear()
-                    except: pass
-                    st.rerun()
+                if not _ed_sb:
+                    st.error("Veritabanı bağlantısı kurulamadı.")
+                else:
+                    _ed_b64_str = _ed_b64.b64encode(_ed_bytes).decode("ascii")
+                    _ed_parcalar = _ed_parcala(_ed_b64_str)
+                    _ed_grup_id = str(_ed_uuid.uuid4())
+                    _ed_ilerleme = st.progress(0, text=f"⏳ 0/{len(_ed_parcalar)} parça kaydedildi...")
+                    try:
+                        for _ed_bi in range(0, len(_ed_parcalar), _ED_TOPLU_EKLE):
+                            _ed_grup = _ed_parcalar[_ed_bi:_ed_bi + _ED_TOPLU_EKLE]
+                            _ed_kayitlar = [{
+                                "musteri_id": 0, "musteri_adi": _ed_yukle.name,
+                                "satirlar": _ed_json.dumps({
+                                    "tip": "excel_depo_chunk", "grup_id": _ed_grup_id,
+                                    "parca_no": _ed_bi + _k, "veri_b64_parca": _parca,
+                                }, ensure_ascii=False),
+                                "toplam_tutar": 0, "olusturan": st.session_state.get("kullanici", ""),
+                                "notlar": "",
+                            } for _k, _parca in enumerate(_ed_grup)]
+                            _ed_sb.table("teklifler").insert(_ed_kayitlar).execute()
+                            _ed_ilerleme.progress(min((_ed_bi + len(_ed_grup)) / len(_ed_parcalar), 1.0),
+                                text=f"⏳ {min(_ed_bi + len(_ed_grup), len(_ed_parcalar))}/{len(_ed_parcalar)} parça kaydedildi...")
+                        # Son olarak küçük bir "özet" (meta) satırı — liste bu satırı okuyacak, parçaları değil
+                        _ed_sb.table("teklifler").insert({
+                            "musteri_id": 0, "musteri_adi": _ed_yukle.name,
+                            "satirlar": _ed_json.dumps({
+                                "tip": "excel_depo_meta", "grup_id": _ed_grup_id,
+                                "dosya_adi": _ed_yukle.name, "boyut_kb": _ed_boyut_kb,
+                                "toplam_parca": len(_ed_parcalar),
+                            }, ensure_ascii=False),
+                            "toplam_tutar": 0, "olusturan": st.session_state.get("kullanici", ""),
+                            "notlar": _ed_aciklama.strip() or _ed_yukle.name,
+                        }).execute()
+                        _ed_ilerleme.empty()
+                        st.success(f"✅ '{_ed_yukle.name}' depoya kaydedildi — formülleri dahil, aynen saklandı ({len(_ed_parcalar)} parça).")
+                        try: db_read.clear()
+                        except: pass
+                        st.rerun()
+                    except Exception as _ed_e:
+                        _ed_ilerleme.empty()
+                        st.error(f"Kaydedilemedi: {_ed_e}")
 
         st.divider()
-        if st.session_state.get("rol") == "admin":
-            with st.expander("🧹 Bakım: Eski/şişmiş kayıtları temizle (sorun yaşarsan buraya bak)"):
-                st.caption("Storage'a geçmeden önce büyük dosyalar eski yöntemle (metne çevrilip) kaydedilmiş olabilir — bunlar tabloyu yavaşlatabilir. Bu araç SADECE eski formattaki (Storage'a taşınmamış) kayıtları bulur, sana gösterir; sen onaylamadan hiçbir şey silinmez.")
-                if st.button("🔍 Eski format kayıtları bul", key="ed_bakim_bul"):
-                    try:
-                        _ed_sb3 = get_sb_client()
-                        _ed_eski = _ed_sb3.table("teklifler").select("id,musteri_adi,notlar,tarih").ilike("satirlar", '%"tip": "excel_depo"%').execute()
-                        st.session_state["_ed_eski_liste"] = _ed_eski.data or []
-                    except Exception as _ed_be:
-                        st.error(f"Aranamadı (muhtemelen yine zaman aşımı): {_ed_be}")
-                        st.session_state["_ed_eski_liste"] = []
-                if st.session_state.get("_ed_eski_liste"):
-                    st.warning(f"⚠️ {len(st.session_state['_ed_eski_liste'])} adet eski format kayıt bulundu:")
-                    for _ed_e in st.session_state["_ed_eski_liste"]:
-                        st.caption(f"[{_ed_e.get('id')}] {_ed_e.get('musteri_adi')} — {_ed_e.get('notlar')} — {_ed_e.get('tarih')}")
-                    st.error("Bunları silmek KALICIDIR ve geri alınamaz. Emin değilsen silme.")
-                    if st.checkbox("Yukarıdaki tüm eski kayıtları kalıcı olarak silmek istediğimi onaylıyorum", key="ed_bakim_onay"):
-                        if st.button("🗑️ Onayladım, şimdi sil", type="primary", key="ed_bakim_sil_btn"):
-                            try:
-                                _ed_sb4 = get_sb_client()
-                                _ed_sb4.table("teklifler").delete().ilike("satirlar", '%"tip": "excel_depo"%').execute()
-                                st.success("✅ Eski kayıtlar silindi.")
-                                st.session_state["_ed_eski_liste"] = []
-                                st.session_state["ed_bakim_onay"] = False
-                                try: db_read.clear()
-                                except: pass
-                                st.rerun()
-                            except Exception as _ed_se2:
-                                st.error(f"Silinemedi: {_ed_se2}")
-
         st.markdown("#### 📚 Depodaki Dosyalar")
         _ed_ara = st.text_input("🔍 Ara (dosya adı / açıklama):", key="ed_ara")
         try:
-            import json as _ed_json
             _ed_sb2 = get_sb_client()
-            try:
-                _ed_ham = pd.DataFrame(_ed_sb2.table("teklifler").select("id,musteri_adi,satirlar,notlar,olusturan,tarih").ilike("satirlar", '%excel_depo%').order("id", desc=True).limit(200).execute().data) if _ed_sb2 else pd.DataFrame()
-            except Exception as _ed_to:
-                if "57014" in str(_ed_to) or "timeout" in str(_ed_to).lower():
-                    st.error("⏱️ Liste okunamadı (zaman aşımı) — büyük ihtimalle yukarıdaki '🧹 Bakım' aracıyla eski kayıtları temizlemen gerekiyor.")
-                    _ed_ham = pd.DataFrame()
-                else:
-                    raise
+            # SADECE küçük "özet" (meta) satırlarını çekiyoruz — büyük parça verisine hiç dokunmuyoruz,
+            # bu yüzden liste, depoda ne kadar veri olursa olsun her zaman hızlı kalır.
+            _ed_ham = pd.DataFrame(_ed_sb2.table("teklifler").select("id,musteri_adi,satirlar,notlar,olusturan,tarih")
+                .ilike("satirlar", '%excel_depo_meta%').order("id", desc=True).limit(200).execute().data) if _ed_sb2 else pd.DataFrame()
             _ed_liste = []
             if not _ed_ham.empty and "satirlar" in _ed_ham.columns:
                 for _, _ed_r in _ed_ham.iterrows():
@@ -11463,13 +11409,13 @@ elif aktif == "kisiler":
                         _ed_parsed = _ed_json.loads(_ed_r.get("satirlar", "") or "{}")
                     except Exception:
                         continue
-                    if _ed_parsed.get("tip") in ("excel_depo", "excel_depo_v2"):
+                    if _ed_parsed.get("tip") == "excel_depo_meta":
                         _ed_liste.append({
                             "id": _ed_r.get("id"),
+                            "grup_id": _ed_parsed.get("grup_id", ""),
                             "dosya_adi": _ed_parsed.get("dosya_adi", ""),
                             "boyut_kb": _ed_parsed.get("boyut_kb", 0),
-                            "veri_b64": _ed_parsed.get("veri_b64", ""),
-                            "depo_yolu": _ed_parsed.get("depo_yolu", ""),
+                            "toplam_parca": _ed_parsed.get("toplam_parca", 0),
                             "notlar": _ed_r.get("notlar", ""),
                             "olusturan": _ed_r.get("olusturan", ""),
                             "tarih": _ed_r.get("tarih", ""),
@@ -11489,18 +11435,31 @@ elif aktif == "kisiler":
                             _ed_tarih_g = _oa_tr_saat(_ed_item["tarih"]).strftime("%d.%m.%Y %H:%M") if "_oa_tr_saat" in dir() else str(_ed_item["tarih"])[:16]
                         except Exception:
                             _ed_tarih_g = str(_ed_item["tarih"])[:16]
-                        st.markdown(f"📄 **{_ed_item['dosya_adi']}** — {_ed_item['notlar']}  \n<span style='color:#94a3b8;font-size:11.5px;'>{_ed_tarih_g} · {_ed_item['boyut_kb']} KB · {_ed_item['olusturan']}</span>", unsafe_allow_html=True)
+                        st.markdown(f"📄 **{_ed_item['dosya_adi']}** — {_ed_item['notlar']}  \n<span style='color:#94a3b8;font-size:11.5px;'>{_ed_tarih_g} · {_ed_item['boyut_kb']} KB · {_ed_item['toplam_parca']} parça · {_ed_item['olusturan']}</span>", unsafe_allow_html=True)
                     with _edc2:
-                        try:
-                            if _ed_item["depo_yolu"]:
-                                _ed_dl_bytes = _ed_sb2.storage.from_(_ED_BUCKET).download(_ed_item["depo_yolu"])
-                            else:
-                                _ed_dl_bytes = _ed_b64.b64decode(_ed_item["veri_b64"])
-                            st.download_button("⬇️ İndir", data=_ed_dl_bytes, file_name=_ed_item["dosya_adi"],
+                        if st.button("⬇️ İndir", key=f"ed_indir_btn_{_ed_item['id']}", use_container_width=True):
+                            with st.spinner("⏳ Parçalar birleştiriliyor..."):
+                                try:
+                                    _ed_parca_rows = _ed_sb2.table("teklifler").select("satirlar") \
+                                        .ilike("satirlar", f'%"grup_id": "{_ed_item["grup_id"]}"%').ilike("satirlar", '%excel_depo_chunk%').execute().data
+                                    _ed_parcalar_d = []
+                                    for _ed_pr in _ed_parca_rows:
+                                        try:
+                                            _ed_pp = _ed_json.loads(_ed_pr.get("satirlar", "") or "{}")
+                                            _ed_parcalar_d.append((_ed_pp.get("parca_no", 0), _ed_pp.get("veri_b64_parca", "")))
+                                        except Exception:
+                                            continue
+                                    _ed_parcalar_d.sort(key=lambda x: x[0])
+                                    _ed_tam_b64 = "".join(p[1] for p in _ed_parcalar_d)
+                                    _ed_dl_bytes = _ed_b64.b64decode(_ed_tam_b64)
+                                    st.session_state[f"_ed_indirilen_{_ed_item['id']}"] = _ed_dl_bytes
+                                except Exception as _ed_ie:
+                                    st.error(f"İndirilemedi: {_ed_ie}")
+                        if st.session_state.get(f"_ed_indirilen_{_ed_item['id']}"):
+                            st.download_button("📥 Hazır, kaydet", data=st.session_state[f"_ed_indirilen_{_ed_item['id']}"],
+                                file_name=_ed_item["dosya_adi"],
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                                key=f"ed_indir_{_ed_item['id']}", use_container_width=True)
-                        except Exception:
-                            st.caption("İndirme hatası")
+                                key=f"ed_gercek_indir_{_ed_item['id']}", use_container_width=True)
                     with _edc3:
                         if st.session_state.get("rol") == "admin":
                             if st.button("🗑️", key=f"ed_sil_btn_{_ed_item['id']}", use_container_width=True):
@@ -11508,10 +11467,7 @@ elif aktif == "kisiler":
                             if st.session_state.get(f"_ed_sil_onay_{_ed_item['id']}"):
                                 if st.button("✅ Emin misin?", key=f"ed_sil_onay_{_ed_item['id']}", use_container_width=True):
                                     try:
-                                        if _ed_item["depo_yolu"]:
-                                            try: _ed_sb2.storage.from_(_ED_BUCKET).remove([_ed_item["depo_yolu"]])
-                                            except Exception: pass
-                                        _ed_sb2.table("teklifler").delete().eq("id", int(_ed_item["id"])).execute()
+                                        _ed_sb2.table("teklifler").delete().ilike("satirlar", f'%"grup_id": "{_ed_item["grup_id"]}"%').execute()
                                         st.success("Silindi.")
                                         st.session_state[f"_ed_sil_onay_{_ed_item['id']}"] = False
                                         try: db_read.clear()
