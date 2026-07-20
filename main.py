@@ -11506,17 +11506,21 @@ elif aktif == "kisiler":
                                 key=f"ed_gercek_indir_{_ed_item['id']}", use_container_width=True)
                     with _edc4:
                         _ed_qs = f"ed_grup={_ed_item['grup_id']}&ed_ad={_ed_b64.urlsafe_b64encode(_ed_item['dosya_adi'].encode()).decode()}"
+                        _ed_link_id = f"ed_link_{_ed_item['id']}"
                         st.markdown(f"""
-<div onclick="
+<a id="{_ed_link_id}" href="?{_ed_qs}" target="_blank" rel="noopener" style="text-decoration:none;">
+  <div style="text-align:center;padding:8px 4px;border:1px solid #d0d5dd;border-radius:8px;
+       background:#fff;color:#111827;font-size:14px;cursor:pointer;">✏️ Yeni Sekmede Aç</div>
+</a>
+<script>
+(function(){{
   try {{
-    var _u = new URL(window.parent.location.href);
-    _u.search = '{_ed_qs}';
-    window.open(_u.toString(), '_blank');
-  }} catch(e) {{
-    window.open('?{_ed_qs}', '_blank');
-  }}
-" style="text-align:center;padding:8px 4px;border:1px solid #d0d5dd;border-radius:8px;
-     background:#fff;color:#111827;font-size:14px;cursor:pointer;">✏️ Yeni Sekmede Aç</div>
+    var _a = document.getElementById("{_ed_link_id}");
+    var _base = window.parent.location.origin + window.parent.location.pathname;
+    _a.href = _base + "?{_ed_qs}";
+  }} catch(e) {{}}
+}})();
+</script>
 """, unsafe_allow_html=True)
                     with _edc3:
                         if st.session_state.get("rol") == "admin":
@@ -11564,14 +11568,34 @@ elif aktif == "kisiler":
                 if (_ed_ws_d.max_row or 0) > 200:
                     st.caption(f"⚠️ Bu sayfa {_ed_ws_d.max_row} satır — performans için ilk 200 satır gösteriliyor.")
 
+                def _ed_tr_goster(v):
+                    """Sayıları Türkçe formatla göster (1.234,56); metin/boşsa dokunma."""
+                    if isinstance(v, (int, float)) and not isinstance(v, bool):
+                        try:
+                            return fmt_para(v).replace(" ₺", "")
+                        except Exception:
+                            return v
+                    return v
+
+                def _ed_tr_oku(v):
+                    """Kullanıcının yazdığı Türkçe formatlı sayıyı (1.234,56) gerçek sayıya çevirir."""
+                    if isinstance(v, str) and re.match(r"^-?[\d\.]+(,\d+)?$", v.strip()) and ("," in v or "." in v):
+                        try:
+                            _temiz = v.strip().replace(".", "").replace(",", ".")
+                            _f = float(_temiz)
+                            return int(_f) if _f == int(_f) else _f
+                        except Exception:
+                            return v
+                    return v
+
                 _ed_veri = []
                 for _ed_ri2, _ed_row in enumerate(_ed_ws_d.iter_rows(min_row=1, max_row=_ed_max_r, max_col=_ed_max_c, values_only=True)):
-                    _ed_veri.append(["" if _v is None else _v for _v in _ed_row])
+                    _ed_veri.append(["" if _v is None else _ed_tr_goster(_v) for _v in _ed_row])
                 _ed_wb_deger.close()
                 _ed_kolon_adlari = [_ed_opx2.utils.get_column_letter(_c) for _c in range(1, _ed_max_c + 1)]
                 _ed_df_grid = pd.DataFrame(_ed_veri, columns=_ed_kolon_adlari)
 
-                st.caption("Hücrelere tıklayıp düzenleyebilirsin. Dokunmadığın hücrelerdeki formüller korunur.")
+                st.caption("Hücrelere tıklayıp düzenleyebilirsin. Dokunmadığın hücrelerdeki formüller korunur. Sayılar Türkçe formatta (1.234,56) gösterilir.")
                 _ed_duzenlenen = st.data_editor(_ed_df_grid, use_container_width=True, height=500, key="ed_grid_editor")
 
                 if st.button("💾 Değişiklikleri Yeni Sürüm Olarak Kaydet", type="primary", key="ed_grid_kaydet"):
@@ -11587,7 +11611,7 @@ elif aktif == "kisiler":
                                     _ed_eski_v = _ed_df_grid.iat[_ed_ri, _ed_ci]
                                     _ed_yeni_v = _ed_duzenlenen.iat[_ed_ri, _ed_ci]
                                     if str(_ed_eski_v) != str(_ed_yeni_v):
-                                        _ed_ws_f.cell(row=_ed_ri + 1, column=_ed_ci + 1).value = (_ed_yeni_v if _ed_yeni_v != "" else None)
+                                        _ed_ws_f.cell(row=_ed_ri + 1, column=_ed_ci + 1).value = (_ed_tr_oku(_ed_yeni_v) if _ed_yeni_v != "" else None)
                                         _ed_degisen += 1
                             if _ed_degisen == 0:
                                 st.info("Hiçbir hücre değiştirilmedi, kaydetmeye gerek yok.")
