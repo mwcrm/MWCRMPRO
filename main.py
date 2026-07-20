@@ -11428,8 +11428,23 @@ elif aktif == "kisiler":
                 st.caption("Depoda henüz dosya yok.")
             else:
                 st.caption(f"{len(_ed_liste)} dosya bulundu.")
+
+                def _ed_dosyayi_getir(grup_id):
+                    _ed_parca_rows = _ed_sb2.table("teklifler").select("satirlar") \
+                        .ilike("satirlar", f'%"grup_id": "{grup_id}"%').ilike("satirlar", '%excel_depo_chunk%').execute().data
+                    _ed_parcalar_d = []
+                    for _ed_pr in _ed_parca_rows:
+                        try:
+                            _ed_pp = _ed_json.loads(_ed_pr.get("satirlar", "") or "{}")
+                            _ed_parcalar_d.append((_ed_pp.get("parca_no", 0), _ed_pp.get("veri_b64_parca", "")))
+                        except Exception:
+                            continue
+                    _ed_parcalar_d.sort(key=lambda x: x[0])
+                    _ed_tam_b64 = "".join(p[1] for p in _ed_parcalar_d)
+                    return _ed_b64.b64decode(_ed_tam_b64)
+
                 for _ed_item in _ed_liste:
-                    _edc1, _edc2, _edc3 = st.columns([4, 1.3, 0.8])
+                    _edc1, _edc2, _edc3, _edc4 = st.columns([3.4, 1.1, 0.8, 0.9])
                     with _edc1:
                         try:
                             _ed_tarih_g = _oa_tr_saat(_ed_item["tarih"]).strftime("%d.%m.%Y %H:%M") if "_oa_tr_saat" in dir() else str(_ed_item["tarih"])[:16]
@@ -11440,26 +11455,26 @@ elif aktif == "kisiler":
                         if st.button("⬇️ İndir", key=f"ed_indir_btn_{_ed_item['id']}", use_container_width=True):
                             with st.spinner("⏳ Parçalar birleştiriliyor..."):
                                 try:
-                                    _ed_parca_rows = _ed_sb2.table("teklifler").select("satirlar") \
-                                        .ilike("satirlar", f'%"grup_id": "{_ed_item["grup_id"]}"%').ilike("satirlar", '%excel_depo_chunk%').execute().data
-                                    _ed_parcalar_d = []
-                                    for _ed_pr in _ed_parca_rows:
-                                        try:
-                                            _ed_pp = _ed_json.loads(_ed_pr.get("satirlar", "") or "{}")
-                                            _ed_parcalar_d.append((_ed_pp.get("parca_no", 0), _ed_pp.get("veri_b64_parca", "")))
-                                        except Exception:
-                                            continue
-                                    _ed_parcalar_d.sort(key=lambda x: x[0])
-                                    _ed_tam_b64 = "".join(p[1] for p in _ed_parcalar_d)
-                                    _ed_dl_bytes = _ed_b64.b64decode(_ed_tam_b64)
-                                    st.session_state[f"_ed_indirilen_{_ed_item['id']}"] = _ed_dl_bytes
+                                    st.session_state[f"_ed_indirilen_{_ed_item['id']}"] = _ed_dosyayi_getir(_ed_item["grup_id"])
                                 except Exception as _ed_ie:
                                     st.error(f"İndirilemedi: {_ed_ie}")
                         if st.session_state.get(f"_ed_indirilen_{_ed_item['id']}"):
-                            st.download_button("📥 Hazır, kaydet", data=st.session_state[f"_ed_indirilen_{_ed_item['id']}"],
+                            st.download_button("📥 Kaydet", data=st.session_state[f"_ed_indirilen_{_ed_item['id']}"],
                                 file_name=_ed_item["dosya_adi"],
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 key=f"ed_gercek_indir_{_ed_item['id']}", use_container_width=True)
+                    with _edc4:
+                        if st.button("✏️ Aç", key=f"ed_ac_btn_{_ed_item['id']}", use_container_width=True):
+                            with st.spinner("⏳ Excel açılıyor..."):
+                                try:
+                                    _ed_acik_bytes = _ed_dosyayi_getir(_ed_item["grup_id"])
+                                    st.session_state["_ed_acik_dosya"] = {
+                                        "bytes": _ed_acik_bytes, "adi": _ed_item["dosya_adi"],
+                                        "grup_id": _ed_item["grup_id"], "notlar": _ed_item["notlar"],
+                                    }
+                                    st.rerun()
+                                except Exception as _ed_ae:
+                                    st.error(f"Açılamadı: {_ed_ae}")
                     with _edc3:
                         if st.session_state.get("rol") == "admin":
                             if st.button("🗑️", key=f"ed_sil_btn_{_ed_item['id']}", use_container_width=True):
@@ -11478,6 +11493,101 @@ elif aktif == "kisiler":
                     st.markdown("<hr style='margin:4px 0;border-color:#eef0f3;'>", unsafe_allow_html=True)
         except Exception as _ed_liste_e:
             st.error(f"Depo listesi okunamadı: {_ed_liste_e}")
+
+        # ══════════════════ AÇ VE DÜZENLE (Google E-Tablo benzeri) ══════════════════
+        # Dokunulmayan hücreler (formüller dahil) aynen korunur; sadece elle değiştirilen
+        # hücreler güncellenir. Veri kaybı olmasın diye düzenlenen dosya YENİ bir sürüm
+        # olarak kaydedilir, orijinal dosyaya asla dokunulmaz/silinmez.
+        if st.session_state.get("_ed_acik_dosya"):
+            st.divider()
+            _ed_ac = st.session_state["_ed_acik_dosya"]
+            st.markdown(f"### ✏️ Düzenleniyor: {_ed_ac['adi']}")
+            if st.button("✖️ Kapat", key="ed_kapat_btn"):
+                for _ed_k in list(st.session_state.keys()):
+                    if _ed_k.startswith("_ed_acik") or _ed_k.startswith("_ed_grid_"):
+                        del st.session_state[_ed_k]
+                st.rerun()
+
+            try:
+                import openpyxl as _ed_opx2
+                # SADECE görüntülemek için hafif (read_only) yükleme — tam/formüllü yükleme
+                # burada YAPILMIYOR, bellek taşmasının sebebi buydu. Tam yükleme sadece
+                # "Kaydet"e basıldığında, bir kereliğine yapılacak.
+                _ed_wb_deger = _ed_opx2.load_workbook(_ed_io.BytesIO(_ed_ac["bytes"]), read_only=True, data_only=True)
+                _ed_sayfa_adi = st.selectbox("Sayfa seç:", _ed_wb_deger.sheetnames, key="ed_sayfa_sec")
+                _ed_ws_d = _ed_wb_deger[_ed_sayfa_adi]
+                _ed_max_r = min(_ed_ws_d.max_row or 1, 200)   # bellek/performans için ilk 200 satır
+                _ed_max_c = min(_ed_ws_d.max_column or 1, 40)
+                if (_ed_ws_d.max_row or 0) > 200:
+                    st.caption(f"⚠️ Bu sayfa {_ed_ws_d.max_row} satır — performans için ilk 200 satır gösteriliyor.")
+
+                _ed_veri = []
+                for _ed_ri2, _ed_row in enumerate(_ed_ws_d.iter_rows(min_row=1, max_row=_ed_max_r, max_col=_ed_max_c, values_only=True)):
+                    _ed_veri.append(["" if _v is None else _v for _v in _ed_row])
+                _ed_wb_deger.close()
+                _ed_kolon_adlari = [_ed_opx2.utils.get_column_letter(_c) for _c in range(1, _ed_max_c + 1)]
+                _ed_df_grid = pd.DataFrame(_ed_veri, columns=_ed_kolon_adlari)
+
+                st.caption("Hücrelere tıklayıp düzenleyebilirsin. Dokunmadığın hücrelerdeki formüller korunur.")
+                _ed_duzenlenen = st.data_editor(_ed_df_grid, use_container_width=True, height=500, key="ed_grid_editor")
+
+                if st.button("💾 Değişiklikleri Yeni Sürüm Olarak Kaydet", type="primary", key="ed_grid_kaydet"):
+                    with st.spinner("⏳ Formüller korunarak kaydediliyor..."):
+                        try:
+                            # Tam (formüllü) yükleme SADECE burada, kaydetme anında yapılıyor —
+                            # açarken/gezinirken belleği şişirmemek için.
+                            _ed_wb_formul = _ed_opx2.load_workbook(_ed_io.BytesIO(_ed_ac["bytes"]), data_only=False)
+                            _ed_ws_f = _ed_wb_formul[_ed_sayfa_adi]
+                            _ed_degisen = 0
+                            for _ed_ri in range(_ed_max_r):
+                                for _ed_ci in range(_ed_max_c):
+                                    _ed_eski_v = _ed_df_grid.iat[_ed_ri, _ed_ci]
+                                    _ed_yeni_v = _ed_duzenlenen.iat[_ed_ri, _ed_ci]
+                                    if str(_ed_eski_v) != str(_ed_yeni_v):
+                                        _ed_ws_f.cell(row=_ed_ri + 1, column=_ed_ci + 1).value = (_ed_yeni_v if _ed_yeni_v != "" else None)
+                                        _ed_degisen += 1
+                            if _ed_degisen == 0:
+                                st.info("Hiçbir hücre değiştirilmedi, kaydetmeye gerek yok.")
+                            else:
+                                _ed_yeni_buf = _ed_io.BytesIO()
+                                _ed_wb_formul.save(_ed_yeni_buf)
+                                _ed_yeni_bytes = _ed_yeni_buf.getvalue()
+                                _ed_yeni_ad = _ed_ac["adi"].rsplit(".", 1)[0] + f"_duzenlendi_{_tr_simdi().strftime('%Y%m%d_%H%M')}.xlsx"
+                                _ed_yeni_b64 = _ed_b64.b64encode(_ed_yeni_bytes).decode("ascii")
+                                _ed_yeni_parcalar = _ed_parcala(_ed_yeni_b64)
+                                _ed_yeni_grup = str(_ed_uuid.uuid4())
+                                _ed_sbx = get_sb_client()
+                                for _ed_bi2 in range(0, len(_ed_yeni_parcalar), _ED_TOPLU_EKLE):
+                                    _ed_grup2 = _ed_yeni_parcalar[_ed_bi2:_ed_bi2 + _ED_TOPLU_EKLE]
+                                    _ed_kayitlar2 = [{
+                                        "musteri_id": 0, "musteri_adi": _ed_yeni_ad,
+                                        "satirlar": _ed_json.dumps({
+                                            "tip": "excel_depo_chunk", "grup_id": _ed_yeni_grup,
+                                            "parca_no": _ed_bi2 + _k2, "veri_b64_parca": _parca2,
+                                        }, ensure_ascii=False),
+                                        "toplam_tutar": 0, "olusturan": st.session_state.get("kullanici", ""),
+                                        "notlar": "",
+                                    } for _k2, _parca2 in enumerate(_ed_grup2)]
+                                    _ed_sbx.table("teklifler").insert(_ed_kayitlar2).execute()
+                                _ed_sbx.table("teklifler").insert({
+                                    "musteri_id": 0, "musteri_adi": _ed_yeni_ad,
+                                    "satirlar": _ed_json.dumps({
+                                        "tip": "excel_depo_meta", "grup_id": _ed_yeni_grup,
+                                        "dosya_adi": _ed_yeni_ad, "boyut_kb": round(len(_ed_yeni_bytes) / 1024, 1),
+                                        "toplam_parca": len(_ed_yeni_parcalar),
+                                    }, ensure_ascii=False),
+                                    "toplam_tutar": 0, "olusturan": st.session_state.get("kullanici", ""),
+                                    "notlar": f"'{_ed_ac['adi']}' dosyasının düzenlenmiş hâli ({_ed_degisen} hücre değişti)",
+                                }).execute()
+                                st.success(f"✅ {_ed_degisen} hücre değiştirildi, yeni sürüm olarak kaydedildi: **{_ed_yeni_ad}**. Orijinal dosya değişmedi.")
+                                del st.session_state["_ed_acik_dosya"]
+                                try: db_read.clear()
+                                except: pass
+                                st.rerun()
+                        except Exception as _ed_ke:
+                            st.error(f"Kaydedilemedi: {_ed_ke}")
+            except Exception as _ed_ace:
+                st.error(f"Dosya açılamadı/işlenemedi: {_ed_ace}")
 
 
 elif aktif == "randevu":
