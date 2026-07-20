@@ -2417,7 +2417,13 @@ def not_dialog(cari_id, firma_adi=""):
                             for _s in _g.get("satirlar", []):
                                 _c = ", ".join(_s.get("cikis",[])) if isinstance(_s.get("cikis"),list) else str(_s.get("cikis") or "")
                                 _v = ", ".join(_s.get("varis",[])) if isinstance(_s.get("varis"),list) else str(_s.get("varis") or "")
-                                st.caption(f"　• {_c} → {_v} · {fmt_para(_s.get('fiyat',0))}")
+                                _tur_g = ", ".join(_s.get("tur", []) or []) or "—"
+                                try: _bas_g = int(float(_s.get("bas", 0) or 0))
+                                except Exception: _bas_g = 0
+                                try: _bit_g = int(float(_s.get("bit", 0) or 0))
+                                except Exception: _bit_g = 0
+                                _rota_g = f"{_c} → {_v}" if (_c or _v) else ""
+                                st.caption(f"　• {_rota_g}{' · ' if _rota_g else ''}{_tur_g} | {_bas_g}-{_bit_g} desi · {fmt_para(_s.get('fiyat',0))}")
                 elif _ttip == "sozlesme":
                     _tv = _tp.get("veri",{})
                     st.caption(f"📜 Sözleşme — Geçerlilik: {_tv.get('gecerlilik_tarihi','—')} · Vade: {_tv.get('vade','—')}")
@@ -5626,22 +5632,36 @@ function kartSec(id){
             def _tum_teklif_sayac_yukle():
                 _sb3 = get_sb_client()
                 if _sb3:
-                    _r3 = _sb3.table("teklifler").select("musteri_id,satirlar").execute()
+                    _r3 = _sb3.table("teklifler").select("musteri_id,musteri_adi,satirlar").execute()
                     return _r3.data or []
                 return []
             _res_tek_data_cl = _tum_teklif_sayac_yukle()
             if _res_tek_data_cl:
                 import collections as _coltek_cl
-                _tek_gecerli_idler = [
-                    str(_rtk.get("musteri_id",""))
-                    for _rtk in _res_tek_data_cl
-                    if "ozel" in str(_rtk.get("satirlar","") or "").lower()
-                ]
-                _tek_sayac_cl = _coltek_cl.Counter(_tek_gecerli_idler)
+                # Hem numara (musteri_id) hem isim (musteri_adi) ile eşleştir — biri kaymışsa diğeri yakalasın.
+                # "ozel" araması artık tam "tip": "ozel" kalıbıyla — Excel Depo gibi başka verilerle
+                # (rastgele metinde "ozel" geçebilir) yanlışlıkla karışmasın diye.
+                _tek_id_liste, _tek_ad_liste = [], []
+                for _rtk in _res_tek_data_cl:
+                    _sat_metin = str(_rtk.get("satirlar","") or "")
+                    if '"tip": "ozel"' in _sat_metin or '"tip":"ozel"' in _sat_metin:
+                        _tek_id_liste.append(str(_rtk.get("musteri_id","")))
+                        if _rtk.get("musteri_adi"):
+                            _tek_ad_liste.append(str(_rtk.get("musteri_adi")).strip().lower())
+                _tek_sayac_cl = _coltek_cl.Counter(_tek_id_liste)
+                _tek_sayac_ad_cl = _coltek_cl.Counter(_tek_ad_liste)
         except Exception:
             _tek_sayac_cl = {}
+            _tek_sayac_ad_cl = {}
+    else:
+        _tek_sayac_ad_cl = {}
     if "id" in df_edit.columns:
-        df_edit["🧾 Teklif"] = df_edit["id"].apply(lambda x: f"🧾 {_tek_sayac_cl.get(str(int(x)),0)}" if _tek_sayac_cl.get(str(int(x)),0) > 0 else "")
+        def _tek_say_bul(_row):
+            _n1 = _tek_sayac_cl.get(str(int(_row["id"])), 0)
+            _n2 = _tek_sayac_ad_cl.get(str(_row.get("firma","")).strip().lower(), 0) if "firma" in df_edit.columns else 0
+            _n = max(_n1, _n2)
+            return f"🧾 {_n}" if _n > 0 else ""
+        df_edit["🧾 Teklif"] = df_edit.apply(_tek_say_bul, axis=1)
     else:
         df_edit["🧾 Teklif"] = ""
 
