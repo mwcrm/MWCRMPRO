@@ -11329,8 +11329,6 @@ elif aktif == "kisiler":
 
         _ED_PARCA_BOYUTU = 300_000   # base64 karakter (~225 KB ham veri) — her satır küçük kalsın, tablo yavaşlamasın
         _ED_TOPLU_EKLE = 20          # her seferde kaç parçayı tek istekte gönderelim
-        _ED_TIP_META = -91001        # "toplam_tutar" kolonunda özet satırını işaretlemek için (gerçek tutarlarla çakışmaz)
-        _ED_TIP_PARCA = -91002       # aynı kolonda veri parçası satırlarını işaretlemek için
 
         def _ed_parcala(b64_metin):
             return [b64_metin[i:i + _ED_PARCA_BOYUTU] for i in range(0, len(b64_metin), _ED_PARCA_BOYUTU)]
@@ -11364,13 +11362,12 @@ elif aktif == "kisiler":
                         for _ed_bi in range(0, len(_ed_parcalar), _ED_TOPLU_EKLE):
                             _ed_grup = _ed_parcalar[_ed_bi:_ed_bi + _ED_TOPLU_EKLE]
                             _ed_kayitlar = [{
-                                # musteri_adi = grup_id: parçaları hızlıca (doğrudan eşleşmeyle) bulmak için
-                                "musteri_id": 0, "musteri_adi": _ed_grup_id,
-                                "toplam_tutar": _ED_TIP_PARCA,   # işaret: bu bir veri parçası
+                                "musteri_id": 0, "musteri_adi": _ed_yukle.name,
                                 "satirlar": _ed_json.dumps({
+                                    "tip": "excel_depo_chunk", "grup_id": _ed_grup_id,
                                     "parca_no": _ed_bi + _k, "veri_b64_parca": _parca,
                                 }, ensure_ascii=False),
-                                "olusturan": st.session_state.get("kullanici", ""),
+                                "toplam_tutar": 0, "olusturan": st.session_state.get("kullanici", ""),
                                 "notlar": "",
                             } for _k, _parca in enumerate(_ed_grup)]
                             _ed_sb.table("teklifler").insert(_ed_kayitlar).execute()
@@ -11378,13 +11375,13 @@ elif aktif == "kisiler":
                                 text=f"⏳ {min(_ed_bi + len(_ed_grup), len(_ed_parcalar))}/{len(_ed_parcalar)} parça kaydedildi...")
                         # Son olarak küçük bir "özet" (meta) satırı — liste bu satırı okuyacak, parçaları değil
                         _ed_sb.table("teklifler").insert({
-                            "musteri_id": 0, "musteri_adi": _ed_grup_id,
-                            "toplam_tutar": _ED_TIP_META,   # işaret: bu bir özet satırı
+                            "musteri_id": 0, "musteri_adi": _ed_yukle.name,
                             "satirlar": _ed_json.dumps({
+                                "tip": "excel_depo_meta", "grup_id": _ed_grup_id,
                                 "dosya_adi": _ed_yukle.name, "boyut_kb": _ed_boyut_kb,
                                 "toplam_parca": len(_ed_parcalar),
                             }, ensure_ascii=False),
-                            "olusturan": st.session_state.get("kullanici", ""),
+                            "toplam_tutar": 0, "olusturan": st.session_state.get("kullanici", ""),
                             "notlar": _ed_aciklama.strip() or _ed_yukle.name,
                         }).execute()
                         _ed_ilerleme.empty()
@@ -11401,10 +11398,10 @@ elif aktif == "kisiler":
         _ed_ara = st.text_input("🔍 Ara (dosya adı / açıklama):", key="ed_ara")
         try:
             _ed_sb2 = get_sb_client()
-            # SADECE küçük "özet" (meta) satırlarını çekiyoruz — doğrudan eşleşme (eq) kullanıyoruz,
-            # metin taraması (ilike) YOK, bu yüzden depoda ne kadar veri olursa olsun liste hızlı kalır.
+            # SADECE küçük "özet" (meta) satırlarını çekiyoruz — büyük parça verisine hiç dokunmuyoruz,
+            # bu yüzden liste, depoda ne kadar veri olursa olsun her zaman hızlı kalır.
             _ed_ham = pd.DataFrame(_ed_sb2.table("teklifler").select("id,musteri_adi,satirlar,notlar,olusturan,tarih")
-                .eq("toplam_tutar", _ED_TIP_META).order("id", desc=True).limit(200).execute().data) if _ed_sb2 else pd.DataFrame()
+                .ilike("satirlar", '%excel_depo_meta%').order("id", desc=True).limit(200).execute().data) if _ed_sb2 else pd.DataFrame()
             _ed_liste = []
             if not _ed_ham.empty and "satirlar" in _ed_ham.columns:
                 for _, _ed_r in _ed_ham.iterrows():
@@ -11412,14 +11409,15 @@ elif aktif == "kisiler":
                         _ed_parsed = _ed_json.loads(_ed_r.get("satirlar", "") or "{}")
                     except Exception:
                         continue
-                    _ed_liste.append({
-                        "id": _ed_r.get("id"),
-                        "grup_id": _ed_r.get("musteri_adi", ""),
-                        "dosya_adi": _ed_parsed.get("dosya_adi", ""),
-                        "boyut_kb": _ed_parsed.get("boyut_kb", 0),
-                        "toplam_parca": _ed_parsed.get("toplam_parca", 0),
-                        "notlar": _ed_r.get("notlar", ""),
-                        "olusturan": _ed_r.get("olusturan", ""),
+                    if _ed_parsed.get("tip") == "excel_depo_meta":
+                        _ed_liste.append({
+                            "id": _ed_r.get("id"),
+                            "grup_id": _ed_parsed.get("grup_id", ""),
+                            "dosya_adi": _ed_parsed.get("dosya_adi", ""),
+                            "boyut_kb": _ed_parsed.get("boyut_kb", 0),
+                            "toplam_parca": _ed_parsed.get("toplam_parca", 0),
+                            "notlar": _ed_r.get("notlar", ""),
+                            "olusturan": _ed_r.get("olusturan", ""),
                             "tarih": _ed_r.get("tarih", ""),
                         })
             if _ed_ara.strip():
@@ -11433,7 +11431,7 @@ elif aktif == "kisiler":
 
                 def _ed_dosyayi_getir(grup_id):
                     _ed_parca_rows = _ed_sb2.table("teklifler").select("satirlar") \
-                        .eq("musteri_adi", grup_id).eq("toplam_tutar", _ED_TIP_PARCA).execute().data
+                        .ilike("satirlar", f'%"grup_id": "{grup_id}"%').ilike("satirlar", '%excel_depo_chunk%').execute().data
                     _ed_parcalar_d = []
                     for _ed_pr in _ed_parca_rows:
                         try:
@@ -11484,7 +11482,7 @@ elif aktif == "kisiler":
                             if st.session_state.get(f"_ed_sil_onay_{_ed_item['id']}"):
                                 if st.button("✅ Emin misin?", key=f"ed_sil_onay_{_ed_item['id']}", use_container_width=True):
                                     try:
-                                        _ed_sb2.table("teklifler").delete().eq("musteri_adi", _ed_item["grup_id"]).execute()
+                                        _ed_sb2.table("teklifler").delete().ilike("satirlar", f'%"grup_id": "{_ed_item["grup_id"]}"%').execute()
                                         st.success("Silindi.")
                                         st.session_state[f"_ed_sil_onay_{_ed_item['id']}"] = False
                                         try: db_read.clear()
@@ -11562,23 +11560,23 @@ elif aktif == "kisiler":
                                 for _ed_bi2 in range(0, len(_ed_yeni_parcalar), _ED_TOPLU_EKLE):
                                     _ed_grup2 = _ed_yeni_parcalar[_ed_bi2:_ed_bi2 + _ED_TOPLU_EKLE]
                                     _ed_kayitlar2 = [{
-                                        "musteri_id": 0, "musteri_adi": _ed_yeni_grup,
-                                        "toplam_tutar": _ED_TIP_PARCA,
+                                        "musteri_id": 0, "musteri_adi": _ed_yeni_ad,
                                         "satirlar": _ed_json.dumps({
+                                            "tip": "excel_depo_chunk", "grup_id": _ed_yeni_grup,
                                             "parca_no": _ed_bi2 + _k2, "veri_b64_parca": _parca2,
                                         }, ensure_ascii=False),
-                                        "olusturan": st.session_state.get("kullanici", ""),
+                                        "toplam_tutar": 0, "olusturan": st.session_state.get("kullanici", ""),
                                         "notlar": "",
                                     } for _k2, _parca2 in enumerate(_ed_grup2)]
                                     _ed_sbx.table("teklifler").insert(_ed_kayitlar2).execute()
                                 _ed_sbx.table("teklifler").insert({
-                                    "musteri_id": 0, "musteri_adi": _ed_yeni_grup,
-                                    "toplam_tutar": _ED_TIP_META,
+                                    "musteri_id": 0, "musteri_adi": _ed_yeni_ad,
                                     "satirlar": _ed_json.dumps({
+                                        "tip": "excel_depo_meta", "grup_id": _ed_yeni_grup,
                                         "dosya_adi": _ed_yeni_ad, "boyut_kb": round(len(_ed_yeni_bytes) / 1024, 1),
                                         "toplam_parca": len(_ed_yeni_parcalar),
                                     }, ensure_ascii=False),
-                                    "olusturan": st.session_state.get("kullanici", ""),
+                                    "toplam_tutar": 0, "olusturan": st.session_state.get("kullanici", ""),
                                     "notlar": f"'{_ed_ac['adi']}' dosyasının düzenlenmiş hâli ({_ed_degisen} hücre değişti)",
                                 }).execute()
                                 st.success(f"✅ {_ed_degisen} hücre değiştirildi, yeni sürüm olarak kaydedildi: **{_ed_yeni_ad}**. Orijinal dosya değişmedi.")
