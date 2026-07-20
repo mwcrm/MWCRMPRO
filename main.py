@@ -293,18 +293,52 @@ def _get_atanmis_firmalar():
             pass
         return {"firmalar": set(), "idler": set()}  # hata durumunda da güvenli taraf: hiçbir şey gösterme
 
+def _bolge_yetki_yukle():
+    """Giriş yapan kullanıcının izinli bölge listesini döner.
+    None = tüm bölgelere yetkili (admin tarafından açıkça verilmiş).
+    [] = hiçbir ekstra bölge yok (varsayılan — hiç ayarlanmamışsa da bu, güvenli/kısıtlı taraf)."""
+    _kul = str(st.session_state.get("kullanici","")).strip()
+    if not _kul:
+        return []
+    _yk = f"_bolge_yetki_{_kul}"
+    if _yk in st.session_state:
+        return st.session_state[_yk]
+    _v = []
+    try:
+        sb = get_sb_client()
+        _r = sb.table("kullanici_tercih").select("deger").eq("kullanici", _kul).eq("anahtar", "_bolge_yetki").execute()
+        if _r.data:
+            _raw = _r.data[0]["deger"]
+            _v = None if _raw == "tam" else json.loads(_raw)
+    except Exception:
+        _v = []
+    st.session_state[_yk] = _v
+    return _v
+
 def _atama_filtresi_uygula(df):
-    """Admin hepsini görür, diğerleri SADECE kendine atananları görür (atanmamışlar dahil hiçbir başkasını görmez)."""
+    """Admin hepsini görür. Diğerleri: kendine BİREBİR atanan müşterileri VEYA yetkili olduğu
+    bölgedeki müşterileri görür (ikisinden biri yeterli). Hiçbir başka veri görünmez."""
     try:
         _rol = str(st.session_state.get("rol","")).strip().lower()
         _kul = str(st.session_state.get("kullanici","")).strip()
         # Admin veya kullanıcı yoksa hepsini göster
         if "admin" in _rol or _kul == "admin" or not _kul:
             return df
-        if df.empty or "atanan_kullanici" not in df.columns:
-            return df.iloc[0:0]  # kolon yoksa güvenli taraf: hiçbir şey gösterme
-        # SADECE kullanıcıya birebir atananlar — atanmamışlar veya başkasına atananlar görünmez
-        return df[df["atanan_kullanici"].astype(str) == _kul]
+        if df.empty:
+            return df
+        _bolge_izinli = _bolge_yetki_yukle()   # None = tüm bölgeler, [] = hiçbiri, [...] = liste
+        _atanan_maske = df["atanan_kullanici"].astype(str) == _kul if "atanan_kullanici" in df.columns else pd.Series(False, index=df.index)
+        if _bolge_izinli is None:
+            _bolge_maske = pd.Series(True, index=df.index)   # tüm bölgelere yetkili
+        elif not _bolge_izinli:
+            _bolge_maske = pd.Series(False, index=df.index)  # hiçbir bölgeye yetkili değil
+        elif "il" in df.columns:
+            _ilce_kol_bm = "ilce" if "ilce" in df.columns else None
+            _bolge_hesap = df.apply(lambda r: il_ilce_bolge_bul(r.get("il",""), r.get(_ilce_kol_bm,"") if _ilce_kol_bm else ""), axis=1).fillna("Havuz (Bölgesiz)")
+            _bolge_maske = _bolge_hesap.isin(_bolge_izinli)
+        else:
+            _bolge_maske = pd.Series(False, index=df.index)
+        return df[_atanan_maske | _bolge_maske]
     except:
         try:
             if "admin" in str(st.session_state.get("rol","")).strip().lower():
@@ -6176,13 +6210,18 @@ elif aktif == "kullanici":
         st.stop()
 
     # ── ADMİN — tam yetki ─────────────────────────────────────────────────────
-    TUM_MENULER = {
-        "yeni":"➕ Yeni Kart","liste":"📋 Cari Liste","randevu":"📅 Randevular",
-        "kisiler":"📞 Kişiler","rapor":"📊 Raporlar",
-        "excel":"📥 Excel","mesajlar":"💬 Mesajlar",
-        "admin_rapor":"📊 Rapor Tasarla","kullanici_log":"📊 Kullanıcı Log",
-        "surum_yonetimi":"🚀 Sürüm Yönetimi"
-    }
+    # Sol menünün TAMAMI (tüm gruplar + tüm alt sayfalar) — tek kaynaktan (_MENU_GRUPLARI) otomatik oluşturuluyor
+    TUM_MENULER = {}
+    try:
+        for _tm_grp_ad, _tm_grp_keys in _MENU_GRUPLARI:
+            for _tm_k in _tm_grp_keys:
+                TUM_MENULER[_tm_k] = _TAB_ETIKETLER.get(_tm_k, _tm_k)
+    except Exception:
+        pass
+    # Sidebar grubunda olmayan, ama ayrıca yetkilendirilebilen ek özellikler
+    TUM_MENULER["mesajlar"] = "💬 Mesajlar"
+    TUM_MENULER["kullanici_log"] = "📊 Kullanıcı Log"
+    TUM_MENULER["surum_yonetimi"] = "🚀 Sürüm Yönetimi"
 
     # Sürüm Yönetimi sekmesi: sadece admin VEYA yetkisi olan kullanıcı
     _surum_yetkisi = (
@@ -6360,6 +6399,57 @@ elif aktif == "kullanici":
                 try: db_read.clear()
                 except: pass
                 st.success("✅ Yetkiler güncellendi!"); st.rerun()
+
+            st.divider()
+            st.markdown("#### 🗺️ Bölge Yetkisi")
+            st.caption("Bu kullanıcının hangi bölgelerdeki müşterileri görebileceğini seç (bölge listesi, sistemdeki mevcut müşteri verisinden otomatik çıkarılır — 'Bölgeler' kutusundakiyle aynı).")
+            try:
+                _byk_sb = get_sb_client()
+                _byk_res = _byk_sb.table("cari_kartlar").select("il,ilce").neq("silindi", 1).execute() if _byk_sb else None
+                _byk_df = pd.DataFrame(_byk_res.data) if (_byk_res and _byk_res.data) else pd.DataFrame()
+                _byk_bolgeler = []
+                if not _byk_df.empty and "il" in _byk_df.columns:
+                    _byk_ilce_kol = "ilce" if "ilce" in _byk_df.columns else None
+                    _byk_ham = _byk_df.apply(lambda r: il_ilce_bolge_bul(r.get("il",""), r.get(_byk_ilce_kol,"") if _byk_ilce_kol else ""), axis=1)
+                    _byk_bolgeler = sorted([b for b in _byk_ham.fillna("Havuz (Bölgesiz)").unique() if b])
+            except Exception:
+                _byk_bolgeler = []
+
+            try:
+                _byk_mevcut = _byk_sb.table("kullanici_tercih").select("deger").eq("kullanici", k3_row["kullanici_adi"]).eq("anahtar", "_bolge_yetki").execute()
+                _byk_durum = "liste"       # varsayılan: kısıtlı (hiç ayarlanmamışsa da bu — güvenli taraf)
+                _byk_liste_mv = []
+                if _byk_mevcut.data:
+                    _byk_raw = _byk_mevcut.data[0]["deger"]
+                    if _byk_raw == "tam":
+                        _byk_durum = "tam"
+                    else:
+                        _byk_liste_mv = json.loads(_byk_raw)
+            except Exception:
+                _byk_durum = "liste"
+                _byk_liste_mv = []
+            _byk_tam_cb = st.checkbox("✅ Tüm Bölgelere Yetkili", value=(_byk_durum == "tam"), key="byk_tam_cb")
+            _byk_yeni = []
+            if not _byk_tam_cb:
+                _byk_cols = st.columns(4)
+                for _byi, _byb in enumerate(_byk_bolgeler):
+                    if _byk_cols[_byi % 4].checkbox(_byb, value=(_byb in _byk_liste_mv), key=f"byk_{k3_id}_{_byb}"):
+                        _byk_yeni.append(_byb)
+
+            if st.button("💾 Bölge Yetkisini Kaydet", use_container_width=True, type="primary", key="byk_kaydet_btn"):
+                try:
+                    _byk_sb2 = get_sb_client()
+                    _byk_sb2.table("kullanici_tercih").delete().eq("kullanici", k3_row["kullanici_adi"]).eq("anahtar", "_bolge_yetki").execute()
+                    _byk_deger = "tam" if _byk_tam_cb else json.dumps(_byk_yeni, ensure_ascii=False)
+                    _byk_sb2.table("kullanici_tercih").insert({
+                        "kullanici": k3_row["kullanici_adi"], "anahtar": "_bolge_yetki",
+                        "deger": _byk_deger,
+                    }).execute()
+                    try: db_read.clear()
+                    except: pass
+                    st.success("✅ Bölge yetkisi güncellendi!"); st.rerun()
+                except Exception as _byk_e:
+                    st.error(f"Kaydedilemedi: {_byk_e}")
 
     with kul_tab4:
         st.markdown("### 📊 Kullanıcı Aktivite Logu")
