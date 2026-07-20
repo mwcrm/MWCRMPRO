@@ -11380,23 +11380,27 @@ elif aktif == "kisiler":
                                 _ed_yontem = "storage"
                         except Exception:
                             _ed_kaydedildi = False
-                        # 2) OLMAZSA: eski yöntem (veriyi metne çevirip tabloya göm) — küçük/orta dosyalarda yedek çözüm
+                        # 2) OLMAZSA: eski yöntem (veriyi metne çevirip tabloya göm) — SADECE küçük dosyalarda (2 MB altı).
+                        # Büyük dosyalarda bu yöntem tabloyu şişirip veritabanını yavaşlatıyordu (zaman aşımı hatasının sebebi buydu).
                         if not _ed_kaydedildi:
-                            try:
-                                _ed_b64_str = _ed_b64.b64encode(_ed_bytes).decode("ascii")
-                                _ed_sb.table("teklifler").insert({
-                                    "musteri_id": 0, "musteri_adi": _ed_yukle.name,
-                                    "satirlar": __import__("json").dumps({
-                                        "tip": "excel_depo", "dosya_adi": _ed_yukle.name,
-                                        "boyut_kb": _ed_boyut_kb, "veri_b64": _ed_b64_str,
-                                    }, ensure_ascii=False),
-                                    "toplam_tutar": 0, "olusturan": st.session_state.get("kullanici", ""),
-                                    "notlar": _ed_aciklama.strip() or _ed_yukle.name,
-                                }).execute()
-                                _ed_kaydedildi = True
-                                _ed_yontem = "yedek"
-                            except Exception as _ed_e2:
-                                st.error(f"Kaydedilemedi: {_ed_e2}")
+                            if _ed_boyut_kb > 2048:
+                                st.error("❌ Storage'a kaydedilemedi ve dosya 2 MB'dan büyük olduğu için yedek yönteme de kaydedilemez (veritabanını yavaşlatır). Storage bağlantısında bir sorun var — lütfen bildir, birlikte bakalım.")
+                            else:
+                                try:
+                                    _ed_b64_str = _ed_b64.b64encode(_ed_bytes).decode("ascii")
+                                    _ed_sb.table("teklifler").insert({
+                                        "musteri_id": 0, "musteri_adi": _ed_yukle.name,
+                                        "satirlar": __import__("json").dumps({
+                                            "tip": "excel_depo", "dosya_adi": _ed_yukle.name,
+                                            "boyut_kb": _ed_boyut_kb, "veri_b64": _ed_b64_str,
+                                        }, ensure_ascii=False),
+                                        "toplam_tutar": 0, "olusturan": st.session_state.get("kullanici", ""),
+                                        "notlar": _ed_aciklama.strip() or _ed_yukle.name,
+                                    }).execute()
+                                    _ed_kaydedildi = True
+                                    _ed_yontem = "yedek"
+                                except Exception as _ed_e2:
+                                    st.error(f"Kaydedilemedi: {_ed_e2}")
                 if _ed_kaydedildi:
                     st.success(f"✅ '{_ed_yukle.name}' depoya kaydedildi" + (" (Storage)" if _ed_yontem == "storage" else " (yedek yöntem)") + " — formülleri dahil, aynen saklandı.")
                     try: db_read.clear()
@@ -11404,12 +11408,49 @@ elif aktif == "kisiler":
                     st.rerun()
 
         st.divider()
+        if st.session_state.get("rol") == "admin":
+            with st.expander("🧹 Bakım: Eski/şişmiş kayıtları temizle (sorun yaşarsan buraya bak)"):
+                st.caption("Storage'a geçmeden önce büyük dosyalar eski yöntemle (metne çevrilip) kaydedilmiş olabilir — bunlar tabloyu yavaşlatabilir. Bu araç SADECE eski formattaki (Storage'a taşınmamış) kayıtları bulur, sana gösterir; sen onaylamadan hiçbir şey silinmez.")
+                if st.button("🔍 Eski format kayıtları bul", key="ed_bakim_bul"):
+                    try:
+                        _ed_sb3 = get_sb_client()
+                        _ed_eski = _ed_sb3.table("teklifler").select("id,musteri_adi,notlar,tarih").ilike("satirlar", '%"tip": "excel_depo"%').execute()
+                        st.session_state["_ed_eski_liste"] = _ed_eski.data or []
+                    except Exception as _ed_be:
+                        st.error(f"Aranamadı (muhtemelen yine zaman aşımı): {_ed_be}")
+                        st.session_state["_ed_eski_liste"] = []
+                if st.session_state.get("_ed_eski_liste"):
+                    st.warning(f"⚠️ {len(st.session_state['_ed_eski_liste'])} adet eski format kayıt bulundu:")
+                    for _ed_e in st.session_state["_ed_eski_liste"]:
+                        st.caption(f"[{_ed_e.get('id')}] {_ed_e.get('musteri_adi')} — {_ed_e.get('notlar')} — {_ed_e.get('tarih')}")
+                    st.error("Bunları silmek KALICIDIR ve geri alınamaz. Emin değilsen silme.")
+                    if st.checkbox("Yukarıdaki tüm eski kayıtları kalıcı olarak silmek istediğimi onaylıyorum", key="ed_bakim_onay"):
+                        if st.button("🗑️ Onayladım, şimdi sil", type="primary", key="ed_bakim_sil_btn"):
+                            try:
+                                _ed_sb4 = get_sb_client()
+                                _ed_sb4.table("teklifler").delete().ilike("satirlar", '%"tip": "excel_depo"%').execute()
+                                st.success("✅ Eski kayıtlar silindi.")
+                                st.session_state["_ed_eski_liste"] = []
+                                st.session_state["ed_bakim_onay"] = False
+                                try: db_read.clear()
+                                except: pass
+                                st.rerun()
+                            except Exception as _ed_se2:
+                                st.error(f"Silinemedi: {_ed_se2}")
+
         st.markdown("#### 📚 Depodaki Dosyalar")
         _ed_ara = st.text_input("🔍 Ara (dosya adı / açıklama):", key="ed_ara")
         try:
             import json as _ed_json
             _ed_sb2 = get_sb_client()
-            _ed_ham = pd.DataFrame(_ed_sb2.table("teklifler").select("*").order("id", desc=True).execute().data) if _ed_sb2 else pd.DataFrame()
+            try:
+                _ed_ham = pd.DataFrame(_ed_sb2.table("teklifler").select("*").order("id", desc=True).limit(200).execute().data) if _ed_sb2 else pd.DataFrame()
+            except Exception as _ed_to:
+                if "57014" in str(_ed_to) or "timeout" in str(_ed_to).lower():
+                    st.error("⏱️ Liste okunamadı (zaman aşımı) — büyük ihtimalle yukarıdaki '🧹 Bakım' aracıyla eski kayıtları temizlemen gerekiyor.")
+                    _ed_ham = pd.DataFrame()
+                else:
+                    raise
             _ed_liste = []
             if not _ed_ham.empty and "satirlar" in _ed_ham.columns:
                 for _, _ed_r in _ed_ham.iterrows():
