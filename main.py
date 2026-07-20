@@ -11510,23 +11510,21 @@ elif aktif == "kisiler":
 
             try:
                 import openpyxl as _ed_opx2
-                _ed_wb_formul = _ed_opx2.load_workbook(_ed_io.BytesIO(_ed_ac["bytes"]), data_only=False)
-                _ed_wb_deger = _ed_opx2.load_workbook(_ed_io.BytesIO(_ed_ac["bytes"]), data_only=True)
-                _ed_sayfa_adi = st.selectbox("Sayfa seç:", _ed_wb_formul.sheetnames, key="ed_sayfa_sec")
-                _ed_ws_f = _ed_wb_formul[_ed_sayfa_adi]
+                # SADECE görüntülemek için hafif (read_only) yükleme — tam/formüllü yükleme
+                # burada YAPILMIYOR, bellek taşmasının sebebi buydu. Tam yükleme sadece
+                # "Kaydet"e basıldığında, bir kereliğine yapılacak.
+                _ed_wb_deger = _ed_opx2.load_workbook(_ed_io.BytesIO(_ed_ac["bytes"]), read_only=True, data_only=True)
+                _ed_sayfa_adi = st.selectbox("Sayfa seç:", _ed_wb_deger.sheetnames, key="ed_sayfa_sec")
                 _ed_ws_d = _ed_wb_deger[_ed_sayfa_adi]
-                _ed_max_r = min(_ed_ws_f.max_row, 500)   # çok büyük sayfalarda tarayıcı donmasın diye ilk 500 satır
-                _ed_max_c = min(_ed_ws_f.max_column, 60)
-                if _ed_ws_f.max_row > 500:
-                    st.caption(f"⚠️ Bu sayfa {_ed_ws_f.max_row} satır — performans için ilk 500 satır gösteriliyor.")
+                _ed_max_r = min(_ed_ws_d.max_row or 1, 200)   # bellek/performans için ilk 200 satır
+                _ed_max_c = min(_ed_ws_d.max_column or 1, 40)
+                if (_ed_ws_d.max_row or 0) > 200:
+                    st.caption(f"⚠️ Bu sayfa {_ed_ws_d.max_row} satır — performans için ilk 200 satır gösteriliyor.")
 
                 _ed_veri = []
-                for _ed_r in range(1, _ed_max_r + 1):
-                    _ed_satir = []
-                    for _ed_c in range(1, _ed_max_c + 1):
-                        _ed_v = _ed_ws_d.cell(row=_ed_r, column=_ed_c).value
-                        _ed_satir.append("" if _ed_v is None else _ed_v)
-                    _ed_veri.append(_ed_satir)
+                for _ed_ri2, _ed_row in enumerate(_ed_ws_d.iter_rows(min_row=1, max_row=_ed_max_r, max_col=_ed_max_c, values_only=True)):
+                    _ed_veri.append(["" if _v is None else _v for _v in _ed_row])
+                _ed_wb_deger.close()
                 _ed_kolon_adlari = [_ed_opx2.utils.get_column_letter(_c) for _c in range(1, _ed_max_c + 1)]
                 _ed_df_grid = pd.DataFrame(_ed_veri, columns=_ed_kolon_adlari)
 
@@ -11534,8 +11532,12 @@ elif aktif == "kisiler":
                 _ed_duzenlenen = st.data_editor(_ed_df_grid, use_container_width=True, height=500, key="ed_grid_editor")
 
                 if st.button("💾 Değişiklikleri Yeni Sürüm Olarak Kaydet", type="primary", key="ed_grid_kaydet"):
-                    with st.spinner("⏳ Kaydediliyor..."):
+                    with st.spinner("⏳ Formüller korunarak kaydediliyor..."):
                         try:
+                            # Tam (formüllü) yükleme SADECE burada, kaydetme anında yapılıyor —
+                            # açarken/gezinirken belleği şişirmemek için.
+                            _ed_wb_formul = _ed_opx2.load_workbook(_ed_io.BytesIO(_ed_ac["bytes"]), data_only=False)
+                            _ed_ws_f = _ed_wb_formul[_ed_sayfa_adi]
                             _ed_degisen = 0
                             for _ed_ri in range(_ed_max_r):
                                 for _ed_ci in range(_ed_max_c):
