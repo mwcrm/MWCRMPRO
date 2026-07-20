@@ -4483,14 +4483,21 @@ section[data-testid="stSidebar"] { display: none !important; }
                 _mask = _mask & (df[_k].isna() | df[_k].astype(str).str.strip().isin(["","None","nan"]))
         return int(_mask.sum())
 
+    # Bu üst rapor sayaçları, ekranda görünen (zaten yetki/atama filtresinden geçmiş) müşterilerle
+    # sınırlı olsun diye — o müşterilerin ID'lerini burada bir kere hesaplıyoruz.
+    _izinli_id_seti = set(df["id"].dropna().astype(int)) if "id" in df.columns and not df.empty else set()
+
     def _not_anahtar_sayisi(_icerir=None, _haric=None):
         """Notlardan (cari_aciklamalar) belirli bir anahtar kelime geçen kayıtları sayar.
         _icerir: bu kelime(ler)den biri geçmeli (liste). _haric: bu kelime geçerse sayılmaz.
-        Yetkili kayıtları her zaman hariç tutulur."""
+        Yetkili kayıtları her zaman hariç tutulur. SADECE görünen (yetkili olunan) müşterilerin
+        kayıtları sayılır — başka kullanıcıların/müşterilerin notları karışmaz."""
         try:
             _ya_df = db_read("cari_aciklamalar", extra_sql="")
             if _ya_df.empty or "aciklama" not in _ya_df.columns:
                 return 0
+            if "cari_id" in _ya_df.columns:
+                _ya_df = _ya_df[_ya_df["cari_id"].apply(lambda x: pd.notna(x) and int(x) in _izinli_id_seti)]
             _ya_notlar = _ya_df["aciklama"].fillna("").astype(str)
             _ya_notlar = _ya_notlar[~_ya_notlar.str.startswith("##YETKILI##")]
             _ya_notlar = _ya_notlar[_ya_notlar.str.strip() != ""]
@@ -4512,13 +4519,16 @@ section[data-testid="stSidebar"] { display: none !important; }
 
     def _gercek_gonderim_sayisi(_islem_turu):
         """'islem_kaydi' tablosundan gerçek gönderim (WhatsApp Teklif / Email Teklif) sayısı —
-        'Mesaj' sütununun kullandığı kaynakla aynı, üst raporun da bunu içermesi için."""
+        'Mesaj' sütununun kullandığı kaynakla aynı, üst raporun da bunu içermesi için.
+        SADECE görünen (yetkili olunan) müşterilerin kayıtları sayılır."""
         try:
             _sbg = get_sb_client()
             if not _sbg:
                 return 0
-            _rg = _sbg.table("islem_kaydi").select("id").eq("islem_turu", _islem_turu).execute()
-            return len(_rg.data or [])
+            _rg = _sbg.table("islem_kaydi").select("id,musteri_id").eq("islem_turu", _islem_turu).execute()
+            _rg_data = _rg.data or []
+            _rg_data = [r for r in _rg_data if r.get("musteri_id") is not None and int(r.get("musteri_id")) in _izinli_id_seti]
+            return len(_rg_data)
         except Exception:
             return 0
 
