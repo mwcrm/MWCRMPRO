@@ -11397,6 +11397,50 @@ elif aktif == "kisiler":
                         st.error(f"Kaydedilemedi: {_ed_e}")
 
         st.divider()
+        if st.session_state.get("rol") == "admin":
+            with st.expander("🔁 Eski (görünmeyen) dosyaları geri getir — veri kaybolmadı, sadece etiketi eski"):
+                st.caption("Bu araç, sistem güncellenmeden önce yüklediğin dosyaları SİLMEDEN, yeni sisteme taşır. Büyük dosyalarda (100+ parça) bu işlem yavaş olabilir, hatta zaman aşımına uğrayabilir — o durumda en garantili yol dosyayı tekrar yüklemektir (eskisi veritabanında kalır, sadece görünmez, zararsızdır).")
+                if st.button("🔍 Eski dosyaları bul", key="ed_tasima_bul"):
+                    try:
+                        _ed_sbm = get_sb_client()
+                        _ed_eski_meta = _ed_sbm.table("teklifler").select("id,musteri_adi,satirlar,notlar,olusturan,tarih") \
+                            .ilike("satirlar", '%"tip": "excel_depo_meta"%').execute().data
+                        st.session_state["_ed_tasima_liste"] = _ed_eski_meta or []
+                    except Exception as _ed_tbe:
+                        st.error(f"Aranamadı (zaman aşımı olabilir): {_ed_tbe}")
+                        st.session_state["_ed_tasima_liste"] = []
+                if st.session_state.get("_ed_tasima_liste"):
+                    st.info(f"{len(st.session_state['_ed_tasima_liste'])} eski dosya bulundu.")
+                    for _ed_em in st.session_state["_ed_tasima_liste"]:
+                        try:
+                            _ed_em_parsed = _ed_json.loads(_ed_em.get("satirlar", "") or "{}")
+                        except Exception:
+                            continue
+                        _ed_em_grup = _ed_em_parsed.get("grup_id", "")
+                        _ed_em_ad = _ed_em_parsed.get("dosya_adi", _ed_em.get("musteri_adi", ""))
+                        st.caption(f"📄 {_ed_em_ad}")
+                        if st.button(f"➡️ '{_ed_em_ad}' dosyasını yeni sisteme taşı", key=f"ed_tasi_{_ed_em['id']}"):
+                            with st.spinner("⏳ Taşınıyor (parçalar aranıyor, biraz sürebilir)..."):
+                                try:
+                                    _ed_sbm2 = get_sb_client()
+                                    # Eski format parçalarını bul (tek seferlik, bu yüzden yavaş olabilir ama kabul edilebilir)
+                                    _ed_eski_parcalar = _ed_sbm2.table("teklifler").select("id,satirlar") \
+                                        .ilike("satirlar", f'%"grup_id": "{_ed_em_grup}"%').ilike("satirlar", '%excel_depo_chunk%').execute().data
+                                    for _ed_epr in _ed_eski_parcalar:
+                                        _ed_sbm2.table("teklifler").update({
+                                            "musteri_adi": _ed_em_grup, "toplam_tutar": _ED_TIP_PARCA,
+                                        }).eq("id", _ed_epr["id"]).execute()
+                                    _ed_sbm2.table("teklifler").update({
+                                        "musteri_adi": _ed_em_grup, "toplam_tutar": _ED_TIP_META,
+                                    }).eq("id", _ed_em["id"]).execute()
+                                    st.success(f"✅ '{_ed_em_ad}' yeni sisteme taşındı, artık listede görünecek.")
+                                    st.session_state["_ed_tasima_liste"] = []
+                                    try: db_read.clear()
+                                    except: pass
+                                    st.rerun()
+                                except Exception as _ed_te:
+                                    st.error(f"Taşınamadı (muhtemelen zaman aşımı — bu dosyayı tekrar yüklemen en garantili yol): {_ed_te}")
+
         st.markdown("#### 📚 Depodaki Dosyalar")
         _ed_ara = st.text_input("🔍 Ara (dosya adı / açıklama):", key="ed_ara")
         try:
