@@ -5684,6 +5684,7 @@ function kartSec(id){
     # SADECE "Kayıtlı Özel Teklifler" listesinde görünen kayıtlar sayılır — o liste
     # sadece satirlar içinde "ozel" geçenleri gösteriyor, sayaç da aynı kritere uymalı.
     _tek_sayac_cl = {}
+    _tek_sayac_ad_cl = {}
     if sb_liste:
         try:
             @st.cache_data(ttl=60, show_spinner=False)
@@ -5711,8 +5712,6 @@ function kartSec(id){
         except Exception:
             _tek_sayac_cl = {}
             _tek_sayac_ad_cl = {}
-    else:
-        _tek_sayac_ad_cl = {}
     if "id" in df_edit.columns:
         def _tek_say_bul(_row):
             _n1 = _tek_sayac_cl.get(str(int(_row["id"])), 0)
