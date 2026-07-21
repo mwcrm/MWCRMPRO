@@ -14108,6 +14108,59 @@ elif aktif == "musteri_atama":
                 st.session_state["_ma_bolge_onay"] = None
                 st.rerun()
 
+    # ── 🔧 SAHİPSİZ TEKLİFLERİ ONAR ─────────────────────────────────────────
+    # Açılır listeden seçilmeden, sadece yazıyla kaydedilmiş eski Özel Teklif'ler
+    # (musteri_id=0) burada bulunup doğru müşteriye bağlanabilir.
+    with st.expander("🔧 Sahipsiz Teklifleri Onar — Cari Liste'de görünmeyen eski teklifler"):
+        st.caption("Müşteri açılır listeden seçilmeden, sadece yazıyla kaydedilmiş eski Özel Teklif'ler burada listelenir. Doğru müşteriyi seçip bağlarsan, Cari Liste'de o müşterinin hanesinde görünmeye başlar.")
+        if st.button("🔍 Sahipsiz Teklifleri Bul", key="ma_sahipsiz_bul"):
+            try:
+                _sb_st = get_sb_client()
+                _st_ham = _sb_st.table("teklifler").select("id,musteri_id,musteri_adi,notlar,tarih").eq("musteri_id", 0).execute().data or []
+                _st_ozel = []
+                for _r in _st_ham:
+                    try:
+                        _rf = _sb_st.table("teklifler").select("satirlar").eq("id", _r["id"]).single().execute()
+                        _sat = _rf.data.get("satirlar","") if _rf.data else ""
+                    except Exception:
+                        _sat = ""
+                    if '"tip": "ozel"' in str(_sat) or '"tip":"ozel"' in str(_sat):
+                        _st_ozel.append(_r)
+                st.session_state["_ma_sahipsiz_liste"] = _st_ozel
+            except Exception as _st_e:
+                st.error(f"Aranamadı: {_st_e}")
+                st.session_state["_ma_sahipsiz_liste"] = []
+
+        if st.session_state.get("_ma_sahipsiz_liste"):
+            _st_liste = st.session_state["_ma_sahipsiz_liste"]
+            st.info(f"{len(_st_liste)} sahipsiz teklif bulundu.")
+            _st_firmalar = sorted(_df_ma["firma"].dropna().astype(str).unique().tolist()) if "firma" in _df_ma.columns else []
+            import difflib as _st_diff
+            for _sr in _st_liste:
+                _st_yazilan = str(_sr.get("musteri_adi","") or "")
+                _st_tahmin = _st_diff.get_close_matches(_st_yazilan, _st_firmalar, n=1, cutoff=0.5)
+                _st_default = _st_tahmin[0] if _st_tahmin else "-- Seç --"
+                _stc1, _stc2, _stc3 = st.columns([2, 3, 1.2])
+                _stc1.caption(f"📝 Yazılan: **{_st_yazilan}**\n\n{_sr.get('tarih','')}")
+                _st_secim = _stc2.selectbox("Gerçek müşteri:", ["-- Seç --"] + _st_firmalar,
+                    index=(_st_firmalar.index(_st_default) + 1) if _st_default in _st_firmalar else 0,
+                    key=f"st_sec_{_sr['id']}", label_visibility="collapsed")
+                if _stc3.button("✅ Bağla", key=f"st_bagla_{_sr['id']}", use_container_width=True):
+                    if _st_secim == "-- Seç --":
+                        st.warning("Önce bir müşteri seç.")
+                    else:
+                        try:
+                            _st_mid = int(_df_ma[_df_ma["firma"] == _st_secim]["id"].iloc[0])
+                            _sb_st2 = get_sb_client()
+                            _sb_st2.table("teklifler").update({"musteri_id": _st_mid, "musteri_adi": _st_secim}).eq("id", _sr["id"]).execute()
+                            st.success(f"✅ Bağlandı: {_st_secim}")
+                            st.session_state["_ma_sahipsiz_liste"] = [x for x in st.session_state["_ma_sahipsiz_liste"] if x["id"] != _sr["id"]]
+                            try: db_read.clear()
+                            except: pass
+                            st.rerun()
+                        except Exception as _st_be:
+                            st.error(f"Bağlanamadı: {_st_be}")
+
     st.divider()
 
     # ── FİLTRELER ─────────────────────────────────────────────────────────────
