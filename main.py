@@ -2429,11 +2429,26 @@ def not_dialog(cari_id, firma_adi=""):
             st.error(f"Arama/mesaj geçmişi yüklenemedi: {_ile}")
 
     with _tab_teklif:
-        # ── Bu müşterinin gerçek teklif geçmişi — fiyat_sorgu/kargo_ihbar hariç ──
+        # ── Bu müşterinin gerçek teklif geçmişi — hem numarayla (musteri_id) birebir eşleşenler,
+        # hem de isim olarak yakın yazılmış (ör. "Ltd. Şti." eksik/farklı) eski kayıtlar otomatik
+        # yakalanır — kullanıcının ayrı bir menüye gidip elle bağlamasına gerek kalmasın diye. ──
         try:
             import json as _dlgtj
+            import difflib as _dlgdiff
             _dlg_sb = get_sb_client()
-            _dlg_tekdf = pd.DataFrame(_dlg_sb.table("teklifler").select("*").eq("musteri_adi", firma_adi).order("id", desc=True).execute().data) if _dlg_sb else pd.DataFrame()
+            _dlg_ham_tum = pd.DataFrame(_dlg_sb.table("teklifler").select("*").order("id", desc=True).execute().data) if _dlg_sb else pd.DataFrame()
+            if not _dlg_ham_tum.empty:
+                _dlg_firma_norm = str(firma_adi).strip().upper()
+                def _dlg_eslesiyor_mu(_r):
+                    if cari_id and str(_r.get("musteri_id","")) == str(cari_id):
+                        return True
+                    _ad = str(_r.get("musteri_adi","") or "").strip().upper()
+                    if not _ad:
+                        return False
+                    return _dlgdiff.SequenceMatcher(None, _ad, _dlg_firma_norm).ratio() >= 0.82
+                _dlg_tekdf = _dlg_ham_tum[_dlg_ham_tum.apply(_dlg_eslesiyor_mu, axis=1)]
+            else:
+                _dlg_tekdf = pd.DataFrame()
         except Exception:
             _dlg_tekdf = pd.DataFrame()
 
@@ -5696,18 +5711,27 @@ function kartSec(id){
                 return []
             _res_tek_data_cl = _tum_teklif_sayac_yukle()
             if _res_tek_data_cl:
-                import collections as _coltek_cl
-                # Hem numara (musteri_id) hem isim (musteri_adi) ile eşleştir — biri kaymışsa diğeri yakalasın.
-                # "ozel" araması artık tam "tip": "ozel" kalıbıyla — Excel Depo gibi başka verilerle
-                # (rastgele metinde "ozel" geçebilir) yanlışlıkla karışmasın diye.
-                _tek_id_liste, _tek_ad_liste = [], []
+                import collections as _coltek_cl, difflib as _tekdiff_cl
+                # 1) Numarayla (musteri_id) birebir eşleşenler — hızlı, kesin
+                _gecerli_id_seti_cl = set(df_edit["id"].dropna().astype(int).astype(str)) if "id" in df_edit.columns else set()
+                _tek_id_liste = []
+                _baglanamayan_adlar_cl = []
                 for _rtk in _res_tek_data_cl:
                     _sat_metin = str(_rtk.get("satirlar","") or "")
                     if '"tip": "ozel"' in _sat_metin or '"tip":"ozel"' in _sat_metin:
-                        _tek_id_liste.append(str(_rtk.get("musteri_id","")))
-                        if _rtk.get("musteri_adi"):
-                            _tek_ad_liste.append(str(_rtk.get("musteri_adi")).strip().lower())
+                        _mid_str = str(_rtk.get("musteri_id",""))
+                        if _mid_str in _gecerli_id_seti_cl:
+                            _tek_id_liste.append(_mid_str)
+                        elif _rtk.get("musteri_adi"):
+                            _baglanamayan_adlar_cl.append(str(_rtk.get("musteri_adi")).strip())
                 _tek_sayac_cl = _coltek_cl.Counter(_tek_id_liste)
+                # 2) ID ile bağlanamayanlar için — isim benzerliğine göre (yakın yazım da dahil) eşleştir
+                _firma_liste_cl = df_edit["firma"].dropna().astype(str).tolist() if "firma" in df_edit.columns else []
+                _tek_ad_liste = []
+                for _bad in _baglanamayan_adlar_cl:
+                    _yakin = _tekdiff_cl.get_close_matches(_bad, _firma_liste_cl, n=1, cutoff=0.82)
+                    if _yakin:
+                        _tek_ad_liste.append(_yakin[0].strip().lower())
                 _tek_sayac_ad_cl = _coltek_cl.Counter(_tek_ad_liste)
         except Exception:
             _tek_sayac_cl = {}
