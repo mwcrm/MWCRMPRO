@@ -2455,15 +2455,13 @@ def not_dialog(cari_id, firma_adi=""):
                     with st.expander(f"⭐ Özel Teklif — {fmt_tarih(_ttarih)}"):
                         for _g in _tp.get("grp", []):
                             for _s in _g.get("satirlar", []):
-                                _c = ", ".join(_s.get("cikis",[])) if isinstance(_s.get("cikis"),list) else str(_s.get("cikis") or "")
-                                _v = ", ".join(_s.get("varis",[])) if isinstance(_s.get("varis"),list) else str(_s.get("varis") or "")
-                                _tur_g = ", ".join(_s.get("tur", []) or []) or "—"
-                                try: _bas_g = int(float(_s.get("bas", 0) or 0))
-                                except Exception: _bas_g = 0
-                                try: _bit_g = int(float(_s.get("bit", 0) or 0))
-                                except Exception: _bit_g = 0
-                                _rota_g = f"{_c} → {_v}" if (_c or _v) else ""
-                                st.caption(f"　• {_rota_g}{' · ' if _rota_g else ''}{_tur_g} | {_bas_g}-{_bit_g} desi · {fmt_para(_s.get('fiyat',0))}")
+                                _cikis = ", ".join(_s.get("cikis",[])) if isinstance(_s.get("cikis"),list) else str(_s.get("cikis") or "")
+                                _varis = ", ".join(_s.get("varis",[])) if isinstance(_s.get("varis"),list) else str(_s.get("varis") or "")
+                                _tur = ", ".join(_s.get("tur",[]) or [])
+                                _bas_v = _s.get("bas", "")
+                                _bit_v = _s.get("bit", "")
+                                _desi_txt = f"{_bas_v}-{_bit_v} desi · " if (_bas_v != "" or _bit_v != "") else ""
+                                st.caption(f"　• {_cikis} → {_varis} · {_tur} · {_desi_txt}{fmt_para(_s.get('fiyat',0))}")
                 elif _ttip == "sozlesme":
                     _tv = _tp.get("veri",{})
                     st.caption(f"📜 Sözleşme — Geçerlilik: {_tv.get('gecerlilik_tarihi','—')} · Vade: {_tv.get('vade','—')}")
