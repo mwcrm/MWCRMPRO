@@ -7934,14 +7934,21 @@ elif aktif == "ozel_teklif":
         if not _oz_hedef:
             st.warning("Müşteri adı boş!")
         else:
+            # Açılır listeden gerçek bir müşteri seçildiyse, HER ZAMAN o müşterinin gerçek
+            # numarasına ve tam firma adına bağla — yazı kutusundaki metin farklı/eksik yazılmış
+            # olsa bile teklif "sahipsiz" kalmasın (Cari Liste'de görünmeme sorununun sebebiydi).
+            _oz_gercek_id = int(_oz_mus["id"]) if _oz_mus is not None else 0
+            _oz_gercek_adi = str(_oz_mus["firma"]) if _oz_mus is not None else _oz_hedef
             _oz_veri = {
-                "musteri_id": int(_oz_mus["id"]) if _oz_mus is not None else 0,
-                "musteri_adi": _oz_hedef,
+                "musteri_id": _oz_gercek_id,
+                "musteri_adi": _oz_gercek_adi,
                 "satirlar": _ozj.dumps({"tip":"ozel","grp":grp}, ensure_ascii=False),
                 "toplam_tutar": sum(float(s.get("fiyat",0) or 0) for g in grp for s in g.get("satirlar",[])),
                 "olusturan": st.session_state["kullanici"],
-                "notlar": f"Vade:{_oz_vade} | Not:{_oz_not}"
+                "notlar": f"Vade:{_oz_vade} | Not:{_oz_not}" + (f" | Yazılan ad: {_oz_hedef}" if (_oz_mus is not None and _oz_hedef.strip() != _oz_gercek_adi.strip()) else "")
             }
+            if _oz_gercek_id == 0:
+                st.warning(f"⚠️ '{_oz_hedef}' için sistemde kayıtlı bir müşteri seçilmedi — bu teklif Cari Liste'de hiçbir müşterinin hanesinde görünmeyecek. Doğru görünmesi için önce yukarıdaki açılır listeden müşteriyi seç.")
             _duz_id = st.session_state.get("oz2_duz_id")
             if _duz_id:
                 db_update("teklifler",{
