@@ -911,7 +911,7 @@ div[data-testid="stMainBlockContainer"] {
         # ══════════════════════════════════════════════════════════════════════
         with _mpt1:
             try:
-                _mp_ham = pd.DataFrame(_mp_sb.table("teklifler").select("*").order("id", desc=True).limit(500).execute().data) if _mp_sb else pd.DataFrame()
+                _mp_ham = db_read("teklifler", order_col="id", desc=True, limit=500) if _mp_sb else pd.DataFrame()
                 if not _mp_ham.empty and "toplam_tutar" in _mp_ham.columns:
                     _mp_ham = _mp_ham[~_mp_ham["toplam_tutar"].isin([-91001, -91002])]
                 if not _mp_ham.empty:
@@ -2229,18 +2229,34 @@ def not_dialog(cari_id, firma_adi=""):
             import json as _dlgtj
             import difflib as _dlgdiff
             _dlg_sb = get_sb_client()
-            _dlg_ham_tum = pd.DataFrame(_dlg_sb.table("teklifler").select("*") \
-                .order("id", desc=True).limit(500).execute().data) if _dlg_sb else pd.DataFrame()
+            _dlg_ham_tum = db_read("teklifler", order_col="id", desc=True, limit=500) if _dlg_sb else pd.DataFrame()
             if not _dlg_ham_tum.empty and "toplam_tutar" in _dlg_ham_tum.columns:
                 _dlg_ham_tum = _dlg_ham_tum[~_dlg_ham_tum["toplam_tutar"].isin([-91001, -91002])]
             if not _dlg_ham_tum.empty:
-                _dlg_firma_norm = str(firma_adi).strip().upper()
+                def _dlg_norm(s):
+                    # Cari Liste'deki 🧾/📜 sayaçlarıyla AYNI normalize mantığı — TR karakter/
+                    # büyük-küçük harf/noktalama farkı yüzünden kayıt bulunamaması engellenir.
+                    _s = (str(s or "").strip().upper()
+                          .replace("İ","I").replace("Ş","S").replace("Ğ","G")
+                          .replace("Ü","U").replace("Ö","O").replace("Ç","C"))
+                    for _ch in [".", ",", "-", "_", "'"]:
+                        _s = _s.replace(_ch, " ")
+                    return " ".join(_s.split())
+                def _dlg_id_norm(v):
+                    try:
+                        return str(int(float(v)))
+                    except (TypeError, ValueError):
+                        return str(v or "").strip()
+                _dlg_cari_id_norm = _dlg_id_norm(cari_id) if cari_id else ""
+                _dlg_firma_norm = _dlg_norm(firma_adi)
                 def _dlg_eslesiyor_mu(_r):
-                    if cari_id and str(_r.get("musteri_id","")) == str(cari_id):
+                    if _dlg_cari_id_norm and _dlg_cari_id_norm != "0" and _dlg_id_norm(_r.get("musteri_id","")) == _dlg_cari_id_norm:
                         return True
-                    _ad = str(_r.get("musteri_adi","") or "").strip().upper()
+                    _ad = _dlg_norm(_r.get("musteri_adi",""))
                     if not _ad:
                         return False
+                    if _ad == _dlg_firma_norm:
+                        return True
                     return _dlgdiff.SequenceMatcher(None, _ad, _dlg_firma_norm).ratio() >= 0.82
                 _dlg_tekdf = _dlg_ham_tum[_dlg_ham_tum.apply(_dlg_eslesiyor_mu, axis=1)]
             else:
@@ -4370,13 +4386,15 @@ section[data-testid="stSidebar"] { display: none !important; }
     # Genel grup
     @st.cache_data(ttl=60, show_spinner=False)
     def _ust_rapor_teklif_toplam():
-        """Üst raporda gösterilecek gerçek (kayıtlı Özel Teklif) sayısı — pipeline aşamasından bağımsız."""
+        """Üst raporda gösterilecek gerçek (kayıtlı Özel Teklif) sayısı — pipeline aşamasından bağımsız.
+        SADECE 'ozel' (teklif) tipi sayılır — sözleşmeler ayrı sayaçta (_sozlesme_kayit_sayisi),
+        eskiden ikisi birlikte sayılıp rakam yanlış çıkıyordu."""
         try:
             _sbut = get_sb_client()
             if not _sbut:
                 return 0
             _rut = _sbut.table("teklifler").select("id,satirlar,toplam_tutar").execute()
-            return len([r for r in (_rut.data or []) if r.get("toplam_tutar") not in (-91001, -91002) and any(t in str(r.get("satirlar","")) for t in ['"tip": "ozel"', '"tip":"ozel"', '"tip": "sozlesme"', '"tip":"sozlesme"'])])
+            return len([r for r in (_rut.data or []) if r.get("toplam_tutar") not in (-91001, -91002) and any(t in str(r.get("satirlar","")) for t in ['"tip": "ozel"', '"tip":"ozel"'])])
         except Exception:
             return 0
 
@@ -4386,6 +4404,7 @@ section[data-testid="stSidebar"] { display: none !important; }
         ("⭐","Özel Müşteri", _durum_sayi("Özel Müşteri"), "durum_Özel Müşteri", "Özel Müşteri" in _aktif_fil_durum),
         ("📋","Aşamasız", _asamasiz_sayi(), "asamasiz", st.session_state.get("_asamasiz_aktif",False)),
         ("🧾","Gerçek Teklif", _ust_rapor_teklif_toplam(), "gercek_teklif", False),
+        ("📜","Sözleşme", _sozlesme_kayit_sayisi(), "gercek_sozlesme", False),
     ]
     for _dn in tum_durum_opts:
         if str(_dn).upper() in ["NONE","NAN",""] or _dn in ["Portföy","Özel Müşteri"]: continue
@@ -5302,6 +5321,7 @@ function kartSec(id){
         "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=True, width=_w("✅ Analiz")),
         "📞 Arama":      st.column_config.NumberColumn("📞 Arama", disabled=True, width=_w("📞 Arama")),
         "🧾 Teklif":     st.column_config.TextColumn("🧾 Teklif", disabled=True, width="small"),
+        "📜 Sözleşme":   st.column_config.TextColumn("📜 Sözleşme", disabled=True, width="small"),
         "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=True, width="small"),
         "asama1":        st.column_config.SelectboxColumn("1. Aşama", options=_asama_secenek_guvenli("asama1", ["", "Randevu"]), width=_w("asama1")),
         "asama2":        st.column_config.SelectboxColumn("2. Aşama", options=_asama_secenek_guvenli("asama2", ["", "Teklif"]), width=_w("asama2")),
@@ -5315,14 +5335,14 @@ function kartSec(id){
     col_order = ["Seç","tarih","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
                  "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","📞 Arama","islem_asamasi",
                  "asama1","asama2","asama3","aciklama","📨 Notlar","📅 Son Randevu",
-                 "🧾 Teklif","💬 Mesaj","ara_islem","sonuc","temsilci"]
+                 "🧾 Teklif","📜 Sözleşme","💬 Mesaj","ara_islem","sonuc","temsilci"]
     # Gizli kolonları çıkar
     _kol_gizli_map = {"firma":"firma","rakip_firma":"rakip_firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email",
                       "adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci",
                       "islem_asamasi":"islem_asamasi","aciklama":"aciklama","tarih":"tarih",
                       "📅 Son Randevu":"📅 Son Randevu","📨 Notlar":"📨 Notlar","id":"id",
                       "beklenen_ciro":"beklenen_ciro","gerceklesen_ciro":"gerceklesen_ciro","✅ Analiz":"✅ Analiz","📞 Arama":"📞 Arama",
-                      "🧾 Teklif":"🧾 Teklif","💬 Mesaj":"💬 Mesaj",
+                      "🧾 Teklif":"🧾 Teklif","📜 Sözleşme":"📜 Sözleşme","💬 Mesaj":"💬 Mesaj",
                       "asama1":"asama1","asama2":"asama2","asama3":"asama3","sonuc":"sonuc","ara_islem":"ara_islem"}
     col_order = [c for c in col_order if not any(c == _kol_gizli_map.get(g,g) for g in _GIZLI_KOLONLAR)]
 
@@ -5481,12 +5501,17 @@ function kartSec(id){
         df_edit["📨 Notlar"] = ""
         df_edit["📞 Arama"] = 0
 
-    # ── Teklif sayısı (yeni sütun, Notlar ile aynı mantık) ──
-    # SADECE "Kayıtlı Özel Teklifler" listesinde görünen kayıtlar sayılır — o liste
-    # sadece satirlar içinde "ozel" geçenleri gösteriyor, sayaç da aynı kritere uymalı.
+    # ── Teklif / Sözleşme sayısı (yeni sütunlar, Notlar ile aynı mantık) ──
+    # SADECE "Kayıtlı Özel Teklifler" / "Geçmiş Sözleşmeler" listesinde görünen kayıtlar
+    # sayılır. "ozel" (teklif) ve "sozlesme" (sözleşme) kayıtları eskiden TEK sayaçta
+    # birleştiriliyordu ("hangi müşteriye kaç teklif / kaç sözleşme" ayrımı görünmüyordu) —
+    # şimdi iki ayrı sayaçta, ayrı sütunlarda tutuluyor.
     _tek_sayac_cl = {}
     _tek_sayac_ad_cl = {}
+    _soz_sayac_cl = {}
+    _soz_sayac_ad_cl = {}
     _tek_toplam_gorunen = 0
+    _soz_toplam_gorunen = 0
     try:
         @st.cache_data(ttl=60, show_spinner=False)
         def _tum_teklif_sayac_yukle():
@@ -5498,40 +5523,107 @@ function kartSec(id){
         _res_tek_data_cl = _tum_teklif_sayac_yukle()
         if _res_tek_data_cl:
             import collections as _coltek_cl, difflib as _tekdiff_cl
-            # 1) Numarayla (musteri_id) birebir eşleşenler — hızlı, kesin
-            _gecerli_id_seti_cl = set(df_edit["id"].dropna().astype(int).astype(str)) if "id" in df_edit.columns else set()
+
+            def _tek_id_norm(v):
+                """musteri_id / id karşılaştırmasını sağlamlaştırır — Supabase bazen
+                sayısal kolonu '5' yerine '5.0' (float) döndürebiliyor, bu yüzden
+                sadece str(x) ile karşılaştırmak eşleşmeyi kaçırabiliyordu."""
+                try:
+                    return str(int(float(v)))
+                except (TypeError, ValueError):
+                    return str(v or "").strip()
+
+            def _tek_norm_firma(s):
+                """Firma adını TR karakter/büyük-küçük harf/boşluk farklarından bağımsız
+                karşılaştırma için sadeleştirir (aynı mantık '✅ Analiz' sütununda da var).
+                Eşleşme başarısız kalıp 'hangi müşteriye kaç teklif' sorusu cevapsız
+                kalmasının en büyük sebeplerinden biri buydu."""
+                _s = (str(s or "").strip().upper()
+                      .replace("İ","I").replace("Ş","S").replace("Ğ","G")
+                      .replace("Ü","U").replace("Ö","O").replace("Ç","C"))
+                for _ch in [".", ",", "-", "_", "'"]:
+                    _s = _s.replace(_ch, " ")
+                return " ".join(_s.split())
+
+            # 1) Numarayla (musteri_id) birebir eşleşenler — hızlı, kesin (teklif ve sözleşme ayrı listelenir)
+            _gecerli_id_seti_cl = set(df_edit["id"].dropna().apply(_tek_id_norm)) if "id" in df_edit.columns else set()
             _tek_id_liste = []
-            _baglanamayan_adlar_cl = []
+            _soz_id_liste = []
+            _tek_baglanamayan_adlar_cl = []
+            _soz_baglanamayan_adlar_cl = []
             for _rtk in _res_tek_data_cl:
                 _sat_metin = str(_rtk.get("satirlar","") or "")
-                if any(t in _sat_metin for t in ['"tip": "ozel"', '"tip":"ozel"', '"tip": "sozlesme"', '"tip":"sozlesme"']):
-                    _mid_str = str(_rtk.get("musteri_id",""))
-                    if _mid_str in _gecerli_id_seti_cl:
-                        _tek_id_liste.append(_mid_str)
-                    elif _rtk.get("musteri_adi"):
-                        _baglanamayan_adlar_cl.append(str(_rtk.get("musteri_adi")).strip())
+                _rtk_ozel = any(t in _sat_metin for t in ['"tip": "ozel"', '"tip":"ozel"'])
+                _rtk_soz = any(t in _sat_metin for t in ['"tip": "sozlesme"', '"tip":"sozlesme"'])
+                if not (_rtk_ozel or _rtk_soz):
+                    continue
+                _mid_str = _tek_id_norm(_rtk.get("musteri_id",""))
+                if _mid_str != "0" and _mid_str in _gecerli_id_seti_cl:
+                    if _rtk_ozel: _tek_id_liste.append(_mid_str)
+                    if _rtk_soz: _soz_id_liste.append(_mid_str)
+                elif _rtk.get("musteri_adi"):
+                    if _rtk_ozel: _tek_baglanamayan_adlar_cl.append(str(_rtk.get("musteri_adi")).strip())
+                    if _rtk_soz: _soz_baglanamayan_adlar_cl.append(str(_rtk.get("musteri_adi")).strip())
             _tek_sayac_cl = _coltek_cl.Counter(_tek_id_liste)
-            # 2) ID ile bağlanamayanlar için — isim benzerliğine göre (yakın yazım da dahil) eşleştir
+            _soz_sayac_cl = _coltek_cl.Counter(_soz_id_liste)
+            # 2) ID ile bağlanamayanlar (veya musteri_id=0 kaydedilmiş eski teklifler) için —
+            # önce normalize edilmiş TAM eşleşme, olmazsa yakın yazım (isim benzerliği) denenir.
             _firma_liste_cl = df_edit["firma"].dropna().astype(str).tolist() if "firma" in df_edit.columns else []
-            _tek_ad_liste = []
-            for _bad in _baglanamayan_adlar_cl:
-                _yakin = _tekdiff_cl.get_close_matches(_bad, _firma_liste_cl, n=1, cutoff=0.82)
+            _firma_norm_map_cl = {}
+            for _f in _firma_liste_cl:
+                _fn = _tek_norm_firma(_f)
+                if _fn and _fn not in _firma_norm_map_cl:
+                    _firma_norm_map_cl[_fn] = _f
+            _firma_norm_liste_cl = list(_firma_norm_map_cl.keys())
+
+            def _tek_isim_esle(_bad):
+                _bn = _tek_norm_firma(_bad)
+                if not _bn:
+                    return None
+                if _bn in _firma_norm_map_cl:
+                    return _firma_norm_map_cl[_bn].strip().lower()
+                _yakin = _tekdiff_cl.get_close_matches(_bn, _firma_norm_liste_cl, n=1, cutoff=0.82)
                 if _yakin:
-                    _tek_ad_liste.append(_yakin[0].strip().lower())
+                    return _firma_norm_map_cl[_yakin[0]].strip().lower()
+                return None
+
+            _tek_ad_liste = []
+            for _bad in _tek_baglanamayan_adlar_cl:
+                _e = _tek_isim_esle(_bad)
+                if _e: _tek_ad_liste.append(_e)
             _tek_sayac_ad_cl = _coltek_cl.Counter(_tek_ad_liste)
+            _soz_ad_liste = []
+            for _bad in _soz_baglanamayan_adlar_cl:
+                _e = _tek_isim_esle(_bad)
+                if _e: _soz_ad_liste.append(_e)
+            _soz_sayac_ad_cl = _coltek_cl.Counter(_soz_ad_liste)
             _tek_toplam_gorunen = sum(_tek_sayac_cl.values()) + sum(_tek_sayac_ad_cl.values())
+            _soz_toplam_gorunen = sum(_soz_sayac_cl.values()) + sum(_soz_sayac_ad_cl.values())
     except Exception:
         _tek_sayac_cl = {}
         _tek_sayac_ad_cl = {}
+        _soz_sayac_cl = {}
+        _soz_sayac_ad_cl = {}
     if "id" in df_edit.columns:
         def _tek_say_bul(_row):
             _n1 = _tek_sayac_cl.get(str(int(_row["id"])), 0)
             _n2 = _tek_sayac_ad_cl.get(str(_row.get("firma","")).strip().lower(), 0) if "firma" in df_edit.columns else 0
-            _n = max(_n1, _n2)
+            # ID ile eşleşen kayıtlar ve isimle eşleşen kayıtlar FARKLI teklif satırlarıdır,
+            # bu yüzden toplanır — eskiden max() kullanılıyordu ve bu bazı müşterilerde
+            # gerçek sayıdan daha DÜŞÜK bir rakam göstermesine (eksik sayıma) yol açıyordu.
+            _n = _n1 + _n2
             return f"🧾 {_n}" if _n > 0 else ""
         df_edit["🧾 Teklif"] = df_edit.apply(_tek_say_bul, axis=1)
+
+        def _soz_say_bul(_row):
+            _n1 = _soz_sayac_cl.get(str(int(_row["id"])), 0)
+            _n2 = _soz_sayac_ad_cl.get(str(_row.get("firma","")).strip().lower(), 0) if "firma" in df_edit.columns else 0
+            _n = _n1 + _n2
+            return f"📜 {_n}" if _n > 0 else ""
+        df_edit["📜 Sözleşme"] = df_edit.apply(_soz_say_bul, axis=1)
     else:
         df_edit["🧾 Teklif"] = ""
+        df_edit["📜 Sözleşme"] = ""
 
     # ── Mesaj (yeni sütun) — gerçek WhatsApp/Email gönderim kayıtları (islem_kaydi
     # tablosu, musteri_id ile bağlı) — WhatsApp Teklif ve Email Teklif türleri sayılır ──
@@ -5585,7 +5677,10 @@ function kartSec(id){
 
     # ── TÜMÜ GÖSTER — tablo sol, not paneli sağ ──────────────────────────────
     _kayitli_sira = st.session_state.get("_cl_kolon_sira", [])
-    _aktif_col_order = _kayitli_sira if _kayitli_sira else col_order
+    # Kaydedilmiş sıra varsa onu kullan, ama sonradan eklenen yeni sütunlar (örn. "📜 Sözleşme")
+    # kaydedilmiş listede yoksa sona eklenir — yoksa kullanıcının kayıtlı düzeninde yeni sütun
+    # hiç görünmez (sessizce kaybolmuş gibi olurdu).
+    _aktif_col_order = (_kayitli_sira + [c for c in col_order if c not in _kayitli_sira]) if _kayitli_sira else col_order
 
     # Notlu satırları sarı yap — kaç tane notlu var
     _notlu_kac = len(df_edit[df_edit["📨 Notlar"] != ""]) if "📨 Notlar" in df_edit.columns else 0
@@ -8456,7 +8551,7 @@ elif aktif == "sozlesme":
         st.markdown("### 📚 Geçmiş Sözleşmeler")
         try:
             _sz_sb2 = get_sb_client()
-            _sz_ham = pd.DataFrame(_sz_sb2.table("teklifler").select("*").order("id", desc=True).limit(500).execute().data) if _sz_sb2 else pd.DataFrame()
+            _sz_ham = db_read("teklifler", order_col="id", desc=True, limit=500) if _sz_sb2 else pd.DataFrame()
             if not _sz_ham.empty and "toplam_tutar" in _sz_ham.columns:
                 _sz_ham = _sz_ham[~_sz_ham["toplam_tutar"].isin([-91001, -91002])]
             if not _sz_ham.empty and "satirlar" in _sz_ham.columns:
@@ -8632,7 +8727,7 @@ elif aktif == "fatura":
         st.markdown("### 📚 Taslak / Gönderilen Faturalar")
         try:
             _ft_sb2 = get_sb_client()
-            _ft_ham = pd.DataFrame(_ft_sb2.table("teklifler").select("*").order("id", desc=True).limit(500).execute().data) if _ft_sb2 else pd.DataFrame()
+            _ft_ham = db_read("teklifler", order_col="id", desc=True, limit=500) if _ft_sb2 else pd.DataFrame()
             if not _ft_ham.empty and "toplam_tutar" in _ft_ham.columns:
                 _ft_ham = _ft_ham[~_ft_ham["toplam_tutar"].isin([-91001, -91002])]
             _ft_ham = _ft_ham[_ft_ham["satirlar"].astype(str).str.contains("fatura", case=False, na=False)] if not _ft_ham.empty else pd.DataFrame()
@@ -9508,7 +9603,7 @@ elif aktif == "kargo_ihbar":
 
     try:
         _ki_sb = get_sb_client()
-        _ki_ham = pd.DataFrame(_ki_sb.table("teklifler").select("*").order("id", desc=True).limit(500).execute().data) if _ki_sb else pd.DataFrame()
+        _ki_ham = db_read("teklifler", order_col="id", desc=True, limit=500) if _ki_sb else pd.DataFrame()
         if not _ki_ham.empty and "toplam_tutar" in _ki_ham.columns:
             _ki_ham = _ki_ham[~_ki_ham["toplam_tutar"].isin([-91001, -91002])]
         _ki_ham = _ki_ham[_ki_ham["satirlar"].astype(str).str.contains("kargo_ihbar", case=False, na=False)] if not _ki_ham.empty else pd.DataFrame()
@@ -14655,8 +14750,7 @@ elif aktif == "islem_takip":
     except: _df_rdv = pd.DataFrame()
 
     try:
-        _r3 = _sb_it.table("teklifler").select("*").order("tarih", desc=False).limit(500).execute()
-        _df_tek3 = pd.DataFrame(_r3.data) if _r3.data else pd.DataFrame()
+        _df_tek3 = db_read("teklifler", order_col="tarih", desc=False, limit=500)
         if not _df_tek3.empty and "toplam_tutar" in _df_tek3.columns:
             _df_tek3 = _df_tek3[~_df_tek3["toplam_tutar"].isin([-91001, -91002])]
     except: _df_tek3 = pd.DataFrame()
