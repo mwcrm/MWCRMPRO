@@ -4365,18 +4365,31 @@ section[data-testid="stSidebar"] { display: none !important; }
     _grp5_toplam = sum(_kolon_sayi("sonuc", a) for a in _grp5_asama)
 
     # Genel grup
+    @st.cache_data(ttl=60, show_spinner=False)
+    def _ust_rapor_teklif_toplam():
+        """Üst raporda gösterilecek gerçek (kayıtlı Özel Teklif) sayısı — pipeline aşamasından bağımsız."""
+        try:
+            _sbut = get_sb_client()
+            if not _sbut:
+                return 0
+            _rut = _sbut.table("teklifler").select("id,satirlar") \
+                .neq("toplam_tutar", -91001).neq("toplam_tutar", -91002).execute()
+            return len([r for r in (_rut.data or []) if '"tip": "ozel"' in str(r.get("satirlar","")) or '"tip":"ozel"' in str(r.get("satirlar",""))])
+        except Exception:
+            return 0
+
     _genel_items = [
         ("📊","Toplam", len(df), "toplam", _toplam_aktif_flag),
         ("📦","Portföy", _durum_sayi("Portföy"), "durum_Portföy", "Portföy" in _aktif_fil_durum),
         ("⭐","Özel Müşteri", _durum_sayi("Özel Müşteri"), "durum_Özel Müşteri", "Özel Müşteri" in _aktif_fil_durum),
         ("📋","Aşamasız", _asamasiz_sayi(), "asamasiz", st.session_state.get("_asamasiz_aktif",False)),
+        ("🧾","Gerçek Teklif", _ust_rapor_teklif_toplam(), "gercek_teklif", False),
     ]
     for _dn in tum_durum_opts:
         if str(_dn).upper() in ["NONE","NAN",""] or _dn in ["Portföy","Özel Müşteri"]: continue
         _genel_items.append((_durum_ikon(_dn), _dn, _durum_sayi(_dn), f"durum_{_dn}", _dn in _aktif_fil_durum))
 
     _grp_data = {
-        "genel":    ("📊","GENEL",    None, _genel_items),
         "genel":    ("📊","GENEL",    None, _genel_items),
         "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama]
                      + [('<i class="ti ti-phone" style="color:#16a34a;font-size:26px;line-height:1;"></i>',"Aranan", _yesil_arama_sayisi(), "yesil_arama_notlar", False)]
@@ -5471,58 +5484,44 @@ function kartSec(id){
     # sadece satirlar içinde "ozel" geçenleri gösteriyor, sayaç da aynı kritere uymalı.
     _tek_sayac_cl = {}
     _tek_sayac_ad_cl = {}
-    _tek_cache_key = f"_tek_sayac_hesap_{st.session_state.get('kullanici','')}"
-    _tek_cache_zaman_key = _tek_cache_key + "_zaman"
-    _tek_simdi = _tr_simdi().timestamp()
-    _tek_onbellek_gecerli = (
-        _tek_cache_key in st.session_state and
-        _tek_cache_zaman_key in st.session_state and
-        (_tek_simdi - st.session_state[_tek_cache_zaman_key]) < 60
-    )
-    if _tek_onbellek_gecerli:
-        _tek_sayac_cl, _tek_sayac_ad_cl = st.session_state[_tek_cache_key]
-    elif sb_liste:
-        try:
-            @st.cache_data(ttl=60, show_spinner=False)
-            def _tum_teklif_sayac_yukle():
-                _sb3 = get_sb_client()
-                if _sb3:
-                    _r3 = _sb3.table("teklifler").select("musteri_id,musteri_adi,satirlar") \
-                        .neq("toplam_tutar", -91001).neq("toplam_tutar", -91002).execute()
-                    return _r3.data or []
-                return []
-            _res_tek_data_cl = _tum_teklif_sayac_yukle()
-            if _res_tek_data_cl:
-                import collections as _coltek_cl, difflib as _tekdiff_cl
-                # 1) Numarayla (musteri_id) birebir eşleşenler — hızlı, kesin
-                _gecerli_id_seti_cl = set(df_edit["id"].dropna().astype(int).astype(str)) if "id" in df_edit.columns else set()
-                _tek_id_liste = []
-                _baglanamayan_adlar_cl = []
-                for _rtk in _res_tek_data_cl:
-                    _sat_metin = str(_rtk.get("satirlar","") or "")
-                    if '"tip": "ozel"' in _sat_metin or '"tip":"ozel"' in _sat_metin:
-                        _mid_str = str(_rtk.get("musteri_id",""))
-                        if _mid_str in _gecerli_id_seti_cl:
-                            _tek_id_liste.append(_mid_str)
-                        elif _rtk.get("musteri_adi"):
-                            _baglanamayan_adlar_cl.append(str(_rtk.get("musteri_adi")).strip())
-                _tek_sayac_cl = _coltek_cl.Counter(_tek_id_liste)
-                # 2) ID ile bağlanamayanlar için — isim benzerliğine göre (yakın yazım da dahil) eşleştir
-                # (Bu adım, çok sayıda sahipsiz kayıtta yavaş olabildiği için oturum bazlı önbelleğe alınıyor.)
-                _firma_liste_cl = df_edit["firma"].dropna().astype(str).tolist() if "firma" in df_edit.columns else []
-                _tek_ad_liste = []
-                for _bad in _baglanamayan_adlar_cl:
-                    _yakin = _tekdiff_cl.get_close_matches(_bad, _firma_liste_cl, n=1, cutoff=0.82)
-                    if _yakin:
-                        _tek_ad_liste.append(_yakin[0].strip().lower())
-                _tek_sayac_ad_cl = _coltek_cl.Counter(_tek_ad_liste)
-            st.session_state[_tek_cache_key] = (_tek_sayac_cl, _tek_sayac_ad_cl)
-            st.session_state[_tek_cache_zaman_key] = _tek_simdi
-        except Exception:
-            _tek_sayac_cl = {}
-            _tek_sayac_ad_cl = {}
-    elif st.session_state.get("rol") == "admin":
-        pass
+    _tek_toplam_gorunen = 0
+    try:
+        @st.cache_data(ttl=60, show_spinner=False)
+        def _tum_teklif_sayac_yukle():
+            _sb3 = get_sb_client()
+            if _sb3:
+                _r3 = _sb3.table("teklifler").select("musteri_id,musteri_adi,satirlar") \
+                    .neq("toplam_tutar", -91001).neq("toplam_tutar", -91002).execute()
+                return _r3.data or []
+            return []
+        _res_tek_data_cl = _tum_teklif_sayac_yukle()
+        if _res_tek_data_cl:
+            import collections as _coltek_cl, difflib as _tekdiff_cl
+            # 1) Numarayla (musteri_id) birebir eşleşenler — hızlı, kesin
+            _gecerli_id_seti_cl = set(df_edit["id"].dropna().astype(int).astype(str)) if "id" in df_edit.columns else set()
+            _tek_id_liste = []
+            _baglanamayan_adlar_cl = []
+            for _rtk in _res_tek_data_cl:
+                _sat_metin = str(_rtk.get("satirlar","") or "")
+                if '"tip": "ozel"' in _sat_metin or '"tip":"ozel"' in _sat_metin:
+                    _mid_str = str(_rtk.get("musteri_id",""))
+                    if _mid_str in _gecerli_id_seti_cl:
+                        _tek_id_liste.append(_mid_str)
+                    elif _rtk.get("musteri_adi"):
+                        _baglanamayan_adlar_cl.append(str(_rtk.get("musteri_adi")).strip())
+            _tek_sayac_cl = _coltek_cl.Counter(_tek_id_liste)
+            # 2) ID ile bağlanamayanlar için — isim benzerliğine göre (yakın yazım da dahil) eşleştir
+            _firma_liste_cl = df_edit["firma"].dropna().astype(str).tolist() if "firma" in df_edit.columns else []
+            _tek_ad_liste = []
+            for _bad in _baglanamayan_adlar_cl:
+                _yakin = _tekdiff_cl.get_close_matches(_bad, _firma_liste_cl, n=1, cutoff=0.82)
+                if _yakin:
+                    _tek_ad_liste.append(_yakin[0].strip().lower())
+            _tek_sayac_ad_cl = _coltek_cl.Counter(_tek_ad_liste)
+            _tek_toplam_gorunen = sum(_tek_sayac_cl.values()) + sum(_tek_sayac_ad_cl.values())
+    except Exception:
+        _tek_sayac_cl = {}
+        _tek_sayac_ad_cl = {}
     if "id" in df_edit.columns:
         def _tek_say_bul(_row):
             _n1 = _tek_sayac_cl.get(str(int(_row["id"])), 0)
