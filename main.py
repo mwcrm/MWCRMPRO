@@ -2838,16 +2838,23 @@ if "_cl_kolon_genislik" not in st.session_state:
 if "_cl_kolon_sira" not in st.session_state:
     st.session_state["_cl_kolon_sira"] = []
 
-# Versiyon kontrolü — sadece admin olmayanlara
+# Versiyon kontrolü — sadece admin olmayanlara, oturum başına SADECE BİR KERE (her tıklamada değil)
 if st.session_state.get("rol") != "admin":
-    try:
-        _sb_s = get_sb_client()
-        if _sb_s:
-            _res = _sb_s.table("sistem_ayarlari").select("deger").eq("anahtar","stable_surum").execute()
-            if _res.data:
-                _stable = _res.data[0]["deger"]
-                if _stable != GUNCEL_SURUM:
-                    st.markdown("""
+    if "_surum_kontrol_yapildi" not in st.session_state:
+        st.session_state["_surum_kontrol_yapildi"] = True
+        st.session_state["_surum_stable_mi"] = True
+        try:
+            _sb_s = get_sb_client()
+            if _sb_s:
+                _res = _sb_s.table("sistem_ayarlari").select("deger").eq("anahtar","stable_surum").execute()
+                if _res.data:
+                    _stable = _res.data[0]["deger"]
+                    st.session_state["_surum_stable_mi"] = (_stable == GUNCEL_SURUM)
+        except:
+            pass
+    if not st.session_state.get("_surum_stable_mi", True):
+        try:
+            st.markdown("""
                     <div style='text-align:center;padding:60px 20px'>
                     <div style='font-size:3rem'>⏳</div>
                     <h2 style='color:#ff9800'>Güncelleme Hazırlanıyor</h2>
@@ -2856,9 +2863,9 @@ if st.session_state.get("rol") != "admin":
                     <p style='color:#666;font-size:0.85rem'>Verileriniz güvende — hiçbir şey kaybolmadı.</p>
                     </div>
                     """, unsafe_allow_html=True)
-                    st.stop()
-    except:
-        pass  # Bağlantı hatası olursa engelleme yapma
+        except:
+            pass  # Bağlantı hatası olursa engelleme yapma
+        st.stop()
 
 
 with st.sidebar:
