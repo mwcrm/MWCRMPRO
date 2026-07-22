@@ -202,9 +202,6 @@ def get_sb_service():
         pass
     return None
 
-def get_sb():
-    return get_sb_client()
-
 def hesapla_segment(manuel_segment, gerceklesen_ciro):
     """Manuel segment varsa onu normalize et, yoksa ciroya göre otomatik hesapla"""
     # Normalize — eski kayıtlardaki farklı ikonları düzelt
@@ -234,9 +231,6 @@ def segment_renk(seg):
     if "C"  in s: return "#f8fafc","#64748b","#cbd5e1"
     return "#ffffff","#374151","#e2e8f0"
 
-def get_supabase():
-    return get_sb_client()
-
 def _telefon_temizle(seri):
     """5413578020.0 gibi float telefonları 5413578020 string'ine çevirir"""
     def _tek(v):
@@ -256,18 +250,6 @@ def _telefon_temizle(seri):
             pass
         return s
     return seri.apply(_tek)
-
-def _no_temizle(v):
-    """Tek değer için .0 ve float temizleyici — her yerde kullan"""
-    if v is None: return ""
-    s = str(v).strip()
-    if s.lower() in ["nan","none",""]: return ""
-    if s.endswith(".0"): s = s[:-2]
-    try:
-        if "e" in s.lower():
-            s = str(int(float(s)))
-    except: pass
-    return s
 
 def _get_atanmis_firmalar():
     """Giriş yapan kullanıcının atanmış firma adlarını döndürür. Admin için None (hepsi).
@@ -492,15 +474,6 @@ def get_cari_listesi():
     except:
         return pd.DataFrame()
 
-@st.cache_data(ttl=120)
-def get_kullanici_listesi():
-    """2 dk cache'li kullanıcı listesi"""
-    return db_read("kullanicilar", extra_sql="")
-
-@st.cache_data(ttl=120)
-def _cached_placeholder(): pass  # cache decorator boş bırakılamaz
-
-
 @st.cache_data(ttl=30)
 def _db_read_supabase_cached(table, filters=None, order_col="id", desc=True, limit=None):
     """Supabase'den DataFrame döner. extra_sql'e KASITLI OLARAK bağlı değil (zaten Supabase
@@ -601,98 +574,6 @@ def db_update(table, data, where_col, where_val):
         pass
     return False
 
-def db_query(sql, params=None):
-    """SELECT sorgusu — Supabase veya SQLite"""
-    if sb_or_sqlite():
-        # Supabase için pandas read
-        try:
-            import sqlalchemy
-            url = st.secrets.get("SUPABASE_URL","").replace("https://","postgresql://postgres.asinwzxwmkkrcbtjrkoq:")
-            # Doğrudan supabase-py kullanalım
-            sb = get_supabase()
-            if sb:
-                # Tabloyu sql'den çıkar
-                tbl = re.search(r'FROM\s+(\w+)', sql, re.IGNORECASE)
-                if tbl:
-                    table_name = tbl.group(1)
-                    res = sb.table(table_name).select("*").execute()
-                    if res.data:
-                        df = pd.DataFrame(res.data)
-                        return df
-                    return pd.DataFrame()
-        except Exception as e:
-            pass
-    # SQLite fallback
-    df = pd.read_sql(sql, conn)
-    return df
-
-def sb_insert(table, data):
-    """INSERT — Supabase veya SQLite"""
-    if sb_or_sqlite():
-        try:
-            sb = get_supabase()
-            if sb:
-                sb.table(table).insert(data).execute()
-                return True
-        except Exception as e:
-            st.error(f"Supabase insert hatası: {e}")
-    return False
-
-def sb_update(table, data, match_col, match_val):
-    """UPDATE — Supabase veya SQLite"""
-    if sb_or_sqlite():
-        try:
-            sb = get_supabase()
-            if sb:
-                sb.table(table).update(data).eq(match_col, match_val).execute()
-                return True
-        except Exception as e:
-            st.error(f"Supabase update hatası: {e}")
-    return False
-
-def sb_delete(table, match_col, match_val):
-    """DELETE — Supabase"""
-    if sb_or_sqlite():
-        try:
-            sb = get_supabase()
-            if sb:
-                sb.table(table).delete().eq(match_col, match_val).execute()
-                return True
-        except:
-            pass
-    return False
-
-def sb_select(table, filters=None, order=None, limit=None):
-    """Supabase tablo sorgusu — DataFrame döner"""
-    if sb_or_sqlite():
-        try:
-            sb = get_supabase()
-            if sb:
-                q = sb.table(table).select("*")
-                if filters:
-                    for col, val in filters.items():
-                        if val is not None:
-                            q = q.eq(col, val)
-                if order:
-                    q = q.order(order, desc=True)
-                if limit:
-                    q = q.limit(limit)
-                res = q.execute()
-                return pd.DataFrame(res.data) if res.data else pd.DataFrame()
-        except Exception as e:
-            pass
-    # SQLite fallback
-    try:
-        sql = f"SELECT * FROM {table}"
-        if filters:
-            where = " AND ".join([f"{k}=?" for k in filters.keys()])
-            sql += f" WHERE {where}"
-            df = pd.read_sql(sql, conn, params=list(filters.values()))
-        else:
-            df = pd.read_sql(sql, conn)
-        return df
-    except:
-        return pd.DataFrame()
 
 
 ILLER_ILCELER = {
@@ -777,118 +658,6 @@ ILLER_ILCELER = {
 # ── VERİTABANI ───────────────────────────────────────────────────────────────
 def get_conn():
     return sqlite3.connect("mw_crm.db", check_same_thread=False)
-
-def init_db():
-    # SQLite her zaman yedek
-    try:
-        conn = get_conn()
-        tables = [
-        """CREATE TABLE IF NOT EXISTS kullanicilar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            kullanici_adi TEXT UNIQUE NOT NULL,
-            sifre TEXT NOT NULL,
-            rol TEXT DEFAULT 'kullanici')""",
-        """CREATE TABLE IF NOT EXISTS cari_kartlar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            firma TEXT, yetkili TEXT, gsm TEXT, sabit TEXT, email TEXT,
-            adres TEXT, ilce TEXT, il TEXT, durum TEXT, temsilci TEXT,
-            islem_asamasi TEXT, silindi INTEGER DEFAULT 0,
-            olusturan TEXT, beklenen_ciro REAL DEFAULT 0,
-            gerceklesen_ciro REAL DEFAULT 0)""",
-        """CREATE TABLE IF NOT EXISTS teklifler (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            musteri_id INTEGER, musteri_adi TEXT,
-            satirlar TEXT, toplam_tutar REAL,
-            olusturan TEXT, notlar TEXT)""",
-        """CREATE TABLE IF NOT EXISTS islem_kaydi (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            musteri_id INTEGER, musteri_adi TEXT,
-            islem_turu TEXT, icerik TEXT,
-            gonderim_bilgisi TEXT, olusturan TEXT)""",
-        """CREATE TABLE IF NOT EXISTS kullanici_tercih (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            kullanici TEXT, anahtar TEXT, deger TEXT,
-            UNIQUE(kullanici, anahtar))""",
-        """CREATE TABLE IF NOT EXISTS kod_deposu (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            surum TEXT, aciklama TEXT, kod TEXT, olusturan TEXT)""",
-        """CREATE TABLE IF NOT EXISTS mesajlar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            gonderen TEXT, alici TEXT, mesaj TEXT,
-            okundu INTEGER DEFAULT 0)""",
-        """CREATE TABLE IF NOT EXISTS duyurular (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            baslik TEXT, icerik TEXT, tip TEXT DEFAULT 'bilgi',
-            olusturan TEXT, aktif INTEGER DEFAULT 1)""",
-        """CREATE TABLE IF NOT EXISTS aktif_kullanicilar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            kullanici TEXT UNIQUE, son_gorulme TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""",
-        """CREATE TABLE IF NOT EXISTS temsilciler (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            ad TEXT, soyad TEXT, telefon TEXT, email TEXT,
-            bolge TEXT, unvan TEXT, aktif INTEGER DEFAULT 1)""",
-        """CREATE TABLE IF NOT EXISTS kisiler (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            ad TEXT, soyad TEXT, telefon TEXT, email TEXT,
-            firma TEXT, gorev TEXT, bolge TEXT,
-            temsilci TEXT, notlar TEXT, kaynak TEXT)""",
-        """CREATE TABLE IF NOT EXISTS sablon_mesajlar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            ad TEXT, metin TEXT, olusturan TEXT, aktif INTEGER DEFAULT 1)""",
-        """CREATE TABLE IF NOT EXISTS kisiler_mesaj_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            kisi_id INTEGER, kisi_adi TEXT, telefon TEXT,
-            sablon_adi TEXT, mesaj TEXT, gonderen TEXT)""",
-        """CREATE TABLE IF NOT EXISTS cari_aciklamalar (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            cari_id INTEGER, cari_adi TEXT,
-            aciklama TEXT, olusturan TEXT)""",
-        """CREATE TABLE IF NOT EXISTS randevular (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            randevu_tarihi TEXT, randevu_saati TEXT,
-            musteri_id INTEGER, musteri_adi TEXT,
-            bolge TEXT, gorev TEXT, takip TEXT, adet INTEGER DEFAULT 0,
-            aciklama TEXT, sonuc TEXT, temsilci TEXT,
-            wa_gonderildi INTEGER DEFAULT 0, olusturan TEXT)""",
-    ]
-        for t in tables:
-            try: conn.execute(t)
-            except: pass
-        for col in ["olusturan TEXT", "beklenen_ciro REAL DEFAULT 0", "gerceklesen_ciro REAL DEFAULT 0", "aciklama TEXT DEFAULT ''"]:
-            try: conn.execute(f"ALTER TABLE cari_kartlar ADD COLUMN {col}")
-            except: pass
-        conn.execute("UPDATE cari_kartlar SET silindi=0 WHERE silindi IS NULL")
-        conn.execute("UPDATE cari_kartlar SET id=rowid WHERE id IS NULL")
-        try:
-            conn.execute("INSERT INTO kullanicilar (kullanici_adi, sifre, rol) VALUES (?,?,?)",
-                         ("admin", "admin123", "admin"))
-        except: pass
-        conn.commit()
-        conn.close()
-    except: pass
-
-    # Supabase admin kullanicisi
-    if sb_or_sqlite():
-        try:
-            sb = get_supabase()
-            if sb:
-                existing = sb.table("kullanicilar").select("id").eq("kullanici_adi","admin").execute()
-                if not existing.data:
-                    sb.table("kullanicilar").insert({"kullanici_adi":"admin","sifre":"admin123","rol":"admin"}).execute()
-        except:
-            pass
 
 def otomatik_yedek():
     """Her gun otomatik yedek alir (sadece SQLite modunda)"""
@@ -2762,18 +2531,6 @@ def save_menu_tercihi(kullanici, sira):
 
 # ── VERSİYON KONTROL SİSTEMİ ─────────────────────────────────────────────────
 GUNCEL_SURUM = "v6.7"  # Bu kodun versiyonu — her güncellemede artır
-
-def _surum_kontrol():
-    """Kullanıcı stable sürümde mi kontrol et"""
-    try:
-        _sb_s = get_sb_client()
-        if not _sb_s: return True  # Bağlantı yoksa geç
-        _res = _sb_s.table("sistem_ayarlari").select("deger").eq("anahtar","stable_surum").execute()
-        if _res.data:
-            return _res.data[0]["deger"] == GUNCEL_SURUM
-        return True
-    except:
-        return True  # Hata olursa engelleme
 
 # Giriş kontrolü
 if not st.session_state.get("giris", False):
