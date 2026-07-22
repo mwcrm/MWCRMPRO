@@ -3204,49 +3204,6 @@ button[data-testid="manage-app-button"] { display: none !important; }
                 st.session_state["_gizli_menu_list"] = []
                 st.rerun()
 
-        with st.expander("📢 Duyuru"):
-            with st.form("duyuru_form"):
-                d_b = st.text_input("Başlık:")
-                d_i = st.text_area("İçerik:", height=50)
-                d_t = st.selectbox("Tip:", ["bilgi","uyari","hata"])
-                if st.form_submit_button("📢 Yayınla") and d_b:
-                    _sb_d = get_sb_client()
-                    if _sb_d:
-                        try:
-                            _sb_d.table("duyurular").insert({
-                                "baslik":d_b,"icerik":d_i,"tip":d_t,
-                                "olusturan":st.session_state["kullanici"],"aktif":1
-                            }).execute()
-                            st.success("✅ Yayınlandı!")
-                        except Exception as _ed:
-                            st.error(f"Hata: {_ed}")
-                    else:
-                        db_insert("duyurular", {"baslik":d_b,"icerik":d_i,"tip":d_t,
-                            "olusturan":st.session_state["kullanici"],"aktif":1})
-                        st.success("✅ Yayınlandı!")
-                    st.rerun()
-            try:
-                _sb_dy = get_sb_client()
-                if _sb_dy:
-                    _dy_res = _sb_dy.table("duyurular").select("*").eq("aktif",1).order("tarih",desc=True).execute()
-                    _df_dy = pd.DataFrame(_dy_res.data) if _dy_res.data else pd.DataFrame()
-                else:
-                    _df_dy = db_read("duyurular", extra_sql="WHERE aktif=1 ORDER BY tarih DESC")
-                if not _df_dy.empty:
-                    for _, _dy in _df_dy.iterrows():
-                        _tip = _dy.get("tip","bilgi")
-                        _renk_d = "#1f6feb" if _tip=="bilgi" else "#ff9800" if _tip=="uyari" else "#f44336"
-                        st.markdown(
-                            f"<div style='border-left:3px solid {_renk_d};padding:4px 8px;margin:2px 0;font-size:11px;'>"
-                            f"<b>{_dy.get('baslik','')}</b><br>{_dy.get('icerik','')}</div>",
-                            unsafe_allow_html=True
-                        )
-                        if st.button("🗑️", key=f"dy_sil_{_dy.get('id',0)}"):
-                            if _sb_dy:
-                                _sb_dy.table("duyurular").update({"aktif":0}).eq("id",int(_dy.get("id",0))).execute()
-                            st.rerun()
-            except: pass
-
     st.divider()
 
     st.divider()
