@@ -1122,7 +1122,7 @@ div[data-testid="stMainBlockContainer"] {
         # ══════════════════════════════════════════════════════════════════════
         with _mpt1:
             try:
-                _mp_ham = pd.DataFrame(_mp_sb.table("teklifler").select("*").order("id", desc=True).execute().data) if _mp_sb else pd.DataFrame()
+                _mp_ham = pd.DataFrame(_mp_sb.table("teklifler").select("*").neq("toplam_tutar", -91001).neq("toplam_tutar", -91002).order("id", desc=True).limit(500).execute().data) if _mp_sb else pd.DataFrame()
                 if not _mp_ham.empty:
                     _mp_ham = _mp_ham[_mp_ham["musteri_adi"].astype(str).str.strip().str.upper() == _mp_firma_adi.strip().upper()]
             except Exception:
@@ -2436,7 +2436,9 @@ def not_dialog(cari_id, firma_adi=""):
             import json as _dlgtj
             import difflib as _dlgdiff
             _dlg_sb = get_sb_client()
-            _dlg_ham_tum = pd.DataFrame(_dlg_sb.table("teklifler").select("*").order("id", desc=True).execute().data) if _dlg_sb else pd.DataFrame()
+            _dlg_ham_tum = pd.DataFrame(_dlg_sb.table("teklifler").select("*") \
+                .neq("toplam_tutar", -91001).neq("toplam_tutar", -91002) \
+                .order("id", desc=True).limit(500).execute().data) if _dlg_sb else pd.DataFrame()
             if not _dlg_ham_tum.empty:
                 _dlg_firma_norm = str(firma_adi).strip().upper()
                 def _dlg_eslesiyor_mu(_r):
@@ -5706,7 +5708,8 @@ function kartSec(id){
             def _tum_teklif_sayac_yukle():
                 _sb3 = get_sb_client()
                 if _sb3:
-                    _r3 = _sb3.table("teklifler").select("musteri_id,musteri_adi,satirlar").execute()
+                    _r3 = _sb3.table("teklifler").select("musteri_id,musteri_adi,satirlar") \
+                        .neq("toplam_tutar", -91001).neq("toplam_tutar", -91002).execute()
                     return _r3.data or []
                 return []
             _res_tek_data_cl = _tum_teklif_sayac_yukle()
@@ -8677,7 +8680,7 @@ elif aktif == "sozlesme":
         st.markdown("### 📚 Geçmiş Sözleşmeler")
         try:
             _sz_sb2 = get_sb_client()
-            _sz_ham = pd.DataFrame(_sz_sb2.table("teklifler").select("*").order("id", desc=True).execute().data) if _sz_sb2 else pd.DataFrame()
+            _sz_ham = pd.DataFrame(_sz_sb2.table("teklifler").select("*").neq("toplam_tutar", -91001).neq("toplam_tutar", -91002).order("id", desc=True).limit(500).execute().data) if _sz_sb2 else pd.DataFrame()
             if not _sz_ham.empty and "satirlar" in _sz_ham.columns:
                 _sz_arsiv_ham = _sz_ham[_sz_ham["satirlar"].astype(str).str.contains("sozlesme", case=False, na=False)].copy()
             else:
@@ -8851,7 +8854,7 @@ elif aktif == "fatura":
         st.markdown("### 📚 Taslak / Gönderilen Faturalar")
         try:
             _ft_sb2 = get_sb_client()
-            _ft_ham = pd.DataFrame(_ft_sb2.table("teklifler").select("*").order("id", desc=True).execute().data) if _ft_sb2 else pd.DataFrame()
+            _ft_ham = pd.DataFrame(_ft_sb2.table("teklifler").select("*").neq("toplam_tutar", -91001).neq("toplam_tutar", -91002).order("id", desc=True).limit(500).execute().data) if _ft_sb2 else pd.DataFrame()
             _ft_ham = _ft_ham[_ft_ham["satirlar"].astype(str).str.contains("fatura", case=False, na=False)] if not _ft_ham.empty else pd.DataFrame()
         except Exception:
             _ft_ham = pd.DataFrame()
@@ -9725,7 +9728,7 @@ elif aktif == "kargo_ihbar":
 
     try:
         _ki_sb = get_sb_client()
-        _ki_ham = pd.DataFrame(_ki_sb.table("teklifler").select("*").order("id", desc=True).execute().data) if _ki_sb else pd.DataFrame()
+        _ki_ham = pd.DataFrame(_ki_sb.table("teklifler").select("*").neq("toplam_tutar", -91001).neq("toplam_tutar", -91002).order("id", desc=True).limit(500).execute().data) if _ki_sb else pd.DataFrame()
         _ki_ham = _ki_ham[_ki_ham["satirlar"].astype(str).str.contains("kargo_ihbar", case=False, na=False)] if not _ki_ham.empty else pd.DataFrame()
     except Exception:
         _ki_ham = pd.DataFrame()
@@ -14143,7 +14146,8 @@ elif aktif == "musteri_atama":
         if st.button("🔍 Sahipsiz Teklifleri Bul", key="ma_sahipsiz_bul"):
             try:
                 _sb_st = get_sb_client()
-                _st_ham = _sb_st.table("teklifler").select("id,musteri_id,musteri_adi,notlar,tarih").eq("musteri_id", 0).execute().data or []
+                _st_ham = _sb_st.table("teklifler").select("id,musteri_id,musteri_adi,notlar,tarih") \
+                    .eq("musteri_id", 0).neq("toplam_tutar", -91001).neq("toplam_tutar", -91002).execute().data or []
                 _st_ozel = []
                 for _r in _st_ham:
                     try:
@@ -14838,7 +14842,7 @@ elif aktif == "islem_takip":
     except: _df_rdv = pd.DataFrame()
 
     try:
-        _r3 = _sb_it.table("teklifler").select("*").order("tarih", desc=False).execute()
+        _r3 = _sb_it.table("teklifler").select("*").neq("toplam_tutar", -91001).neq("toplam_tutar", -91002).order("tarih", desc=False).limit(500).execute()
         _df_tek3 = pd.DataFrame(_r3.data) if _r3.data else pd.DataFrame()
     except: _df_tek3 = pd.DataFrame()
 
