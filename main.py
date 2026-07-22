@@ -5703,7 +5703,17 @@ function kartSec(id){
     # sadece satirlar içinde "ozel" geçenleri gösteriyor, sayaç da aynı kritere uymalı.
     _tek_sayac_cl = {}
     _tek_sayac_ad_cl = {}
-    if sb_liste:
+    _tek_cache_key = f"_tek_sayac_hesap_{st.session_state.get('kullanici','')}"
+    _tek_cache_zaman_key = _tek_cache_key + "_zaman"
+    _tek_simdi = _tr_simdi().timestamp()
+    _tek_onbellek_gecerli = (
+        _tek_cache_key in st.session_state and
+        _tek_cache_zaman_key in st.session_state and
+        (_tek_simdi - st.session_state[_tek_cache_zaman_key]) < 60
+    )
+    if _tek_onbellek_gecerli:
+        _tek_sayac_cl, _tek_sayac_ad_cl = st.session_state[_tek_cache_key]
+    elif sb_liste:
         try:
             @st.cache_data(ttl=60, show_spinner=False)
             def _tum_teklif_sayac_yukle():
@@ -5714,7 +5724,6 @@ function kartSec(id){
                     return _r3.data or []
                 return []
             _res_tek_data_cl = _tum_teklif_sayac_yukle()
-            pass
             if _res_tek_data_cl:
                 import collections as _coltek_cl, difflib as _tekdiff_cl
                 # 1) Numarayla (musteri_id) birebir eşleşenler — hızlı, kesin
@@ -5731,6 +5740,7 @@ function kartSec(id){
                             _baglanamayan_adlar_cl.append(str(_rtk.get("musteri_adi")).strip())
                 _tek_sayac_cl = _coltek_cl.Counter(_tek_id_liste)
                 # 2) ID ile bağlanamayanlar için — isim benzerliğine göre (yakın yazım da dahil) eşleştir
+                # (Bu adım, çok sayıda sahipsiz kayıtta yavaş olabildiği için oturum bazlı önbelleğe alınıyor.)
                 _firma_liste_cl = df_edit["firma"].dropna().astype(str).tolist() if "firma" in df_edit.columns else []
                 _tek_ad_liste = []
                 for _bad in _baglanamayan_adlar_cl:
@@ -5738,6 +5748,8 @@ function kartSec(id){
                     if _yakin:
                         _tek_ad_liste.append(_yakin[0].strip().lower())
                 _tek_sayac_ad_cl = _coltek_cl.Counter(_tek_ad_liste)
+            st.session_state[_tek_cache_key] = (_tek_sayac_cl, _tek_sayac_ad_cl)
+            st.session_state[_tek_cache_zaman_key] = _tek_simdi
         except Exception:
             _tek_sayac_cl = {}
             _tek_sayac_ad_cl = {}
