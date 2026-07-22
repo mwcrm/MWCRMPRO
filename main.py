@@ -5710,6 +5710,8 @@ function kartSec(id){
                     return _r3.data or []
                 return []
             _res_tek_data_cl = _tum_teklif_sayac_yukle()
+            if st.session_state.get("rol") == "admin":
+                st.caption(f"🔍 [admin] Teklif sayacı: {len(_res_tek_data_cl)} kayıt okundu, {'id' in df_edit.columns and 'firma' in df_edit.columns} (id/firma sütunları var mı)")
             if _res_tek_data_cl:
                 import collections as _coltek_cl, difflib as _tekdiff_cl
                 # 1) Numarayla (musteri_id) birebir eşleşenler — hızlı, kesin
@@ -5733,9 +5735,13 @@ function kartSec(id){
                     if _yakin:
                         _tek_ad_liste.append(_yakin[0].strip().lower())
                 _tek_sayac_ad_cl = _coltek_cl.Counter(_tek_ad_liste)
-        except Exception:
+        except Exception as _tek_hata_cl:
             _tek_sayac_cl = {}
             _tek_sayac_ad_cl = {}
+            if st.session_state.get("rol") == "admin":
+                st.error(f"🔍 Teklif sayacı hatası (sadece admin görür): {_tek_hata_cl}")
+    elif st.session_state.get("rol") == "admin":
+        st.caption("🔍 [admin] Teklif sayacı: sb_liste boş/None, veritabanı bağlantısı kurulamadı.")
     if "id" in df_edit.columns:
         def _tek_say_bul(_row):
             _n1 = _tek_sayac_cl.get(str(int(_row["id"])), 0)
