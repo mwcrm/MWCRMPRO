@@ -4825,8 +4825,13 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
 
         # Not sayılarını al
         try:
-            _sb_kbn = get_sb_client()
-            _kb_not_data = _sb_kbn.table("cari_aciklamalar").select("cari_id").execute().data or [] if _sb_kbn else []
+            @st.cache_data(ttl=60, show_spinner=False)
+            def _kb_not_sayilari_yukle():
+                _sb_kbn2 = get_sb_client()
+                if _sb_kbn2:
+                    return _sb_kbn2.table("cari_aciklamalar").select("cari_id").execute().data or []
+                return []
+            _kb_not_data = _kb_not_sayilari_yukle()
             import collections as _kbc2
             _kb_not_sayac = _kbc2.Counter([str(r["cari_id"]) for r in _kb_not_data])
         except: _kb_not_sayac = {}
@@ -5601,9 +5606,14 @@ function kartSec(id){
     try:
         # Analiz yapılmış firmaları işaretle
         try:
-            _sb_an = get_sb_client()
-            if _sb_an:
-                _an_raw = _sb_an.table("musteri_analiz").select("firma").execute().data or []
+            @st.cache_data(ttl=60, show_spinner=False)
+            def _analiz_firmalari_yukle():
+                _sb_an2 = get_sb_client()
+                if _sb_an2:
+                    return _sb_an2.table("musteri_analiz").select("firma").execute().data or []
+                return []
+            _an_raw = _analiz_firmalari_yukle()
+            if True:
                 def _norm_firma(s):
                     return (str(s or "").strip()
                             .upper()
