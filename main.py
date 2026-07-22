@@ -4398,38 +4398,6 @@ section[data-testid="stSidebar"] { display: none !important; }
         except Exception:
             return 0
 
-    # ── GEÇİCİ TEŞHİS ──────────────────────────────────────────────────────
-    # Önceki teşhiste "canceling statement due to statement timeout" (57014) hatası
-    # görüldü — teklifler tablosu Excel Depo dosya parçalarıyla o kadar şişmiş ki
-    # tüm tabloyu çeken sorgu Supabase'de süre aşımına uğruyordu, bu yüzden 🧾/📜
-    # sütunları ve üst rapor hep boş/0 çıkıyordu. Şimdi Excel Depo satırları
-    # (toplam_tutar=-91001/-91002) SUNUCU tarafında filtreleniyor. Bu teşhis o
-    # düzeltmenin gerçekten işe yarayıp yaramadığını göstermek için — sorun
-    # çözülünce bu bloğu (ve altındaki st.caption satırını) kaldırabiliriz.
-    @st.cache_data(ttl=60, show_spinner=False)
-    def _teklif_teshis_ozet():
-        try:
-            _sbdbg = get_sb_client()
-            if not _sbdbg:
-                return {"baglanti": "Supabase client YOK (get_sb_client None döndü)"}
-            _depo_sayisi = None
-            try:
-                _rdepo = _sbdbg.table("teklifler").select("id", count="exact").in_("toplam_tutar", [-91001, -91002]).execute()
-                _depo_sayisi = _rdepo.count
-            except Exception as _depo_e:
-                _depo_sayisi = f"okunamadı: {_depo_e}"
-            _rdbg = _sbdbg.table("teklifler").select("id,satirlar,toplam_tutar") \
-                .not_.in_("toplam_tutar", [-91001, -91002]).execute()
-            _tumu = _rdbg.data or []
-            _ozel_n = len([r for r in _tumu if any(t in str(r.get("satirlar","")) for t in ['"tip": "ozel"', '"tip":"ozel"'])])
-            _soz_n = len([r for r in _tumu if any(t in str(r.get("satirlar","")) for t in ['"tip": "sozlesme"', '"tip":"sozlesme"'])])
-            return {"excel_depo_satir_sayisi": _depo_sayisi, "excel_depo_haric_satir": len(_tumu),
-                     "tip_ozel": _ozel_n, "tip_sozlesme": _soz_n}
-        except Exception as _dbg_e:
-            return {"HATA": str(_dbg_e)}
-    _teklif_dbg = _teklif_teshis_ozet()
-    st.caption(f"🔧 Teşhis (geçici) — teklifler tablosu: {_teklif_dbg}")
-
     _genel_items = [
         ("📊","Toplam", len(df), "toplam", _toplam_aktif_flag),
         ("📦","Portföy", _durum_sayi("Portföy"), "durum_Portföy", "Portföy" in _aktif_fil_durum),
