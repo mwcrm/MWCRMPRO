@@ -4361,14 +4361,21 @@ section[data-testid="stSidebar"] { display: none !important; }
         except Exception:
             return 0
 
+    @st.cache_data(ttl=60, show_spinner=False)
     def _sozlesme_kayit_sayisi():
         """'Sözleşmeler' sayfasındaki (teklifler tablosu, tip='sozlesme') gerçek sözleşme
-        kayıt sayısı — 3. Aşama alanındaki müşteri sayısıyla karıştırılmasın diye ayrı sayılır."""
+        kayıt sayısı — 3. Aşama alanındaki müşteri sayısıyla karıştırılmasın diye ayrı sayılır.
+        ÖNEMLİ: eskiden db_read("teklifler") ile TÜM tabloyu (Excel Depo dosya parçaları
+        dahil) çekiyordu — bu tablo Excel Depo yüzünden çok büyüdüğü için sorgu Supabase'de
+        'statement timeout'a (57014) uğruyor, sonuç sessizce 0 dönüyordu. Şimdi Excel Depo
+        satırları (toplam_tutar=-91001/-91002) SUNUCU tarafında filtreleniyor."""
         try:
-            _sz = db_read("teklifler", extra_sql="")
-            if _sz.empty or "satirlar" not in _sz.columns:
+            _sbsz = get_sb_client()
+            if not _sbsz:
                 return 0
-            return int(_sz["satirlar"].astype(str).str.contains("sozlesme", case=False, na=False).sum())
+            _rsz = _sbsz.table("teklifler").select("id,satirlar,toplam_tutar") \
+                .not_.in_("toplam_tutar", [-91001, -91002]).execute()
+            return len([r for r in (_rsz.data or []) if "sozlesme" in str(r.get("satirlar","")).lower()])
         except Exception:
             return 0
 
@@ -4388,40 +4395,46 @@ section[data-testid="stSidebar"] { display: none !important; }
     def _ust_rapor_teklif_toplam():
         """Üst raporda gösterilecek gerçek (kayıtlı Özel Teklif) sayısı — pipeline aşamasından bağımsız.
         SADECE 'ozel' (teklif) tipi sayılır — sözleşmeler ayrı sayaçta (_sozlesme_kayit_sayisi),
-        eskiden ikisi birlikte sayılıp rakam yanlış çıkıyordu."""
+        eskiden ikisi birlikte sayılıp rakam yanlış çıkıyordu.
+        Excel Depo dosya parçaları (toplam_tutar=-91001/-91002) artık SUNUCU tarafında
+        filtreleniyor — aksi halde sorgu Supabase'de zaman aşımına uğrayıp sessizce 0 dönüyordu."""
         try:
             _sbut = get_sb_client()
             if not _sbut:
                 return 0
-            _rut = _sbut.table("teklifler").select("id,satirlar,toplam_tutar").execute()
-            return len([r for r in (_rut.data or []) if r.get("toplam_tutar") not in (-91001, -91002) and any(t in str(r.get("satirlar","")) for t in ['"tip": "ozel"', '"tip":"ozel"'])])
+            _rut = _sbut.table("teklifler").select("id,satirlar,toplam_tutar") \
+                .not_.in_("toplam_tutar", [-91001, -91002]).execute()
+            return len([r for r in (_rut.data or []) if any(t in str(r.get("satirlar","")) for t in ['"tip": "ozel"', '"tip":"ozel"'])])
         except Exception:
             return 0
 
     # ── GEÇİCİ TEŞHİS ──────────────────────────────────────────────────────
-    # "Gerçek Teklif"/"Sözleşme" 0 görünüyorsa NEDENİNİ anlamak için: teklifler
-    # tablosunda gerçekte kaç satır var, bunun kaçı tip=ozel/sozlesme etiketli.
-    # Sorun çözülünce bu bloğu (ve altındaki st.caption satırını) kaldırabiliriz.
+    # Önceki teşhiste "canceling statement due to statement timeout" (57014) hatası
+    # görüldü — teklifler tablosu Excel Depo dosya parçalarıyla o kadar şişmiş ki
+    # tüm tabloyu çeken sorgu Supabase'de süre aşımına uğruyordu, bu yüzden 🧾/📜
+    # sütunları ve üst rapor hep boş/0 çıkıyordu. Şimdi Excel Depo satırları
+    # (toplam_tutar=-91001/-91002) SUNUCU tarafında filtreleniyor. Bu teşhis o
+    # düzeltmenin gerçekten işe yarayıp yaramadığını göstermek için — sorun
+    # çözülünce bu bloğu (ve altındaki st.caption satırını) kaldırabiliriz.
     @st.cache_data(ttl=60, show_spinner=False)
     def _teklif_teshis_ozet():
         try:
             _sbdbg = get_sb_client()
             if not _sbdbg:
                 return {"baglanti": "Supabase client YOK (get_sb_client None döndü)"}
-            _rdbg = _sbdbg.table("teklifler").select("id,satirlar,toplam_tutar").execute()
+            _depo_sayisi = None
+            try:
+                _rdepo = _sbdbg.table("teklifler").select("id", count="exact").in_("toplam_tutar", [-91001, -91002]).execute()
+                _depo_sayisi = _rdepo.count
+            except Exception as _depo_e:
+                _depo_sayisi = f"okunamadı: {_depo_e}"
+            _rdbg = _sbdbg.table("teklifler").select("id,satirlar,toplam_tutar") \
+                .not_.in_("toplam_tutar", [-91001, -91002]).execute()
             _tumu = _rdbg.data or []
-            _excel_haric = [r for r in _tumu if r.get("toplam_tutar") not in (-91001, -91002)]
-            _ozel_n = len([r for r in _excel_haric if any(t in str(r.get("satirlar","")) for t in ['"tip": "ozel"', '"tip":"ozel"'])])
-            _soz_n = len([r for r in _excel_haric if any(t in str(r.get("satirlar","")) for t in ['"tip": "sozlesme"', '"tip":"sozlesme"'])])
-            _diger_tip_ornek = []
-            for r in _excel_haric:
-                if any(t in str(r.get("satirlar","")) for t in ['"tip": "ozel"', '"tip":"ozel"', '"tip": "sozlesme"', '"tip":"sozlesme"']):
-                    continue
-                _diger_tip_ornek.append(str(r.get("satirlar",""))[:60])
-                if len(_diger_tip_ornek) >= 3:
-                    break
-            return {"toplam_satir": len(_tumu), "excel_depo_haric": len(_excel_haric),
-                     "tip_ozel": _ozel_n, "tip_sozlesme": _soz_n, "diger_tip_ornek": _diger_tip_ornek}
+            _ozel_n = len([r for r in _tumu if any(t in str(r.get("satirlar","")) for t in ['"tip": "ozel"', '"tip":"ozel"'])])
+            _soz_n = len([r for r in _tumu if any(t in str(r.get("satirlar","")) for t in ['"tip": "sozlesme"', '"tip":"sozlesme"'])])
+            return {"excel_depo_satir_sayisi": _depo_sayisi, "excel_depo_haric_satir": len(_tumu),
+                     "tip_ozel": _ozel_n, "tip_sozlesme": _soz_n}
         except Exception as _dbg_e:
             return {"HATA": str(_dbg_e)}
     _teklif_dbg = _teklif_teshis_ozet()
@@ -5544,10 +5557,15 @@ function kartSec(id){
     try:
         @st.cache_data(ttl=60, show_spinner=False)
         def _tum_teklif_sayac_yukle():
+            # Excel Depo dosya parçaları (toplam_tutar=-91001/-91002) SUNUCU tarafında
+            # filtreleniyor — tüm tabloyu (dosya parçaları dahil) çekmek Supabase'de
+            # 'statement timeout' (57014) hatasına yol açıp sonucu sessizce boşaltıyordu,
+            # bu yüzden 🧾 Teklif / 📜 Sözleşme sütunları hep boş görünüyordu.
             _sb3 = get_sb_client()
             if _sb3:
-                _r3 = _sb3.table("teklifler").select("musteri_id,musteri_adi,satirlar,toplam_tutar").execute()
-                return [r for r in (_r3.data or []) if r.get("toplam_tutar") not in (-91001, -91002)]
+                _r3 = _sb3.table("teklifler").select("musteri_id,musteri_adi,satirlar,toplam_tutar") \
+                    .not_.in_("toplam_tutar", [-91001, -91002]).execute()
+                return _r3.data or []
             return []
         _res_tek_data_cl = _tum_teklif_sayac_yukle()
         if _res_tek_data_cl:
