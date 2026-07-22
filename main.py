@@ -5713,8 +5713,7 @@ function kartSec(id){
                     return _r3.data or []
                 return []
             _res_tek_data_cl = _tum_teklif_sayac_yukle()
-            if st.session_state.get("rol") == "admin":
-                st.caption(f"🔍 [admin] Teklif sayacı: {len(_res_tek_data_cl)} kayıt okundu, {'id' in df_edit.columns and 'firma' in df_edit.columns} (id/firma sütunları var mı)")
+            pass
             if _res_tek_data_cl:
                 import collections as _coltek_cl, difflib as _tekdiff_cl
                 # 1) Numarayla (musteri_id) birebir eşleşenler — hızlı, kesin
@@ -5738,13 +5737,11 @@ function kartSec(id){
                     if _yakin:
                         _tek_ad_liste.append(_yakin[0].strip().lower())
                 _tek_sayac_ad_cl = _coltek_cl.Counter(_tek_ad_liste)
-        except Exception as _tek_hata_cl:
+        except Exception:
             _tek_sayac_cl = {}
             _tek_sayac_ad_cl = {}
-            if st.session_state.get("rol") == "admin":
-                st.error(f"🔍 Teklif sayacı hatası (sadece admin görür): {_tek_hata_cl}")
     elif st.session_state.get("rol") == "admin":
-        st.caption("🔍 [admin] Teklif sayacı: sb_liste boş/None, veritabanı bağlantısı kurulamadı.")
+        pass
     if "id" in df_edit.columns:
         def _tek_say_bul(_row):
             _n1 = _tek_sayac_cl.get(str(int(_row["id"])), 0)
@@ -11619,34 +11616,32 @@ elif aktif == "kisiler":
 
         st.divider()
         if st.session_state.get("rol") == "admin":
-            with st.expander("⚠️ Bakım: Excel Depo verisi 'teklifler' tablosunu yavaşlatıyor mu?"):
-                st.caption("Excel Depo dosyaları, senin isteğinle mevcut 'teklifler' tablosunda (yeni tablo açmadan) saklanıyor. Çok sayıda/büyük dosya biriktiyse bu tablo şişip diğer özellikleri (teklif sayacı, sözleşme listesi vb.) yavaşlatabilir/zaman aşımına uğratabilir. Aşağıdan durumu kontrol edebilirsin.")
-                if st.button("🔍 Excel Depo Boyutunu Kontrol Et", key="ed_boyut_kontrol"):
+            with st.expander("⚠️ Bakım: Excel Depo verisi 'teklifler' tablosunu yavaşlatıyor mu?", expanded=True):
+                st.caption("Excel Depo dosyaları, senin isteğinle mevcut 'teklifler' tablosunda (yeni tablo açmadan) saklanıyor. Çok sayıda/büyük dosya biriktiyse bu tablo şişip diğer özellikleri (teklif sayacı, sözleşme listesi vb.) yavaşlatabilir/zaman aşımına uğratabilir.")
+                if st.button("🔍 Boyutu Kontrol Et", key="ed_boyut_kontrol"):
                     try:
                         _edb_sb = get_sb_client()
                         _edb_meta = _edb_sb.table("teklifler").select("id", count="exact").eq("toplam_tutar", _ED_TIP_META).execute()
                         _edb_parca = _edb_sb.table("teklifler").select("id", count="exact").eq("toplam_tutar", _ED_TIP_PARCA).execute()
                         st.session_state["_edb_sonuc"] = (_edb_meta.count or 0, _edb_parca.count or 0)
                     except Exception as _edb_e:
-                        st.error(f"Kontrol edilemedi (muhtemelen bu sorgu bile zaman aşımına uğruyor — tablo çok şişmiş demektir): {_edb_e}")
+                        st.error(f"Kontrol edilemedi (bu sorgu bile zaman aşımına uğruyorsa, tablo gerçekten çok şişmiş demektir — aşağıdaki temizle butonuna direkt basabilirsin): {_edb_e}")
                 if st.session_state.get("_edb_sonuc"):
                     _edb_m, _edb_p = st.session_state["_edb_sonuc"]
-                    st.warning(f"📦 Excel Depo: **{_edb_m} dosya**, toplam **{_edb_p} veri parçası** satırı — bunların hepsi 'teklifler' tablosunda duruyor.")
-                    st.error("Eğer diğer özellikler (Teklif sayacı, Sözleşme listesi) zaman aşımı hatası veriyorsa, büyük ihtimalle sebep bu. Kalıcı çözüm: Excel Depo'daki dosyaları (aşağıdaki listeden istediklerini indirip) SİLMEK — bu, tabloyu küçültüp diğer her şeyi tekrar hızlandırır. Silme KALICIDIR ve geri alınamaz.")
-                    if st.checkbox("Excel Depo'daki TÜM dosyaları (parçalarıyla birlikte) kalıcı olarak silmek istediğimi onaylıyorum", key="edb_sil_onay"):
-                        if st.button("🗑️ Onayladım, Excel Depo'yu tamamen temizle", type="primary", key="edb_sil_btn"):
-                            try:
-                                _edb_sb2 = get_sb_client()
-                                _edb_sb2.table("teklifler").delete().eq("toplam_tutar", _ED_TIP_META).execute()
-                                _edb_sb2.table("teklifler").delete().eq("toplam_tutar", _ED_TIP_PARCA).execute()
-                                st.success("✅ Excel Depo temizlendi. Diğer özellikler artık hızlanmalı.")
-                                st.session_state["_edb_sonuc"] = None
-                                st.session_state["edb_sil_onay"] = False
-                                try: db_read.clear()
-                                except: pass
-                                st.rerun()
-                            except Exception as _edb_se:
-                                st.error(f"Silinemedi: {_edb_se}")
+                    st.warning(f"📦 Excel Depo: **{_edb_m} dosya**, toplam **{_edb_p} veri parçası** satırı.")
+                st.error("⚠️ Aşağıdaki buton, Excel Depo'daki TÜM dosyaları KALICI olarak siler (parçalarıyla birlikte) — geri alınamaz, dosyaları tekrar yüklemen gerekir. Diğer özellikler (Teklif, Sözleşme) yeniden hızlanır.")
+                if st.button("🗑️ Onaylıyorum, Excel Depo'yu Şimdi Temizle", type="primary", key="edb_sil_btn"):
+                    try:
+                        _edb_sb2 = get_sb_client()
+                        _edb_sb2.table("teklifler").delete().eq("toplam_tutar", _ED_TIP_META).execute()
+                        _edb_sb2.table("teklifler").delete().eq("toplam_tutar", _ED_TIP_PARCA).execute()
+                        st.success("✅ Excel Depo temizlendi. Diğer özellikler artık hızlanmalı.")
+                        st.session_state["_edb_sonuc"] = None
+                        try: db_read.clear()
+                        except: pass
+                        st.rerun()
+                    except Exception as _edb_se:
+                        st.error(f"Silinemedi: {_edb_se}")
 
         st.markdown("#### 📚 Depodaki Dosyalar")
         _ed_ara = st.text_input("🔍 Ara (dosya adı / açıklama):", key="ed_ara")
