@@ -2204,10 +2204,12 @@ def not_dialog(cari_id, firma_adi=""):
     except Exception:
         pass
 
-    _tab_not, _tab_rdv, _tab_yetkili, _tab_iletisim, _tab_teklif, _tab_sozlesme, _tab_analiz, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "📞 Arama/Mesaj", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "🔍 Analiz", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
-    with _tab_not:
+    _nd_sekmeler = ["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "📞 Arama/Mesaj", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "🔍 Analiz", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"]
+    _nd_secim = st.radio("Bölüm", _nd_sekmeler, horizontal=True, label_visibility="collapsed", key=f"nd_sekme_{cari_id}")
+    st.markdown("<hr style='margin-top:-8px;'>", unsafe_allow_html=True)
+    if _nd_secim == "📝 Notlar":
         not_paneli(cari_id, firma_adi, key_prefix="dlg")
-    with _tab_rdv:
+    if _nd_secim == "📅 Randevu Ekle":
         if firma_adi:
             st.markdown(f"**{firma_adi}** için randevu ekle")
 
@@ -2259,7 +2261,7 @@ def not_dialog(cari_id, firma_adi=""):
                     st.rerun()
             except Exception as _re:
                 st.error(f"Hata: {_re}")
-    with _tab_yetkili:
+    if _nd_secim == "👥 Yetkililer":
         st.caption(f"**{firma_adi}** için birden fazla yetkili kişi ekleyebilirsiniz (ad, görev, email, GSM, sabit tel).")
         import json as _ykj
         _YK_ETIKET = "##YETKILI##"
@@ -2382,7 +2384,7 @@ def not_dialog(cari_id, firma_adi=""):
                 except Exception as _yee:
                     st.error(f"Hata: {_yee}")
 
-    with _tab_iletisim:
+    if _nd_secim == "📞 Arama/Mesaj":
         st.caption(f"**{firma_adi}** ile yapılan tüm arama ve SMS kayıtları (rehber/cari eşleşmesiyle otomatik toplanır).")
         import re as _ilre
 
@@ -2448,7 +2450,7 @@ def not_dialog(cari_id, firma_adi=""):
         except Exception as _ile:
             st.error(f"Arama/mesaj geçmişi yüklenemedi: {_ile}")
 
-    with _tab_teklif:
+    if _nd_secim == "⭐ Özel Teklif":
         # ── Bu müşterinin gerçek teklif geçmişi — hem numarayla (musteri_id) birebir eşleşenler,
         # hem de isim olarak yakın yazılmış (ör. "Ltd. Şti." eksik/farklı) eski kayıtlar otomatik
         # yakalanır — kullanıcının ayrı bir menüye gidip elle bağlamasına gerek kalmasın diye. ──
@@ -2513,19 +2515,19 @@ def not_dialog(cari_id, firma_adi=""):
             st.session_state["aktif_tab"] = "ozel_teklif"
             st.session_state["teklif_musteri_onsel"] = firma_adi
             st.rerun()
-    with _tab_sozlesme:
+    if _nd_secim == "📜 Sözleşme Hazırla":
         st.caption(f"**{firma_adi}** için sözleşme hazırla — müşteri otomatik seçili şekilde Sözleşmeler sayfası açılır.")
         if st.button("📜 Sözleşmeler Sayfasını Aç", key=f"dlg_sozlesme_{cari_id}", type="primary", use_container_width=True):
             st.session_state["aktif_tab"] = "sozlesme"
             st.session_state["sozlesme_musteri_onsel"] = firma_adi
             st.rerun()
-    with _tab_analiz:
+    if _nd_secim == "🔍 Analiz":
         st.caption(f"**{firma_adi}** için analiz yap/düzenle — müşteri otomatik seçili şekilde Analiz sayfası açılır.")
         if st.button("🔍 Analiz Sayfasını Aç", key=f"dlg_analiz_{cari_id}", type="primary", use_container_width=True):
             st.session_state["aktif_tab"] = "analiz"
             st.session_state["an_cari_sec"] = f"[{int(cari_id)}] {firma_adi}"
             st.rerun()
-    with _tab_duz:
+    if _nd_secim == "✏️ Cari Kartı Düzenle":
         st.caption(f"**{firma_adi}** — kayıtlı tüm bilgilerle eksiksiz düzenleme ekranı açılır.")
         if st.button("✏️ Cari Kartı Düzenle", key=f"dlg_cari_duzenle_{cari_id}", type="primary", use_container_width=True):
             try:
@@ -2548,22 +2550,31 @@ def not_dialog(cari_id, firma_adi=""):
                     st.rerun()
             except Exception as _de:
                 st.error(f"Hata: {_de}")
-    with _tab_sil:
-        st.caption(f"**{firma_adi}** kaydını komple sil — tıklayınca anında silinir, onay istenmez.")
+    if _nd_secim == "🗑️ Cari Sil":
+        st.caption(f"**{firma_adi}** kaydını komple sil — bu işlem KALICIDIR ve geri alınamaz.")
         if st.button("🗑️ Cari Komple Sil", key=f"dlg_cari_sil_{cari_id}", type="primary", use_container_width=True):
-            try:
-                _sb_cs = get_sb_client()
-                if _sb_cs:
-                    _sb_cs.table("cari_kartlar").update({"silindi": 1}).eq("id", int(cari_id)).execute()
-                else:
-                    db_update("cari_kartlar", {"silindi": 1}, "id", int(cari_id))
-                get_cari_listesi.clear()
-                st.cache_data.clear()
-                st.session_state.pop("cari_editor", None)
-                st.toast(f"🗑️ '{firma_adi}' silindi", icon="🗑️")
+            st.session_state[f"_cari_sil_onay_{cari_id}"] = True
+        if st.session_state.get(f"_cari_sil_onay_{cari_id}"):
+            st.error(f"⚠️ '{firma_adi}' kalıcı olarak silinecek. Emin misin?")
+            _cso1, _cso2 = st.columns(2)
+            if _cso1.button("✅ Evet, kalıcı olarak sil", key=f"dlg_cari_sil_onay_evet_{cari_id}", type="primary", use_container_width=True):
+                try:
+                    _sb_cs = get_sb_client()
+                    if _sb_cs:
+                        _sb_cs.table("cari_kartlar").update({"silindi": 1}).eq("id", int(cari_id)).execute()
+                    else:
+                        db_update("cari_kartlar", {"silindi": 1}, "id", int(cari_id))
+                    get_cari_listesi.clear()
+                    st.cache_data.clear()
+                    st.session_state.pop("cari_editor", None)
+                    st.session_state[f"_cari_sil_onay_{cari_id}"] = False
+                    st.toast(f"🗑️ '{firma_adi}' silindi", icon="🗑️")
+                    st.rerun()
+                except Exception as _cse:
+                    st.error(f"Silme hatası: {_cse}")
+            if _cso2.button("❌ Vazgeç", key=f"dlg_cari_sil_onay_hayir_{cari_id}", use_container_width=True):
+                st.session_state[f"_cari_sil_onay_{cari_id}"] = False
                 st.rerun()
-            except Exception as _cse:
-                st.error(f"Silme hatası: {_cse}")
 
 def not_paneli(cari_id, firma_adi="", key_prefix="np"):
     """Her yerde kullanılan ortak not paneli — Model 5: ultra minimal"""
