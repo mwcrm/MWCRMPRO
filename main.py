@@ -498,30 +498,41 @@ def _cached_placeholder(): pass  # cache decorator boş bırakılamaz
 
 
 @st.cache_data(ttl=30)
-def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
-    """Supabase veya SQLite'dan DataFrame döner"""
+def _db_read_supabase_cached(table, filters=None, order_col="id", desc=True, limit=None):
+    """Supabase'den DataFrame döner. extra_sql'e KASITLI OLARAK bağlı değil (zaten Supabase
+    sorgusunu etkilemiyordu) — böylece aynı tablo farklı extra_sql metniyle çağrılsa bile
+    TEK bir önbellek kaydını paylaşır, gereksiz tekrar tekrar internet isteği atılmaz."""
     sb = get_sb_client()
-    if sb:
-        try:
-            q = sb.table(table).select("*")
-            if filters:
-                for k, v in filters.items():
-                    if v == "NOT_NULL":
-                        q = q.not_.is_(k, "null")
-                    elif v == "neq_1":
-                        q = q.neq(k, 1)
-                    else:
-                        q = q.eq(k, v)
-            if order_col:
-                q = q.order(order_col, desc=desc)
-            if limit:
-                q = q.limit(limit)
-            res = q.execute()
-            if res and res.data is not None:
-                return pd.DataFrame(res.data) if res.data else pd.DataFrame()
-            return pd.DataFrame()
-        except Exception as _e_read:
-            pass
+    if not sb:
+        return None  # sentinel: Supabase yok, çağıran SQLite'a düşsün
+    try:
+        q = sb.table(table).select("*")
+        if filters:
+            for k, v in filters.items():
+                if v == "NOT_NULL":
+                    q = q.not_.is_(k, "null")
+                elif v == "neq_1":
+                    q = q.neq(k, 1)
+                else:
+                    q = q.eq(k, v)
+        if order_col:
+            q = q.order(order_col, desc=desc)
+        if limit:
+            q = q.limit(limit)
+        res = q.execute()
+        if res and res.data is not None:
+            return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+        return pd.DataFrame()
+    except Exception:
+        return None  # sentinel: hata, çağıran SQLite'a düşsün
+
+
+def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
+    """Supabase (önbellekli, extra_sql'den bağımsız paylaşılan önbellek) veya SQLite'dan
+    (extra_sql burada geçerli, sadece Supabase erişilemezse kullanılan yedek yol) DataFrame döner"""
+    _sonuc = _db_read_supabase_cached(table, filters, order_col, desc, limit)
+    if _sonuc is not None:
+        return _sonuc
     try:
         sql = f"SELECT * FROM {table}"
         if extra_sql:
@@ -532,6 +543,11 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
         return df
     except:
         return pd.DataFrame()
+
+# Kodun 35 yerinde "db_read.clear()" çağrılıyor (kayıt sonrası önbelleği temizlemek için) —
+# db_read artık düz bir fonksiyon olduğu için, bu çağrının hâlâ çalışması adına gerçek
+# önbellekli fonksiyona yönlendiriyoruz.
+db_read.clear = _db_read_supabase_cached.clear
 
 
 def db_insert(table, data):
