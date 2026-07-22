@@ -6290,15 +6290,14 @@ elif aktif == "kullanici":
         "surum_yonetimi" in str(st.session_state.get("_yetki_listesi",""))
     )
 
-    if st.session_state.get("rol") == "admin":
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_font = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar"])
-    elif _surum_yetkisi:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_font = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar"])
-    else:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_font = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar"])
-        kul_tab5 = None
+    _kul_sekmeler = ["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log"]
+    if st.session_state.get("rol") == "admin" or _surum_yetkisi:
+        _kul_sekmeler.append("🚀 Sürüm Yönetimi")
+    _kul_sekmeler += ["🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar"]
+    _kul_secim = st.radio("Bölüm", _kul_sekmeler, horizontal=True, label_visibility="collapsed", key="kul_sekme_secim")
+    st.markdown("<hr style='margin-top:-8px;'>", unsafe_allow_html=True)
 
-    with kul_tab1:
+    if _kul_secim == "📋 Kullanıcılar":
         df_kul = db_read("kullanicilar", extra_sql="")
         if not df_kul.empty:
             goster_k = [c for c in ["id","kullanici_adi","ad","soyad","email","telefon","rol","yetkiler"] if c in df_kul.columns]
@@ -6338,7 +6337,7 @@ elif aktif == "kullanici":
                         sb_s.table("kullanicilar").delete().eq("id",sil_id).execute()
                     st.success("Silindi!"); st.rerun()
 
-    with kul_tab2:
+    if _kul_secim == "➕ Yeni Kullanıcı":
         st.markdown("#### ➕ Yeni Kullanıcı")
         _yk_musteri_dfm = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
         _yk_musteri_opts = ["-- Bağlı değil --"] + ([f"[{int(r['id'])}] {r['firma']}" for _, r in _yk_musteri_dfm.iterrows()] if not _yk_musteri_dfm.empty else [])
@@ -6428,7 +6427,7 @@ elif aktif == "kullanici":
                 else:
                     st.warning("Kullanıcı adı ve şifre zorunlu!")
 
-    with kul_tab3:
+    if _kul_secim == "🔐 Yetki Düzenle":
         st.markdown("#### 🔐 Yetki Düzenle")
         df_kul3 = db_read("kullanicilar", extra_sql="")
         if not df_kul3.empty:
@@ -6512,7 +6511,7 @@ elif aktif == "kullanici":
                 except Exception as _byk_e:
                     st.error(f"Kaydedilemedi: {_byk_e}")
 
-    with kul_tab4:
+    if _kul_secim == "📊 Kullanıcı Log":
         st.markdown("### 📊 Kullanıcı Aktivite Logu")
         st.caption("Kim giriş yaptı, hangi sayfaya girdi, ne yaptı — tarih saat ile")
 
@@ -6647,7 +6646,7 @@ elif aktif == "kullanici":
                     except Exception as _e_del:
                         st.error(f"Silinemedi: {_e_del}")
 
-    with kul_tab5_ekran:
+    if _kul_secim == "🎨 Ekran Ayarları":
         st.markdown("### 🎨 Ekran Ayarları")
         _sb_ekran = get_sb_client()
         _ekran_kul = st.session_state.get("kullanici","")
@@ -6874,8 +6873,7 @@ function updateBot(v){{
             st.session_state.pop("_ekran_bosluk", None)
             st.rerun()
 
-    if kul_tab5 and (st.session_state.get("rol") == "admin" or _surum_yetkisi):
-        with kul_tab5:
+    if _kul_secim == "🚀 Sürüm Yönetimi":
             st.markdown("### 🚀 Sürüm Yönetimi")
 
             _sb_sv = get_sb_client()
@@ -7001,7 +6999,7 @@ function updateBot(v){{
                 """)
 
     # ── 📐 KOLON AYARLARI ─────────────────────────────────────────────────────
-    with kul_tab_kolon:
+    if _kul_secim == "📐 Kolon Ayarları":
         st.markdown("### 📐 Cari Liste Kolon Ayarları")
         st.caption("Genişlik ayarlayın, gizlemek istediklerinizi kapatın → Kaydet")
         _KOL_VARS_UI = {
@@ -7139,7 +7137,7 @@ function updateBot(v){{
                     st.error(f"Hata: {_kbge}")
 
     # ── 🔄 TOPLU DEĞİŞTİR ────────────────────────────────────────────────────
-    with kul_tab_toplu:
+    if _kul_secim == "🔄 Toplu Değiştir":
         st.markdown("### 🔄 Toplu Aşama / Durum Değiştir")
         st.caption("Seçili aşama veya durumu toplu olarak değiştirin")
 
@@ -7214,7 +7212,7 @@ function updateBot(v){{
                     st.error("Güncelleme başarısız!")
         else:
             st.info("Müşteri verisi bulunamadı.")
-    with kul_tab_tanim:
+    if _kul_secim == "⚙️ Tanımlar":
         st.markdown("### ⚙️ Aşama & Durum Tanımları")
         _sb_tan = get_sb_client()
 
@@ -7328,7 +7326,7 @@ function updateBot(v){{
                     if _tan_sil("durum", _d):
                         st.success(f"'{_d}' silindi!"); st.rerun()
 
-    with kul_tab_font:
+    if _kul_secim == "🔤 Fontlar":
         st.markdown("### 🔤 Sözleşme PDF Fontları")
         st.caption("Sözleşme PDF'lerinin Türkçe karakterleri (ş, ğ, ı, ç, ö, ü, İ) doğru basabilmesi için gereken "
                    "font dosyaları. Başka bir bilgisayarda kuruluma ihtiyaç olursa buradan indirilebilir; "
@@ -11904,9 +11902,11 @@ elif aktif == "randevu":
     bugun_str = _tr_simdi().strftime("%Y-%m-%d")
 
     # ── iki sekme ─────────────────────────────────────────────────────────────
-    r_tab1, r_tab2, r_tab3, r_tab4, r_tab_rut = st.tabs(["📋 Liste & Düzenle", "➕ Yeni Randevu", "📂 Aşama Sayfaları", "⚙️ Yönetim", "🗺️ Rut Haritası"])
+    _r_sekmeler = ["📋 Liste & Düzenle", "➕ Yeni Randevu", "📂 Aşama Sayfaları", "⚙️ Yönetim", "🗺️ Rut Haritası"]
+    _r_secim = st.radio("Bölüm", _r_sekmeler, horizontal=True, label_visibility="collapsed", key="r_sekme_secim")
+    st.markdown("<hr style='margin-top:-8px;'>", unsafe_allow_html=True)
 
-    with r_tab1:
+    if _r_secim == "📋 Liste & Düzenle":
         # Filtreler
         rf1,rf2,rf3,rf4 = st.columns(4)
         _fil_tem   = rf1.text_input("Temsilci:", key="rand_fil_tem")
@@ -12226,7 +12226,7 @@ elif aktif == "randevu":
                 file_name=f"randevular_{_tr_simdi().strftime('%Y%m%d')}.xlsx",
                 use_container_width=True)
 
-    with r_tab2:
+    if _r_secim == "➕ Yeni Randevu":
         df_mrand = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
         musteri_rand_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['firma']} ({r['durum']})" for _,r in df_mrand.iterrows()]
 
@@ -12462,7 +12462,7 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
                             "gonderim_bilgisi":_tw3,"olusturan":st.session_state.get("kullanici","")})
                     st.rerun()
 
-    with r_tab3:
+    if _r_secim == "📂 Aşama Sayfaları":
         import json as _json_ls_r
         st.markdown("### 📂 Aşama Sayfaları")
 
@@ -12602,7 +12602,7 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
                     st.session_state["varsayilan_asama"] = _secili_asama; st.rerun()
 
 
-    with r_tab4:
+    if _r_secim == "⚙️ Yönetim":
         st.markdown("### ⚙️ Yönetim Araçları")
 
         _yt_sec = st.radio("", [
@@ -13087,7 +13087,7 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
 
             st.divider()
 
-    with r_tab_rut:
+    if _r_secim == "🗺️ Rut Haritası":
         st.markdown("### 🗺️ Günlük Rut Haritası")
         import streamlit.components.v1 as _rut_comp
         import json as _rj
