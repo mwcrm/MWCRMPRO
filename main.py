@@ -168,7 +168,6 @@ def sb_or_sqlite():
         return False
 
 @st.cache_resource
-@st.cache_resource
 def get_sb_client():
     """Supabase client — tek seferlik oluştur, cache'le"""
     try:
@@ -4520,20 +4519,24 @@ section[data-testid="stSidebar"] { display: none !important; }
         """Notlardan toplam arama sayısı — 'ziyaret' geçenler hariç"""
         return _not_anahtar_sayisi(_haric=["ziyaret"])
 
+    @st.cache_data(ttl=60, show_spinner=False)
+    def _islem_kaydi_turune_gore_yukle(_islem_turu):
+        """Ham veriyi (kullanıcıdan bağımsız) önbellekli çeker — filtreleme aşağıda hızlıca Python'da yapılır."""
+        try:
+            _sbg = get_sb_client()
+            if not _sbg:
+                return []
+            _rg = _sbg.table("islem_kaydi").select("id,musteri_id").eq("islem_turu", _islem_turu).execute()
+            return _rg.data or []
+        except Exception:
+            return []
+
     def _gercek_gonderim_sayisi(_islem_turu):
         """'islem_kaydi' tablosundan gerçek gönderim (WhatsApp Teklif / Email Teklif) sayısı —
         'Mesaj' sütununun kullandığı kaynakla aynı, üst raporun da bunu içermesi için.
         SADECE görünen (yetkili olunan) müşterilerin kayıtları sayılır."""
-        try:
-            _sbg = get_sb_client()
-            if not _sbg:
-                return 0
-            _rg = _sbg.table("islem_kaydi").select("id,musteri_id").eq("islem_turu", _islem_turu).execute()
-            _rg_data = _rg.data or []
-            _rg_data = [r for r in _rg_data if r.get("musteri_id") is not None and int(r.get("musteri_id")) in _izinli_id_seti]
-            return len(_rg_data)
-        except Exception:
-            return 0
+        _rg_data = _islem_kaydi_turune_gore_yukle(_islem_turu)
+        return len([r for r in _rg_data if r.get("musteri_id") is not None and int(r.get("musteri_id")) in _izinli_id_seti])
 
     def _email_not_sayisi():
         """Notlarda 'email'/'e-mail'/'mail' geçen kayıt sayısı + gerçekten gönderilen Email Teklif sayısı"""
