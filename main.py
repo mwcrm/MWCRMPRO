@@ -4398,6 +4398,35 @@ section[data-testid="stSidebar"] { display: none !important; }
         except Exception:
             return 0
 
+    # ── GEÇİCİ TEŞHİS ──────────────────────────────────────────────────────
+    # "Gerçek Teklif"/"Sözleşme" 0 görünüyorsa NEDENİNİ anlamak için: teklifler
+    # tablosunda gerçekte kaç satır var, bunun kaçı tip=ozel/sozlesme etiketli.
+    # Sorun çözülünce bu bloğu (ve altındaki st.caption satırını) kaldırabiliriz.
+    @st.cache_data(ttl=60, show_spinner=False)
+    def _teklif_teshis_ozet():
+        try:
+            _sbdbg = get_sb_client()
+            if not _sbdbg:
+                return {"baglanti": "Supabase client YOK (get_sb_client None döndü)"}
+            _rdbg = _sbdbg.table("teklifler").select("id,satirlar,toplam_tutar").execute()
+            _tumu = _rdbg.data or []
+            _excel_haric = [r for r in _tumu if r.get("toplam_tutar") not in (-91001, -91002)]
+            _ozel_n = len([r for r in _excel_haric if any(t in str(r.get("satirlar","")) for t in ['"tip": "ozel"', '"tip":"ozel"'])])
+            _soz_n = len([r for r in _excel_haric if any(t in str(r.get("satirlar","")) for t in ['"tip": "sozlesme"', '"tip":"sozlesme"'])])
+            _diger_tip_ornek = []
+            for r in _excel_haric:
+                if any(t in str(r.get("satirlar","")) for t in ['"tip": "ozel"', '"tip":"ozel"', '"tip": "sozlesme"', '"tip":"sozlesme"']):
+                    continue
+                _diger_tip_ornek.append(str(r.get("satirlar",""))[:60])
+                if len(_diger_tip_ornek) >= 3:
+                    break
+            return {"toplam_satir": len(_tumu), "excel_depo_haric": len(_excel_haric),
+                     "tip_ozel": _ozel_n, "tip_sozlesme": _soz_n, "diger_tip_ornek": _diger_tip_ornek}
+        except Exception as _dbg_e:
+            return {"HATA": str(_dbg_e)}
+    _teklif_dbg = _teklif_teshis_ozet()
+    st.caption(f"🔧 Teşhis (geçici) — teklifler tablosu: {_teklif_dbg}")
+
     _genel_items = [
         ("📊","Toplam", len(df), "toplam", _toplam_aktif_flag),
         ("📦","Portföy", _durum_sayi("Portföy"), "durum_Portföy", "Portföy" in _aktif_fil_durum),
