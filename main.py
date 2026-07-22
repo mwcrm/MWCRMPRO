@@ -4376,7 +4376,7 @@ section[data-testid="stSidebar"] { display: none !important; }
             if not _sbut:
                 return 0
             _rut = _sbut.table("teklifler").select("id,satirlar,toplam_tutar").execute()
-            return len([r for r in (_rut.data or []) if r.get("toplam_tutar") not in (-91001, -91002) and ('"tip": "ozel"' in str(r.get("satirlar","")) or '"tip":"ozel"' in str(r.get("satirlar","")))])
+            return len([r for r in (_rut.data or []) if r.get("toplam_tutar") not in (-91001, -91002) and any(t in str(r.get("satirlar","")) for t in ['"tip": "ozel"', '"tip":"ozel"', '"tip": "sozlesme"', '"tip":"sozlesme"'])])
         except Exception:
             return 0
 
@@ -5504,7 +5504,7 @@ function kartSec(id){
             _baglanamayan_adlar_cl = []
             for _rtk in _res_tek_data_cl:
                 _sat_metin = str(_rtk.get("satirlar","") or "")
-                if '"tip": "ozel"' in _sat_metin or '"tip":"ozel"' in _sat_metin:
+                if any(t in _sat_metin for t in ['"tip": "ozel"', '"tip":"ozel"', '"tip": "sozlesme"', '"tip":"sozlesme"']):
                     _mid_str = str(_rtk.get("musteri_id",""))
                     if _mid_str in _gecerli_id_seti_cl:
                         _tek_id_liste.append(_mid_str)
