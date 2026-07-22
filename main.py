@@ -168,6 +168,7 @@ def sb_or_sqlite():
         return False
 
 @st.cache_resource
+@st.cache_resource
 def get_sb_client():
     """Supabase client — tek seferlik oluştur, cache'le"""
     try:
@@ -270,28 +271,32 @@ def _no_temizle(v):
     return s
 
 def _get_atanmis_firmalar():
-    """Giriş yapan kullanıcının atanmış firma adlarını döndürür. Admin için None (hepsi)."""
+    """Giriş yapan kullanıcının atanmış firma adlarını döndürür. Admin için None (hepsi).
+    Oturum başına bir kere hesaplanır (her çağrıda değil) — aynı kullanıcı için tekrar tekrar
+    internete gitmesin diye."""
+    _rol0 = st.session_state.get("rol","")
+    _kul0 = st.session_state.get("kullanici","")
+    if _rol0 == "admin" or not _kul0:
+        return None
+    _ck = f"_atanmis_firmalar_{_kul0}"
+    if _ck in st.session_state:
+        return st.session_state[_ck]
     try:
-        _rol = st.session_state.get("rol","")
-        _kul = st.session_state.get("kullanici","")
-        if _rol == "admin" or not _kul:
-            return None  # None = hepsini göster
         sb = get_sb_client()
         if sb:
-            _res = sb.table("cari_kartlar").select("firma,id").eq("atanan_kullanici", _kul).neq("silindi",1).execute()
+            _res = sb.table("cari_kartlar").select("firma,id").eq("atanan_kullanici", _kul0).neq("silindi",1).execute()
             if _res.data:
-                return {
+                _sonuc = {
                     "firmalar": set(str(r.get("firma","")).strip().upper() for r in _res.data if r.get("firma")),
                     "idler": set(int(r.get("id",0)) for r in _res.data if r.get("id"))
                 }
-        return {"firmalar": set(), "idler": set()}  # boş — hiçbir şey görmesin
+                st.session_state[_ck] = _sonuc
+                return _sonuc
+        st.session_state[_ck] = {"firmalar": set(), "idler": set()}
+        return st.session_state[_ck]  # boş — hiçbir şey görmesin
     except:
-        try:
-            if "admin" in str(st.session_state.get("rol","")).strip().lower():
-                return None
-        except:
-            pass
-        return {"firmalar": set(), "idler": set()}  # hata durumunda da güvenli taraf: hiçbir şey gösterme
+        st.session_state[_ck] = {"firmalar": set(), "idler": set()}
+        return st.session_state[_ck]  # hata durumunda da güvenli taraf: hiçbir şey gösterme
 
 def _bolge_yetki_yukle():
     """Giriş yapan kullanıcının izinli bölge listesini döner.
@@ -2653,6 +2658,7 @@ _TAB_ETIKETLER = {
     
 }
 
+@st.cache_data(ttl=60, show_spinner=False)
 def get_menu_tercihi(kullanici):
     def _temizle(liste):
         goruldu = []
@@ -2738,6 +2744,8 @@ def save_menu_tercihi(kullanici, sira):
             conn.execute("INSERT OR REPLACE INTO kullanici_tercih (kullanici, anahtar, deger) VALUES (?,?,?)",
                 (kullanici, "menu_sirasi", json.dumps(sira)))
             conn.commit(); conn.close()
+    except: pass
+    try: get_menu_tercihi.clear()
     except: pass
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
