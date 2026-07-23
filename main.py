@@ -8509,10 +8509,176 @@ elif aktif == "fatura":
     import json as _ftj
     from datetime import date as _ftdate
 
+    # ══════════════════ PARAŞÜT API — OAuth bağlantısı + gönderim (ayarlar veritabanında) ══════════════════
+    def _parasut_ayarlari_yukle():
+        """Client ID / Secret / Company ID — Secrets değil, doğrudan veritabanından okunur."""
+        try:
+            sb = get_sb_client()
+            if not sb:
+                return {}
+            r = sb.table("sistem_ayarlari").select("deger").eq("anahtar", "parasut_ayarlar").execute()
+            if r.data:
+                return _ftj.loads(r.data[0]["deger"])
+            return {}
+        except Exception:
+            return {}
+
+    def _parasut_ayarlari_kaydet(cid, csecret, company_id):
+        try:
+            sb = get_sb_client()
+            if not sb:
+                return False
+            sb.table("sistem_ayarlari").delete().eq("anahtar", "parasut_ayarlar").execute()
+            sb.table("sistem_ayarlari").insert({"anahtar": "parasut_ayarlar", "deger": _ftj.dumps({
+                "client_id": cid.strip(), "client_secret": csecret.strip(), "company_id": company_id.strip(),
+            })}).execute()
+            return True
+        except Exception:
+            return False
+
+    def _parasut_ayarli_mi():
+        _a = _parasut_ayarlari_yukle()
+        return bool(_a.get("client_id") and _a.get("client_secret") and _a.get("company_id"))
+
+    def _parasut_yetki_url():
+        _cid = _parasut_ayarlari_yukle().get("client_id", "")
+        return f"https://api.parasut.com/oauth/authorize?client_id={_cid}&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code"
+
+    def _parasut_token_yukle():
+        """Kaydedilmiş Paraşüt bağlantı jetonunu (varsa) getirir."""
+        try:
+            sb = get_sb_client()
+            if not sb:
+                return None
+            r = sb.table("sistem_ayarlari").select("deger").eq("anahtar", "parasut_token").execute()
+            if r.data:
+                return _ftj.loads(r.data[0]["deger"])
+            return None
+        except Exception:
+            return None
+
+    def _parasut_token_kaydet(token_data):
+        try:
+            sb = get_sb_client()
+            if not sb:
+                return False
+            sb.table("sistem_ayarlari").delete().eq("anahtar", "parasut_token").execute()
+            sb.table("sistem_ayarlari").insert({"anahtar": "parasut_token", "deger": _ftj.dumps(token_data)}).execute()
+            return True
+        except Exception:
+            return False
+
+    def _parasut_kod_ile_baglan(kod):
+        """Kullanıcının Paraşüt'ten aldığı kodu, gerçek jetona (token) çevirir."""
+        try:
+            import requests as _preq
+            _a = _parasut_ayarlari_yukle()
+            _r = _preq.post("https://api.parasut.com/oauth/token", data={
+                "grant_type": "authorization_code",
+                "code": kod.strip(),
+                "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
+                "client_id": _a.get("client_id", ""),
+                "client_secret": _a.get("client_secret", ""),
+            }, timeout=20)
+            if _r.status_code == 200:
+                _td = _r.json()
+                _td["_alinma_zamani"] = _tr_simdi().timestamp()
+                _parasut_token_kaydet(_td)
+                return True, None
+            return False, _r.text
+        except Exception as _pe:
+            return False, str(_pe)
+
+    def _parasut_token_yenile(_td):
+        try:
+            import requests as _preq
+            _a = _parasut_ayarlari_yukle()
+            _r = _preq.post("https://api.parasut.com/oauth/token", data={
+                "grant_type": "refresh_token",
+                "refresh_token": _td.get("refresh_token", ""),
+                "client_id": _a.get("client_id", ""),
+                "client_secret": _a.get("client_secret", ""),
+            }, timeout=20)
+            if _r.status_code == 200:
+                _ytd = _r.json()
+                _ytd["_alinma_zamani"] = _tr_simdi().timestamp()
+                _parasut_token_kaydet(_ytd)
+                return _ytd
+            return None
+        except Exception:
+            return None
+
+    def _parasut_gecerli_token():
+        """Geçerli (süresi dolmamış) bir erişim jetonu döner, gerekirse otomatik yeniler."""
+        _td = _parasut_token_yukle()
+        if not _td:
+            return None
+        _gecen = _tr_simdi().timestamp() - _td.get("_alinma_zamani", 0)
+        if _gecen > (_td.get("expires_in", 7200) - 120):  # süresi dolmadan 2 dk önce yenile
+            _td = _parasut_token_yenile(_td)
+        return _td.get("access_token") if _td else None
+
+    def _parasut_api(method, path, json_govde=None, params=None):
+        """Paraşüt API'sine istek atar. path örn: '/sales_invoices'"""
+        _tok = _parasut_gecerli_token()
+        if not _tok:
+            return None, "Paraşüt'e bağlı değilsin."
+        try:
+            import requests as _preq
+            _cid = _parasut_ayarlari_yukle().get("company_id", "")
+            _url = f"https://api.parasut.com/v4/{_cid}{path}"
+            _headers = {"Authorization": f"Bearer {_tok}", "Content-Type": "application/vnd.api+json"}
+            _r = _preq.request(method, _url, headers=_headers, json=json_govde, params=params, timeout=20)
+            if 200 <= _r.status_code < 300:
+                return _r.json(), None
+            return None, f"[{_r.status_code}] {_r.text[:300]}"
+        except Exception as _pae:
+            return None, str(_pae)
+
     st.markdown("## 💰 Faturalar")
-    st.info("🔧 **Kurulum aşamasında.** Paraşüt API bağlantısı (Client ID / Secret) henüz eklenmedi — şu an "
-            "sadece fatura taslağı hazırlayıp arşivleyebilirsin. Bağlantı eklendiğinde 'Paraşüt'e Gönder' "
-            "butonu aktif olacak, başka hiçbir şey değişmeyecek.")
+
+    if not _parasut_ayarli_mi():
+        with st.expander("⚙️ Paraşüt API Bilgilerini Gir (bir kereye mahsus)", expanded=True):
+            st.caption("Paraşüt Uygulama Ayarları'ndan aldığın bilgileri buraya yapıştır — hiçbir dış panele gitmene gerek yok, doğrudan veritabanına kaydedilir.")
+            _pa_cid = st.text_input("Application Id (Client ID):", key="pa_cid_input")
+            _pa_csec = st.text_input("Secret (Client Secret):", key="pa_csec_input", type="password")
+            _pa_company = st.text_input("Şirket (Company) ID:", value="843974", key="pa_company_input")
+            if st.button("💾 Kaydet", type="primary", key="pa_ayar_kaydet_btn"):
+                if not (_pa_cid.strip() and _pa_csec.strip() and _pa_company.strip()):
+                    st.warning("Üç alanı da doldurmalısın.")
+                elif _parasut_ayarlari_kaydet(_pa_cid, _pa_csec, _pa_company):
+                    st.success("✅ Kaydedildi! Şimdi aşağıda 'Paraşüt'e Bağlan' çıkacak.")
+                    st.rerun()
+                else:
+                    st.error("Kaydedilemedi, tekrar dene.")
+    else:
+        _pt = _parasut_token_yukle()
+        if _pt:
+            with st.expander("✅ Paraşüt'e bağlı", expanded=False):
+                st.caption("Bağlantı aktif. Sorun yaşarsan aşağıdan tekrar bağlanabilirsin.")
+                if st.button("🔌 Bağlantıyı Kes", key="ft_parasut_kes"):
+                    try:
+                        _pks = get_sb_client()
+                        if _pks: _pks.table("sistem_ayarlari").delete().eq("anahtar", "parasut_token").execute()
+                        st.success("Bağlantı kesildi."); st.rerun()
+                    except Exception as _pke:
+                        st.error(f"Hata: {_pke}")
+        else:
+            with st.expander("🔗 Paraşüt'e Bağlan", expanded=True):
+                st.markdown(f"1. [Bu bağlantıya tıkla]({_parasut_yetki_url()}) — Paraşüt'e giriş yap, izin ver\n"
+                            "2. Ekranda çıkan **kodu kopyala**\n"
+                            "3. Aşağıya yapıştırıp \"Bağlan\"a bas")
+                _pt_kod = st.text_input("Paraşüt'ten aldığın kod:", key="ft_parasut_kod")
+                if st.button("🔗 Bağlan", key="ft_parasut_baglan_btn", type="primary"):
+                    if not _pt_kod.strip():
+                        st.warning("Önce kodu yapıştır.")
+                    else:
+                        _pok, _phata = _parasut_kod_ile_baglan(_pt_kod)
+                        if _pok:
+                            st.success("✅ Paraşüt'e başarıyla bağlandı!")
+                            st.rerun()
+                        else:
+                            st.error(f"Bağlanamadı: {_phata}")
 
     _ft_tab1, _ft_tab2 = st.tabs(["📝 Yeni Fatura Taslağı", "📚 Taslak/Gönderilen Faturalar"])
 
@@ -8620,13 +8786,16 @@ elif aktif == "fatura":
                                 "olusturan": st.session_state.get("kullanici",""),
                                 "notlar": f"Fatura taslağı · {fmt_para(_ft_genel_toplam)}",
                             }).execute()
-                        st.success("✅ Taslak kaydedildi! 'Taslak/Gönderilen Faturalar' sekmesinden görebilirsin.")
+                        st.success("✅ Taslak kaydedildi! 'Taslak/Gönderilen Faturalar' sekmesinden Paraşüt'e gönderebilirsin.")
                         st.session_state["ft_kalemler"] = []
                         st.rerun()
                     except Exception as _ftse:
                         st.error(f"Hata: {_ftse}")
-            _ftb2.button("📤 Paraşüt'e Gönder (yakında)", use_container_width=True, disabled=True,
-                         help="Paraşüt API bağlantısı eklendiğinde aktif olacak")
+            with _ftb2:
+                if _parasut_ayarli_mi() and _parasut_token_yukle():
+                    st.caption("✅ Paraşüt bağlı — kaydettikten sonra 'Taslak/Gönderilen Faturalar' sekmesinden gönderebilirsin.")
+                else:
+                    st.caption("🔌 Paraşüt henüz bağlı değil (yukarıdan bağlanabilirsin).")
 
     with _ft_tab2:
         st.markdown("### 📚 Taslak / Gönderilen Faturalar")
@@ -8655,6 +8824,40 @@ elif aktif == "fatura":
         if not _ft_liste:
             st.info("Henüz fatura taslağı oluşturulmamış.")
         else:
+            def _parasut_musteri_bul_veya_olustur(_ad, _vd, _vno):
+                """Paraşüt'te bu isimde müşteri var mı arar, yoksa oluşturur. contact id döner."""
+                _bul, _hata = _parasut_api("GET", "/contacts", params={"filter[name]": _ad})
+                if _bul and _bul.get("data"):
+                    return _bul["data"][0]["id"], None
+                _govde = {"data": {"type": "contacts", "attributes": {
+                    "account_type": "customer", "name": _ad,
+                    "tax_office": _vd or "", "tax_number": _vno or "",
+                }}}
+                _olustur, _hata2 = _parasut_api("POST", "/contacts", json_govde=_govde)
+                if _olustur and _olustur.get("data"):
+                    return _olustur["data"]["id"], None
+                return None, (_hata2 or _hata or "Müşteri oluşturulamadı")
+
+            def _parasut_fatura_gonder(_fv):
+                _cid, _hata = _parasut_musteri_bul_veya_olustur(_fv.get("musteri_uzun",""), _fv.get("vd",""), _fv.get("vno",""))
+                if not _cid:
+                    return False, f"Müşteri bulunamadı/oluşturulamadı: {_hata}"
+                _kalem_aciklama = " · ".join(f"{k.get('aciklama','')} ({k.get('miktar',0)}x{fmt_para(k.get('birim_fiyat',0))})" for k in _fv.get("kalemler", []))
+                _govde = {"data": {
+                    "type": "sales_invoices",
+                    "attributes": {
+                        "item_type": "invoice",
+                        "description": _kalem_aciklama[:500],
+                        "issue_date": _tr_simdi().strftime("%Y-%m-%d"),
+                        "currency": "TRL",
+                    },
+                    "relationships": {"contact": {"data": {"id": _cid, "type": "contacts"}}},
+                }}
+                _sonuc, _hata3 = _parasut_api("POST", "/sales_invoices", json_govde=_govde)
+                if _sonuc and _sonuc.get("data"):
+                    return True, _sonuc["data"]["id"]
+                return False, _hata3
+
             for _fv in _ft_liste:
                 with st.container(border=True):
                     _fc1, _fc2, _fc3 = st.columns([2.5,1,1])
@@ -8665,6 +8868,30 @@ elif aktif == "fatura":
                     with st.expander("Kalemleri gör"):
                         for _k in _fv.get("kalemler", []):
                             st.caption(f"• {_k.get('aciklama','')} — {_k.get('miktar',0)} x {fmt_para(_k.get('birim_fiyat',0))}")
+                    if _fv.get("durum") == "gonderildi":
+                        st.success(f"✅ Paraşüt'e gönderildi (Fatura ID: {_fv.get('parasut_id','?')})")
+                    elif _parasut_ayarli_mi() and _parasut_token_yukle():
+                        if st.button("📤 Paraşüt'e Gönder", key=f"ft_gonder_{_fv['id']}"):
+                            with st.spinner("⏳ Paraşüt'e gönderiliyor..."):
+                                _pok, _psonuc = _parasut_fatura_gonder(_fv)
+                            if _pok:
+                                try:
+                                    _fv["durum"] = "gonderildi"
+                                    _fv["parasut_id"] = _psonuc
+                                    _sb_g = get_sb_client()
+                                    _sb_g.table("teklifler").update({
+                                        "satirlar": _ftj.dumps({"tip": "fatura", "veri": _fv}, ensure_ascii=False)
+                                    }).eq("id", int(_fv["id"])).execute()
+                                except Exception:
+                                    pass
+                                st.success(f"✅ Gönderildi! Paraşüt Fatura ID: {_psonuc}")
+                                try: db_read.clear()
+                                except: pass
+                                st.rerun()
+                            else:
+                                st.error(f"Gönderilemedi: {_psonuc}")
+                    else:
+                        st.caption("🔌 Paraşüt bağlı değil — üstteki 'Faturalar' sayfasının başından bağlanabilirsin.")
 
 elif aktif == "otomatik_arama":
     sayfa_log("otomatik_arama")
