@@ -8635,6 +8635,40 @@ elif aktif == "fatura":
         except Exception as _pae:
             return None, str(_pae)
 
+    def _parasut_musteri_bul_veya_olustur(_ad, _vd, _vno):
+        """Paraşüt'te bu isimde müşteri var mı arar, yoksa oluşturur. contact id döner."""
+        _bul, _hata = _parasut_api("GET", "/contacts", params={"filter[name]": _ad})
+        if _bul and _bul.get("data"):
+            return _bul["data"][0]["id"], None
+        _govde = {"data": {"type": "contacts", "attributes": {
+            "account_type": "customer", "name": _ad,
+            "tax_office": _vd or "", "tax_number": _vno or "",
+        }}}
+        _olustur, _hata2 = _parasut_api("POST", "/contacts", json_govde=_govde)
+        if _olustur and _olustur.get("data"):
+            return _olustur["data"]["id"], None
+        return None, (_hata2 or _hata or "Müşteri oluşturulamadı")
+
+    def _parasut_fatura_gonder(_fv):
+        _cid, _hata = _parasut_musteri_bul_veya_olustur(_fv.get("musteri_uzun",""), _fv.get("vd",""), _fv.get("vno",""))
+        if not _cid:
+            return False, f"Müşteri bulunamadı/oluşturulamadı: {_hata}"
+        _kalem_aciklama = " · ".join(f"{k.get('aciklama','')} ({k.get('miktar',0)}x{fmt_para(k.get('birim_fiyat',0))})" for k in _fv.get("kalemler", []))
+        _govde = {"data": {
+            "type": "sales_invoices",
+            "attributes": {
+                "item_type": "invoice",
+                "description": _kalem_aciklama[:500],
+                "issue_date": _tr_simdi().strftime("%Y-%m-%d"),
+                "currency": "TRL",
+            },
+            "relationships": {"contact": {"data": {"id": _cid, "type": "contacts"}}},
+        }}
+        _sonuc, _hata3 = _parasut_api("POST", "/sales_invoices", json_govde=_govde)
+        if _sonuc and _sonuc.get("data"):
+            return True, _sonuc["data"]["id"]
+        return False, _hata3
+
     st.markdown("## 💰 Faturalar")
 
     if not _parasut_ayarli_mi():
@@ -8764,8 +8798,9 @@ elif aktif == "fatura":
             _fts3.metric("Genel Toplam", fmt_para(_ft_genel_toplam))
 
             st.markdown("---")
-            _ftb1, _ftb2 = st.columns(2)
-            if _ftb1.button("💾 Taslak Olarak Kaydet", type="primary", use_container_width=True, key="ft_taslak_kaydet"):
+            _ft_baglanti_var = _parasut_ayarli_mi() and _parasut_token_yukle()
+            _ft_buton_yazi = "💾 Kaydet ve Paraşüt'e Otomatik Gönder" if _ft_baglanti_var else "💾 Taslak Olarak Kaydet"
+            if st.button(_ft_buton_yazi, type="primary", use_container_width=True, key="ft_taslak_kaydet"):
                 if not st.session_state["ft_kalemler"]:
                     st.warning("En az bir kalem eklemelisin.")
                 else:
@@ -8777,8 +8812,9 @@ elif aktif == "fatura":
                             "ara_toplam": _ft_ara_toplam, "kdv_tutar": _ft_kdv_tutar, "genel_toplam": _ft_genel_toplam,
                             "tarih": _ftdate.today().strftime("%d/%m/%Y"), "durum": "taslak",
                         }
+                        _ft_kayit_id = None
                         if _ft_sb:
-                            _ft_sb.table("teklifler").insert({
+                            _ft_ekle = _ft_sb.table("teklifler").insert({
                                 "musteri_id": _ft_id or 0,
                                 "musteri_adi": _ft_uzun,
                                 "satirlar": _ftj.dumps({"tip": "fatura", "veri": _ft_veri}, ensure_ascii=False),
@@ -8786,16 +8822,31 @@ elif aktif == "fatura":
                                 "olusturan": st.session_state.get("kullanici",""),
                                 "notlar": f"Fatura taslağı · {fmt_para(_ft_genel_toplam)}",
                             }).execute()
-                        st.success("✅ Taslak kaydedildi! 'Taslak/Gönderilen Faturalar' sekmesinden Paraşüt'e gönderebilirsin.")
+                            if _ft_ekle.data:
+                                _ft_kayit_id = _ft_ekle.data[0]["id"]
+
+                        if _ft_baglanti_var and _ft_kayit_id:
+                            with st.spinner("⏳ Kaydedildi, şimdi Paraşüt'e gönderiliyor..."):
+                                _pok, _psonuc = _parasut_fatura_gonder(_ft_veri)
+                            if _pok:
+                                _ft_veri["durum"] = "gonderildi"
+                                _ft_veri["parasut_id"] = _psonuc
+                                _ft_sb.table("teklifler").update({
+                                    "satirlar": _ftj.dumps({"tip": "fatura", "veri": _ft_veri}, ensure_ascii=False)
+                                }).eq("id", int(_ft_kayit_id)).execute()
+                                st.success(f"✅ Kaydedildi ve Paraşüt'e gönderildi! (Fatura ID: {_psonuc})")
+                            else:
+                                st.warning(f"✅ Taslak kaydedildi ama Paraşüt'e gönderilemedi: {_psonuc}\n\n'Taslak/Gönderilen Faturalar' sekmesinden tekrar deneyebilirsin.")
+                        else:
+                            st.success("✅ Taslak kaydedildi! 'Taslak/Gönderilen Faturalar' sekmesinden Paraşüt'e gönderebilirsin.")
                         st.session_state["ft_kalemler"] = []
+                        try: db_read.clear()
+                        except: pass
                         st.rerun()
                     except Exception as _ftse:
                         st.error(f"Hata: {_ftse}")
-            with _ftb2:
-                if _parasut_ayarli_mi() and _parasut_token_yukle():
-                    st.caption("✅ Paraşüt bağlı — kaydettikten sonra 'Taslak/Gönderilen Faturalar' sekmesinden gönderebilirsin.")
-                else:
-                    st.caption("🔌 Paraşüt henüz bağlı değil (yukarıdan bağlanabilirsin).")
+            if not _ft_baglanti_var:
+                st.caption("🔌 Paraşüt henüz bağlı değil (yukarıdan bağlanabilirsin) — şimdilik sadece taslak kaydedilir.")
 
     with _ft_tab2:
         st.markdown("### 📚 Taslak / Gönderilen Faturalar")
@@ -8824,40 +8875,6 @@ elif aktif == "fatura":
         if not _ft_liste:
             st.info("Henüz fatura taslağı oluşturulmamış.")
         else:
-            def _parasut_musteri_bul_veya_olustur(_ad, _vd, _vno):
-                """Paraşüt'te bu isimde müşteri var mı arar, yoksa oluşturur. contact id döner."""
-                _bul, _hata = _parasut_api("GET", "/contacts", params={"filter[name]": _ad})
-                if _bul and _bul.get("data"):
-                    return _bul["data"][0]["id"], None
-                _govde = {"data": {"type": "contacts", "attributes": {
-                    "account_type": "customer", "name": _ad,
-                    "tax_office": _vd or "", "tax_number": _vno or "",
-                }}}
-                _olustur, _hata2 = _parasut_api("POST", "/contacts", json_govde=_govde)
-                if _olustur and _olustur.get("data"):
-                    return _olustur["data"]["id"], None
-                return None, (_hata2 or _hata or "Müşteri oluşturulamadı")
-
-            def _parasut_fatura_gonder(_fv):
-                _cid, _hata = _parasut_musteri_bul_veya_olustur(_fv.get("musteri_uzun",""), _fv.get("vd",""), _fv.get("vno",""))
-                if not _cid:
-                    return False, f"Müşteri bulunamadı/oluşturulamadı: {_hata}"
-                _kalem_aciklama = " · ".join(f"{k.get('aciklama','')} ({k.get('miktar',0)}x{fmt_para(k.get('birim_fiyat',0))})" for k in _fv.get("kalemler", []))
-                _govde = {"data": {
-                    "type": "sales_invoices",
-                    "attributes": {
-                        "item_type": "invoice",
-                        "description": _kalem_aciklama[:500],
-                        "issue_date": _tr_simdi().strftime("%Y-%m-%d"),
-                        "currency": "TRL",
-                    },
-                    "relationships": {"contact": {"data": {"id": _cid, "type": "contacts"}}},
-                }}
-                _sonuc, _hata3 = _parasut_api("POST", "/sales_invoices", json_govde=_govde)
-                if _sonuc and _sonuc.get("data"):
-                    return True, _sonuc["data"]["id"]
-                return False, _hata3
-
             for _fv in _ft_liste:
                 with st.container(border=True):
                     _fc1, _fc2, _fc3 = st.columns([2.5,1,1])
