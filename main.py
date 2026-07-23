@@ -1239,20 +1239,26 @@ div[data-testid="stMainBlockContainer"] {
 
 
 def giris_ekrani():
+    # ── Üst boşluğu daralt — giriş formu daha yukarıda görünsün ──
+    st.markdown("""
+<style>
+.block-container { padding-top: 1rem !important; }
+</style>
+""", unsafe_allow_html=True)
     # ── LOGO ──────────────────────────────────────────────────────────────────
     st.markdown("""
-<div style="text-align:center;padding:2rem 0 1.5rem;">
-  <div style="width:64px;height:64px;background:#1d4ed8;border-radius:16px;
-       display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">
-    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+<div style="text-align:center;padding:0.25rem 0 0.5rem;">
+  <div style="width:56px;height:56px;background:#1d4ed8;border-radius:14px;
+       display:inline-flex;align-items:center;justify-content:center;margin-bottom:8px;">
+    <svg width="32" height="32" viewBox="0 0 36 36" fill="none">
       <rect x="4" y="4" width="12" height="12" rx="2" fill="white" opacity=".9"/>
       <rect x="20" y="4" width="12" height="12" rx="2" fill="white" opacity=".7"/>
       <rect x="4" y="20" width="12" height="12" rx="2" fill="white" opacity=".7"/>
       <rect x="20" y="20" width="12" height="12" rx="2" fill="white" opacity=".5"/>
     </svg>
   </div>
-  <div style="font-size:26px;font-weight:600;color:#0f172a;letter-spacing:-.5px;">MWCRMPRO</div>
-  <div style="font-size:13px;color:#64748b;margin-top:4px;">Cari Yönetim Sistemi</div>
+  <div style="font-size:24px;font-weight:600;color:#0f172a;letter-spacing:-.5px;">MWCRMPRO</div>
+  <div style="font-size:12px;color:#64748b;margin-top:2px;">Cari Yönetim Sistemi</div>
 </div>
 """, unsafe_allow_html=True)
 
