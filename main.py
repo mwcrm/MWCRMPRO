@@ -1922,6 +1922,18 @@ def _parasut_api(method, path, json_govde=None, params=None):
         _url = f"https://api.parasut.com/v4/{_cid}{path}"
         _headers = {"Authorization": f"Bearer {_tok}", "Content-Type": "application/vnd.api+json"}
         _r = _preq.request(method, _url, headers=_headers, json=json_govde, params=params, timeout=20)
+        # Hata ayıklama günlüğü — admin, Paraşüt sayfasındaki "🔍 Hata Ayıklama Günlüğü" kutusundan görebilir
+        try:
+            if "_parasut_debug_log" not in st.session_state:
+                st.session_state["_parasut_debug_log"] = []
+            _adet = len(_r.json().get("data", [])) if (200 <= _r.status_code < 300 and isinstance(_r.json(), dict)) else "-"
+            st.session_state["_parasut_debug_log"].insert(0, {
+                "url": _r.url, "durum": _r.status_code, "adet": _adet,
+                "yanit_ozet": _r.text[:200],
+            })
+            st.session_state["_parasut_debug_log"] = st.session_state["_parasut_debug_log"][:15]
+        except Exception:
+            pass
         if 200 <= _r.status_code < 300:
             return _r.json(), None
         return None, f"[{_r.status_code}] {_r.text[:300]}"
@@ -8977,6 +8989,11 @@ elif aktif == "parasut":
     if not (_parasut_ayarli_mi() and _parasut_token_yukle()):
         st.info("🔌 Önce **'💰 Faturalar'** sayfasından Paraşüt'e bağlanman lazım.")
     else:
+        if st.session_state.get("rol") == "admin" and st.session_state.get("_parasut_debug_log"):
+            with st.expander("🔍 Hata Ayıklama Günlüğü (sadece admin) — 'veri gelmiyor' sorununu buradan teşhis et"):
+                for _dl in st.session_state["_parasut_debug_log"]:
+                    st.code(f"URL: {_dl['url']}\nDurum kodu: {_dl['durum']} · Dönen kayıt sayısı: {_dl['adet']}\nYanıt: {_dl['yanit_ozet']}", language="text")
+
         def _parasut_tum_sayfalari_cek(_path, _params=None):
             """Verilen endpoint'in TÜM sayfalarını (25'er 25'er) çekip birleştirir."""
             _hepsi = []
