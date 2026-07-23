@@ -1245,20 +1245,20 @@ def giris_ekrani():
 .block-container { padding-top: 0.25rem !important; }
 </style>
 """, unsafe_allow_html=True)
-    # ── LOGO — küçük ve sade ──────────────────────────────────────────────────
+    # ── LOGO — mini ──────────────────────────────────────────────────────────
     st.markdown("""
-<div style="text-align:center;padding:0 0 0.5rem;">
-  <div style="width:38px;height:38px;background:#1d4ed8;border-radius:10px;
-       display:inline-flex;align-items:center;justify-content:center;margin-bottom:6px;">
-    <svg width="22" height="22" viewBox="0 0 36 36" fill="none">
+<div style="text-align:center;padding:0 0 0.2rem;">
+  <div style="width:24px;height:24px;background:#1d4ed8;border-radius:7px;
+       display:inline-flex;align-items:center;justify-content:center;margin-bottom:3px;">
+    <svg width="14" height="14" viewBox="0 0 36 36" fill="none">
       <rect x="4" y="4" width="12" height="12" rx="2" fill="white" opacity=".9"/>
       <rect x="20" y="4" width="12" height="12" rx="2" fill="white" opacity=".7"/>
       <rect x="4" y="20" width="12" height="12" rx="2" fill="white" opacity=".7"/>
       <rect x="20" y="20" width="12" height="12" rx="2" fill="white" opacity=".5"/>
     </svg>
   </div>
-  <div style="font-size:17px;font-weight:600;color:#0f172a;letter-spacing:-.3px;">MWCRMPRO</div>
-  <div style="font-size:11px;color:#94a3b8;margin-top:1px;">Cari Yönetim Sistemi</div>
+  <div style="font-size:12px;font-weight:600;color:#0f172a;letter-spacing:-.2px;">MWCRMPRO</div>
+  <div style="font-size:9px;color:#94a3b8;">Cari Yönetim Sistemi</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -1266,7 +1266,7 @@ def giris_ekrani():
     with _gc2:
         # ── CİHAZ SEÇİMİ — radio buton ile, rerun YOK ────────────────────────
         st.markdown("""
-<div style="text-align:center;color:#94a3b8;font-size:11px;margin-bottom:4px;">
+<div style="text-align:center;color:#94a3b8;font-size:10px;margin-bottom:2px;">
     Hangi cihazdan bağlanıyorsunuz?
 </div>
 """, unsafe_allow_html=True)
