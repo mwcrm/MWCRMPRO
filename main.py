@@ -202,6 +202,9 @@ def get_sb_service():
         pass
     return None
 
+def get_sb():
+    return get_sb_client()
+
 def hesapla_segment(manuel_segment, gerceklesen_ciro):
     """Manuel segment varsa onu normalize et, yoksa ciroya göre otomatik hesapla"""
     # Normalize — eski kayıtlardaki farklı ikonları düzelt
@@ -231,6 +234,9 @@ def segment_renk(seg):
     if "C"  in s: return "#f8fafc","#64748b","#cbd5e1"
     return "#ffffff","#374151","#e2e8f0"
 
+def get_supabase():
+    return get_sb_client()
+
 def _telefon_temizle(seri):
     """5413578020.0 gibi float telefonları 5413578020 string'ine çevirir"""
     def _tek(v):
@@ -251,87 +257,55 @@ def _telefon_temizle(seri):
         return s
     return seri.apply(_tek)
 
-def _get_atanmis_firmalar():
-    """Giriş yapan kullanıcının atanmış firma adlarını döndürür. Admin için None (hepsi).
-    Oturum başına bir kere hesaplanır (her çağrıda değil) — aynı kullanıcı için tekrar tekrar
-    internete gitmesin diye."""
-    _rol0 = st.session_state.get("rol","")
-    _kul0 = st.session_state.get("kullanici","")
-    if _rol0 == "admin" or not _kul0:
-        return None
-    _ck = f"_atanmis_firmalar_{_kul0}"
-    if _ck in st.session_state:
-        return st.session_state[_ck]
+def _no_temizle(v):
+    """Tek değer için .0 ve float temizleyici — her yerde kullan"""
+    if v is None: return ""
+    s = str(v).strip()
+    if s.lower() in ["nan","none",""]: return ""
+    if s.endswith(".0"): s = s[:-2]
     try:
+        if "e" in s.lower():
+            s = str(int(float(s)))
+    except: pass
+    return s
+
+def _get_atanmis_firmalar():
+    """Giriş yapan kullanıcının atanmış firma adlarını döndürür. Admin için None (hepsi)."""
+    try:
+        _rol = st.session_state.get("rol","")
+        _kul = st.session_state.get("kullanici","")
+        if _rol == "admin" or not _kul:
+            return None  # None = hepsini göster
         sb = get_sb_client()
         if sb:
-            _res = sb.table("cari_kartlar").select("firma,id").eq("atanan_kullanici", _kul0).neq("silindi",1).execute()
+            _res = sb.table("cari_kartlar").select("firma,id").eq("atanan_kullanici", _kul).neq("silindi",1).execute()
             if _res.data:
-                _sonuc = {
+                return {
                     "firmalar": set(str(r.get("firma","")).strip().upper() for r in _res.data if r.get("firma")),
                     "idler": set(int(r.get("id",0)) for r in _res.data if r.get("id"))
                 }
-                st.session_state[_ck] = _sonuc
-                return _sonuc
-        st.session_state[_ck] = {"firmalar": set(), "idler": set()}
-        return st.session_state[_ck]  # boş — hiçbir şey görmesin
+        return {"firmalar": set(), "idler": set()}  # boş — hiçbir şey görmesin
     except:
-        st.session_state[_ck] = {"firmalar": set(), "idler": set()}
-        return st.session_state[_ck]  # hata durumunda da güvenli taraf: hiçbir şey gösterme
-
-def _bolge_yetki_yukle():
-    """Giriş yapan kullanıcının izinli bölge listesini döner.
-    None = tüm bölgelere yetkili (admin tarafından açıkça verilmiş).
-    [] = hiçbir ekstra bölge yok (varsayılan — hiç ayarlanmamışsa da bu, güvenli/kısıtlı taraf)."""
-    _kul = str(st.session_state.get("kullanici","")).strip()
-    if not _kul:
-        return []
-    _yk = f"_bolge_yetki_{_kul}"
-    if _yk in st.session_state:
-        return st.session_state[_yk]
-    _v = []
-    try:
-        sb = get_sb_client()
-        _r = sb.table("kullanici_tercih").select("deger").eq("kullanici", _kul).eq("anahtar", "_bolge_yetki").execute()
-        if _r.data:
-            _raw = _r.data[0]["deger"]
-            _v = None if _raw == "tam" else json.loads(_raw)
-    except Exception:
-        _v = []
-    st.session_state[_yk] = _v
-    return _v
+        return None  # hata durumunda hepsini göster (güvenli taraf)
 
 def _atama_filtresi_uygula(df):
-    """Admin hepsini görür. Diğerleri: kendine BİREBİR atanan müşterileri VEYA yetkili olduğu
-    bölgedeki müşterileri görür (ikisinden biri yeterli). Hiçbir başka veri görünmez."""
+    """Admin hepsini görür, diğerleri sadece kendine atananları"""
     try:
         _rol = str(st.session_state.get("rol","")).strip().lower()
         _kul = str(st.session_state.get("kullanici","")).strip()
         # Admin veya kullanıcı yoksa hepsini göster
         if "admin" in _rol or _kul == "admin" or not _kul:
             return df
-        if df.empty:
+        if df.empty or "atanan_kullanici" not in df.columns:
             return df
-        _bolge_izinli = _bolge_yetki_yukle()   # None = tüm bölgeler, [] = hiçbiri, [...] = liste
-        _atanan_maske = df["atanan_kullanici"].astype(str) == _kul if "atanan_kullanici" in df.columns else pd.Series(False, index=df.index)
-        if _bolge_izinli is None:
-            _bolge_maske = pd.Series(True, index=df.index)   # tüm bölgelere yetkili
-        elif not _bolge_izinli:
-            _bolge_maske = pd.Series(False, index=df.index)  # hiçbir bölgeye yetkili değil
-        elif "il" in df.columns:
-            _ilce_kol_bm = "ilce" if "ilce" in df.columns else None
-            _bolge_hesap = df.apply(lambda r: il_ilce_bolge_bul(r.get("il",""), r.get(_ilce_kol_bm,"") if _ilce_kol_bm else ""), axis=1).fillna("Havuz (Bölgesiz)")
-            _bolge_maske = _bolge_hesap.isin(_bolge_izinli)
-        else:
-            _bolge_maske = pd.Series(False, index=df.index)
-        return df[_atanan_maske | _bolge_maske]
+        # Kullanıcıya atananlar VEYA atanmamışlar
+        return df[
+            (df["atanan_kullanici"].astype(str) == _kul) |
+            (df["atanan_kullanici"].isna()) |
+            (df["atanan_kullanici"].astype(str).isin(["None","nan",""]))
+        ]
     except:
-        try:
-            if "admin" in str(st.session_state.get("rol","")).strip().lower():
-                return df
-            return df.iloc[0:0]
-        except:
-            return df
+        return df
 
 # ── BÖLGE EŞLEŞTİRME (il + ilçe → bölge adı) ────────────────────────────────
 _BL_ISTANBUL_ANADOLU = {"adalar","atasehir","beykoz","cekmekoy","kadikoy","kartal",
@@ -474,42 +448,40 @@ def get_cari_listesi():
     except:
         return pd.DataFrame()
 
+@st.cache_data(ttl=120)
+def get_kullanici_listesi():
+    """2 dk cache'li kullanıcı listesi"""
+    return db_read("kullanicilar", extra_sql="")
+
+@st.cache_data(ttl=120)
+def _cached_placeholder(): pass  # cache decorator boş bırakılamaz
+
+
 @st.cache_data(ttl=30)
-def _db_read_supabase_cached(table, filters=None, order_col="id", desc=True, limit=None):
-    """Supabase'den DataFrame döner. extra_sql'e KASITLI OLARAK bağlı değil (zaten Supabase
-    sorgusunu etkilemiyordu) — böylece aynı tablo farklı extra_sql metniyle çağrılsa bile
-    TEK bir önbellek kaydını paylaşır, gereksiz tekrar tekrar internet isteği atılmaz."""
-    sb = get_sb_client()
-    if not sb:
-        return None  # sentinel: Supabase yok, çağıran SQLite'a düşsün
-    try:
-        q = sb.table(table).select("*")
-        if filters:
-            for k, v in filters.items():
-                if v == "NOT_NULL":
-                    q = q.not_.is_(k, "null")
-                elif v == "neq_1":
-                    q = q.neq(k, 1)
-                else:
-                    q = q.eq(k, v)
-        if order_col:
-            q = q.order(order_col, desc=desc)
-        if limit:
-            q = q.limit(limit)
-        res = q.execute()
-        if res and res.data is not None:
-            return pd.DataFrame(res.data) if res.data else pd.DataFrame()
-        return pd.DataFrame()
-    except Exception:
-        return None  # sentinel: hata, çağıran SQLite'a düşsün
-
-
 def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sql=None):
-    """Supabase (önbellekli, extra_sql'den bağımsız paylaşılan önbellek) veya SQLite'dan
-    (extra_sql burada geçerli, sadece Supabase erişilemezse kullanılan yedek yol) DataFrame döner"""
-    _sonuc = _db_read_supabase_cached(table, filters, order_col, desc, limit)
-    if _sonuc is not None:
-        return _sonuc
+    """Supabase veya SQLite'dan DataFrame döner"""
+    sb = get_sb_client()
+    if sb:
+        try:
+            q = sb.table(table).select("*")
+            if filters:
+                for k, v in filters.items():
+                    if v == "NOT_NULL":
+                        q = q.not_.is_(k, "null")
+                    elif v == "neq_1":
+                        q = q.neq(k, 1)
+                    else:
+                        q = q.eq(k, v)
+            if order_col:
+                q = q.order(order_col, desc=desc)
+            if limit:
+                q = q.limit(limit)
+            res = q.execute()
+            if res and res.data is not None:
+                return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+            return pd.DataFrame()
+        except Exception as _e_read:
+            pass
     try:
         sql = f"SELECT * FROM {table}"
         if extra_sql:
@@ -520,11 +492,6 @@ def db_read(table, filters=None, order_col="id", desc=True, limit=None, extra_sq
         return df
     except:
         return pd.DataFrame()
-
-# Kodun 35 yerinde "db_read.clear()" çağrılıyor (kayıt sonrası önbelleği temizlemek için) —
-# db_read artık düz bir fonksiyon olduğu için, bu çağrının hâlâ çalışması adına gerçek
-# önbellekli fonksiyona yönlendiriyoruz.
-db_read.clear = _db_read_supabase_cached.clear
 
 
 def db_insert(table, data):
@@ -574,6 +541,98 @@ def db_update(table, data, where_col, where_val):
         pass
     return False
 
+def db_query(sql, params=None):
+    """SELECT sorgusu — Supabase veya SQLite"""
+    if sb_or_sqlite():
+        # Supabase için pandas read
+        try:
+            import sqlalchemy
+            url = st.secrets.get("SUPABASE_URL","").replace("https://","postgresql://postgres.asinwzxwmkkrcbtjrkoq:")
+            # Doğrudan supabase-py kullanalım
+            sb = get_supabase()
+            if sb:
+                # Tabloyu sql'den çıkar
+                tbl = re.search(r'FROM\s+(\w+)', sql, re.IGNORECASE)
+                if tbl:
+                    table_name = tbl.group(1)
+                    res = sb.table(table_name).select("*").execute()
+                    if res.data:
+                        df = pd.DataFrame(res.data)
+                        return df
+                    return pd.DataFrame()
+        except Exception as e:
+            pass
+    # SQLite fallback
+    df = pd.read_sql(sql, conn)
+    return df
+
+def sb_insert(table, data):
+    """INSERT — Supabase veya SQLite"""
+    if sb_or_sqlite():
+        try:
+            sb = get_supabase()
+            if sb:
+                sb.table(table).insert(data).execute()
+                return True
+        except Exception as e:
+            st.error(f"Supabase insert hatası: {e}")
+    return False
+
+def sb_update(table, data, match_col, match_val):
+    """UPDATE — Supabase veya SQLite"""
+    if sb_or_sqlite():
+        try:
+            sb = get_supabase()
+            if sb:
+                sb.table(table).update(data).eq(match_col, match_val).execute()
+                return True
+        except Exception as e:
+            st.error(f"Supabase update hatası: {e}")
+    return False
+
+def sb_delete(table, match_col, match_val):
+    """DELETE — Supabase"""
+    if sb_or_sqlite():
+        try:
+            sb = get_supabase()
+            if sb:
+                sb.table(table).delete().eq(match_col, match_val).execute()
+                return True
+        except:
+            pass
+    return False
+
+def sb_select(table, filters=None, order=None, limit=None):
+    """Supabase tablo sorgusu — DataFrame döner"""
+    if sb_or_sqlite():
+        try:
+            sb = get_supabase()
+            if sb:
+                q = sb.table(table).select("*")
+                if filters:
+                    for col, val in filters.items():
+                        if val is not None:
+                            q = q.eq(col, val)
+                if order:
+                    q = q.order(order, desc=True)
+                if limit:
+                    q = q.limit(limit)
+                res = q.execute()
+                return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+        except Exception as e:
+            pass
+    # SQLite fallback
+    try:
+        sql = f"SELECT * FROM {table}"
+        if filters:
+            where = " AND ".join([f"{k}=?" for k in filters.keys()])
+            sql += f" WHERE {where}"
+            df = pd.read_sql(sql, conn, params=list(filters.values()))
+        else:
+            df = pd.read_sql(sql, conn)
+        return df
+    except:
+        return pd.DataFrame()
 
 
 ILLER_ILCELER = {
@@ -658,6 +717,118 @@ ILLER_ILCELER = {
 # ── VERİTABANI ───────────────────────────────────────────────────────────────
 def get_conn():
     return sqlite3.connect("mw_crm.db", check_same_thread=False)
+
+def init_db():
+    # SQLite her zaman yedek
+    try:
+        conn = get_conn()
+        tables = [
+        """CREATE TABLE IF NOT EXISTS kullanicilar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kullanici_adi TEXT UNIQUE NOT NULL,
+            sifre TEXT NOT NULL,
+            rol TEXT DEFAULT 'kullanici')""",
+        """CREATE TABLE IF NOT EXISTS cari_kartlar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            firma TEXT, yetkili TEXT, gsm TEXT, sabit TEXT, email TEXT,
+            adres TEXT, ilce TEXT, il TEXT, durum TEXT, temsilci TEXT,
+            islem_asamasi TEXT, silindi INTEGER DEFAULT 0,
+            olusturan TEXT, beklenen_ciro REAL DEFAULT 0,
+            gerceklesen_ciro REAL DEFAULT 0)""",
+        """CREATE TABLE IF NOT EXISTS teklifler (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            musteri_id INTEGER, musteri_adi TEXT,
+            satirlar TEXT, toplam_tutar REAL,
+            olusturan TEXT, notlar TEXT)""",
+        """CREATE TABLE IF NOT EXISTS islem_kaydi (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            musteri_id INTEGER, musteri_adi TEXT,
+            islem_turu TEXT, icerik TEXT,
+            gonderim_bilgisi TEXT, olusturan TEXT)""",
+        """CREATE TABLE IF NOT EXISTS kullanici_tercih (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kullanici TEXT, anahtar TEXT, deger TEXT,
+            UNIQUE(kullanici, anahtar))""",
+        """CREATE TABLE IF NOT EXISTS kod_deposu (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            surum TEXT, aciklama TEXT, kod TEXT, olusturan TEXT)""",
+        """CREATE TABLE IF NOT EXISTS mesajlar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            gonderen TEXT, alici TEXT, mesaj TEXT,
+            okundu INTEGER DEFAULT 0)""",
+        """CREATE TABLE IF NOT EXISTS duyurular (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            baslik TEXT, icerik TEXT, tip TEXT DEFAULT 'bilgi',
+            olusturan TEXT, aktif INTEGER DEFAULT 1)""",
+        """CREATE TABLE IF NOT EXISTS aktif_kullanicilar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            kullanici TEXT UNIQUE, son_gorulme TIMESTAMP DEFAULT CURRENT_TIMESTAMP)""",
+        """CREATE TABLE IF NOT EXISTS temsilciler (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ad TEXT, soyad TEXT, telefon TEXT, email TEXT,
+            bolge TEXT, unvan TEXT, aktif INTEGER DEFAULT 1)""",
+        """CREATE TABLE IF NOT EXISTS kisiler (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ad TEXT, soyad TEXT, telefon TEXT, email TEXT,
+            firma TEXT, gorev TEXT, bolge TEXT,
+            temsilci TEXT, notlar TEXT, kaynak TEXT)""",
+        """CREATE TABLE IF NOT EXISTS sablon_mesajlar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ad TEXT, metin TEXT, olusturan TEXT, aktif INTEGER DEFAULT 1)""",
+        """CREATE TABLE IF NOT EXISTS kisiler_mesaj_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            kisi_id INTEGER, kisi_adi TEXT, telefon TEXT,
+            sablon_adi TEXT, mesaj TEXT, gonderen TEXT)""",
+        """CREATE TABLE IF NOT EXISTS cari_aciklamalar (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            cari_id INTEGER, cari_adi TEXT,
+            aciklama TEXT, olusturan TEXT)""",
+        """CREATE TABLE IF NOT EXISTS randevular (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tarih TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            randevu_tarihi TEXT, randevu_saati TEXT,
+            musteri_id INTEGER, musteri_adi TEXT,
+            bolge TEXT, gorev TEXT, takip TEXT, adet INTEGER DEFAULT 0,
+            aciklama TEXT, sonuc TEXT, temsilci TEXT,
+            wa_gonderildi INTEGER DEFAULT 0, olusturan TEXT)""",
+    ]
+        for t in tables:
+            try: conn.execute(t)
+            except: pass
+        for col in ["olusturan TEXT", "beklenen_ciro REAL DEFAULT 0", "gerceklesen_ciro REAL DEFAULT 0", "aciklama TEXT DEFAULT ''"]:
+            try: conn.execute(f"ALTER TABLE cari_kartlar ADD COLUMN {col}")
+            except: pass
+        conn.execute("UPDATE cari_kartlar SET silindi=0 WHERE silindi IS NULL")
+        conn.execute("UPDATE cari_kartlar SET id=rowid WHERE id IS NULL")
+        try:
+            conn.execute("INSERT INTO kullanicilar (kullanici_adi, sifre, rol) VALUES (?,?,?)",
+                         ("admin", "admin123", "admin"))
+        except: pass
+        conn.commit()
+        conn.close()
+    except: pass
+
+    # Supabase admin kullanicisi
+    if sb_or_sqlite():
+        try:
+            sb = get_supabase()
+            if sb:
+                existing = sb.table("kullanicilar").select("id").eq("kullanici_adi","admin").execute()
+                if not existing.data:
+                    sb.table("kullanicilar").insert({"kullanici_adi":"admin","sifre":"admin123","rol":"admin"}).execute()
+        except:
+            pass
 
 def otomatik_yedek():
     """Her gun otomatik yedek alir (sadece SQLite modunda)"""
@@ -911,9 +1082,7 @@ div[data-testid="stMainBlockContainer"] {
         # ══════════════════════════════════════════════════════════════════════
         with _mpt1:
             try:
-                _mp_ham = pd.DataFrame(_mp_sb.table("teklifler").select("*").order("id", desc=True).limit(500).execute().data) if _mp_sb else pd.DataFrame()
-                if not _mp_ham.empty and "toplam_tutar" in _mp_ham.columns:
-                    _mp_ham = _mp_ham[~_mp_ham["toplam_tutar"].isin([-91001, -91002])]
+                _mp_ham = pd.DataFrame(_mp_sb.table("teklifler").select("*").order("id", desc=True).execute().data) if _mp_sb else pd.DataFrame()
                 if not _mp_ham.empty:
                     _mp_ham = _mp_ham[_mp_ham["musteri_adi"].astype(str).str.strip().str.upper() == _mp_firma_adi.strip().upper()]
             except Exception:
@@ -1239,37 +1408,32 @@ div[data-testid="stMainBlockContainer"] {
 
 
 def giris_ekrani():
-    # ── Üst boşluğu iyice daralt — giriş formu en yukarıda görünsün ──
+    # ── LOGO ──────────────────────────────────────────────────────────────────
     st.markdown("""
-<style>
-.block-container { padding-top: 0.25rem !important; }
-div[data-testid="stRadio"] label p { font-size: 12px !important; }
-div[data-testid="stTextInput"] input { font-size: 13px !important; }
-</style>
-""", unsafe_allow_html=True)
-    # ── LOGO — mini ──────────────────────────────────────────────────────────
-    st.markdown("""
-<div style="text-align:center;padding:0 0 0.2rem;">
-  <div style="width:24px;height:24px;background:#1d4ed8;border-radius:7px;
-       display:inline-flex;align-items:center;justify-content:center;margin-bottom:3px;">
-    <svg width="14" height="14" viewBox="0 0 36 36" fill="none">
+<div style="text-align:center;padding:2rem 0 1.5rem;">
+  <div style="width:64px;height:64px;background:#1d4ed8;border-radius:16px;
+       display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
       <rect x="4" y="4" width="12" height="12" rx="2" fill="white" opacity=".9"/>
       <rect x="20" y="4" width="12" height="12" rx="2" fill="white" opacity=".7"/>
       <rect x="4" y="20" width="12" height="12" rx="2" fill="white" opacity=".7"/>
       <rect x="20" y="20" width="12" height="12" rx="2" fill="white" opacity=".5"/>
     </svg>
   </div>
-  <div style="font-size:12px;font-weight:600;color:#0f172a;letter-spacing:-.2px;">MWCRMPRO</div>
-  <div style="font-size:9px;color:#94a3b8;">Cari Yönetim Sistemi</div>
+  <div style="font-size:26px;font-weight:600;color:#0f172a;letter-spacing:-.5px;">MWCRMPRO</div>
+  <div style="font-size:13px;color:#64748b;margin-top:4px;">Cari Yönetim Sistemi</div>
 </div>
 """, unsafe_allow_html=True)
 
-    _gc1, _gc2, _gc3 = st.columns([1.6,1,1.6])
+    _gc1, _gc2, _gc3 = st.columns([1,2,1])
     with _gc2:
         # ── CİHAZ SEÇİMİ — radio buton ile, rerun YOK ────────────────────────
         st.markdown("""
-<div style="text-align:center;color:#94a3b8;font-size:10px;margin-bottom:2px;">
+<div style="background:white;border:0.5px solid #e2e8f0;border-radius:16px;
+     padding:20px 20px 16px;margin-bottom:12px;">
+  <div style="font-size:13px;color:#64748b;text-align:center;margin-bottom:14px;font-weight:500;">
     Hangi cihazdan bağlanıyorsunuz?
+  </div>
 </div>
 """, unsafe_allow_html=True)
         _cihaz = st.radio(
@@ -1281,7 +1445,15 @@ div[data-testid="stTextInput"] input { font-size: 13px !important; }
         )
         _mobil_secildi = "Telefon" in _cihaz
 
+        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+
         # ── GİRİŞ FORMU ────────────────────────────────────────────────────────
+        st.markdown("""
+<div style="background:white;border:0.5px solid #e2e8f0;border-radius:16px;padding:20px 20px 4px;">
+  <div style="font-size:16px;font-weight:600;color:#0f172a;margin-bottom:4px;">Giriş Yap</div>
+</div>
+""", unsafe_allow_html=True)
+
         with st.form("giris_form", clear_on_submit=False):
             kullanici = st.text_input("Kullanıcı Adı", placeholder="kullanici_adi")
             sifre     = st.text_input("Şifre", type="password", placeholder="••••••••")
@@ -1413,16 +1585,6 @@ _sayfa_adlari = {
     "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
     "musteri_atama":"Müşteri Atama","islem_takip":"İşlem Takip",
 }
-# ── Yeni sekmede doğrudan Excel Depo dosyası açma (ed_grup query param'ı ile) ──
-if st.query_params.get("ed_grup"):
-    st.session_state["aktif_tab"] = "kisiler"
-    st.session_state["_rehber_sekme_secim"] = "📦 Excel Depo"
-    st.session_state["_ed_url_grup"] = st.query_params.get("ed_grup")
-    try:
-        import base64 as _url_b64
-        st.session_state["_ed_url_ad"] = _url_b64.urlsafe_b64decode(st.query_params.get("ed_ad", "")).decode()
-    except Exception:
-        st.session_state["_ed_url_ad"] = "dosya.xlsx"
 _aktif_sayfa = st.session_state.get("aktif_tab","liste")
 _sayfa_adi = _sayfa_adlari.get(_aktif_sayfa, _aktif_sayfa)
 st.markdown(f"<script>document.title='MWCRMPRO | {_sayfa_adi}'</script>", unsafe_allow_html=True)
@@ -1799,179 +1961,6 @@ def fmt_para(n):
         return "0 ₺"
 
 
-# ══════════════════ PARAŞÜT API — OAuth bağlantısı + gönderim (ayarlar veritabanında) ══════════════════
-def _parasut_ayarlari_yukle():
-    """Client ID / Secret / Company ID — Secrets değil, doğrudan veritabanından okunur."""
-    try:
-        sb = get_sb_client()
-        if not sb:
-            return {}
-        r = sb.table("sistem_ayarlari").select("deger").eq("anahtar", "parasut_ayarlar").execute()
-        if r.data:
-            return json.loads(r.data[0]["deger"])
-        return {}
-    except Exception:
-        return {}
-
-def _parasut_ayarlari_kaydet(cid, csecret, company_id):
-    try:
-        sb = get_sb_client()
-        if not sb:
-            return False
-        sb.table("sistem_ayarlari").delete().eq("anahtar", "parasut_ayarlar").execute()
-        sb.table("sistem_ayarlari").insert({"anahtar": "parasut_ayarlar", "deger": json.dumps({
-            "client_id": cid.strip(), "client_secret": csecret.strip(), "company_id": company_id.strip(),
-        })}).execute()
-        return True
-    except Exception:
-        return False
-
-def _parasut_ayarli_mi():
-    _a = _parasut_ayarlari_yukle()
-    return bool(_a.get("client_id") and _a.get("client_secret") and _a.get("company_id"))
-
-def _parasut_yetki_url():
-    _cid = _parasut_ayarlari_yukle().get("client_id", "")
-    return f"https://api.parasut.com/oauth/authorize?client_id={_cid}&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code"
-
-def _parasut_token_yukle():
-    """Kaydedilmiş Paraşüt bağlantı jetonunu (varsa) getirir."""
-    try:
-        sb = get_sb_client()
-        if not sb:
-            return None
-        r = sb.table("sistem_ayarlari").select("deger").eq("anahtar", "parasut_token").execute()
-        if r.data:
-            return json.loads(r.data[0]["deger"])
-        return None
-    except Exception:
-        return None
-
-def _parasut_token_kaydet(token_data):
-    try:
-        sb = get_sb_client()
-        if not sb:
-            return False
-        sb.table("sistem_ayarlari").delete().eq("anahtar", "parasut_token").execute()
-        sb.table("sistem_ayarlari").insert({"anahtar": "parasut_token", "deger": json.dumps(token_data)}).execute()
-        return True
-    except Exception:
-        return False
-
-def _parasut_kod_ile_baglan(kod):
-    """Kullanıcının Paraşüt'ten aldığı kodu, gerçek jetona (token) çevirir."""
-    try:
-        import requests as _preq
-        _a = _parasut_ayarlari_yukle()
-        _r = _preq.post("https://api.parasut.com/oauth/token", data={
-            "grant_type": "authorization_code",
-            "code": kod.strip(),
-            "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
-            "client_id": _a.get("client_id", ""),
-            "client_secret": _a.get("client_secret", ""),
-        }, timeout=20)
-        if _r.status_code == 200:
-            _td = _r.json()
-            _td["_alinma_zamani"] = _tr_simdi().timestamp()
-            _parasut_token_kaydet(_td)
-            return True, None
-        return False, _r.text
-    except Exception as _pe:
-        return False, str(_pe)
-
-def _parasut_token_yenile(_td):
-    try:
-        import requests as _preq
-        _a = _parasut_ayarlari_yukle()
-        _r = _preq.post("https://api.parasut.com/oauth/token", data={
-            "grant_type": "refresh_token",
-            "refresh_token": _td.get("refresh_token", ""),
-            "client_id": _a.get("client_id", ""),
-            "client_secret": _a.get("client_secret", ""),
-        }, timeout=20)
-        if _r.status_code == 200:
-            _ytd = _r.json()
-            _ytd["_alinma_zamani"] = _tr_simdi().timestamp()
-            _parasut_token_kaydet(_ytd)
-            return _ytd
-        return None
-    except Exception:
-        return None
-
-def _parasut_gecerli_token():
-    """Geçerli (süresi dolmamış) bir erişim jetonu döner, gerekirse otomatik yeniler."""
-    _td = _parasut_token_yukle()
-    if not _td:
-        return None
-    _gecen = _tr_simdi().timestamp() - _td.get("_alinma_zamani", 0)
-    if _gecen > (_td.get("expires_in", 7200) - 120):  # süresi dolmadan 2 dk önce yenile
-        _td = _parasut_token_yenile(_td)
-    return _td.get("access_token") if _td else None
-
-def _parasut_api(method, path, json_govde=None, params=None):
-    """Paraşüt API'sine istek atar. path örn: '/sales_invoices'"""
-    _tok = _parasut_gecerli_token()
-    if not _tok:
-        return None, "Paraşüt'e bağlı değilsin."
-    try:
-        import requests as _preq
-        _cid = _parasut_ayarlari_yukle().get("company_id", "")
-        _url = f"https://api.parasut.com/v4/{_cid}{path}"
-        _headers = {"Authorization": f"Bearer {_tok}", "Content-Type": "application/vnd.api+json"}
-        _r = _preq.request(method, _url, headers=_headers, json=json_govde, params=params, timeout=20)
-        # Hata ayıklama günlüğü — admin, Paraşüt sayfasındaki "🔍 Hata Ayıklama Günlüğü" kutusundan görebilir
-        try:
-            if "_parasut_debug_log" not in st.session_state:
-                st.session_state["_parasut_debug_log"] = []
-            _adet = len(_r.json().get("data", [])) if (200 <= _r.status_code < 300 and isinstance(_r.json(), dict)) else "-"
-            st.session_state["_parasut_debug_log"].insert(0, {
-                "url": _r.url, "durum": _r.status_code, "adet": _adet,
-                "yanit_ozet": _r.text[:200],
-            })
-            st.session_state["_parasut_debug_log"] = st.session_state["_parasut_debug_log"][:15]
-        except Exception:
-            pass
-        if 200 <= _r.status_code < 300:
-            return _r.json(), None
-        return None, f"[{_r.status_code}] {_r.text[:300]}"
-    except Exception as _pae:
-        return None, str(_pae)
-
-def _parasut_musteri_bul_veya_olustur(_ad, _vd, _vno):
-    """Paraşüt'te bu isimde müşteri var mı arar, yoksa oluşturur. contact id döner."""
-    _bul, _hata = _parasut_api("GET", "/contacts", params={"filter[name]": _ad})
-    if _bul and _bul.get("data"):
-        return _bul["data"][0]["id"], None
-    _govde = {"data": {"type": "contacts", "attributes": {
-        "account_type": "customer", "name": _ad,
-        "tax_office": _vd or "", "tax_number": _vno or "",
-    }}}
-    _olustur, _hata2 = _parasut_api("POST", "/contacts", json_govde=_govde)
-    if _olustur and _olustur.get("data"):
-        return _olustur["data"]["id"], None
-    return None, (_hata2 or _hata or "Müşteri oluşturulamadı")
-
-def _parasut_fatura_gonder(_fv):
-    _cid, _hata = _parasut_musteri_bul_veya_olustur(_fv.get("musteri_uzun",""), _fv.get("vd",""), _fv.get("vno",""))
-    if not _cid:
-        return False, f"Müşteri bulunamadı/oluşturulamadı: {_hata}"
-    _kalem_aciklama = " · ".join(f"{k.get('aciklama','')} ({k.get('miktar',0)}x{fmt_para(k.get('birim_fiyat',0))})" for k in _fv.get("kalemler", []))
-    _govde = {"data": {
-        "type": "sales_invoices",
-        "attributes": {
-            "item_type": "invoice",
-            "description": _kalem_aciklama[:500],
-            "issue_date": _tr_simdi().strftime("%Y-%m-%d"),
-            "currency": "TRL",
-        },
-        "relationships": {"contact": {"data": {"id": _cid, "type": "contacts"}}},
-    }}
-    _sonuc, _hata3 = _parasut_api("POST", "/sales_invoices", json_govde=_govde)
-    if _sonuc and _sonuc.get("data"):
-        return True, _sonuc["data"]["id"]
-    return False, _hata3
-
-
 def fmt_tel(n):
     """5544929309.0 → 5544929309"""
     try:
@@ -2023,7 +2012,6 @@ def cari_rehbere_toplu_ekle(cari_liste):
         return 0
 
 
-def cari_rehbere_ekle(firma, gsm, sabit):
     """Bir cari kartın GSM/Sabit numaralarını 'kisiler' (Telefon Kişiler/Rehber) tablosuna aktarır.
     Aynı numara rehberde zaten varsa tekrar eklemez — mükerrer kayıt oluşturmaz.
     Cari kart açıldıkça (yeni kayıt / toplu aktarım) otomatik çağrılır."""
@@ -2146,12 +2134,10 @@ def not_dialog(cari_id, firma_adi=""):
     except Exception:
         pass
 
-    _nd_sekmeler = ["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "📞 Arama/Mesaj", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "🔍 Analiz", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"]
-    _nd_secim = st.radio("Bölüm", _nd_sekmeler, horizontal=True, label_visibility="collapsed", key=f"nd_sekme_{cari_id}")
-    st.markdown("<hr style='margin-top:-8px;'>", unsafe_allow_html=True)
-    if _nd_secim == "📝 Notlar":
+    _tab_not, _tab_rdv, _tab_yetkili, _tab_iletisim, _tab_teklif, _tab_sozlesme, _tab_analiz, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "📞 Arama/Mesaj", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "🔍 Analiz", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
+    with _tab_not:
         not_paneli(cari_id, firma_adi, key_prefix="dlg")
-    if _nd_secim == "📅 Randevu Ekle":
+    with _tab_rdv:
         if firma_adi:
             st.markdown(f"**{firma_adi}** için randevu ekle")
 
@@ -2203,7 +2189,7 @@ def not_dialog(cari_id, firma_adi=""):
                     st.rerun()
             except Exception as _re:
                 st.error(f"Hata: {_re}")
-    if _nd_secim == "👥 Yetkililer":
+    with _tab_yetkili:
         st.caption(f"**{firma_adi}** için birden fazla yetkili kişi ekleyebilirsiniz (ad, görev, email, GSM, sabit tel).")
         import json as _ykj
         _YK_ETIKET = "##YETKILI##"
@@ -2326,7 +2312,7 @@ def not_dialog(cari_id, firma_adi=""):
                 except Exception as _yee:
                     st.error(f"Hata: {_yee}")
 
-    if _nd_secim == "📞 Arama/Mesaj":
+    with _tab_iletisim:
         st.caption(f"**{firma_adi}** ile yapılan tüm arama ve SMS kayıtları (rehber/cari eşleşmesiyle otomatik toplanır).")
         import re as _ilre
 
@@ -2392,30 +2378,12 @@ def not_dialog(cari_id, firma_adi=""):
         except Exception as _ile:
             st.error(f"Arama/mesaj geçmişi yüklenemedi: {_ile}")
 
-    if _nd_secim == "⭐ Özel Teklif":
-        # ── Bu müşterinin gerçek teklif geçmişi — hem numarayla (musteri_id) birebir eşleşenler,
-        # hem de isim olarak yakın yazılmış (ör. "Ltd. Şti." eksik/farklı) eski kayıtlar otomatik
-        # yakalanır — kullanıcının ayrı bir menüye gidip elle bağlamasına gerek kalmasın diye. ──
+    with _tab_teklif:
+        # ── Bu müşterinin gerçek teklif geçmişi — fiyat_sorgu/kargo_ihbar hariç ──
         try:
             import json as _dlgtj
-            import difflib as _dlgdiff
             _dlg_sb = get_sb_client()
-            _dlg_ham_tum = pd.DataFrame(_dlg_sb.table("teklifler").select("*") \
-                .order("id", desc=True).limit(500).execute().data) if _dlg_sb else pd.DataFrame()
-            if not _dlg_ham_tum.empty and "toplam_tutar" in _dlg_ham_tum.columns:
-                _dlg_ham_tum = _dlg_ham_tum[~_dlg_ham_tum["toplam_tutar"].isin([-91001, -91002])]
-            if not _dlg_ham_tum.empty:
-                _dlg_firma_norm = str(firma_adi).strip().upper()
-                def _dlg_eslesiyor_mu(_r):
-                    if cari_id and str(_r.get("musteri_id","")) == str(cari_id):
-                        return True
-                    _ad = str(_r.get("musteri_adi","") or "").strip().upper()
-                    if not _ad:
-                        return False
-                    return _dlgdiff.SequenceMatcher(None, _ad, _dlg_firma_norm).ratio() >= 0.82
-                _dlg_tekdf = _dlg_ham_tum[_dlg_ham_tum.apply(_dlg_eslesiyor_mu, axis=1)]
-            else:
-                _dlg_tekdf = pd.DataFrame()
+            _dlg_tekdf = pd.DataFrame(_dlg_sb.table("teklifler").select("*").eq("musteri_adi", firma_adi).order("id", desc=True).execute().data) if _dlg_sb else pd.DataFrame()
         except Exception:
             _dlg_tekdf = pd.DataFrame()
 
@@ -2437,13 +2405,9 @@ def not_dialog(cari_id, firma_adi=""):
                     with st.expander(f"⭐ Özel Teklif — {fmt_tarih(_ttarih)}"):
                         for _g in _tp.get("grp", []):
                             for _s in _g.get("satirlar", []):
-                                _cikis = ", ".join(_s.get("cikis",[])) if isinstance(_s.get("cikis"),list) else str(_s.get("cikis") or "")
-                                _varis = ", ".join(_s.get("varis",[])) if isinstance(_s.get("varis"),list) else str(_s.get("varis") or "")
-                                _tur = ", ".join(_s.get("tur",[]) or [])
-                                _bas_v = _s.get("bas", "")
-                                _bit_v = _s.get("bit", "")
-                                _desi_txt = f"{_bas_v}-{_bit_v} desi · " if (_bas_v != "" or _bit_v != "") else ""
-                                st.caption(f"　• {_cikis} → {_varis} · {_tur} · {_desi_txt}{fmt_para(_s.get('fiyat',0))}")
+                                _c = ", ".join(_s.get("cikis",[])) if isinstance(_s.get("cikis"),list) else str(_s.get("cikis") or "")
+                                _v = ", ".join(_s.get("varis",[])) if isinstance(_s.get("varis"),list) else str(_s.get("varis") or "")
+                                st.caption(f"　• {_c} → {_v} · {fmt_para(_s.get('fiyat',0))}")
                 elif _ttip == "sozlesme":
                     _tv = _tp.get("veri",{})
                     st.caption(f"📜 Sözleşme — Geçerlilik: {_tv.get('gecerlilik_tarihi','—')} · Vade: {_tv.get('vade','—')}")
@@ -2458,19 +2422,19 @@ def not_dialog(cari_id, firma_adi=""):
             st.session_state["aktif_tab"] = "ozel_teklif"
             st.session_state["teklif_musteri_onsel"] = firma_adi
             st.rerun()
-    if _nd_secim == "📜 Sözleşme Hazırla":
+    with _tab_sozlesme:
         st.caption(f"**{firma_adi}** için sözleşme hazırla — müşteri otomatik seçili şekilde Sözleşmeler sayfası açılır.")
         if st.button("📜 Sözleşmeler Sayfasını Aç", key=f"dlg_sozlesme_{cari_id}", type="primary", use_container_width=True):
             st.session_state["aktif_tab"] = "sozlesme"
             st.session_state["sozlesme_musteri_onsel"] = firma_adi
             st.rerun()
-    if _nd_secim == "🔍 Analiz":
+    with _tab_analiz:
         st.caption(f"**{firma_adi}** için analiz yap/düzenle — müşteri otomatik seçili şekilde Analiz sayfası açılır.")
         if st.button("🔍 Analiz Sayfasını Aç", key=f"dlg_analiz_{cari_id}", type="primary", use_container_width=True):
             st.session_state["aktif_tab"] = "analiz"
             st.session_state["an_cari_sec"] = f"[{int(cari_id)}] {firma_adi}"
             st.rerun()
-    if _nd_secim == "✏️ Cari Kartı Düzenle":
+    with _tab_duz:
         st.caption(f"**{firma_adi}** — kayıtlı tüm bilgilerle eksiksiz düzenleme ekranı açılır.")
         if st.button("✏️ Cari Kartı Düzenle", key=f"dlg_cari_duzenle_{cari_id}", type="primary", use_container_width=True):
             try:
@@ -2493,31 +2457,22 @@ def not_dialog(cari_id, firma_adi=""):
                     st.rerun()
             except Exception as _de:
                 st.error(f"Hata: {_de}")
-    if _nd_secim == "🗑️ Cari Sil":
-        st.caption(f"**{firma_adi}** kaydını komple sil — bu işlem KALICIDIR ve geri alınamaz.")
+    with _tab_sil:
+        st.caption(f"**{firma_adi}** kaydını komple sil — tıklayınca anında silinir, onay istenmez.")
         if st.button("🗑️ Cari Komple Sil", key=f"dlg_cari_sil_{cari_id}", type="primary", use_container_width=True):
-            st.session_state[f"_cari_sil_onay_{cari_id}"] = True
-        if st.session_state.get(f"_cari_sil_onay_{cari_id}"):
-            st.error(f"⚠️ '{firma_adi}' kalıcı olarak silinecek. Emin misin?")
-            _cso1, _cso2 = st.columns(2)
-            if _cso1.button("✅ Evet, kalıcı olarak sil", key=f"dlg_cari_sil_onay_evet_{cari_id}", type="primary", use_container_width=True):
-                try:
-                    _sb_cs = get_sb_client()
-                    if _sb_cs:
-                        _sb_cs.table("cari_kartlar").update({"silindi": 1}).eq("id", int(cari_id)).execute()
-                    else:
-                        db_update("cari_kartlar", {"silindi": 1}, "id", int(cari_id))
-                    get_cari_listesi.clear()
-                    st.cache_data.clear()
-                    st.session_state.pop("cari_editor", None)
-                    st.session_state[f"_cari_sil_onay_{cari_id}"] = False
-                    st.toast(f"🗑️ '{firma_adi}' silindi", icon="🗑️")
-                    st.rerun()
-                except Exception as _cse:
-                    st.error(f"Silme hatası: {_cse}")
-            if _cso2.button("❌ Vazgeç", key=f"dlg_cari_sil_onay_hayir_{cari_id}", use_container_width=True):
-                st.session_state[f"_cari_sil_onay_{cari_id}"] = False
+            try:
+                _sb_cs = get_sb_client()
+                if _sb_cs:
+                    _sb_cs.table("cari_kartlar").update({"silindi": 1}).eq("id", int(cari_id)).execute()
+                else:
+                    db_update("cari_kartlar", {"silindi": 1}, "id", int(cari_id))
+                get_cari_listesi.clear()
+                st.cache_data.clear()
+                st.session_state.pop("cari_editor", None)
+                st.toast(f"🗑️ '{firma_adi}' silindi", icon="🗑️")
                 st.rerun()
+            except Exception as _cse:
+                st.error(f"Silme hatası: {_cse}")
 
 def not_paneli(cari_id, firma_adi="", key_prefix="np"):
     """Her yerde kullanılan ortak not paneli — Model 5: ultra minimal"""
@@ -2582,7 +2537,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "ozel_teklif", "sozlesme", "fatura", "parasut", "kargo_ihbar", "otomatik_arama", "gonderim_kuyrugu", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "ozel_teklif", "sozlesme", "fatura", "kargo_ihbar", "otomatik_arama", "gonderim_kuyrugu", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -2590,7 +2545,6 @@ _TAB_ETIKETLER = {
     "ozel_teklif": "⭐ Özel Teklif",
     "sozlesme": "📜 Sözleşmeler",
     "fatura": "💰 Faturalar",
-    "parasut": "💠 Paraşüt",
     "kargo_ihbar": "📦 Kargo İhbarları",
     "otomatik_arama": "📱 Arama & SMS Takip",
     "gonderim_kuyrugu": "📤 Mesaj/Arama Gönder",
@@ -2612,7 +2566,6 @@ _TAB_ETIKETLER = {
     
 }
 
-@st.cache_data(ttl=60, show_spinner=False)
 def get_menu_tercihi(kullanici):
     def _temizle(liste):
         goruldu = []
@@ -2699,13 +2652,23 @@ def save_menu_tercihi(kullanici, sira):
                 (kullanici, "menu_sirasi", json.dumps(sira)))
             conn.commit(); conn.close()
     except: pass
-    try: get_menu_tercihi.clear()
-    except: pass
 
 # ── SIDEBAR ───────────────────────────────────────────────────────────────────
 
 # ── VERSİYON KONTROL SİSTEMİ ─────────────────────────────────────────────────
 GUNCEL_SURUM = "v6.7"  # Bu kodun versiyonu — her güncellemede artır
+
+def _surum_kontrol():
+    """Kullanıcı stable sürümde mi kontrol et"""
+    try:
+        _sb_s = get_sb_client()
+        if not _sb_s: return True  # Bağlantı yoksa geç
+        _res = _sb_s.table("sistem_ayarlari").select("deger").eq("anahtar","stable_surum").execute()
+        if _res.data:
+            return _res.data[0]["deger"] == GUNCEL_SURUM
+        return True
+    except:
+        return True  # Hata olursa engelleme
 
 # Giriş kontrolü
 if not st.session_state.get("giris", False):
@@ -2804,23 +2767,16 @@ if "_cl_kolon_genislik" not in st.session_state:
 if "_cl_kolon_sira" not in st.session_state:
     st.session_state["_cl_kolon_sira"] = []
 
-# Versiyon kontrolü — sadece admin olmayanlara, oturum başına SADECE BİR KERE (her tıklamada değil)
+# Versiyon kontrolü — sadece admin olmayanlara
 if st.session_state.get("rol") != "admin":
-    if "_surum_kontrol_yapildi" not in st.session_state:
-        st.session_state["_surum_kontrol_yapildi"] = True
-        st.session_state["_surum_stable_mi"] = True
-        try:
-            _sb_s = get_sb_client()
-            if _sb_s:
-                _res = _sb_s.table("sistem_ayarlari").select("deger").eq("anahtar","stable_surum").execute()
-                if _res.data:
-                    _stable = _res.data[0]["deger"]
-                    st.session_state["_surum_stable_mi"] = (_stable == GUNCEL_SURUM)
-        except:
-            pass
-    if not st.session_state.get("_surum_stable_mi", True):
-        try:
-            st.markdown("""
+    try:
+        _sb_s = get_sb_client()
+        if _sb_s:
+            _res = _sb_s.table("sistem_ayarlari").select("deger").eq("anahtar","stable_surum").execute()
+            if _res.data:
+                _stable = _res.data[0]["deger"]
+                if _stable != GUNCEL_SURUM:
+                    st.markdown("""
                     <div style='text-align:center;padding:60px 20px'>
                     <div style='font-size:3rem'>⏳</div>
                     <h2 style='color:#ff9800'>Güncelleme Hazırlanıyor</h2>
@@ -2829,9 +2785,9 @@ if st.session_state.get("rol") != "admin":
                     <p style='color:#666;font-size:0.85rem'>Verileriniz güvende — hiçbir şey kaybolmadı.</p>
                     </div>
                     """, unsafe_allow_html=True)
-        except:
-            pass  # Bağlantı hatası olursa engelleme yapma
-        st.stop()
+                    st.stop()
+    except:
+        pass  # Bağlantı hatası olursa engelleme yapma
 
 
 with st.sidebar:
@@ -2963,12 +2919,6 @@ button[data-testid="manage-app-button"] { display: none !important; }
     if st.session_state.get("rol") != "admin":
         _sb_liste = [t for t in _sb_liste if t not in _SADECE_ADMIN]
 
-    # ── GERÇEK ERİŞİM KONTROLÜ — sadece menüde gizlemekle kalmaz, izinsiz sayfaya
-    # doğrudan geçilmeye çalışılırsa da erişimi engeller (admin hariç). ──────────
-    if st.session_state.get("rol") != "admin" and st.session_state.get("aktif_tab") not in _sb_liste and _sb_liste:
-        st.session_state["_erisim_engellendi"] = st.session_state.get("aktif_tab")
-        st.session_state["aktif_tab"] = _sb_liste[0]
-
     _TAB_RENKLER = {
         "yeni":        "#16a34a",
         "liste":       "#0369a1",
@@ -3039,7 +2989,6 @@ button[data-testid="manage-app-button"] { display: none !important; }
         ("🔎 Analiz ve takip",   ["analiz", "islem_takip"]),
         ("📅 Randevu ve teklif", ["randevu", "ozel_teklif", "sozlesme"]),
         ("💰 Faturalar",         ["fatura"]),
-        ("💠 Paraşüt",           ["parasut"]),
         ("📦 Kargo İhbarları",   ["kargo_ihbar"]),
         ("📱 Telefon Entegrasyonu", ["otomatik_arama", "gonderim_kuyrugu", "kisiler"]),
         ("🚚 Saha",              ["rota_analiz", "operasyon", "harita"]),
@@ -3171,6 +3120,49 @@ button[data-testid="manage-app-button"] { display: none !important; }
                 st.session_state["_gizli_menu_list"] = []
                 st.rerun()
 
+        with st.expander("📢 Duyuru"):
+            with st.form("duyuru_form"):
+                d_b = st.text_input("Başlık:")
+                d_i = st.text_area("İçerik:", height=50)
+                d_t = st.selectbox("Tip:", ["bilgi","uyari","hata"])
+                if st.form_submit_button("📢 Yayınla") and d_b:
+                    _sb_d = get_sb_client()
+                    if _sb_d:
+                        try:
+                            _sb_d.table("duyurular").insert({
+                                "baslik":d_b,"icerik":d_i,"tip":d_t,
+                                "olusturan":st.session_state["kullanici"],"aktif":1
+                            }).execute()
+                            st.success("✅ Yayınlandı!")
+                        except Exception as _ed:
+                            st.error(f"Hata: {_ed}")
+                    else:
+                        db_insert("duyurular", {"baslik":d_b,"icerik":d_i,"tip":d_t,
+                            "olusturan":st.session_state["kullanici"],"aktif":1})
+                        st.success("✅ Yayınlandı!")
+                    st.rerun()
+            try:
+                _sb_dy = get_sb_client()
+                if _sb_dy:
+                    _dy_res = _sb_dy.table("duyurular").select("*").eq("aktif",1).order("tarih",desc=True).execute()
+                    _df_dy = pd.DataFrame(_dy_res.data) if _dy_res.data else pd.DataFrame()
+                else:
+                    _df_dy = db_read("duyurular", extra_sql="WHERE aktif=1 ORDER BY tarih DESC")
+                if not _df_dy.empty:
+                    for _, _dy in _df_dy.iterrows():
+                        _tip = _dy.get("tip","bilgi")
+                        _renk_d = "#1f6feb" if _tip=="bilgi" else "#ff9800" if _tip=="uyari" else "#f44336"
+                        st.markdown(
+                            f"<div style='border-left:3px solid {_renk_d};padding:4px 8px;margin:2px 0;font-size:11px;'>"
+                            f"<b>{_dy.get('baslik','')}</b><br>{_dy.get('icerik','')}</div>",
+                            unsafe_allow_html=True
+                        )
+                        if st.button("🗑️", key=f"dy_sil_{_dy.get('id',0)}"):
+                            if _sb_dy:
+                                _sb_dy.table("duyurular").update({"aktif":0}).eq("id",int(_dy.get("id",0))).execute()
+                            st.rerun()
+            except: pass
+
     st.divider()
 
     st.divider()
@@ -3200,10 +3192,6 @@ st.divider()
 if "aktif_tab" not in st.session_state:
     st.session_state["aktif_tab"] = "liste"
 aktif = st.session_state["aktif_tab"]
-
-if st.session_state.get("_erisim_engellendi"):
-    st.warning("⛔ Bu sayfaya erişim yetkin yok. Yöneticinle iletişime geç.")
-    del st.session_state["_erisim_engellendi"]
 
 
 # ── MOBİL MOD — body class + nav aktif ikon ──────────────────────────────────
@@ -4429,21 +4417,14 @@ section[data-testid="stSidebar"] { display: none !important; }
                 _mask = _mask & (df[_k].isna() | df[_k].astype(str).str.strip().isin(["","None","nan"]))
         return int(_mask.sum())
 
-    # Bu üst rapor sayaçları, ekranda görünen (zaten yetki/atama filtresinden geçmiş) müşterilerle
-    # sınırlı olsun diye — o müşterilerin ID'lerini burada bir kere hesaplıyoruz.
-    _izinli_id_seti = set(df["id"].dropna().astype(int)) if "id" in df.columns and not df.empty else set()
-
     def _not_anahtar_sayisi(_icerir=None, _haric=None):
         """Notlardan (cari_aciklamalar) belirli bir anahtar kelime geçen kayıtları sayar.
         _icerir: bu kelime(ler)den biri geçmeli (liste). _haric: bu kelime geçerse sayılmaz.
-        Yetkili kayıtları her zaman hariç tutulur. SADECE görünen (yetkili olunan) müşterilerin
-        kayıtları sayılır — başka kullanıcıların/müşterilerin notları karışmaz."""
+        Yetkili kayıtları her zaman hariç tutulur."""
         try:
             _ya_df = db_read("cari_aciklamalar", extra_sql="")
             if _ya_df.empty or "aciklama" not in _ya_df.columns:
                 return 0
-            if "cari_id" in _ya_df.columns:
-                _ya_df = _ya_df[_ya_df["cari_id"].apply(lambda x: pd.notna(x) and int(x) in _izinli_id_seti)]
             _ya_notlar = _ya_df["aciklama"].fillna("").astype(str)
             _ya_notlar = _ya_notlar[~_ya_notlar.str.startswith("##YETKILI##")]
             _ya_notlar = _ya_notlar[_ya_notlar.str.strip() != ""]
@@ -4463,24 +4444,17 @@ section[data-testid="stSidebar"] { display: none !important; }
         """Notlardan toplam arama sayısı — 'ziyaret' geçenler hariç"""
         return _not_anahtar_sayisi(_haric=["ziyaret"])
 
-    @st.cache_data(ttl=60, show_spinner=False)
-    def _islem_kaydi_turune_gore_yukle(_islem_turu):
-        """Ham veriyi (kullanıcıdan bağımsız) önbellekli çeker — filtreleme aşağıda hızlıca Python'da yapılır."""
+    def _gercek_gonderim_sayisi(_islem_turu):
+        """'islem_kaydi' tablosundan gerçek gönderim (WhatsApp Teklif / Email Teklif) sayısı —
+        'Mesaj' sütununun kullandığı kaynakla aynı, üst raporun da bunu içermesi için."""
         try:
             _sbg = get_sb_client()
             if not _sbg:
-                return []
-            _rg = _sbg.table("islem_kaydi").select("id,musteri_id").eq("islem_turu", _islem_turu).execute()
-            return _rg.data or []
+                return 0
+            _rg = _sbg.table("islem_kaydi").select("id").eq("islem_turu", _islem_turu).execute()
+            return len(_rg.data or [])
         except Exception:
-            return []
-
-    def _gercek_gonderim_sayisi(_islem_turu):
-        """'islem_kaydi' tablosundan gerçek gönderim (WhatsApp Teklif / Email Teklif) sayısı —
-        'Mesaj' sütununun kullandığı kaynakla aynı, üst raporun da bunu içermesi için.
-        SADECE görünen (yetkili olunan) müşterilerin kayıtları sayılır."""
-        _rg_data = _islem_kaydi_turune_gore_yukle(_islem_turu)
-        return len([r for r in _rg_data if r.get("musteri_id") is not None and int(r.get("musteri_id")) in _izinli_id_seti])
+            return 0
 
     def _email_not_sayisi():
         """Notlarda 'email'/'e-mail'/'mail' geçen kayıt sayısı + gerçekten gönderilen Email Teklif sayısı"""
@@ -4541,30 +4515,18 @@ section[data-testid="stSidebar"] { display: none !important; }
     _grp5_toplam = sum(_kolon_sayi("sonuc", a) for a in _grp5_asama)
 
     # Genel grup
-    @st.cache_data(ttl=60, show_spinner=False)
-    def _ust_rapor_teklif_toplam():
-        """Üst raporda gösterilecek gerçek (kayıtlı Özel Teklif) sayısı — pipeline aşamasından bağımsız."""
-        try:
-            _sbut = get_sb_client()
-            if not _sbut:
-                return 0
-            _rut = _sbut.table("teklifler").select("id,satirlar,toplam_tutar").execute()
-            return len([r for r in (_rut.data or []) if r.get("toplam_tutar") not in (-91001, -91002) and any(t in str(r.get("satirlar","")) for t in ['"tip": "ozel"', '"tip":"ozel"', '"tip": "sozlesme"', '"tip":"sozlesme"'])])
-        except Exception:
-            return 0
-
     _genel_items = [
         ("📊","Toplam", len(df), "toplam", _toplam_aktif_flag),
         ("📦","Portföy", _durum_sayi("Portföy"), "durum_Portföy", "Portföy" in _aktif_fil_durum),
         ("⭐","Özel Müşteri", _durum_sayi("Özel Müşteri"), "durum_Özel Müşteri", "Özel Müşteri" in _aktif_fil_durum),
         ("📋","Aşamasız", _asamasiz_sayi(), "asamasiz", st.session_state.get("_asamasiz_aktif",False)),
-        ("🧾","Gerçek Teklif", _ust_rapor_teklif_toplam(), "gercek_teklif", False),
     ]
     for _dn in tum_durum_opts:
         if str(_dn).upper() in ["NONE","NAN",""] or _dn in ["Portföy","Özel Müşteri"]: continue
         _genel_items.append((_durum_ikon(_dn), _dn, _durum_sayi(_dn), f"durum_{_dn}", _dn in _aktif_fil_durum))
 
     _grp_data = {
+        "genel":    ("📊","GENEL",    None, _genel_items),
         "genel":    ("📊","GENEL",    None, _genel_items),
         "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama]
                      + [('<i class="ti ti-phone" style="color:#16a34a;font-size:26px;line-height:1;"></i>',"Aranan", _yesil_arama_sayisi(), "yesil_arama_notlar", False)]
@@ -4772,13 +4734,8 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
 
         # Not sayılarını al
         try:
-            @st.cache_data(ttl=60, show_spinner=False)
-            def _kb_not_sayilari_yukle():
-                _sb_kbn2 = get_sb_client()
-                if _sb_kbn2:
-                    return _sb_kbn2.table("cari_aciklamalar").select("cari_id").execute().data or []
-                return []
-            _kb_not_data = _kb_not_sayilari_yukle()
+            _sb_kbn = get_sb_client()
+            _kb_not_data = _sb_kbn.table("cari_aciklamalar").select("cari_id").execute().data or [] if _sb_kbn else []
             import collections as _kbc2
             _kb_not_sayac = _kbc2.Counter([str(r["cari_id"]) for r in _kb_not_data])
         except: _kb_not_sayac = {}
@@ -5553,14 +5510,9 @@ function kartSec(id){
     try:
         # Analiz yapılmış firmaları işaretle
         try:
-            @st.cache_data(ttl=60, show_spinner=False)
-            def _analiz_firmalari_yukle():
-                _sb_an2 = get_sb_client()
-                if _sb_an2:
-                    return _sb_an2.table("musteri_analiz").select("firma").execute().data or []
-                return []
-            _an_raw = _analiz_firmalari_yukle()
-            if True:
+            _sb_an = get_sb_client()
+            if _sb_an:
+                _an_raw = _sb_an.table("musteri_analiz").select("firma").execute().data or []
                 def _norm_firma(s):
                     return (str(s or "").strip()
                             .upper()
@@ -5658,51 +5610,28 @@ function kartSec(id){
     # SADECE "Kayıtlı Özel Teklifler" listesinde görünen kayıtlar sayılır — o liste
     # sadece satirlar içinde "ozel" geçenleri gösteriyor, sayaç da aynı kritere uymalı.
     _tek_sayac_cl = {}
-    _tek_sayac_ad_cl = {}
-    _tek_toplam_gorunen = 0
-    try:
-        @st.cache_data(ttl=60, show_spinner=False)
-        def _tum_teklif_sayac_yukle():
-            _sb3 = get_sb_client()
-            if _sb3:
-                _r3 = _sb3.table("teklifler").select("musteri_id,musteri_adi,satirlar,toplam_tutar").execute()
-                return [r for r in (_r3.data or []) if r.get("toplam_tutar") not in (-91001, -91002)]
-            return []
-        _res_tek_data_cl = _tum_teklif_sayac_yukle()
-        if _res_tek_data_cl:
-            import collections as _coltek_cl, difflib as _tekdiff_cl
-            # 1) Numarayla (musteri_id) birebir eşleşenler — hızlı, kesin
-            _gecerli_id_seti_cl = set(df_edit["id"].dropna().astype(int).astype(str)) if "id" in df_edit.columns else set()
-            _tek_id_liste = []
-            _baglanamayan_adlar_cl = []
-            for _rtk in _res_tek_data_cl:
-                _sat_metin = str(_rtk.get("satirlar","") or "")
-                if any(t in _sat_metin for t in ['"tip": "ozel"', '"tip":"ozel"', '"tip": "sozlesme"', '"tip":"sozlesme"']):
-                    _mid_str = str(_rtk.get("musteri_id",""))
-                    if _mid_str in _gecerli_id_seti_cl:
-                        _tek_id_liste.append(_mid_str)
-                    elif _rtk.get("musteri_adi"):
-                        _baglanamayan_adlar_cl.append(str(_rtk.get("musteri_adi")).strip())
-            _tek_sayac_cl = _coltek_cl.Counter(_tek_id_liste)
-            # 2) ID ile bağlanamayanlar için — isim benzerliğine göre (yakın yazım da dahil) eşleştir
-            _firma_liste_cl = df_edit["firma"].dropna().astype(str).tolist() if "firma" in df_edit.columns else []
-            _tek_ad_liste = []
-            for _bad in _baglanamayan_adlar_cl:
-                _yakin = _tekdiff_cl.get_close_matches(_bad, _firma_liste_cl, n=1, cutoff=0.82)
-                if _yakin:
-                    _tek_ad_liste.append(_yakin[0].strip().lower())
-            _tek_sayac_ad_cl = _coltek_cl.Counter(_tek_ad_liste)
-            _tek_toplam_gorunen = sum(_tek_sayac_cl.values()) + sum(_tek_sayac_ad_cl.values())
-    except Exception:
-        _tek_sayac_cl = {}
-        _tek_sayac_ad_cl = {}
+    if sb_liste:
+        try:
+            @st.cache_data(ttl=60, show_spinner=False)
+            def _tum_teklif_sayac_yukle():
+                _sb3 = get_sb_client()
+                if _sb3:
+                    _r3 = _sb3.table("teklifler").select("musteri_id,satirlar").execute()
+                    return _r3.data or []
+                return []
+            _res_tek_data_cl = _tum_teklif_sayac_yukle()
+            if _res_tek_data_cl:
+                import collections as _coltek_cl
+                _tek_gecerli_idler = [
+                    str(_rtk.get("musteri_id",""))
+                    for _rtk in _res_tek_data_cl
+                    if "ozel" in str(_rtk.get("satirlar","") or "").lower()
+                ]
+                _tek_sayac_cl = _coltek_cl.Counter(_tek_gecerli_idler)
+        except Exception:
+            _tek_sayac_cl = {}
     if "id" in df_edit.columns:
-        def _tek_say_bul(_row):
-            _n1 = _tek_sayac_cl.get(str(int(_row["id"])), 0)
-            _n2 = _tek_sayac_ad_cl.get(str(_row.get("firma","")).strip().lower(), 0) if "firma" in df_edit.columns else 0
-            _n = max(_n1, _n2)
-            return f"🧾 {_n}" if _n > 0 else ""
-        df_edit["🧾 Teklif"] = df_edit.apply(_tek_say_bul, axis=1)
+        df_edit["🧾 Teklif"] = df_edit["id"].apply(lambda x: f"🧾 {_tek_sayac_cl.get(str(int(x)),0)}" if _tek_sayac_cl.get(str(int(x)),0) > 0 else "")
     else:
         df_edit["🧾 Teklif"] = ""
 
@@ -5801,15 +5730,6 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
 
     _tbl_col = st.container()
     _not_col = None
-
-    # ── Metin (object) sütunlarındaki None değerleri "None" yazısı olarak görünmesin diye temizle ──
-    # (Sadece görüntüleme anında; veritabanındaki gerçek veriye veya sayısal sütunlara dokunmuyor.)
-    try:
-        for _col_temiz in df_edit.columns:
-            if df_edit[_col_temiz].dtype == object:
-                df_edit[_col_temiz] = df_edit[_col_temiz].apply(lambda _v: "" if _v is None else _v)
-    except Exception:
-        pass
 
     with _tbl_col:
         edited_df = st.data_editor(
@@ -6201,18 +6121,13 @@ elif aktif == "kullanici":
         st.stop()
 
     # ── ADMİN — tam yetki ─────────────────────────────────────────────────────
-    # Sol menünün TAMAMI (tüm gruplar + tüm alt sayfalar) — tek kaynaktan (_MENU_GRUPLARI) otomatik oluşturuluyor
-    TUM_MENULER = {}
-    try:
-        for _tm_grp_ad, _tm_grp_keys in _MENU_GRUPLARI:
-            for _tm_k in _tm_grp_keys:
-                TUM_MENULER[_tm_k] = _TAB_ETIKETLER.get(_tm_k, _tm_k)
-    except Exception:
-        pass
-    # Sidebar grubunda olmayan, ama ayrıca yetkilendirilebilen ek özellikler
-    TUM_MENULER["mesajlar"] = "💬 Mesajlar"
-    TUM_MENULER["kullanici_log"] = "📊 Kullanıcı Log"
-    TUM_MENULER["surum_yonetimi"] = "🚀 Sürüm Yönetimi"
+    TUM_MENULER = {
+        "yeni":"➕ Yeni Kart","liste":"📋 Cari Liste","randevu":"📅 Randevular",
+        "kisiler":"📞 Kişiler","rapor":"📊 Raporlar",
+        "excel":"📥 Excel","mesajlar":"💬 Mesajlar",
+        "admin_rapor":"📊 Rapor Tasarla","kullanici_log":"📊 Kullanıcı Log",
+        "surum_yonetimi":"🚀 Sürüm Yönetimi"
+    }
 
     # Sürüm Yönetimi sekmesi: sadece admin VEYA yetkisi olan kullanıcı
     _surum_yetkisi = (
@@ -6220,14 +6135,15 @@ elif aktif == "kullanici":
         "surum_yonetimi" in str(st.session_state.get("_yetki_listesi",""))
     )
 
-    _kul_sekmeler = ["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log"]
-    if st.session_state.get("rol") == "admin" or _surum_yetkisi:
-        _kul_sekmeler.append("🚀 Sürüm Yönetimi")
-    _kul_sekmeler += ["🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar"]
-    _kul_secim = st.radio("Bölüm", _kul_sekmeler, horizontal=True, label_visibility="collapsed", key="kul_sekme_secim")
-    st.markdown("<hr style='margin-top:-8px;'>", unsafe_allow_html=True)
+    if st.session_state.get("rol") == "admin":
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_font = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar"])
+    elif _surum_yetkisi:
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_font = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar"])
+    else:
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_font = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar"])
+        kul_tab5 = None
 
-    if _kul_secim == "📋 Kullanıcılar":
+    with kul_tab1:
         df_kul = db_read("kullanicilar", extra_sql="")
         if not df_kul.empty:
             goster_k = [c for c in ["id","kullanici_adi","ad","soyad","email","telefon","rol","yetkiler"] if c in df_kul.columns]
@@ -6267,7 +6183,7 @@ elif aktif == "kullanici":
                         sb_s.table("kullanicilar").delete().eq("id",sil_id).execute()
                     st.success("Silindi!"); st.rerun()
 
-    if _kul_secim == "➕ Yeni Kullanıcı":
+    with kul_tab2:
         st.markdown("#### ➕ Yeni Kullanıcı")
         _yk_musteri_dfm = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
         _yk_musteri_opts = ["-- Bağlı değil --"] + ([f"[{int(r['id'])}] {r['firma']}" for _, r in _yk_musteri_dfm.iterrows()] if not _yk_musteri_dfm.empty else [])
@@ -6357,7 +6273,7 @@ elif aktif == "kullanici":
                 else:
                     st.warning("Kullanıcı adı ve şifre zorunlu!")
 
-    if _kul_secim == "🔐 Yetki Düzenle":
+    with kul_tab3:
         st.markdown("#### 🔐 Yetki Düzenle")
         df_kul3 = db_read("kullanicilar", extra_sql="")
         if not df_kul3.empty:
@@ -6390,58 +6306,7 @@ elif aktif == "kullanici":
                 except: pass
                 st.success("✅ Yetkiler güncellendi!"); st.rerun()
 
-            st.divider()
-            st.markdown("#### 🗺️ Bölge Yetkisi")
-            st.caption("Bu kullanıcının hangi bölgelerdeki müşterileri görebileceğini seç (bölge listesi, sistemdeki mevcut müşteri verisinden otomatik çıkarılır — 'Bölgeler' kutusundakiyle aynı).")
-            try:
-                _byk_sb = get_sb_client()
-                _byk_res = _byk_sb.table("cari_kartlar").select("il,ilce").neq("silindi", 1).execute() if _byk_sb else None
-                _byk_df = pd.DataFrame(_byk_res.data) if (_byk_res and _byk_res.data) else pd.DataFrame()
-                _byk_bolgeler = []
-                if not _byk_df.empty and "il" in _byk_df.columns:
-                    _byk_ilce_kol = "ilce" if "ilce" in _byk_df.columns else None
-                    _byk_ham = _byk_df.apply(lambda r: il_ilce_bolge_bul(r.get("il",""), r.get(_byk_ilce_kol,"") if _byk_ilce_kol else ""), axis=1)
-                    _byk_bolgeler = sorted([b for b in _byk_ham.fillna("Havuz (Bölgesiz)").unique() if b])
-            except Exception:
-                _byk_bolgeler = []
-
-            try:
-                _byk_mevcut = _byk_sb.table("kullanici_tercih").select("deger").eq("kullanici", k3_row["kullanici_adi"]).eq("anahtar", "_bolge_yetki").execute()
-                _byk_durum = "liste"       # varsayılan: kısıtlı (hiç ayarlanmamışsa da bu — güvenli taraf)
-                _byk_liste_mv = []
-                if _byk_mevcut.data:
-                    _byk_raw = _byk_mevcut.data[0]["deger"]
-                    if _byk_raw == "tam":
-                        _byk_durum = "tam"
-                    else:
-                        _byk_liste_mv = json.loads(_byk_raw)
-            except Exception:
-                _byk_durum = "liste"
-                _byk_liste_mv = []
-            _byk_tam_cb = st.checkbox("✅ Tüm Bölgelere Yetkili", value=(_byk_durum == "tam"), key="byk_tam_cb")
-            _byk_yeni = []
-            if not _byk_tam_cb:
-                _byk_cols = st.columns(4)
-                for _byi, _byb in enumerate(_byk_bolgeler):
-                    if _byk_cols[_byi % 4].checkbox(_byb, value=(_byb in _byk_liste_mv), key=f"byk_{k3_id}_{_byb}"):
-                        _byk_yeni.append(_byb)
-
-            if st.button("💾 Bölge Yetkisini Kaydet", use_container_width=True, type="primary", key="byk_kaydet_btn"):
-                try:
-                    _byk_sb2 = get_sb_client()
-                    _byk_sb2.table("kullanici_tercih").delete().eq("kullanici", k3_row["kullanici_adi"]).eq("anahtar", "_bolge_yetki").execute()
-                    _byk_deger = "tam" if _byk_tam_cb else json.dumps(_byk_yeni, ensure_ascii=False)
-                    _byk_sb2.table("kullanici_tercih").insert({
-                        "kullanici": k3_row["kullanici_adi"], "anahtar": "_bolge_yetki",
-                        "deger": _byk_deger,
-                    }).execute()
-                    try: db_read.clear()
-                    except: pass
-                    st.success("✅ Bölge yetkisi güncellendi!"); st.rerun()
-                except Exception as _byk_e:
-                    st.error(f"Kaydedilemedi: {_byk_e}")
-
-    if _kul_secim == "📊 Kullanıcı Log":
+    with kul_tab4:
         st.markdown("### 📊 Kullanıcı Aktivite Logu")
         st.caption("Kim giriş yaptı, hangi sayfaya girdi, ne yaptı — tarih saat ile")
 
@@ -6576,7 +6441,7 @@ elif aktif == "kullanici":
                     except Exception as _e_del:
                         st.error(f"Silinemedi: {_e_del}")
 
-    if _kul_secim == "🎨 Ekran Ayarları":
+    with kul_tab5_ekran:
         st.markdown("### 🎨 Ekran Ayarları")
         _sb_ekran = get_sb_client()
         _ekran_kul = st.session_state.get("kullanici","")
@@ -6803,7 +6668,8 @@ function updateBot(v){{
             st.session_state.pop("_ekran_bosluk", None)
             st.rerun()
 
-    if _kul_secim == "🚀 Sürüm Yönetimi":
+    if kul_tab5 and (st.session_state.get("rol") == "admin" or _surum_yetkisi):
+        with kul_tab5:
             st.markdown("### 🚀 Sürüm Yönetimi")
 
             _sb_sv = get_sb_client()
@@ -6929,7 +6795,7 @@ function updateBot(v){{
                 """)
 
     # ── 📐 KOLON AYARLARI ─────────────────────────────────────────────────────
-    if _kul_secim == "📐 Kolon Ayarları":
+    with kul_tab_kolon:
         st.markdown("### 📐 Cari Liste Kolon Ayarları")
         st.caption("Genişlik ayarlayın, gizlemek istediklerinizi kapatın → Kaydet")
         _KOL_VARS_UI = {
@@ -7067,7 +6933,7 @@ function updateBot(v){{
                     st.error(f"Hata: {_kbge}")
 
     # ── 🔄 TOPLU DEĞİŞTİR ────────────────────────────────────────────────────
-    if _kul_secim == "🔄 Toplu Değiştir":
+    with kul_tab_toplu:
         st.markdown("### 🔄 Toplu Aşama / Durum Değiştir")
         st.caption("Seçili aşama veya durumu toplu olarak değiştirin")
 
@@ -7142,7 +7008,7 @@ function updateBot(v){{
                     st.error("Güncelleme başarısız!")
         else:
             st.info("Müşteri verisi bulunamadı.")
-    if _kul_secim == "⚙️ Tanımlar":
+    with kul_tab_tanim:
         st.markdown("### ⚙️ Aşama & Durum Tanımları")
         _sb_tan = get_sb_client()
 
@@ -7256,7 +7122,7 @@ function updateBot(v){{
                     if _tan_sil("durum", _d):
                         st.success(f"'{_d}' silindi!"); st.rerun()
 
-    if _kul_secim == "🔤 Fontlar":
+    with kul_tab_font:
         st.markdown("### 🔤 Sözleşme PDF Fontları")
         st.caption("Sözleşme PDF'lerinin Türkçe karakterleri (ş, ğ, ı, ç, ö, ü, İ) doğru basabilmesi için gereken "
                    "font dosyaları. Başka bir bilgisayarda kuruluma ihtiyaç olursa buradan indirilebilir; "
@@ -7913,21 +7779,14 @@ elif aktif == "ozel_teklif":
         if not _oz_hedef:
             st.warning("Müşteri adı boş!")
         else:
-            # Açılır listeden gerçek bir müşteri seçildiyse, HER ZAMAN o müşterinin gerçek
-            # numarasına ve tam firma adına bağla — yazı kutusundaki metin farklı/eksik yazılmış
-            # olsa bile teklif "sahipsiz" kalmasın (Cari Liste'de görünmeme sorununun sebebiydi).
-            _oz_gercek_id = int(_oz_mus["id"]) if _oz_mus is not None else 0
-            _oz_gercek_adi = str(_oz_mus["firma"]) if _oz_mus is not None else _oz_hedef
             _oz_veri = {
-                "musteri_id": _oz_gercek_id,
-                "musteri_adi": _oz_gercek_adi,
+                "musteri_id": int(_oz_mus["id"]) if _oz_mus is not None else 0,
+                "musteri_adi": _oz_hedef,
                 "satirlar": _ozj.dumps({"tip":"ozel","grp":grp}, ensure_ascii=False),
                 "toplam_tutar": sum(float(s.get("fiyat",0) or 0) for g in grp for s in g.get("satirlar",[])),
                 "olusturan": st.session_state["kullanici"],
-                "notlar": f"Vade:{_oz_vade} | Not:{_oz_not}" + (f" | Yazılan ad: {_oz_hedef}" if (_oz_mus is not None and _oz_hedef.strip() != _oz_gercek_adi.strip()) else "")
+                "notlar": f"Vade:{_oz_vade} | Not:{_oz_not}"
             }
-            if _oz_gercek_id == 0:
-                st.warning(f"⚠️ '{_oz_hedef}' için sistemde kayıtlı bir müşteri seçilmedi — bu teklif Cari Liste'de hiçbir müşterinin hanesinde görünmeyecek. Doğru görünmesi için önce yukarıdaki açılır listeden müşteriyi seç.")
             _duz_id = st.session_state.get("oz2_duz_id")
             if _duz_id:
                 db_update("teklifler",{
@@ -8629,9 +8488,7 @@ elif aktif == "sozlesme":
         st.markdown("### 📚 Geçmiş Sözleşmeler")
         try:
             _sz_sb2 = get_sb_client()
-            _sz_ham = pd.DataFrame(_sz_sb2.table("teklifler").select("*").order("id", desc=True).limit(500).execute().data) if _sz_sb2 else pd.DataFrame()
-            if not _sz_ham.empty and "toplam_tutar" in _sz_ham.columns:
-                _sz_ham = _sz_ham[~_sz_ham["toplam_tutar"].isin([-91001, -91002])]
+            _sz_ham = pd.DataFrame(_sz_sb2.table("teklifler").select("*").order("id", desc=True).execute().data) if _sz_sb2 else pd.DataFrame()
             if not _sz_ham.empty and "satirlar" in _sz_ham.columns:
                 _sz_arsiv_ham = _sz_ham[_sz_ham["satirlar"].astype(str).str.contains("sozlesme", case=False, na=False)].copy()
             else:
@@ -8682,61 +8539,12 @@ elif aktif == "fatura":
     import json as _ftj
     from datetime import date as _ftdate
 
-
     st.markdown("## 💰 Faturalar")
+    st.info("🔧 **Kurulum aşamasında.** Paraşüt API bağlantısı (Client ID / Secret) henüz eklenmedi — şu an "
+            "sadece fatura taslağı hazırlayıp arşivleyebilirsin. Bağlantı eklendiğinde 'Paraşüt'e Gönder' "
+            "butonu aktif olacak, başka hiçbir şey değişmeyecek.")
 
-    if not _parasut_ayarli_mi():
-        with st.expander("⚙️ Paraşüt API Bilgilerini Gir (bir kereye mahsus)", expanded=True):
-            st.caption("Paraşüt Uygulama Ayarları'ndan aldığın bilgileri buraya yapıştır — hiçbir dış panele gitmene gerek yok, doğrudan veritabanına kaydedilir.")
-            _pa_cid = st.text_input("Application Id (Client ID):", key="pa_cid_input")
-            _pa_csec = st.text_input("Secret (Client Secret):", key="pa_csec_input", type="password")
-            _pa_company = st.text_input("Şirket (Company) ID:", value="843974", key="pa_company_input")
-            if st.button("💾 Kaydet", type="primary", key="pa_ayar_kaydet_btn"):
-                if not (_pa_cid.strip() and _pa_csec.strip() and _pa_company.strip()):
-                    st.warning("Üç alanı da doldurmalısın.")
-                elif _parasut_ayarlari_kaydet(_pa_cid, _pa_csec, _pa_company):
-                    st.success("✅ Kaydedildi! Şimdi aşağıda 'Paraşüt'e Bağlan' çıkacak.")
-                    st.rerun()
-                else:
-                    st.error("Kaydedilemedi, tekrar dene.")
-    else:
-        _pt = _parasut_token_yukle()
-        if _pt:
-            with st.expander("✅ Paraşüt'e bağlı", expanded=False):
-                st.caption("Bağlantı aktif. Sorun yaşarsan aşağıdan tekrar bağlanabilirsin.")
-                if st.button("🔌 Bağlantıyı Kes", key="ft_parasut_kes"):
-                    try:
-                        _pks = get_sb_client()
-                        if _pks: _pks.table("sistem_ayarlari").delete().eq("anahtar", "parasut_token").execute()
-                        st.success("Bağlantı kesildi."); st.rerun()
-                    except Exception as _pke:
-                        st.error(f"Hata: {_pke}")
-        else:
-            with st.expander("🔗 Paraşüt'e Bağlan", expanded=True):
-                st.caption("Paraşüt'ün giriş ekranı güvenlik gereği sistemimizin içine gömülemiyor (bankalar/Google gibi tüm giriş sayfaları bunu engeller) — yeni bir sekmede açılacak, izin verip döneceksin.")
-                st.markdown(f"""
-<a href="{_parasut_yetki_url()}" target="_blank" rel="noopener" style="text-decoration:none;">
-  <div style="text-align:center;padding:12px;border-radius:8px;background:#7c3aed;color:white;
-       font-weight:600;font-size:15px;cursor:pointer;margin-bottom:10px;">
-       🔗 1) Paraşüt'e Git ve İzin Ver
-  </div>
-</a>
-""", unsafe_allow_html=True)
-                st.caption("Paraşüt'te giriş yapıp izin verince ekranda bir **kod** göreceksin — onu kopyala.")
-                _pt_kod = st.text_input("2) Paraşüt'ten aldığın kodu buraya yapıştır:", key="ft_parasut_kod")
-                if st.button("✅ 3) Bağlan", key="ft_parasut_baglan_btn", type="primary", use_container_width=True):
-                    if not _pt_kod.strip():
-                        st.warning("Önce kodu yapıştır.")
-                    else:
-                        with st.spinner("⏳ Bağlanıyor..."):
-                            _pok, _phata = _parasut_kod_ile_baglan(_pt_kod)
-                        if _pok:
-                            st.success("✅ Paraşüt'e başarıyla bağlandı!")
-                            st.rerun()
-                        else:
-                            st.error(f"Bağlanamadı: {_phata}")
-
-    _ft_tab1, _ft_tab2, _ft_tab3 = st.tabs(["📝 Yeni Fatura Taslağı", "📚 Taslak/Gönderilen Faturalar", "🔗 Paraşüt'teki Faturalar"])
+    _ft_tab1, _ft_tab2 = st.tabs(["📝 Yeni Fatura Taslağı", "📚 Taslak/Gönderilen Faturalar"])
 
     with _ft_tab1:
         _ft_dfm = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
@@ -8820,9 +8628,8 @@ elif aktif == "fatura":
             _fts3.metric("Genel Toplam", fmt_para(_ft_genel_toplam))
 
             st.markdown("---")
-            _ft_baglanti_var = _parasut_ayarli_mi() and _parasut_token_yukle()
-            _ft_buton_yazi = "💾 Kaydet ve Paraşüt'e Otomatik Gönder" if _ft_baglanti_var else "💾 Taslak Olarak Kaydet"
-            if st.button(_ft_buton_yazi, type="primary", use_container_width=True, key="ft_taslak_kaydet"):
+            _ftb1, _ftb2 = st.columns(2)
+            if _ftb1.button("💾 Taslak Olarak Kaydet", type="primary", use_container_width=True, key="ft_taslak_kaydet"):
                 if not st.session_state["ft_kalemler"]:
                     st.warning("En az bir kalem eklemelisin.")
                 else:
@@ -8834,9 +8641,8 @@ elif aktif == "fatura":
                             "ara_toplam": _ft_ara_toplam, "kdv_tutar": _ft_kdv_tutar, "genel_toplam": _ft_genel_toplam,
                             "tarih": _ftdate.today().strftime("%d/%m/%Y"), "durum": "taslak",
                         }
-                        _ft_kayit_id = None
                         if _ft_sb:
-                            _ft_ekle = _ft_sb.table("teklifler").insert({
+                            _ft_sb.table("teklifler").insert({
                                 "musteri_id": _ft_id or 0,
                                 "musteri_adi": _ft_uzun,
                                 "satirlar": _ftj.dumps({"tip": "fatura", "veri": _ft_veri}, ensure_ascii=False),
@@ -8844,39 +8650,19 @@ elif aktif == "fatura":
                                 "olusturan": st.session_state.get("kullanici",""),
                                 "notlar": f"Fatura taslağı · {fmt_para(_ft_genel_toplam)}",
                             }).execute()
-                            if _ft_ekle.data:
-                                _ft_kayit_id = _ft_ekle.data[0]["id"]
-
-                        if _ft_baglanti_var and _ft_kayit_id:
-                            with st.spinner("⏳ Kaydedildi, şimdi Paraşüt'e gönderiliyor..."):
-                                _pok, _psonuc = _parasut_fatura_gonder(_ft_veri)
-                            if _pok:
-                                _ft_veri["durum"] = "gonderildi"
-                                _ft_veri["parasut_id"] = _psonuc
-                                _ft_sb.table("teklifler").update({
-                                    "satirlar": _ftj.dumps({"tip": "fatura", "veri": _ft_veri}, ensure_ascii=False)
-                                }).eq("id", int(_ft_kayit_id)).execute()
-                                st.success(f"✅ Kaydedildi ve Paraşüt'e gönderildi! (Fatura ID: {_psonuc})")
-                            else:
-                                st.warning(f"✅ Taslak kaydedildi ama Paraşüt'e gönderilemedi: {_psonuc}\n\n'Taslak/Gönderilen Faturalar' sekmesinden tekrar deneyebilirsin.")
-                        else:
-                            st.success("✅ Taslak kaydedildi! 'Taslak/Gönderilen Faturalar' sekmesinden Paraşüt'e gönderebilirsin.")
+                        st.success("✅ Taslak kaydedildi! 'Taslak/Gönderilen Faturalar' sekmesinden görebilirsin.")
                         st.session_state["ft_kalemler"] = []
-                        try: db_read.clear()
-                        except: pass
                         st.rerun()
                     except Exception as _ftse:
                         st.error(f"Hata: {_ftse}")
-            if not _ft_baglanti_var:
-                st.caption("🔌 Paraşüt henüz bağlı değil (yukarıdan bağlanabilirsin) — şimdilik sadece taslak kaydedilir.")
+            _ftb2.button("📤 Paraşüt'e Gönder (yakında)", use_container_width=True, disabled=True,
+                         help="Paraşüt API bağlantısı eklendiğinde aktif olacak")
 
     with _ft_tab2:
         st.markdown("### 📚 Taslak / Gönderilen Faturalar")
         try:
             _ft_sb2 = get_sb_client()
-            _ft_ham = pd.DataFrame(_ft_sb2.table("teklifler").select("*").order("id", desc=True).limit(500).execute().data) if _ft_sb2 else pd.DataFrame()
-            if not _ft_ham.empty and "toplam_tutar" in _ft_ham.columns:
-                _ft_ham = _ft_ham[~_ft_ham["toplam_tutar"].isin([-91001, -91002])]
+            _ft_ham = pd.DataFrame(_ft_sb2.table("teklifler").select("*").order("id", desc=True).execute().data) if _ft_sb2 else pd.DataFrame()
             _ft_ham = _ft_ham[_ft_ham["satirlar"].astype(str).str.contains("fatura", case=False, na=False)] if not _ft_ham.empty else pd.DataFrame()
         except Exception:
             _ft_ham = pd.DataFrame()
@@ -8907,359 +8693,6 @@ elif aktif == "fatura":
                     with st.expander("Kalemleri gör"):
                         for _k in _fv.get("kalemler", []):
                             st.caption(f"• {_k.get('aciklama','')} — {_k.get('miktar',0)} x {fmt_para(_k.get('birim_fiyat',0))}")
-                    if _fv.get("durum") == "gonderildi":
-                        st.success(f"✅ Paraşüt'e gönderildi (Fatura ID: {_fv.get('parasut_id','?')})")
-                    elif _parasut_ayarli_mi() and _parasut_token_yukle():
-                        if st.button("📤 Paraşüt'e Gönder", key=f"ft_gonder_{_fv['id']}"):
-                            with st.spinner("⏳ Paraşüt'e gönderiliyor..."):
-                                _pok, _psonuc = _parasut_fatura_gonder(_fv)
-                            if _pok:
-                                try:
-                                    _fv["durum"] = "gonderildi"
-                                    _fv["parasut_id"] = _psonuc
-                                    _sb_g = get_sb_client()
-                                    _sb_g.table("teklifler").update({
-                                        "satirlar": _ftj.dumps({"tip": "fatura", "veri": _fv}, ensure_ascii=False)
-                                    }).eq("id", int(_fv["id"])).execute()
-                                except Exception:
-                                    pass
-                                st.success(f"✅ Gönderildi! Paraşüt Fatura ID: {_psonuc}")
-                                try: db_read.clear()
-                                except: pass
-                                st.rerun()
-                            else:
-                                st.error(f"Gönderilemedi: {_psonuc}")
-                    else:
-                        st.caption("🔌 Paraşüt bağlı değil — üstteki 'Faturalar' sayfasının başından bağlanabilirsin.")
-
-    with _ft_tab3:
-        st.markdown("### 🔗 Paraşüt'teki Gerçek Faturalar")
-        st.caption("Bu liste, Paraşüt'ün kendi sitesinden değil, doğrudan Paraşüt API'sinden anlık çekiliyor — sistemin dışına çıkmana gerek yok.")
-        if not (_parasut_ayarli_mi() and _parasut_token_yukle()):
-            st.info("🔌 Önce Paraşüt'e bağlanman lazım (bu sayfanın en üstünden).")
-        else:
-            if st.button("🔄 Paraşüt'ten Yenile", key="ft_parasut_yenile_btn"):
-                st.session_state.pop("_ft_parasut_liste_cache", None)
-                st.rerun()
-            if "_ft_parasut_liste_cache" not in st.session_state:
-                with st.spinner("⏳ Paraşüt'teki TÜM faturalar çekiliyor (çok sayıda faturan varsa biraz sürebilir)..."):
-                    _pl_hepsi = []
-                    _pl_sayfa = 1
-                    _pl_hata_son = None
-                    while True:
-                        _pl_sonuc, _pl_hata_son = _parasut_api("GET", "/sales_invoices", params={
-                            "sort": "-issue_date", "page[size]": 25, "page[number]": _pl_sayfa,
-                        })
-                        if not _pl_sonuc:
-                            break
-                        _pl_veri = _pl_sonuc.get("data", [])
-                        if not _pl_veri:
-                            break
-                        _pl_hepsi.extend(_pl_veri)
-                        if len(_pl_veri) < 25:  # son sayfaya gelindi
-                            break
-                        _pl_sayfa += 1
-                        if _pl_sayfa > 200:  # güvenlik: 5000 faturadan sonra dur (sonsuz döngü olmasın)
-                            break
-                    st.session_state["_ft_parasut_liste_cache"] = _pl_hepsi
-                    if not _pl_hepsi and _pl_hata_son:
-                        st.error(f"Çekilemedi: {_pl_hata_son}")
-            _pl_liste = st.session_state.get("_ft_parasut_liste_cache", [])
-            if not _pl_liste:
-                st.caption("Paraşüt'te henüz görüntülenecek fatura yok (ya da liste boş döndü).")
-            else:
-                st.caption(f"Toplam **{len(_pl_liste)}** fatura bulundu (Paraşüt'teki tamamı).")
-                for _pf in _pl_liste:
-                    _pfa = _pf.get("attributes", {})
-                    with st.container(border=True):
-                        _pfc1, _pfc2, _pfc3 = st.columns([2.5, 1, 1])
-                        _pfc1.markdown(f"**{_pfa.get('description','') or '(açıklama yok)'}**")
-                        _pfc1.caption(f"📅 {_pfa.get('issue_date','')} · Fatura No: {_pfa.get('invoice_no','—')}")
-                        _pfc2.metric("Toplam", fmt_para(_pfa.get("net_total", 0)))
-                        _pfc3.markdown(f"🏷️ **{(_pfa.get('item_type','') or '').upper()}**  \n{'✅ Ödendi' if _pfa.get('payment_status')=='paid' else '⏳ ' + str(_pfa.get('payment_status','—'))}")
-
-elif aktif == "parasut":
-    sayfa_log("parasut")
-    st.markdown("## 💠 Paraşüt")
-    st.caption("Paraşüt hesabındaki verileri doğrudan (API üzerinden) burada görüntülersin — Paraşüt'ün sitesine gitmene gerek kalmaz.")
-
-    if not (_parasut_ayarli_mi() and _parasut_token_yukle()):
-        st.info("🔌 Önce **'💰 Faturalar'** sayfasından Paraşüt'e bağlanman lazım.")
-    else:
-        if st.session_state.get("rol") == "admin" and st.session_state.get("_parasut_debug_log"):
-            with st.expander("🔍 Hata Ayıklama Günlüğü (sadece admin) — 'veri gelmiyor' sorununu buradan teşhis et"):
-                for _dl in st.session_state["_parasut_debug_log"]:
-                    st.code(f"URL: {_dl['url']}\nDurum kodu: {_dl['durum']} · Dönen kayıt sayısı: {_dl['adet']}\nYanıt: {_dl['yanit_ozet']}", language="text")
-
-        def _parasut_tum_sayfalari_cek(_path, _params=None):
-            """Verilen endpoint'in TÜM sayfalarını (25'er 25'er) çekip birleştirir."""
-            _hepsi = []
-            _sayfa = 1
-            _son_hata = None
-            while True:
-                _p = dict(_params or {})
-                _p["page[size]"] = 25
-                _p["page[number]"] = _sayfa
-                _sonuc, _son_hata = _parasut_api("GET", _path, params=_p)
-                if not _sonuc:
-                    break
-                _veri = _sonuc.get("data", [])
-                if not _veri:
-                    break
-                _hepsi.extend(_veri)
-                if len(_veri) < 25:
-                    break
-                _sayfa += 1
-                if _sayfa > 200:
-                    break
-            return _hepsi, (_son_hata if not _hepsi else None)
-
-        def _pm_liste_goster(_cache_key, _path, _params, _baslik_fn, _alt_fn, _tutar_fn=None):
-            """Ortak liste gösterme yardımcısı — çek, önbelleğe al, arama kutusu + kart listesi göster."""
-            _yc1, _yc2 = st.columns([1, 5])
-            if _yc1.button("🔄 Yenile", key=f"pm_yenile_{_cache_key}"):
-                st.session_state.pop(_cache_key, None)
-                st.rerun()
-            if _cache_key not in st.session_state:
-                with st.spinner("⏳ Paraşüt'ten çekiliyor..."):
-                    _liste, _hata = _parasut_tum_sayfalari_cek(_path, _params)
-                st.session_state[_cache_key] = _liste
-                if _hata:
-                    st.error(f"Çekilemedi (endpoint adı Paraşüt'te farklı olabilir — gerçek hata): {_hata}")
-            _liste = st.session_state.get(_cache_key, [])
-            if not _liste:
-                st.caption("Kayıt bulunamadı (veya bu bölüm hesabınızda henüz boş).")
-                return []
-            st.caption(f"Toplam **{len(_liste)}** kayıt.")
-            _ara = st.text_input("🔍 Ara:", key=f"pm_ara_{_cache_key}")
-            for _it in _liste:
-                _a = _it.get("attributes", {})
-                _baslik = _baslik_fn(_a)
-                if _ara and _ara.lower() not in str(_baslik).lower():
-                    continue
-                with st.container(border=True):
-                    _cc1, _cc2 = st.columns([2.5, 1.5])
-                    _cc1.markdown(f"**{_baslik}**")
-                    _cc1.caption(_alt_fn(_a))
-                    if _tutar_fn:
-                        _cc2.metric("Tutar", fmt_para(_tutar_fn(_a)))
-            return _liste
-
-        _pm_grup = st.radio("Ana Grup", ["💵 SATIŞLAR", "💸 GİDERLER", "🏦 NAKİT", "📦 STOK"], horizontal=True, key="pm_ana_grup")
-        st.markdown("<hr style='margin-top:-8px;'>", unsafe_allow_html=True)
-
-        if _pm_grup == "💵 SATIŞLAR":
-            _pm_alt = st.radio("Alt", ["Teklifler", "Faturalar", "Müşteriler", "Satışlar Raporu", "Tahsilatlar Raporu", "Gelir Gider Raporu"],
-                                horizontal=True, label_visibility="collapsed", key="pm_satis_alt")
-
-            if _pm_alt == "Teklifler":
-                _pm_liste_goster("_pm_teklif_cache", "/sales_invoices", {"filter[item_type]": "estimate"},
-                    lambda a: a.get("description","") or "(açıklama yok)",
-                    lambda a: f"📅 {a.get('issue_date','')} · Durum: {a.get('status','—')}",
-                    lambda a: a.get("net_total", 0))
-
-            elif _pm_alt == "Faturalar":
-                _pm_liste_goster("_ft_parasut_liste_cache", "/sales_invoices", {"filter[item_type]": "invoice"},
-                    lambda a: a.get("description","") or "(açıklama yok)",
-                    lambda a: f"📅 {a.get('issue_date','')} · No: {a.get('invoice_no','—')}",
-                    lambda a: a.get("net_total", 0))
-
-            elif _pm_alt == "Müşteriler":
-                _pm_liste_goster("_pm_musteri_cache", "/contacts", {"filter[account_type]": "customer"},
-                    lambda a: a.get("name",""),
-                    lambda a: f"📧 {a.get('email','—')} · ☎️ {a.get('phone','—')} · VD:{a.get('tax_office','—')}",
-                    lambda a: a.get("trl_balance", 0))
-
-            elif _pm_alt == "Satışlar Raporu":
-                if "_ft_parasut_liste_cache" not in st.session_state:
-                    with st.spinner("⏳ Hesaplanıyor..."):
-                        _liste, _hata = _parasut_tum_sayfalari_cek("/sales_invoices", {"filter[item_type]": "invoice"})
-                        st.session_state["_ft_parasut_liste_cache"] = _liste
-                _liste = st.session_state.get("_ft_parasut_liste_cache", [])
-                _toplam = sum(float(s.get("attributes",{}).get("net_total",0) or 0) for s in _liste)
-                _c1, _c2 = st.columns(2)
-                _c1.metric("Toplam Satış", fmt_para(_toplam))
-                _c2.metric("Fatura Adedi", len(_liste))
-
-            elif _pm_alt == "Tahsilatlar Raporu":
-                if "_ft_parasut_liste_cache" not in st.session_state:
-                    with st.spinner("⏳ Hesaplanıyor..."):
-                        _liste, _hata = _parasut_tum_sayfalari_cek("/sales_invoices", {"filter[item_type]": "invoice"})
-                        st.session_state["_ft_parasut_liste_cache"] = _liste
-                _liste = st.session_state.get("_ft_parasut_liste_cache", [])
-                _toplam_tahsil = sum(float(s.get("attributes",{}).get("paid_total", s.get("attributes",{}).get("net_total",0)) or 0) - float(s.get("attributes",{}).get("remaining",0) or 0) for s in _liste)
-                _kalan = sum(float(s.get("attributes",{}).get("remaining",0) or 0) for s in _liste)
-                _c1, _c2 = st.columns(2)
-                _c1.metric("Tahsil Edilen (tahmini)", fmt_para(_toplam_tahsil))
-                _c2.metric("Kalan (Tahsil Edilmemiş)", fmt_para(_kalan))
-                st.caption("Not: Paraşüt'ün ayrı bir 'ödemeler' uç noktası varsa daha kesin veri için o eklenmeli — bu, fatura tutarlarından tahmini hesaplanıyor.")
-
-            elif _pm_alt == "Gelir Gider Raporu":
-                with st.spinner("⏳ Hesaplanıyor..."):
-                    if "_ft_parasut_liste_cache" not in st.session_state:
-                        _sl, _ = _parasut_tum_sayfalari_cek("/sales_invoices", {"filter[item_type]": "invoice"})
-                        st.session_state["_ft_parasut_liste_cache"] = _sl
-                    if "_pm_gider_cache" not in st.session_state:
-                        _gl, _ = _parasut_tum_sayfalari_cek("/purchase_bills")
-                        st.session_state["_pm_gider_cache"] = _gl
-                _sl = st.session_state.get("_ft_parasut_liste_cache", [])
-                _gl = st.session_state.get("_pm_gider_cache", [])
-                _gelir = sum(float(s.get("attributes",{}).get("net_total",0) or 0) for s in _sl)
-                _gider = sum(float(g.get("attributes",{}).get("net_total",0) or 0) for g in _gl)
-                _c1, _c2, _c3 = st.columns(3)
-                _c1.metric("Gelir", fmt_para(_gelir))
-                _c2.metric("Gider", fmt_para(_gider))
-                _c3.metric("Net", fmt_para(_gelir - _gider))
-
-        elif _pm_grup == "💸 GİDERLER":
-            _pm_alt = st.radio("Alt", ["Gider Listesi", "Tedarikçiler", "Çalışanlar", "Giderler Raporu", "Ödemeler Raporu", "KDV Raporu"],
-                                horizontal=True, label_visibility="collapsed", key="pm_gider_alt")
-
-            if _pm_alt == "Gider Listesi":
-                _pm_liste_goster("_pm_gider_cache", "/purchase_bills", None,
-                    lambda a: a.get("description","") or "(açıklama yok)",
-                    lambda a: f"📅 {a.get('issue_date','')}",
-                    lambda a: a.get("net_total", 0))
-
-            elif _pm_alt == "Tedarikçiler":
-                _pm_liste_goster("_pm_tedarikci_cache", "/contacts", {"filter[account_type]": "supplier"},
-                    lambda a: a.get("name",""),
-                    lambda a: f"📧 {a.get('email','—')} · ☎️ {a.get('phone','—')}",
-                    lambda a: a.get("trl_balance", 0))
-
-            elif _pm_alt == "Çalışanlar":
-                _pm_liste_goster("_pm_calisan_cache", "/employees", None,
-                    lambda a: f"{a.get('name','')} {a.get('surname','')}".strip(),
-                    lambda a: f"📧 {a.get('email','—')}")
-
-            elif _pm_alt == "Giderler Raporu":
-                if "_pm_gider_cache" not in st.session_state:
-                    with st.spinner("⏳ Hesaplanıyor..."):
-                        _gl, _ = _parasut_tum_sayfalari_cek("/purchase_bills")
-                        st.session_state["_pm_gider_cache"] = _gl
-                _gl = st.session_state.get("_pm_gider_cache", [])
-                _toplam = sum(float(g.get("attributes",{}).get("net_total",0) or 0) for g in _gl)
-                _c1, _c2 = st.columns(2)
-                _c1.metric("Toplam Gider", fmt_para(_toplam))
-                _c2.metric("Kayıt Adedi", len(_gl))
-
-            elif _pm_alt == "Ödemeler Raporu":
-                if "_pm_gider_cache" not in st.session_state:
-                    with st.spinner("⏳ Hesaplanıyor..."):
-                        _gl, _ = _parasut_tum_sayfalari_cek("/purchase_bills")
-                        st.session_state["_pm_gider_cache"] = _gl
-                _gl = st.session_state.get("_pm_gider_cache", [])
-                _kalan = sum(float(g.get("attributes",{}).get("remaining",0) or 0) for g in _gl)
-                st.metric("Ödenmemiş Gider Bakiyesi", fmt_para(_kalan))
-
-            elif _pm_alt == "KDV Raporu":
-                with st.spinner("⏳ Hesaplanıyor..."):
-                    if "_ft_parasut_liste_cache" not in st.session_state:
-                        _sl, _ = _parasut_tum_sayfalari_cek("/sales_invoices", {"filter[item_type]": "invoice"})
-                        st.session_state["_ft_parasut_liste_cache"] = _sl
-                    if "_pm_gider_cache" not in st.session_state:
-                        _gl, _ = _parasut_tum_sayfalari_cek("/purchase_bills")
-                        st.session_state["_pm_gider_cache"] = _gl
-                _sl = st.session_state.get("_ft_parasut_liste_cache", [])
-                _gl = st.session_state.get("_pm_gider_cache", [])
-                _kdv_satis = sum(float(s.get("attributes",{}).get("vat_total", s.get("attributes",{}).get("gross_total",0) - s.get("attributes",{}).get("net_total",0) if s.get("attributes",{}).get("gross_total") else 0) or 0) for s in _sl)
-                _kdv_gider = sum(float(g.get("attributes",{}).get("vat_total", g.get("attributes",{}).get("gross_total",0) - g.get("attributes",{}).get("net_total",0) if g.get("attributes",{}).get("gross_total") else 0) or 0) for g in _gl)
-                _c1, _c2, _c3 = st.columns(3)
-                _c1.metric("Hesaplanan KDV (Satış)", fmt_para(_kdv_satis))
-                _c2.metric("İndirilecek KDV (Gider)", fmt_para(_kdv_gider))
-                _c3.metric("Ödenecek KDV (tahmini)", fmt_para(_kdv_satis - _kdv_gider))
-
-        elif _pm_grup == "🏦 NAKİT":
-            _pm_alt = st.radio("Alt", ["Kasa ve Bankalar", "Çekler", "Kasa/Banka Raporu", "Nakit Akışı Raporu"],
-                                horizontal=True, label_visibility="collapsed", key="pm_nakit_alt")
-
-            if _pm_alt == "Kasa ve Bankalar":
-                _pm_liste_goster("_pm_kasa_cache", "/accounts", None,
-                    lambda a: a.get("name",""),
-                    lambda a: f"Tür: {a.get('account_type','—')} · Para Birimi: {a.get('currency','—')}",
-                    lambda a: a.get("balance", 0))
-
-            elif _pm_alt == "Çekler":
-                _pm_liste_goster("_pm_cek_cache", "/e_documents", {"filter[document_type]": "check"},
-                    lambda a: a.get("description","") or "Çek",
-                    lambda a: f"Durum: {a.get('status','—')}")
-
-            elif _pm_alt == "Kasa/Banka Raporu":
-                if "_pm_kasa_cache" not in st.session_state:
-                    with st.spinner("⏳ Hesaplanıyor..."):
-                        _kl, _ = _parasut_tum_sayfalari_cek("/accounts")
-                        st.session_state["_pm_kasa_cache"] = _kl
-                _kl = st.session_state.get("_pm_kasa_cache", [])
-                _toplam_bakiye = sum(float(k.get("attributes",{}).get("balance",0) or 0) for k in _kl)
-                st.metric("Toplam Kasa/Banka Bakiyesi", fmt_para(_toplam_bakiye))
-
-            elif _pm_alt == "Nakit Akışı Raporu":
-                with st.spinner("⏳ Hesaplanıyor..."):
-                    if "_ft_parasut_liste_cache" not in st.session_state:
-                        _sl, _ = _parasut_tum_sayfalari_cek("/sales_invoices", {"filter[item_type]": "invoice"})
-                        st.session_state["_ft_parasut_liste_cache"] = _sl
-                    if "_pm_gider_cache" not in st.session_state:
-                        _gl, _ = _parasut_tum_sayfalari_cek("/purchase_bills")
-                        st.session_state["_pm_gider_cache"] = _gl
-                _sl = st.session_state.get("_ft_parasut_liste_cache", [])
-                _gl = st.session_state.get("_pm_gider_cache", [])
-                _giris = sum(float(s.get("attributes",{}).get("net_total",0) or 0) - float(s.get("attributes",{}).get("remaining",0) or 0) for s in _sl)
-                _cikis = sum(float(g.get("attributes",{}).get("net_total",0) or 0) - float(g.get("attributes",{}).get("remaining",0) or 0) for g in _gl)
-                _c1, _c2, _c3 = st.columns(3)
-                _c1.metric("Nakit Girişi (tahmini)", fmt_para(_giris))
-                _c2.metric("Nakit Çıkışı (tahmini)", fmt_para(_cikis))
-                _c3.metric("Net Nakit Akışı", fmt_para(_giris - _cikis))
-
-        elif _pm_grup == "📦 STOK":
-            _pm_alt = st.radio("Alt", ["Hizmet ve Ürünler", "Depolar", "Depolar Arası Transfer", "Giden İrsaliyeler",
-                                        "Gelen İrsaliyeler", "Fiyat Listeleri", "Stok Geçmişi", "Stoktaki Ürünler Rap."],
-                                horizontal=True, label_visibility="collapsed", key="pm_stok_alt")
-
-            if _pm_alt == "Hizmet ve Ürünler":
-                _pm_liste_goster("_pm_urun_cache", "/products", None,
-                    lambda a: a.get("name",""),
-                    lambda a: f"Kod: {a.get('code','—')} · Stok: {a.get('inventory_level','—')}",
-                    lambda a: a.get("list_price", 0))
-
-            elif _pm_alt == "Depolar":
-                _pm_liste_goster("_pm_depo_cache", "/warehouses", None,
-                    lambda a: a.get("name",""),
-                    lambda a: f"Adres: {a.get('address','—')}")
-
-            elif _pm_alt == "Depolar Arası Transfer":
-                _pm_liste_goster("_pm_transfer_cache", "/warehouse_transfers", None,
-                    lambda a: a.get("description","") or "Transfer",
-                    lambda a: f"📅 {a.get('date','—')}")
-
-            elif _pm_alt == "Giden İrsaliyeler":
-                _pm_liste_goster("_pm_g_irsaliye_cache", "/shipment_documents", {"filter[shipment_type]": "outgoing"},
-                    lambda a: a.get("description","") or "İrsaliye",
-                    lambda a: f"📅 {a.get('date','—')}")
-
-            elif _pm_alt == "Gelen İrsaliyeler":
-                _pm_liste_goster("_pm_gel_irsaliye_cache", "/shipment_documents", {"filter[shipment_type]": "incoming"},
-                    lambda a: a.get("description","") or "İrsaliye",
-                    lambda a: f"📅 {a.get('date','—')}")
-
-            elif _pm_alt == "Fiyat Listeleri":
-                _pm_liste_goster("_pm_fiyat_liste_cache", "/price_lists", None,
-                    lambda a: a.get("name",""),
-                    lambda a: f"Para Birimi: {a.get('currency','—')}")
-
-            elif _pm_alt == "Stok Geçmişi":
-                _pm_liste_goster("_pm_stok_gecmis_cache", "/inventory_levels", None,
-                    lambda a: a.get("warehouse_name","") or "Depo",
-                    lambda a: f"Miktar: {a.get('quantity','—')}")
-
-            elif _pm_alt == "Stoktaki Ürünler Rap.":
-                if "_pm_urun_cache" not in st.session_state:
-                    with st.spinner("⏳ Hesaplanıyor..."):
-                        _ul, _ = _parasut_tum_sayfalari_cek("/products")
-                        st.session_state["_pm_urun_cache"] = _ul
-                _ul = st.session_state.get("_pm_urun_cache", [])
-                for _u in _ul:
-                    _ua = _u.get("attributes", {})
-                    st.caption(f"📦 {_ua.get('name','')} — Stokta: {_ua.get('inventory_level','—')}")
 
 elif aktif == "otomatik_arama":
     sayfa_log("otomatik_arama")
@@ -10103,9 +9536,7 @@ elif aktif == "kargo_ihbar":
 
     try:
         _ki_sb = get_sb_client()
-        _ki_ham = pd.DataFrame(_ki_sb.table("teklifler").select("*").order("id", desc=True).limit(500).execute().data) if _ki_sb else pd.DataFrame()
-        if not _ki_ham.empty and "toplam_tutar" in _ki_ham.columns:
-            _ki_ham = _ki_ham[~_ki_ham["toplam_tutar"].isin([-91001, -91002])]
+        _ki_ham = pd.DataFrame(_ki_sb.table("teklifler").select("*").order("id", desc=True).execute().data) if _ki_sb else pd.DataFrame()
         _ki_ham = _ki_ham[_ki_ham["satirlar"].astype(str).str.contains("kargo_ihbar", case=False, na=False)] if not _ki_ham.empty else pd.DataFrame()
     except Exception:
         _ki_ham = pd.DataFrame()
@@ -11904,35 +11335,6 @@ elif aktif == "kisiler":
         def _ed_parcala(b64_metin):
             return [b64_metin[i:i + _ED_PARCA_BOYUTU] for i in range(0, len(b64_metin), _ED_PARCA_BOYUTU)]
 
-        # ── Yeni sekmede doğrudan açılış: URL'de ed_grup varsa, dosyayı otomatik getir ──
-        if st.session_state.get("_ed_url_grup") and not st.session_state.get("_ed_acik_dosya"):
-            with st.spinner("⏳ Excel açılıyor..."):
-                try:
-                    _ed_sbu = get_sb_client()
-                    _ed_url_bytes = None
-                    if _ed_sbu:
-                        _ed_url_rows = _ed_sbu.table("teklifler").select("satirlar") \
-                            .eq("musteri_adi", st.session_state["_ed_url_grup"]).eq("toplam_tutar", _ED_TIP_PARCA).execute().data
-                        _ed_url_parcalar = []
-                        for _ed_upr in _ed_url_rows:
-                            try:
-                                _ed_upp = _ed_json.loads(_ed_upr.get("satirlar", "") or "{}")
-                                _ed_url_parcalar.append((_ed_upp.get("parca_no", 0), _ed_upp.get("veri_b64_parca", "")))
-                            except Exception:
-                                continue
-                        _ed_url_parcalar.sort(key=lambda x: x[0])
-                        _ed_url_b64 = "".join(p[1] for p in _ed_url_parcalar)
-                        _ed_url_bytes = _ed_b64.b64decode(_ed_url_b64)
-                    if _ed_url_bytes:
-                        st.session_state["_ed_acik_dosya"] = {
-                            "bytes": _ed_url_bytes, "adi": st.session_state.get("_ed_url_ad", "dosya.xlsx"),
-                            "grup_id": st.session_state["_ed_url_grup"], "notlar": "",
-                        }
-                except Exception as _ed_ue:
-                    st.error(f"Dosya otomatik açılamadı: {_ed_ue}")
-            del st.session_state["_ed_url_grup"]
-            st.query_params.clear()
-
         _ed_yukle = st.file_uploader("Excel dosyası yükle (.xlsx / .xls) — boyut sınırı yok:", type=["xlsx", "xls"], key="ed_yukle")
         _ed_aciklama = st.text_input("Kısa açıklama (aranabilir olsun, ör: '2026 Temmuz Stok Listesi'):", key="ed_aciklama")
 
@@ -11995,34 +11397,6 @@ elif aktif == "kisiler":
                         st.error(f"Kaydedilemedi: {_ed_e}")
 
         st.divider()
-        if st.session_state.get("rol") == "admin":
-            with st.expander("⚠️ Bakım: Excel Depo verisi 'teklifler' tablosunu yavaşlatıyor mu?", expanded=True):
-                st.caption("Excel Depo dosyaları, senin isteğinle mevcut 'teklifler' tablosunda (yeni tablo açmadan) saklanıyor. Çok sayıda/büyük dosya biriktiyse bu tablo şişip diğer özellikleri (teklif sayacı, sözleşme listesi vb.) yavaşlatabilir/zaman aşımına uğratabilir.")
-                if st.button("🔍 Boyutu Kontrol Et", key="ed_boyut_kontrol"):
-                    try:
-                        _edb_sb = get_sb_client()
-                        _edb_meta = _edb_sb.table("teklifler").select("id", count="exact").eq("toplam_tutar", _ED_TIP_META).execute()
-                        _edb_parca = _edb_sb.table("teklifler").select("id", count="exact").eq("toplam_tutar", _ED_TIP_PARCA).execute()
-                        st.session_state["_edb_sonuc"] = (_edb_meta.count or 0, _edb_parca.count or 0)
-                    except Exception as _edb_e:
-                        st.error(f"Kontrol edilemedi (bu sorgu bile zaman aşımına uğruyorsa, tablo gerçekten çok şişmiş demektir — aşağıdaki temizle butonuna direkt basabilirsin): {_edb_e}")
-                if st.session_state.get("_edb_sonuc"):
-                    _edb_m, _edb_p = st.session_state["_edb_sonuc"]
-                    st.warning(f"📦 Excel Depo: **{_edb_m} dosya**, toplam **{_edb_p} veri parçası** satırı.")
-                st.error("⚠️ Aşağıdaki buton, Excel Depo'daki TÜM dosyaları KALICI olarak siler (parçalarıyla birlikte) — geri alınamaz, dosyaları tekrar yüklemen gerekir. Diğer özellikler (Teklif, Sözleşme) yeniden hızlanır.")
-                if st.button("🗑️ Onaylıyorum, Excel Depo'yu Şimdi Temizle", type="primary", key="edb_sil_btn"):
-                    try:
-                        _edb_sb2 = get_sb_client()
-                        _edb_sb2.table("teklifler").delete().eq("toplam_tutar", _ED_TIP_META).execute()
-                        _edb_sb2.table("teklifler").delete().eq("toplam_tutar", _ED_TIP_PARCA).execute()
-                        st.success("✅ Excel Depo temizlendi. Diğer özellikler artık hızlanmalı.")
-                        st.session_state["_edb_sonuc"] = None
-                        try: db_read.clear()
-                        except: pass
-                        st.rerun()
-                    except Exception as _edb_se:
-                        st.error(f"Silinemedi: {_edb_se}")
-
         st.markdown("#### 📚 Depodaki Dosyalar")
         _ed_ara = st.text_input("🔍 Ara (dosya adı / açıklama):", key="ed_ara")
         try:
@@ -12092,23 +11466,17 @@ elif aktif == "kisiler":
                                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                                 key=f"ed_gercek_indir_{_ed_item['id']}", use_container_width=True)
                     with _edc4:
-                        _ed_qs = f"ed_grup={_ed_item['grup_id']}&ed_ad={_ed_b64.urlsafe_b64encode(_ed_item['dosya_adi'].encode()).decode()}"
-                        _ed_link_id = f"ed_link_{_ed_item['id']}"
-                        st.markdown(f"""
-<a id="{_ed_link_id}" href="?{_ed_qs}" target="_blank" rel="noopener" style="text-decoration:none;">
-  <div style="text-align:center;padding:8px 4px;border:1px solid #d0d5dd;border-radius:8px;
-       background:#fff;color:#111827;font-size:14px;cursor:pointer;">✏️ Yeni Sekmede Aç</div>
-</a>
-<script>
-(function(){{
-  try {{
-    var _a = document.getElementById("{_ed_link_id}");
-    var _base = window.parent.location.origin + window.parent.location.pathname;
-    _a.href = _base + "?{_ed_qs}";
-  }} catch(e) {{}}
-}})();
-</script>
-""", unsafe_allow_html=True)
+                        if st.button("✏️ Aç", key=f"ed_ac_btn_{_ed_item['id']}", use_container_width=True):
+                            with st.spinner("⏳ Excel açılıyor..."):
+                                try:
+                                    _ed_acik_bytes = _ed_dosyayi_getir(_ed_item["grup_id"])
+                                    st.session_state["_ed_acik_dosya"] = {
+                                        "bytes": _ed_acik_bytes, "adi": _ed_item["dosya_adi"],
+                                        "grup_id": _ed_item["grup_id"], "notlar": _ed_item["notlar"],
+                                    }
+                                    st.rerun()
+                                except Exception as _ed_ae:
+                                    st.error(f"Açılamadı: {_ed_ae}")
                     with _edc3:
                         if st.session_state.get("rol") == "admin":
                             if st.button("🗑️", key=f"ed_sil_btn_{_ed_item['id']}", use_container_width=True):
@@ -12155,34 +11523,14 @@ elif aktif == "kisiler":
                 if (_ed_ws_d.max_row or 0) > 200:
                     st.caption(f"⚠️ Bu sayfa {_ed_ws_d.max_row} satır — performans için ilk 200 satır gösteriliyor.")
 
-                def _ed_tr_goster(v):
-                    """Sayıları Türkçe formatla göster (1.234,56); metin/boşsa dokunma."""
-                    if isinstance(v, (int, float)) and not isinstance(v, bool):
-                        try:
-                            return fmt_para(v).replace(" ₺", "")
-                        except Exception:
-                            return v
-                    return v
-
-                def _ed_tr_oku(v):
-                    """Kullanıcının yazdığı Türkçe formatlı sayıyı (1.234,56) gerçek sayıya çevirir."""
-                    if isinstance(v, str) and re.match(r"^-?[\d\.]+(,\d+)?$", v.strip()) and ("," in v or "." in v):
-                        try:
-                            _temiz = v.strip().replace(".", "").replace(",", ".")
-                            _f = float(_temiz)
-                            return int(_f) if _f == int(_f) else _f
-                        except Exception:
-                            return v
-                    return v
-
                 _ed_veri = []
                 for _ed_ri2, _ed_row in enumerate(_ed_ws_d.iter_rows(min_row=1, max_row=_ed_max_r, max_col=_ed_max_c, values_only=True)):
-                    _ed_veri.append(["" if _v is None else _ed_tr_goster(_v) for _v in _ed_row])
+                    _ed_veri.append(["" if _v is None else _v for _v in _ed_row])
                 _ed_wb_deger.close()
                 _ed_kolon_adlari = [_ed_opx2.utils.get_column_letter(_c) for _c in range(1, _ed_max_c + 1)]
                 _ed_df_grid = pd.DataFrame(_ed_veri, columns=_ed_kolon_adlari)
 
-                st.caption("Hücrelere tıklayıp düzenleyebilirsin. Dokunmadığın hücrelerdeki formüller korunur. Sayılar Türkçe formatta (1.234,56) gösterilir.")
+                st.caption("Hücrelere tıklayıp düzenleyebilirsin. Dokunmadığın hücrelerdeki formüller korunur.")
                 _ed_duzenlenen = st.data_editor(_ed_df_grid, use_container_width=True, height=500, key="ed_grid_editor")
 
                 if st.button("💾 Değişiklikleri Yeni Sürüm Olarak Kaydet", type="primary", key="ed_grid_kaydet"):
@@ -12198,7 +11546,7 @@ elif aktif == "kisiler":
                                     _ed_eski_v = _ed_df_grid.iat[_ed_ri, _ed_ci]
                                     _ed_yeni_v = _ed_duzenlenen.iat[_ed_ri, _ed_ci]
                                     if str(_ed_eski_v) != str(_ed_yeni_v):
-                                        _ed_ws_f.cell(row=_ed_ri + 1, column=_ed_ci + 1).value = (_ed_tr_oku(_ed_yeni_v) if _ed_yeni_v != "" else None)
+                                        _ed_ws_f.cell(row=_ed_ri + 1, column=_ed_ci + 1).value = (_ed_yeni_v if _ed_yeni_v != "" else None)
                                         _ed_degisen += 1
                             if _ed_degisen == 0:
                                 st.info("Hiçbir hücre değiştirilmedi, kaydetmeye gerek yok.")
@@ -12260,11 +11608,9 @@ elif aktif == "randevu":
     bugun_str = _tr_simdi().strftime("%Y-%m-%d")
 
     # ── iki sekme ─────────────────────────────────────────────────────────────
-    _r_sekmeler = ["📋 Liste & Düzenle", "➕ Yeni Randevu", "📂 Aşama Sayfaları", "⚙️ Yönetim", "🗺️ Rut Haritası"]
-    _r_secim = st.radio("Bölüm", _r_sekmeler, horizontal=True, label_visibility="collapsed", key="r_sekme_secim")
-    st.markdown("<hr style='margin-top:-8px;'>", unsafe_allow_html=True)
+    r_tab1, r_tab2, r_tab3, r_tab4, r_tab_rut = st.tabs(["📋 Liste & Düzenle", "➕ Yeni Randevu", "📂 Aşama Sayfaları", "⚙️ Yönetim", "🗺️ Rut Haritası"])
 
-    if _r_secim == "📋 Liste & Düzenle":
+    with r_tab1:
         # Filtreler
         rf1,rf2,rf3,rf4 = st.columns(4)
         _fil_tem   = rf1.text_input("Temsilci:", key="rand_fil_tem")
@@ -12584,7 +11930,7 @@ elif aktif == "randevu":
                 file_name=f"randevular_{_tr_simdi().strftime('%Y%m%d')}.xlsx",
                 use_container_width=True)
 
-    if _r_secim == "➕ Yeni Randevu":
+    with r_tab2:
         df_mrand = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
         musteri_rand_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['id'])}] {r['firma']} ({r['durum']})" for _,r in df_mrand.iterrows()]
 
@@ -12820,7 +12166,7 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
                             "gonderim_bilgisi":_tw3,"olusturan":st.session_state.get("kullanici","")})
                     st.rerun()
 
-    if _r_secim == "📂 Aşama Sayfaları":
+    with r_tab3:
         import json as _json_ls_r
         st.markdown("### 📂 Aşama Sayfaları")
 
@@ -12960,7 +12306,7 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
                     st.session_state["varsayilan_asama"] = _secili_asama; st.rerun()
 
 
-    if _r_secim == "⚙️ Yönetim":
+    with r_tab4:
         st.markdown("### ⚙️ Yönetim Araçları")
 
         _yt_sec = st.radio("", [
@@ -13445,7 +12791,7 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
 
             st.divider()
 
-    if _r_secim == "🗺️ Rut Haritası":
+    with r_tab_rut:
         st.markdown("### 🗺️ Günlük Rut Haritası")
         import streamlit.components.v1 as _rut_comp
         import json as _rj
@@ -14506,102 +13852,6 @@ elif aktif == "musteri_atama":
 
     st.divider()
 
-    # ── 🗺️ BÖLGE BAZLI TOPLU ATAMA — tek tek müşteri değil, tüm bir ili bir kullanıcıya ver ──
-    with st.expander("🗺️ Bölge (İl) Bazlı Toplu Atama — bir ilin TÜM müşterilerini bir kullanıcıya ver"):
-        st.caption("Örnek: 'İzmir' seçip 'ahmet' kullanıcısına atarsan, İzmir'deki TÜM müşteriler tek seferde ahmet'e atanır. Kullanıcı, sadece atanan bölgelerdeki müşterileri görür (diğer her şey gizli kalır).")
-        _ma_il_listesi = sorted([x for x in _df_ma["il"].dropna().astype(str).unique() if x.strip()]) if "il" in _df_ma.columns else []
-        _mab1, _mab2, _mab3 = st.columns([2, 2, 1.2])
-        _ma_bolge_il = _mab1.selectbox("İl seç:", ["-- İl Seç --"] + _ma_il_listesi, key="ma_bolge_il_sec")
-        _ma_bolge_kul = _mab2.selectbox("Kullanıcı seç:", ["-- Kullanıcı Seç --"] + _kul_listesi, key="ma_bolge_kul_sec")
-        if _ma_bolge_il != "-- İl Seç --":
-            _ma_bolge_sayisi = len(_df_ma[_df_ma["il"].astype(str) == _ma_bolge_il])
-            st.caption(f"📍 '{_ma_bolge_il}' ilinde toplam **{_ma_bolge_sayisi}** müşteri var.")
-        with _mab3:
-            if st.button("✅ Bölgeyi Ata", type="primary", use_container_width=True, key="ma_bolge_ata_btn"):
-                if _ma_bolge_il == "-- İl Seç --" or _ma_bolge_kul == "-- Kullanıcı Seç --":
-                    st.warning("İl ve kullanıcı seçmelisin.")
-                else:
-                    st.session_state["_ma_bolge_onay"] = (_ma_bolge_il, _ma_bolge_kul)
-        if st.session_state.get("_ma_bolge_onay"):
-            _oil, _okul = st.session_state["_ma_bolge_onay"]
-            _osayi = len(_df_ma[_df_ma["il"].astype(str) == _oil])
-            st.warning(f"⚠️ '{_oil}' ilindeki **{_osayi} müşterinin tamamı** '{_okul}' kullanıcısına atanacak (varsa önceki ataması değişir). Onaylıyor musun?")
-            _moc1, _moc2 = st.columns(2)
-            if _moc1.button("✅ Evet, ata", key="ma_bolge_onay_evet"):
-                try:
-                    _ma_bolge_idler = _df_ma[_df_ma["il"].astype(str) == _oil]["id"].tolist()
-                    for _mid_b in _ma_bolge_idler:
-                        _sb_ma.table("cari_kartlar").update({"atanan_kullanici": _okul}).eq("id", int(_mid_b)).execute()
-                    st.success(f"✅ '{_oil}' ilindeki {len(_ma_bolge_idler)} müşteri '{_okul}' kullanıcısına atandı.")
-                    st.session_state["_ma_bolge_onay"] = None
-                    try: db_read.clear()
-                    except: pass
-                    try: get_cari_listesi.clear()
-                    except: pass
-                    st.rerun()
-                except Exception as _ma_be:
-                    st.error(f"Atanamadı: {_ma_be}")
-            if _moc2.button("❌ Vazgeç", key="ma_bolge_onay_hayir"):
-                st.session_state["_ma_bolge_onay"] = None
-                st.rerun()
-
-    # ── 🔧 SAHİPSİZ TEKLİFLERİ ONAR ─────────────────────────────────────────
-    # Açılır listeden seçilmeden, sadece yazıyla kaydedilmiş eski Özel Teklif'ler
-    # (musteri_id=0) burada bulunup doğru müşteriye bağlanabilir.
-    with st.expander("🔧 Sahipsiz Teklifleri Onar — Cari Liste'de görünmeyen eski teklifler"):
-        st.caption("Müşteri açılır listeden seçilmeden, sadece yazıyla kaydedilmiş eski Özel Teklif'ler burada listelenir. Doğru müşteriyi seçip bağlarsan, Cari Liste'de o müşterinin hanesinde görünmeye başlar.")
-        if st.button("🔍 Sahipsiz Teklifleri Bul", key="ma_sahipsiz_bul"):
-            try:
-                _sb_st = get_sb_client()
-                _st_ham_raw = _sb_st.table("teklifler").select("id,musteri_id,musteri_adi,notlar,tarih,toplam_tutar") \
-                    .eq("musteri_id", 0).execute().data or []
-                _st_ham = [r for r in _st_ham_raw if r.get("toplam_tutar") not in (-91001, -91002)]
-                _st_ozel = []
-                for _r in _st_ham:
-                    try:
-                        _rf = _sb_st.table("teklifler").select("satirlar").eq("id", _r["id"]).single().execute()
-                        _sat = _rf.data.get("satirlar","") if _rf.data else ""
-                    except Exception:
-                        _sat = ""
-                    if '"tip": "ozel"' in str(_sat) or '"tip":"ozel"' in str(_sat):
-                        _st_ozel.append(_r)
-                st.session_state["_ma_sahipsiz_liste"] = _st_ozel
-            except Exception as _st_e:
-                st.error(f"Aranamadı: {_st_e}")
-                st.session_state["_ma_sahipsiz_liste"] = []
-
-        if st.session_state.get("_ma_sahipsiz_liste"):
-            _st_liste = st.session_state["_ma_sahipsiz_liste"]
-            st.info(f"{len(_st_liste)} sahipsiz teklif bulundu.")
-            _st_firmalar = sorted(_df_ma["firma"].dropna().astype(str).unique().tolist()) if "firma" in _df_ma.columns else []
-            import difflib as _st_diff
-            for _sr in _st_liste:
-                _st_yazilan = str(_sr.get("musteri_adi","") or "")
-                _st_tahmin = _st_diff.get_close_matches(_st_yazilan, _st_firmalar, n=1, cutoff=0.5)
-                _st_default = _st_tahmin[0] if _st_tahmin else "-- Seç --"
-                _stc1, _stc2, _stc3 = st.columns([2, 3, 1.2])
-                _stc1.caption(f"📝 Yazılan: **{_st_yazilan}**\n\n{_sr.get('tarih','')}")
-                _st_secim = _stc2.selectbox("Gerçek müşteri:", ["-- Seç --"] + _st_firmalar,
-                    index=(_st_firmalar.index(_st_default) + 1) if _st_default in _st_firmalar else 0,
-                    key=f"st_sec_{_sr['id']}", label_visibility="collapsed")
-                if _stc3.button("✅ Bağla", key=f"st_bagla_{_sr['id']}", use_container_width=True):
-                    if _st_secim == "-- Seç --":
-                        st.warning("Önce bir müşteri seç.")
-                    else:
-                        try:
-                            _st_mid = int(_df_ma[_df_ma["firma"] == _st_secim]["id"].iloc[0])
-                            _sb_st2 = get_sb_client()
-                            _sb_st2.table("teklifler").update({"musteri_id": _st_mid, "musteri_adi": _st_secim}).eq("id", _sr["id"]).execute()
-                            st.success(f"✅ Bağlandı: {_st_secim}")
-                            st.session_state["_ma_sahipsiz_liste"] = [x for x in st.session_state["_ma_sahipsiz_liste"] if x["id"] != _sr["id"]]
-                            try: db_read.clear()
-                            except: pass
-                            st.rerun()
-                        except Exception as _st_be:
-                            st.error(f"Bağlanamadı: {_st_be}")
-
-    st.divider()
-
     # ── FİLTRELER ─────────────────────────────────────────────────────────────
     _maf1, _maf2 = st.columns(2)
     _ma_ara = _maf1.text_input("🔍 Firma Ara", placeholder="firma adı...", key="ma_ara")
@@ -15250,10 +14500,8 @@ elif aktif == "islem_takip":
     except: _df_rdv = pd.DataFrame()
 
     try:
-        _r3 = _sb_it.table("teklifler").select("*").order("tarih", desc=False).limit(500).execute()
+        _r3 = _sb_it.table("teklifler").select("*").order("tarih", desc=False).execute()
         _df_tek3 = pd.DataFrame(_r3.data) if _r3.data else pd.DataFrame()
-        if not _df_tek3.empty and "toplam_tutar" in _df_tek3.columns:
-            _df_tek3 = _df_tek3[~_df_tek3["toplam_tutar"].isin([-91001, -91002])]
     except: _df_tek3 = pd.DataFrame()
 
     _it_cariler = get_cari_listesi()
