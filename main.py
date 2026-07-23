@@ -1853,6 +1853,7 @@ def cari_rehbere_toplu_ekle(cari_liste):
         return 0
 
 
+def cari_rehbere_ekle(firma, gsm, sabit):
     """Bir cari kartın GSM/Sabit numaralarını 'kisiler' (Telefon Kişiler/Rehber) tablosuna aktarır.
     Aynı numara rehberde zaten varsa tekrar eklemez — mükerrer kayıt oluşturmaz.
     Cari kart açıldıkça (yeni kayıt / toplu aktarım) otomatik çağrılır."""
@@ -8699,15 +8700,23 @@ elif aktif == "fatura":
                         st.error(f"Hata: {_pke}")
         else:
             with st.expander("🔗 Paraşüt'e Bağlan", expanded=True):
-                st.markdown(f"1. [Bu bağlantıya tıkla]({_parasut_yetki_url()}) — Paraşüt'e giriş yap, izin ver\n"
-                            "2. Ekranda çıkan **kodu kopyala**\n"
-                            "3. Aşağıya yapıştırıp \"Bağlan\"a bas")
-                _pt_kod = st.text_input("Paraşüt'ten aldığın kod:", key="ft_parasut_kod")
-                if st.button("🔗 Bağlan", key="ft_parasut_baglan_btn", type="primary"):
+                st.caption("Paraşüt'ün giriş ekranı güvenlik gereği sistemimizin içine gömülemiyor (bankalar/Google gibi tüm giriş sayfaları bunu engeller) — yeni bir sekmede açılacak, izin verip döneceksin.")
+                st.markdown(f"""
+<a href="{_parasut_yetki_url()}" target="_blank" rel="noopener" style="text-decoration:none;">
+  <div style="text-align:center;padding:12px;border-radius:8px;background:#7c3aed;color:white;
+       font-weight:600;font-size:15px;cursor:pointer;margin-bottom:10px;">
+       🔗 1) Paraşüt'e Git ve İzin Ver
+  </div>
+</a>
+""", unsafe_allow_html=True)
+                st.caption("Paraşüt'te giriş yapıp izin verince ekranda bir **kod** göreceksin — onu kopyala.")
+                _pt_kod = st.text_input("2) Paraşüt'ten aldığın kodu buraya yapıştır:", key="ft_parasut_kod")
+                if st.button("✅ 3) Bağlan", key="ft_parasut_baglan_btn", type="primary", use_container_width=True):
                     if not _pt_kod.strip():
                         st.warning("Önce kodu yapıştır.")
                     else:
-                        _pok, _phata = _parasut_kod_ile_baglan(_pt_kod)
+                        with st.spinner("⏳ Bağlanıyor..."):
+                            _pok, _phata = _parasut_kod_ile_baglan(_pt_kod)
                         if _pok:
                             st.success("✅ Paraşüt'e başarıyla bağlandı!")
                             st.rerun()
