@@ -2573,7 +2573,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "ozel_teklif", "sozlesme", "fatura", "kargo_ihbar", "otomatik_arama", "gonderim_kuyrugu", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "islem_takip", "randevu", "ozel_teklif", "sozlesme", "fatura", "parasut", "kargo_ihbar", "otomatik_arama", "gonderim_kuyrugu", "rota_analiz", "operasyon", "kisiler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "musteri_atama", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
