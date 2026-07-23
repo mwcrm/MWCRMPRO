@@ -8723,7 +8723,7 @@ elif aktif == "fatura":
                         else:
                             st.error(f"Bağlanamadı: {_phata}")
 
-    _ft_tab1, _ft_tab2 = st.tabs(["📝 Yeni Fatura Taslağı", "📚 Taslak/Gönderilen Faturalar"])
+    _ft_tab1, _ft_tab2, _ft_tab3 = st.tabs(["📝 Yeni Fatura Taslağı", "📚 Taslak/Gönderilen Faturalar", "🔗 Paraşüt'teki Faturalar"])
 
     with _ft_tab1:
         _ft_dfm = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL) ORDER BY firma")
@@ -8918,6 +8918,37 @@ elif aktif == "fatura":
                                 st.error(f"Gönderilemedi: {_psonuc}")
                     else:
                         st.caption("🔌 Paraşüt bağlı değil — üstteki 'Faturalar' sayfasının başından bağlanabilirsin.")
+
+    with _ft_tab3:
+        st.markdown("### 🔗 Paraşüt'teki Gerçek Faturalar")
+        st.caption("Bu liste, Paraşüt'ün kendi sitesinden değil, doğrudan Paraşüt API'sinden anlık çekiliyor — sistemin dışına çıkmana gerek yok.")
+        if not (_parasut_ayarli_mi() and _parasut_token_yukle()):
+            st.info("🔌 Önce Paraşüt'e bağlanman lazım (bu sayfanın en üstünden).")
+        else:
+            if st.button("🔄 Paraşüt'ten Yenile", key="ft_parasut_yenile_btn"):
+                st.session_state.pop("_ft_parasut_liste_cache", None)
+                st.rerun()
+            if "_ft_parasut_liste_cache" not in st.session_state:
+                with st.spinner("⏳ Paraşüt'ten faturalar çekiliyor..."):
+                    _pl_sonuc, _pl_hata = _parasut_api("GET", "/sales_invoices", params={"sort": "-issue_date", "page[size]": 50})
+                if _pl_sonuc:
+                    st.session_state["_ft_parasut_liste_cache"] = _pl_sonuc.get("data", [])
+                else:
+                    st.session_state["_ft_parasut_liste_cache"] = []
+                    st.error(f"Çekilemedi: {_pl_hata}")
+            _pl_liste = st.session_state.get("_ft_parasut_liste_cache", [])
+            if not _pl_liste:
+                st.caption("Paraşüt'te henüz görüntülenecek fatura yok (ya da liste boş döndü).")
+            else:
+                st.caption(f"{len(_pl_liste)} fatura bulundu (son 50).")
+                for _pf in _pl_liste:
+                    _pfa = _pf.get("attributes", {})
+                    with st.container(border=True):
+                        _pfc1, _pfc2, _pfc3 = st.columns([2.5, 1, 1])
+                        _pfc1.markdown(f"**{_pfa.get('description','') or '(açıklama yok)'}**")
+                        _pfc1.caption(f"📅 {_pfa.get('issue_date','')} · Fatura No: {_pfa.get('invoice_no','—')}")
+                        _pfc2.metric("Toplam", fmt_para(_pfa.get("net_total", 0)))
+                        _pfc3.markdown(f"🏷️ **{(_pfa.get('item_type','') or '').upper()}**  \n{'✅ Ödendi' if _pfa.get('payment_status')=='paid' else '⏳ ' + str(_pfa.get('payment_status','—'))}")
 
 elif aktif == "otomatik_arama":
     sayfa_log("otomatik_arama")
