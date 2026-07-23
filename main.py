@@ -8929,18 +8929,33 @@ elif aktif == "fatura":
                 st.session_state.pop("_ft_parasut_liste_cache", None)
                 st.rerun()
             if "_ft_parasut_liste_cache" not in st.session_state:
-                with st.spinner("⏳ Paraşüt'ten faturalar çekiliyor..."):
-                    _pl_sonuc, _pl_hata = _parasut_api("GET", "/sales_invoices", params={"sort": "-issue_date", "page[size]": 50})
-                if _pl_sonuc:
-                    st.session_state["_ft_parasut_liste_cache"] = _pl_sonuc.get("data", [])
-                else:
-                    st.session_state["_ft_parasut_liste_cache"] = []
-                    st.error(f"Çekilemedi: {_pl_hata}")
+                with st.spinner("⏳ Paraşüt'teki TÜM faturalar çekiliyor (çok sayıda faturan varsa biraz sürebilir)..."):
+                    _pl_hepsi = []
+                    _pl_sayfa = 1
+                    _pl_hata_son = None
+                    while True:
+                        _pl_sonuc, _pl_hata_son = _parasut_api("GET", "/sales_invoices", params={
+                            "sort": "-issue_date", "page[size]": 25, "page[number]": _pl_sayfa,
+                        })
+                        if not _pl_sonuc:
+                            break
+                        _pl_veri = _pl_sonuc.get("data", [])
+                        if not _pl_veri:
+                            break
+                        _pl_hepsi.extend(_pl_veri)
+                        if len(_pl_veri) < 25:  # son sayfaya gelindi
+                            break
+                        _pl_sayfa += 1
+                        if _pl_sayfa > 200:  # güvenlik: 5000 faturadan sonra dur (sonsuz döngü olmasın)
+                            break
+                    st.session_state["_ft_parasut_liste_cache"] = _pl_hepsi
+                    if not _pl_hepsi and _pl_hata_son:
+                        st.error(f"Çekilemedi: {_pl_hata_son}")
             _pl_liste = st.session_state.get("_ft_parasut_liste_cache", [])
             if not _pl_liste:
                 st.caption("Paraşüt'te henüz görüntülenecek fatura yok (ya da liste boş döndü).")
             else:
-                st.caption(f"{len(_pl_liste)} fatura bulundu (son 50).")
+                st.caption(f"Toplam **{len(_pl_liste)}** fatura bulundu (Paraşüt'teki tamamı).")
                 for _pf in _pl_liste:
                     _pfa = _pf.get("attributes", {})
                     with st.container(border=True):
