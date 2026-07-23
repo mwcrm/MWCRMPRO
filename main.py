@@ -1802,6 +1802,167 @@ def fmt_para(n):
         return "0 ₺"
 
 
+# ══════════════════ PARAŞÜT API — OAuth bağlantısı + gönderim (ayarlar veritabanında) ══════════════════
+def _parasut_ayarlari_yukle():
+    """Client ID / Secret / Company ID — Secrets değil, doğrudan veritabanından okunur."""
+    try:
+        sb = get_sb_client()
+        if not sb:
+            return {}
+        r = sb.table("sistem_ayarlari").select("deger").eq("anahtar", "parasut_ayarlar").execute()
+        if r.data:
+            return json.loads(r.data[0]["deger"])
+        return {}
+    except Exception:
+        return {}
+
+def _parasut_ayarlari_kaydet(cid, csecret, company_id):
+    try:
+        sb = get_sb_client()
+        if not sb:
+            return False
+        sb.table("sistem_ayarlari").delete().eq("anahtar", "parasut_ayarlar").execute()
+        sb.table("sistem_ayarlari").insert({"anahtar": "parasut_ayarlar", "deger": json.dumps({
+            "client_id": cid.strip(), "client_secret": csecret.strip(), "company_id": company_id.strip(),
+        })}).execute()
+        return True
+    except Exception:
+        return False
+
+def _parasut_ayarli_mi():
+    _a = _parasut_ayarlari_yukle()
+    return bool(_a.get("client_id") and _a.get("client_secret") and _a.get("company_id"))
+
+def _parasut_yetki_url():
+    _cid = _parasut_ayarlari_yukle().get("client_id", "")
+    return f"https://api.parasut.com/oauth/authorize?client_id={_cid}&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code"
+
+def _parasut_token_yukle():
+    """Kaydedilmiş Paraşüt bağlantı jetonunu (varsa) getirir."""
+    try:
+        sb = get_sb_client()
+        if not sb:
+            return None
+        r = sb.table("sistem_ayarlari").select("deger").eq("anahtar", "parasut_token").execute()
+        if r.data:
+            return json.loads(r.data[0]["deger"])
+        return None
+    except Exception:
+        return None
+
+def _parasut_token_kaydet(token_data):
+    try:
+        sb = get_sb_client()
+        if not sb:
+            return False
+        sb.table("sistem_ayarlari").delete().eq("anahtar", "parasut_token").execute()
+        sb.table("sistem_ayarlari").insert({"anahtar": "parasut_token", "deger": json.dumps(token_data)}).execute()
+        return True
+    except Exception:
+        return False
+
+def _parasut_kod_ile_baglan(kod):
+    """Kullanıcının Paraşüt'ten aldığı kodu, gerçek jetona (token) çevirir."""
+    try:
+        import requests as _preq
+        _a = _parasut_ayarlari_yukle()
+        _r = _preq.post("https://api.parasut.com/oauth/token", data={
+            "grant_type": "authorization_code",
+            "code": kod.strip(),
+            "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
+            "client_id": _a.get("client_id", ""),
+            "client_secret": _a.get("client_secret", ""),
+        }, timeout=20)
+        if _r.status_code == 200:
+            _td = _r.json()
+            _td["_alinma_zamani"] = _tr_simdi().timestamp()
+            _parasut_token_kaydet(_td)
+            return True, None
+        return False, _r.text
+    except Exception as _pe:
+        return False, str(_pe)
+
+def _parasut_token_yenile(_td):
+    try:
+        import requests as _preq
+        _a = _parasut_ayarlari_yukle()
+        _r = _preq.post("https://api.parasut.com/oauth/token", data={
+            "grant_type": "refresh_token",
+            "refresh_token": _td.get("refresh_token", ""),
+            "client_id": _a.get("client_id", ""),
+            "client_secret": _a.get("client_secret", ""),
+        }, timeout=20)
+        if _r.status_code == 200:
+            _ytd = _r.json()
+            _ytd["_alinma_zamani"] = _tr_simdi().timestamp()
+            _parasut_token_kaydet(_ytd)
+            return _ytd
+        return None
+    except Exception:
+        return None
+
+def _parasut_gecerli_token():
+    """Geçerli (süresi dolmamış) bir erişim jetonu döner, gerekirse otomatik yeniler."""
+    _td = _parasut_token_yukle()
+    if not _td:
+        return None
+    _gecen = _tr_simdi().timestamp() - _td.get("_alinma_zamani", 0)
+    if _gecen > (_td.get("expires_in", 7200) - 120):  # süresi dolmadan 2 dk önce yenile
+        _td = _parasut_token_yenile(_td)
+    return _td.get("access_token") if _td else None
+
+def _parasut_api(method, path, json_govde=None, params=None):
+    """Paraşüt API'sine istek atar. path örn: '/sales_invoices'"""
+    _tok = _parasut_gecerli_token()
+    if not _tok:
+        return None, "Paraşüt'e bağlı değilsin."
+    try:
+        import requests as _preq
+        _cid = _parasut_ayarlari_yukle().get("company_id", "")
+        _url = f"https://api.parasut.com/v4/{_cid}{path}"
+        _headers = {"Authorization": f"Bearer {_tok}", "Content-Type": "application/vnd.api+json"}
+        _r = _preq.request(method, _url, headers=_headers, json=json_govde, params=params, timeout=20)
+        if 200 <= _r.status_code < 300:
+            return _r.json(), None
+        return None, f"[{_r.status_code}] {_r.text[:300]}"
+    except Exception as _pae:
+        return None, str(_pae)
+
+def _parasut_musteri_bul_veya_olustur(_ad, _vd, _vno):
+    """Paraşüt'te bu isimde müşteri var mı arar, yoksa oluşturur. contact id döner."""
+    _bul, _hata = _parasut_api("GET", "/contacts", params={"filter[name]": _ad})
+    if _bul and _bul.get("data"):
+        return _bul["data"][0]["id"], None
+    _govde = {"data": {"type": "contacts", "attributes": {
+        "account_type": "customer", "name": _ad,
+        "tax_office": _vd or "", "tax_number": _vno or "",
+    }}}
+    _olustur, _hata2 = _parasut_api("POST", "/contacts", json_govde=_govde)
+    if _olustur and _olustur.get("data"):
+        return _olustur["data"]["id"], None
+    return None, (_hata2 or _hata or "Müşteri oluşturulamadı")
+
+def _parasut_fatura_gonder(_fv):
+    _cid, _hata = _parasut_musteri_bul_veya_olustur(_fv.get("musteri_uzun",""), _fv.get("vd",""), _fv.get("vno",""))
+    if not _cid:
+        return False, f"Müşteri bulunamadı/oluşturulamadı: {_hata}"
+    _kalem_aciklama = " · ".join(f"{k.get('aciklama','')} ({k.get('miktar',0)}x{fmt_para(k.get('birim_fiyat',0))})" for k in _fv.get("kalemler", []))
+    _govde = {"data": {
+        "type": "sales_invoices",
+        "attributes": {
+            "item_type": "invoice",
+            "description": _kalem_aciklama[:500],
+            "issue_date": _tr_simdi().strftime("%Y-%m-%d"),
+            "currency": "TRL",
+        },
+        "relationships": {"contact": {"data": {"id": _cid, "type": "contacts"}}},
+    }}
+    _sonuc, _hata3 = _parasut_api("POST", "/sales_invoices", json_govde=_govde)
+    if _sonuc and _sonuc.get("data"):
+        return True, _sonuc["data"]["id"]
+    return False, _hata3
+
+
 def fmt_tel(n):
     """5544929309.0 → 5544929309"""
     try:
@@ -2420,6 +2581,7 @@ _TAB_ETIKETLER = {
     "ozel_teklif": "⭐ Özel Teklif",
     "sozlesme": "📜 Sözleşmeler",
     "fatura": "💰 Faturalar",
+    "parasut": "💠 Paraşüt",
     "kargo_ihbar": "📦 Kargo İhbarları",
     "otomatik_arama": "📱 Arama & SMS Takip",
     "gonderim_kuyrugu": "📤 Mesaj/Arama Gönder",
@@ -2868,6 +3030,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
         ("🔎 Analiz ve takip",   ["analiz", "islem_takip"]),
         ("📅 Randevu ve teklif", ["randevu", "ozel_teklif", "sozlesme"]),
         ("💰 Faturalar",         ["fatura"]),
+        ("💠 Paraşüt",           ["parasut"]),
         ("📦 Kargo İhbarları",   ["kargo_ihbar"]),
         ("📱 Telefon Entegrasyonu", ["otomatik_arama", "gonderim_kuyrugu", "kisiler"]),
         ("🚚 Saha",              ["rota_analiz", "operasyon", "harita"]),
@@ -8510,165 +8673,6 @@ elif aktif == "fatura":
     import json as _ftj
     from datetime import date as _ftdate
 
-    # ══════════════════ PARAŞÜT API — OAuth bağlantısı + gönderim (ayarlar veritabanında) ══════════════════
-    def _parasut_ayarlari_yukle():
-        """Client ID / Secret / Company ID — Secrets değil, doğrudan veritabanından okunur."""
-        try:
-            sb = get_sb_client()
-            if not sb:
-                return {}
-            r = sb.table("sistem_ayarlari").select("deger").eq("anahtar", "parasut_ayarlar").execute()
-            if r.data:
-                return _ftj.loads(r.data[0]["deger"])
-            return {}
-        except Exception:
-            return {}
-
-    def _parasut_ayarlari_kaydet(cid, csecret, company_id):
-        try:
-            sb = get_sb_client()
-            if not sb:
-                return False
-            sb.table("sistem_ayarlari").delete().eq("anahtar", "parasut_ayarlar").execute()
-            sb.table("sistem_ayarlari").insert({"anahtar": "parasut_ayarlar", "deger": _ftj.dumps({
-                "client_id": cid.strip(), "client_secret": csecret.strip(), "company_id": company_id.strip(),
-            })}).execute()
-            return True
-        except Exception:
-            return False
-
-    def _parasut_ayarli_mi():
-        _a = _parasut_ayarlari_yukle()
-        return bool(_a.get("client_id") and _a.get("client_secret") and _a.get("company_id"))
-
-    def _parasut_yetki_url():
-        _cid = _parasut_ayarlari_yukle().get("client_id", "")
-        return f"https://api.parasut.com/oauth/authorize?client_id={_cid}&redirect_uri=urn:ietf:wg:oauth:2.0:oob&response_type=code"
-
-    def _parasut_token_yukle():
-        """Kaydedilmiş Paraşüt bağlantı jetonunu (varsa) getirir."""
-        try:
-            sb = get_sb_client()
-            if not sb:
-                return None
-            r = sb.table("sistem_ayarlari").select("deger").eq("anahtar", "parasut_token").execute()
-            if r.data:
-                return _ftj.loads(r.data[0]["deger"])
-            return None
-        except Exception:
-            return None
-
-    def _parasut_token_kaydet(token_data):
-        try:
-            sb = get_sb_client()
-            if not sb:
-                return False
-            sb.table("sistem_ayarlari").delete().eq("anahtar", "parasut_token").execute()
-            sb.table("sistem_ayarlari").insert({"anahtar": "parasut_token", "deger": _ftj.dumps(token_data)}).execute()
-            return True
-        except Exception:
-            return False
-
-    def _parasut_kod_ile_baglan(kod):
-        """Kullanıcının Paraşüt'ten aldığı kodu, gerçek jetona (token) çevirir."""
-        try:
-            import requests as _preq
-            _a = _parasut_ayarlari_yukle()
-            _r = _preq.post("https://api.parasut.com/oauth/token", data={
-                "grant_type": "authorization_code",
-                "code": kod.strip(),
-                "redirect_uri": "urn:ietf:wg:oauth:2.0:oob",
-                "client_id": _a.get("client_id", ""),
-                "client_secret": _a.get("client_secret", ""),
-            }, timeout=20)
-            if _r.status_code == 200:
-                _td = _r.json()
-                _td["_alinma_zamani"] = _tr_simdi().timestamp()
-                _parasut_token_kaydet(_td)
-                return True, None
-            return False, _r.text
-        except Exception as _pe:
-            return False, str(_pe)
-
-    def _parasut_token_yenile(_td):
-        try:
-            import requests as _preq
-            _a = _parasut_ayarlari_yukle()
-            _r = _preq.post("https://api.parasut.com/oauth/token", data={
-                "grant_type": "refresh_token",
-                "refresh_token": _td.get("refresh_token", ""),
-                "client_id": _a.get("client_id", ""),
-                "client_secret": _a.get("client_secret", ""),
-            }, timeout=20)
-            if _r.status_code == 200:
-                _ytd = _r.json()
-                _ytd["_alinma_zamani"] = _tr_simdi().timestamp()
-                _parasut_token_kaydet(_ytd)
-                return _ytd
-            return None
-        except Exception:
-            return None
-
-    def _parasut_gecerli_token():
-        """Geçerli (süresi dolmamış) bir erişim jetonu döner, gerekirse otomatik yeniler."""
-        _td = _parasut_token_yukle()
-        if not _td:
-            return None
-        _gecen = _tr_simdi().timestamp() - _td.get("_alinma_zamani", 0)
-        if _gecen > (_td.get("expires_in", 7200) - 120):  # süresi dolmadan 2 dk önce yenile
-            _td = _parasut_token_yenile(_td)
-        return _td.get("access_token") if _td else None
-
-    def _parasut_api(method, path, json_govde=None, params=None):
-        """Paraşüt API'sine istek atar. path örn: '/sales_invoices'"""
-        _tok = _parasut_gecerli_token()
-        if not _tok:
-            return None, "Paraşüt'e bağlı değilsin."
-        try:
-            import requests as _preq
-            _cid = _parasut_ayarlari_yukle().get("company_id", "")
-            _url = f"https://api.parasut.com/v4/{_cid}{path}"
-            _headers = {"Authorization": f"Bearer {_tok}", "Content-Type": "application/vnd.api+json"}
-            _r = _preq.request(method, _url, headers=_headers, json=json_govde, params=params, timeout=20)
-            if 200 <= _r.status_code < 300:
-                return _r.json(), None
-            return None, f"[{_r.status_code}] {_r.text[:300]}"
-        except Exception as _pae:
-            return None, str(_pae)
-
-    def _parasut_musteri_bul_veya_olustur(_ad, _vd, _vno):
-        """Paraşüt'te bu isimde müşteri var mı arar, yoksa oluşturur. contact id döner."""
-        _bul, _hata = _parasut_api("GET", "/contacts", params={"filter[name]": _ad})
-        if _bul and _bul.get("data"):
-            return _bul["data"][0]["id"], None
-        _govde = {"data": {"type": "contacts", "attributes": {
-            "account_type": "customer", "name": _ad,
-            "tax_office": _vd or "", "tax_number": _vno or "",
-        }}}
-        _olustur, _hata2 = _parasut_api("POST", "/contacts", json_govde=_govde)
-        if _olustur and _olustur.get("data"):
-            return _olustur["data"]["id"], None
-        return None, (_hata2 or _hata or "Müşteri oluşturulamadı")
-
-    def _parasut_fatura_gonder(_fv):
-        _cid, _hata = _parasut_musteri_bul_veya_olustur(_fv.get("musteri_uzun",""), _fv.get("vd",""), _fv.get("vno",""))
-        if not _cid:
-            return False, f"Müşteri bulunamadı/oluşturulamadı: {_hata}"
-        _kalem_aciklama = " · ".join(f"{k.get('aciklama','')} ({k.get('miktar',0)}x{fmt_para(k.get('birim_fiyat',0))})" for k in _fv.get("kalemler", []))
-        _govde = {"data": {
-            "type": "sales_invoices",
-            "attributes": {
-                "item_type": "invoice",
-                "description": _kalem_aciklama[:500],
-                "issue_date": _tr_simdi().strftime("%Y-%m-%d"),
-                "currency": "TRL",
-            },
-            "relationships": {"contact": {"data": {"id": _cid, "type": "contacts"}}},
-        }}
-        _sonuc, _hata3 = _parasut_api("POST", "/sales_invoices", json_govde=_govde)
-        if _sonuc and _sonuc.get("data"):
-            return True, _sonuc["data"]["id"]
-        return False, _hata3
 
     st.markdown("## 💰 Faturalar")
 
@@ -8964,6 +8968,284 @@ elif aktif == "fatura":
                         _pfc1.caption(f"📅 {_pfa.get('issue_date','')} · Fatura No: {_pfa.get('invoice_no','—')}")
                         _pfc2.metric("Toplam", fmt_para(_pfa.get("net_total", 0)))
                         _pfc3.markdown(f"🏷️ **{(_pfa.get('item_type','') or '').upper()}**  \n{'✅ Ödendi' if _pfa.get('payment_status')=='paid' else '⏳ ' + str(_pfa.get('payment_status','—'))}")
+
+elif aktif == "parasut":
+    sayfa_log("parasut")
+    st.markdown("## 💠 Paraşüt")
+    st.caption("Paraşüt hesabındaki verileri doğrudan (API üzerinden) burada görüntülersin — Paraşüt'ün sitesine gitmene gerek kalmaz.")
+
+    if not (_parasut_ayarli_mi() and _parasut_token_yukle()):
+        st.info("🔌 Önce **'💰 Faturalar'** sayfasından Paraşüt'e bağlanman lazım.")
+    else:
+        def _parasut_tum_sayfalari_cek(_path, _params=None):
+            """Verilen endpoint'in TÜM sayfalarını (25'er 25'er) çekip birleştirir."""
+            _hepsi = []
+            _sayfa = 1
+            _son_hata = None
+            while True:
+                _p = dict(_params or {})
+                _p["page[size]"] = 25
+                _p["page[number]"] = _sayfa
+                _sonuc, _son_hata = _parasut_api("GET", _path, params=_p)
+                if not _sonuc:
+                    break
+                _veri = _sonuc.get("data", [])
+                if not _veri:
+                    break
+                _hepsi.extend(_veri)
+                if len(_veri) < 25:
+                    break
+                _sayfa += 1
+                if _sayfa > 200:
+                    break
+            return _hepsi, (_son_hata if not _hepsi else None)
+
+        def _pm_liste_goster(_cache_key, _path, _params, _baslik_fn, _alt_fn, _tutar_fn=None):
+            """Ortak liste gösterme yardımcısı — çek, önbelleğe al, arama kutusu + kart listesi göster."""
+            _yc1, _yc2 = st.columns([1, 5])
+            if _yc1.button("🔄 Yenile", key=f"pm_yenile_{_cache_key}"):
+                st.session_state.pop(_cache_key, None)
+                st.rerun()
+            if _cache_key not in st.session_state:
+                with st.spinner("⏳ Paraşüt'ten çekiliyor..."):
+                    _liste, _hata = _parasut_tum_sayfalari_cek(_path, _params)
+                st.session_state[_cache_key] = _liste
+                if _hata:
+                    st.error(f"Çekilemedi (endpoint adı Paraşüt'te farklı olabilir — gerçek hata): {_hata}")
+            _liste = st.session_state.get(_cache_key, [])
+            if not _liste:
+                st.caption("Kayıt bulunamadı (veya bu bölüm hesabınızda henüz boş).")
+                return []
+            st.caption(f"Toplam **{len(_liste)}** kayıt.")
+            _ara = st.text_input("🔍 Ara:", key=f"pm_ara_{_cache_key}")
+            for _it in _liste:
+                _a = _it.get("attributes", {})
+                _baslik = _baslik_fn(_a)
+                if _ara and _ara.lower() not in str(_baslik).lower():
+                    continue
+                with st.container(border=True):
+                    _cc1, _cc2 = st.columns([2.5, 1.5])
+                    _cc1.markdown(f"**{_baslik}**")
+                    _cc1.caption(_alt_fn(_a))
+                    if _tutar_fn:
+                        _cc2.metric("Tutar", fmt_para(_tutar_fn(_a)))
+            return _liste
+
+        _pm_grup = st.radio("Ana Grup", ["💵 SATIŞLAR", "💸 GİDERLER", "🏦 NAKİT", "📦 STOK"], horizontal=True, key="pm_ana_grup")
+        st.markdown("<hr style='margin-top:-8px;'>", unsafe_allow_html=True)
+
+        if _pm_grup == "💵 SATIŞLAR":
+            _pm_alt = st.radio("Alt", ["Teklifler", "Faturalar", "Müşteriler", "Satışlar Raporu", "Tahsilatlar Raporu", "Gelir Gider Raporu"],
+                                horizontal=True, label_visibility="collapsed", key="pm_satis_alt")
+
+            if _pm_alt == "Teklifler":
+                _pm_liste_goster("_pm_teklif_cache", "/sales_invoices", {"filter[item_type]": "estimate"},
+                    lambda a: a.get("description","") or "(açıklama yok)",
+                    lambda a: f"📅 {a.get('issue_date','')} · Durum: {a.get('status','—')}",
+                    lambda a: a.get("net_total", 0))
+
+            elif _pm_alt == "Faturalar":
+                _pm_liste_goster("_ft_parasut_liste_cache", "/sales_invoices", {"filter[item_type]": "invoice"},
+                    lambda a: a.get("description","") or "(açıklama yok)",
+                    lambda a: f"📅 {a.get('issue_date','')} · No: {a.get('invoice_no','—')}",
+                    lambda a: a.get("net_total", 0))
+
+            elif _pm_alt == "Müşteriler":
+                _pm_liste_goster("_pm_musteri_cache", "/contacts", {"filter[account_type]": "customer"},
+                    lambda a: a.get("name",""),
+                    lambda a: f"📧 {a.get('email','—')} · ☎️ {a.get('phone','—')} · VD:{a.get('tax_office','—')}",
+                    lambda a: a.get("trl_balance", 0))
+
+            elif _pm_alt == "Satışlar Raporu":
+                if "_ft_parasut_liste_cache" not in st.session_state:
+                    with st.spinner("⏳ Hesaplanıyor..."):
+                        _liste, _hata = _parasut_tum_sayfalari_cek("/sales_invoices", {"filter[item_type]": "invoice"})
+                        st.session_state["_ft_parasut_liste_cache"] = _liste
+                _liste = st.session_state.get("_ft_parasut_liste_cache", [])
+                _toplam = sum(float(s.get("attributes",{}).get("net_total",0) or 0) for s in _liste)
+                _c1, _c2 = st.columns(2)
+                _c1.metric("Toplam Satış", fmt_para(_toplam))
+                _c2.metric("Fatura Adedi", len(_liste))
+
+            elif _pm_alt == "Tahsilatlar Raporu":
+                if "_ft_parasut_liste_cache" not in st.session_state:
+                    with st.spinner("⏳ Hesaplanıyor..."):
+                        _liste, _hata = _parasut_tum_sayfalari_cek("/sales_invoices", {"filter[item_type]": "invoice"})
+                        st.session_state["_ft_parasut_liste_cache"] = _liste
+                _liste = st.session_state.get("_ft_parasut_liste_cache", [])
+                _toplam_tahsil = sum(float(s.get("attributes",{}).get("paid_total", s.get("attributes",{}).get("net_total",0)) or 0) - float(s.get("attributes",{}).get("remaining",0) or 0) for s in _liste)
+                _kalan = sum(float(s.get("attributes",{}).get("remaining",0) or 0) for s in _liste)
+                _c1, _c2 = st.columns(2)
+                _c1.metric("Tahsil Edilen (tahmini)", fmt_para(_toplam_tahsil))
+                _c2.metric("Kalan (Tahsil Edilmemiş)", fmt_para(_kalan))
+                st.caption("Not: Paraşüt'ün ayrı bir 'ödemeler' uç noktası varsa daha kesin veri için o eklenmeli — bu, fatura tutarlarından tahmini hesaplanıyor.")
+
+            elif _pm_alt == "Gelir Gider Raporu":
+                with st.spinner("⏳ Hesaplanıyor..."):
+                    if "_ft_parasut_liste_cache" not in st.session_state:
+                        _sl, _ = _parasut_tum_sayfalari_cek("/sales_invoices", {"filter[item_type]": "invoice"})
+                        st.session_state["_ft_parasut_liste_cache"] = _sl
+                    if "_pm_gider_cache" not in st.session_state:
+                        _gl, _ = _parasut_tum_sayfalari_cek("/purchase_bills")
+                        st.session_state["_pm_gider_cache"] = _gl
+                _sl = st.session_state.get("_ft_parasut_liste_cache", [])
+                _gl = st.session_state.get("_pm_gider_cache", [])
+                _gelir = sum(float(s.get("attributes",{}).get("net_total",0) or 0) for s in _sl)
+                _gider = sum(float(g.get("attributes",{}).get("net_total",0) or 0) for g in _gl)
+                _c1, _c2, _c3 = st.columns(3)
+                _c1.metric("Gelir", fmt_para(_gelir))
+                _c2.metric("Gider", fmt_para(_gider))
+                _c3.metric("Net", fmt_para(_gelir - _gider))
+
+        elif _pm_grup == "💸 GİDERLER":
+            _pm_alt = st.radio("Alt", ["Gider Listesi", "Tedarikçiler", "Çalışanlar", "Giderler Raporu", "Ödemeler Raporu", "KDV Raporu"],
+                                horizontal=True, label_visibility="collapsed", key="pm_gider_alt")
+
+            if _pm_alt == "Gider Listesi":
+                _pm_liste_goster("_pm_gider_cache", "/purchase_bills", None,
+                    lambda a: a.get("description","") or "(açıklama yok)",
+                    lambda a: f"📅 {a.get('issue_date','')}",
+                    lambda a: a.get("net_total", 0))
+
+            elif _pm_alt == "Tedarikçiler":
+                _pm_liste_goster("_pm_tedarikci_cache", "/contacts", {"filter[account_type]": "supplier"},
+                    lambda a: a.get("name",""),
+                    lambda a: f"📧 {a.get('email','—')} · ☎️ {a.get('phone','—')}",
+                    lambda a: a.get("trl_balance", 0))
+
+            elif _pm_alt == "Çalışanlar":
+                _pm_liste_goster("_pm_calisan_cache", "/employees", None,
+                    lambda a: f"{a.get('name','')} {a.get('surname','')}".strip(),
+                    lambda a: f"📧 {a.get('email','—')}")
+
+            elif _pm_alt == "Giderler Raporu":
+                if "_pm_gider_cache" not in st.session_state:
+                    with st.spinner("⏳ Hesaplanıyor..."):
+                        _gl, _ = _parasut_tum_sayfalari_cek("/purchase_bills")
+                        st.session_state["_pm_gider_cache"] = _gl
+                _gl = st.session_state.get("_pm_gider_cache", [])
+                _toplam = sum(float(g.get("attributes",{}).get("net_total",0) or 0) for g in _gl)
+                _c1, _c2 = st.columns(2)
+                _c1.metric("Toplam Gider", fmt_para(_toplam))
+                _c2.metric("Kayıt Adedi", len(_gl))
+
+            elif _pm_alt == "Ödemeler Raporu":
+                if "_pm_gider_cache" not in st.session_state:
+                    with st.spinner("⏳ Hesaplanıyor..."):
+                        _gl, _ = _parasut_tum_sayfalari_cek("/purchase_bills")
+                        st.session_state["_pm_gider_cache"] = _gl
+                _gl = st.session_state.get("_pm_gider_cache", [])
+                _kalan = sum(float(g.get("attributes",{}).get("remaining",0) or 0) for g in _gl)
+                st.metric("Ödenmemiş Gider Bakiyesi", fmt_para(_kalan))
+
+            elif _pm_alt == "KDV Raporu":
+                with st.spinner("⏳ Hesaplanıyor..."):
+                    if "_ft_parasut_liste_cache" not in st.session_state:
+                        _sl, _ = _parasut_tum_sayfalari_cek("/sales_invoices", {"filter[item_type]": "invoice"})
+                        st.session_state["_ft_parasut_liste_cache"] = _sl
+                    if "_pm_gider_cache" not in st.session_state:
+                        _gl, _ = _parasut_tum_sayfalari_cek("/purchase_bills")
+                        st.session_state["_pm_gider_cache"] = _gl
+                _sl = st.session_state.get("_ft_parasut_liste_cache", [])
+                _gl = st.session_state.get("_pm_gider_cache", [])
+                _kdv_satis = sum(float(s.get("attributes",{}).get("vat_total", s.get("attributes",{}).get("gross_total",0) - s.get("attributes",{}).get("net_total",0) if s.get("attributes",{}).get("gross_total") else 0) or 0) for s in _sl)
+                _kdv_gider = sum(float(g.get("attributes",{}).get("vat_total", g.get("attributes",{}).get("gross_total",0) - g.get("attributes",{}).get("net_total",0) if g.get("attributes",{}).get("gross_total") else 0) or 0) for g in _gl)
+                _c1, _c2, _c3 = st.columns(3)
+                _c1.metric("Hesaplanan KDV (Satış)", fmt_para(_kdv_satis))
+                _c2.metric("İndirilecek KDV (Gider)", fmt_para(_kdv_gider))
+                _c3.metric("Ödenecek KDV (tahmini)", fmt_para(_kdv_satis - _kdv_gider))
+
+        elif _pm_grup == "🏦 NAKİT":
+            _pm_alt = st.radio("Alt", ["Kasa ve Bankalar", "Çekler", "Kasa/Banka Raporu", "Nakit Akışı Raporu"],
+                                horizontal=True, label_visibility="collapsed", key="pm_nakit_alt")
+
+            if _pm_alt == "Kasa ve Bankalar":
+                _pm_liste_goster("_pm_kasa_cache", "/accounts", None,
+                    lambda a: a.get("name",""),
+                    lambda a: f"Tür: {a.get('account_type','—')} · Para Birimi: {a.get('currency','—')}",
+                    lambda a: a.get("balance", 0))
+
+            elif _pm_alt == "Çekler":
+                _pm_liste_goster("_pm_cek_cache", "/e_documents", {"filter[document_type]": "check"},
+                    lambda a: a.get("description","") or "Çek",
+                    lambda a: f"Durum: {a.get('status','—')}")
+
+            elif _pm_alt == "Kasa/Banka Raporu":
+                if "_pm_kasa_cache" not in st.session_state:
+                    with st.spinner("⏳ Hesaplanıyor..."):
+                        _kl, _ = _parasut_tum_sayfalari_cek("/accounts")
+                        st.session_state["_pm_kasa_cache"] = _kl
+                _kl = st.session_state.get("_pm_kasa_cache", [])
+                _toplam_bakiye = sum(float(k.get("attributes",{}).get("balance",0) or 0) for k in _kl)
+                st.metric("Toplam Kasa/Banka Bakiyesi", fmt_para(_toplam_bakiye))
+
+            elif _pm_alt == "Nakit Akışı Raporu":
+                with st.spinner("⏳ Hesaplanıyor..."):
+                    if "_ft_parasut_liste_cache" not in st.session_state:
+                        _sl, _ = _parasut_tum_sayfalari_cek("/sales_invoices", {"filter[item_type]": "invoice"})
+                        st.session_state["_ft_parasut_liste_cache"] = _sl
+                    if "_pm_gider_cache" not in st.session_state:
+                        _gl, _ = _parasut_tum_sayfalari_cek("/purchase_bills")
+                        st.session_state["_pm_gider_cache"] = _gl
+                _sl = st.session_state.get("_ft_parasut_liste_cache", [])
+                _gl = st.session_state.get("_pm_gider_cache", [])
+                _giris = sum(float(s.get("attributes",{}).get("net_total",0) or 0) - float(s.get("attributes",{}).get("remaining",0) or 0) for s in _sl)
+                _cikis = sum(float(g.get("attributes",{}).get("net_total",0) or 0) - float(g.get("attributes",{}).get("remaining",0) or 0) for g in _gl)
+                _c1, _c2, _c3 = st.columns(3)
+                _c1.metric("Nakit Girişi (tahmini)", fmt_para(_giris))
+                _c2.metric("Nakit Çıkışı (tahmini)", fmt_para(_cikis))
+                _c3.metric("Net Nakit Akışı", fmt_para(_giris - _cikis))
+
+        elif _pm_grup == "📦 STOK":
+            _pm_alt = st.radio("Alt", ["Hizmet ve Ürünler", "Depolar", "Depolar Arası Transfer", "Giden İrsaliyeler",
+                                        "Gelen İrsaliyeler", "Fiyat Listeleri", "Stok Geçmişi", "Stoktaki Ürünler Rap."],
+                                horizontal=True, label_visibility="collapsed", key="pm_stok_alt")
+
+            if _pm_alt == "Hizmet ve Ürünler":
+                _pm_liste_goster("_pm_urun_cache", "/products", None,
+                    lambda a: a.get("name",""),
+                    lambda a: f"Kod: {a.get('code','—')} · Stok: {a.get('inventory_level','—')}",
+                    lambda a: a.get("list_price", 0))
+
+            elif _pm_alt == "Depolar":
+                _pm_liste_goster("_pm_depo_cache", "/warehouses", None,
+                    lambda a: a.get("name",""),
+                    lambda a: f"Adres: {a.get('address','—')}")
+
+            elif _pm_alt == "Depolar Arası Transfer":
+                _pm_liste_goster("_pm_transfer_cache", "/warehouse_transfers", None,
+                    lambda a: a.get("description","") or "Transfer",
+                    lambda a: f"📅 {a.get('date','—')}")
+
+            elif _pm_alt == "Giden İrsaliyeler":
+                _pm_liste_goster("_pm_g_irsaliye_cache", "/shipment_documents", {"filter[shipment_type]": "outgoing"},
+                    lambda a: a.get("description","") or "İrsaliye",
+                    lambda a: f"📅 {a.get('date','—')}")
+
+            elif _pm_alt == "Gelen İrsaliyeler":
+                _pm_liste_goster("_pm_gel_irsaliye_cache", "/shipment_documents", {"filter[shipment_type]": "incoming"},
+                    lambda a: a.get("description","") or "İrsaliye",
+                    lambda a: f"📅 {a.get('date','—')}")
+
+            elif _pm_alt == "Fiyat Listeleri":
+                _pm_liste_goster("_pm_fiyat_liste_cache", "/price_lists", None,
+                    lambda a: a.get("name",""),
+                    lambda a: f"Para Birimi: {a.get('currency','—')}")
+
+            elif _pm_alt == "Stok Geçmişi":
+                _pm_liste_goster("_pm_stok_gecmis_cache", "/inventory_levels", None,
+                    lambda a: a.get("warehouse_name","") or "Depo",
+                    lambda a: f"Miktar: {a.get('quantity','—')}")
+
+            elif _pm_alt == "Stoktaki Ürünler Rap.":
+                if "_pm_urun_cache" not in st.session_state:
+                    with st.spinner("⏳ Hesaplanıyor..."):
+                        _ul, _ = _parasut_tum_sayfalari_cek("/products")
+                        st.session_state["_pm_urun_cache"] = _ul
+                _ul = st.session_state.get("_pm_urun_cache", [])
+                for _u in _ul:
+                    _ua = _u.get("attributes", {})
+                    st.caption(f"📦 {_ua.get('name','')} — Stokta: {_ua.get('inventory_level','—')}")
 
 elif aktif == "otomatik_arama":
     sayfa_log("otomatik_arama")
