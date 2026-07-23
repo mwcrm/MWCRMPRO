@@ -1243,6 +1243,8 @@ def giris_ekrani():
     st.markdown("""
 <style>
 .block-container { padding-top: 0.25rem !important; }
+div[data-testid="stRadio"] label p { font-size: 12px !important; }
+div[data-testid="stTextInput"] input { font-size: 13px !important; }
 </style>
 """, unsafe_allow_html=True)
     # ── LOGO — mini ──────────────────────────────────────────────────────────
@@ -1262,7 +1264,7 @@ def giris_ekrani():
 </div>
 """, unsafe_allow_html=True)
 
-    _gc1, _gc2, _gc3 = st.columns([1,2,1])
+    _gc1, _gc2, _gc3 = st.columns([1.6,1,1.6])
     with _gc2:
         # ── CİHAZ SEÇİMİ — radio buton ile, rerun YOK ────────────────────────
         st.markdown("""
