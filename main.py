@@ -65,6 +65,7 @@ _MUH_CLIENT_SECRET = st.secrets.get("MUHASEBE_CLIENT_SECRET", "EHBUuu5JvCEgg48kc
 _MUH_REDIRECT_URI  = "urn:ietf:wg:oauth:2.0:oob"
 _MUH_COMPANY_ID    = st.secrets.get("MUHASEBE_COMPANY_ID", "843974")
 _MUH_API_BASE      = "https://api.parasut.com"
+_MUH_UA            = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 
 def _muh_token_oku():
     """Kayıtlı muhasebe bağlantı token'ını kullanici_tercih tablosundan okur (yeni tablo açılmadı)."""
@@ -100,7 +101,9 @@ def _muh_token_istegi(form_data):
     import urllib.request, urllib.parse, urllib.error
     data = urllib.parse.urlencode(form_data).encode()
     req = urllib.request.Request(f"{_MUH_API_BASE}/oauth/token", data=data, method="POST",
-                                  headers={"Content-Type": "application/x-www-form-urlencoded"})
+                                  headers={"Content-Type": "application/x-www-form-urlencoded",
+                                           "Accept": "application/json",
+                                           "User-Agent": _MUH_UA})
     try:
         with urllib.request.urlopen(req, timeout=15) as resp:
             token = json.loads(resp.read().decode())
@@ -162,6 +165,7 @@ def _muh_api_get(yol, params=None):
     req = urllib.request.Request(url, headers={
         "Authorization": f"Bearer {tok['access_token']}",
         "Accept": "application/json",
+        "User-Agent": _MUH_UA,
     })
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
@@ -174,6 +178,101 @@ def _muh_api_get(yol, params=None):
         return None, f"HTTP {e.code}: {detay}"
     except Exception as e:
         return None, str(e)
+
+def _muh_api_istek(yol, method="POST", body=None):
+    """Muhasebe API'sine POST/PUT/DELETE isteği yapar (JSON:API gövdesiyle)."""
+    import urllib.request, urllib.error
+    tok, hata = _muh_gecerli_token()
+    if not tok:
+        return None, hata
+    url = f"{_MUH_API_BASE}{yol}"
+    data = json.dumps(body).encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, method=method, headers={
+        "Authorization": f"Bearer {tok['access_token']}",
+        "Accept": "application/json",
+        "Content-Type": "application/vnd.api+json",
+        "User-Agent": _MUH_UA,
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            _ham = resp.read().decode()
+            return (json.loads(_ham) if _ham.strip() else {}), None
+    except urllib.error.HTTPError as e:
+        try:
+            detay = e.read().decode()[:500]
+        except:
+            detay = str(e)
+        return None, f"HTTP {e.code}: {detay}"
+    except Exception as e:
+        return None, str(e)
+
+def _muh_contact_id_bul_veya_olustur(cari_id, firma_adi):
+    """CRM'deki cari için muhasebe sisteminde kayıtlı contact id'yi bulur, yoksa yeni oluşturur."""
+    _anahtar = f"_muh_contact_{cari_id}"
+    try:
+        sb = get_sb_client()
+        if sb:
+            r = sb.table("kullanici_tercih").select("deger").eq("kullanici", "_sistem").eq("anahtar", _anahtar).execute()
+            if r.data:
+                return r.data[0]["deger"], None
+    except:
+        pass
+
+    _sonuc, _hata = _muh_api_istek(
+        f"/v4/companies/{_MUH_COMPANY_ID}/contacts", method="POST",
+        body={"data": {"type": "contacts", "attributes": {
+            "name": firma_adi, "account_type": "customer", "contact_type": "company",
+        }}}
+    )
+    if _hata:
+        return None, f"Müşteri kaydı oluşturulamadı: {_hata}"
+    _yeni_id = ((_sonuc or {}).get("data") or {}).get("id")
+    if not _yeni_id:
+        return None, "Müşteri kaydı oluşturuldu ama id alınamadı."
+    try:
+        sb = get_sb_client()
+        if sb:
+            sb.table("kullanici_tercih").insert({"kullanici": "_sistem", "anahtar": _anahtar, "deger": str(_yeni_id)}).execute()
+    except:
+        pass
+    return _yeni_id, None
+
+def _muh_fatura_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fatura_tarihi, vade_tarihi):
+    """Yeni satış faturası oluşturur — tek kalemli basit fatura."""
+    _gecici_id = "det-1"
+    _govde = {
+        "data": {
+            "type": "sales_invoices",
+            "attributes": {
+                "item_type": "invoice",
+                "description": aciklama or "",
+                "issue_date": str(fatura_tarihi),
+                "due_date": str(vade_tarihi),
+                "currency": "TRL",
+                "exchange_rate": 1,
+            },
+            "relationships": {
+                "contact": {"data": {"id": str(contact_id), "type": "contacts"}},
+                "details": {"data": [{"type": "sales_invoice_details", "id": _gecici_id}]},
+            },
+        },
+        "included": [
+            {
+                "type": "sales_invoice_details",
+                "id": _gecici_id,
+                "attributes": {
+                    "quantity": float(miktar),
+                    "unit_price": float(birim_fiyat),
+                    "vat_rate": float(kdv_orani),
+                    "description": aciklama or "",
+                },
+            }
+        ],
+    }
+    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/sales_invoices", method="POST", body=_govde)
+
+def _muh_fatura_sil(invoice_id):
+    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/sales_invoices/{invoice_id}", method="DELETE")
 
 def hesapla_segment(manuel_segment, gerceklesen_ciro):
     """Manuel segment varsa onu normalize et, yoksa ciroya göre otomatik hesapla"""
@@ -12899,11 +12998,11 @@ elif aktif == "bolgeler":
         st.divider()
         st.caption("Yeni müşteri eklemek için mevcut 📥 Excel Aktar sayfasını kullanabilirsiniz — il/ilçe bilgisi girildiğinde bölgesi otomatik hesaplanır. Tek tek bölge listesi için Cari Liste ekranının en üstündeki 📍 Bölgeler kutucuklarını kullanın.")
 
-# ── MUHASEBE – FATURALAR (sadece görüntüleme, veri yazma YOK) ────────────────
+# ── MUHASEBE – FATURALAR ──────────────────────────────────────────────────────
 elif aktif == "muhasebe_fatura":
     sayfa_log("muhasebe_fatura")
     st.markdown("## 💰 Muhasebe – Faturalar")
-    st.caption("Bu ekran salt-okunurdur; hiçbir veri CRM veritabanına yazılmaz. Fatura kesme/silme işlemi yapılmaz.")
+    st.caption("Fatura oluşturma/silme işlemleri gerçek muhasebe sistemine anında yansır — dikkatli kullanın.")
 
     _muh_tok = _muh_token_oku()
     if not _muh_tok:
@@ -12931,6 +13030,53 @@ elif aktif == "muhasebe_fatura":
             if st.button("🔄 Yenile", key="muh_yenile_btn"):
                 st.rerun()
 
+        # ── YENİ FATURA OLUŞTUR (CRM'den Parasut'a gönderir) ─────────────────
+        with st.expander("➕ Yeni Fatura Oluştur"):
+            st.caption("Kaydettiğinde fatura gerçekten muhasebe sisteminde oluşturulur. Test amaçlı kullanmayın.")
+            _muh_cari_df = db_read("cari_kartlar", extra_sql="ORDER BY firma")
+            if not _muh_cari_df.empty and "silindi" in _muh_cari_df.columns:
+                _muh_cari_df = _muh_cari_df[~_muh_cari_df["silindi"].isin([1, "1", True, "true"])]
+            if _muh_cari_df.empty or "firma" not in _muh_cari_df.columns:
+                st.info("Fatura kesilecek cari bulunamadı. Önce bir cari kartı oluşturun.")
+            else:
+                _muh_cari_secim = st.selectbox(
+                    "Cari", options=_muh_cari_df["id"].tolist(),
+                    format_func=lambda x: _muh_cari_df.loc[_muh_cari_df["id"] == x, "firma"].values[0]
+                                 if x in _muh_cari_df["id"].values else str(x),
+                    key="muh_yeni_cari"
+                )
+                _muh_f1, _muh_f2 = st.columns(2)
+                _muh_aciklama = _muh_f1.text_input("Açıklama / Hizmet", key="muh_yeni_aciklama")
+                _muh_miktar = _muh_f2.number_input("Miktar", min_value=0.0, value=1.0, step=1.0, key="muh_yeni_miktar")
+                _muh_f3, _muh_f4 = st.columns(2)
+                _muh_birim_fiyat = _muh_f3.number_input("Birim Fiyat (₺)", min_value=0.0, value=0.0, step=100.0, key="muh_yeni_fiyat")
+                _muh_kdv = _muh_f4.selectbox("KDV Oranı (%)", options=[0, 1, 8, 10, 18, 20], index=5, key="muh_yeni_kdv")
+                _muh_f5, _muh_f6 = st.columns(2)
+                _muh_f_tarih = _muh_f5.date_input("Fatura Tarihi", value=datetime.now().date(), key="muh_yeni_ftarih")
+                _muh_v_tarih = _muh_f6.date_input("Vade Tarihi", value=datetime.now().date() + timedelta(days=30), key="muh_yeni_vtarih")
+
+                if st.button("💾 Fatura Oluştur ve Gönder", type="primary", key="muh_yeni_kaydet_btn"):
+                    if not _muh_aciklama.strip():
+                        st.warning("Açıklama boş olamaz.")
+                    elif _muh_birim_fiyat <= 0:
+                        st.warning("Birim fiyat 0'dan büyük olmalı.")
+                    else:
+                        _muh_firma_adi = _muh_cari_df.loc[_muh_cari_df["id"] == _muh_cari_secim, "firma"].values[0]
+                        with st.spinner("Müşteri kontrol ediliyor ve fatura oluşturuluyor..."):
+                            _muh_contact_id, _muh_c_hata = _muh_contact_id_bul_veya_olustur(_muh_cari_secim, _muh_firma_adi)
+                            if _muh_c_hata:
+                                st.error(_muh_c_hata)
+                            else:
+                                _muh_sonuc, _muh_f_hata = _muh_fatura_olustur(
+                                    _muh_contact_id, _muh_aciklama, _muh_miktar, _muh_birim_fiyat,
+                                    _muh_kdv, _muh_f_tarih, _muh_v_tarih
+                                )
+                                if _muh_f_hata:
+                                    st.error(f"Fatura oluşturulamadı: {_muh_f_hata}")
+                                else:
+                                    st.success("✅ Fatura başarıyla oluşturuldu.")
+                                    st.rerun()
+
         with st.spinner("Faturalar alınıyor..."):
             _muh_veri, _muh_hata = _muh_api_get(
                 f"/v4/companies/{_MUH_COMPANY_ID}/sales_invoices",
@@ -12945,20 +13091,40 @@ elif aktif == "muhasebe_fatura":
             if not _muh_kayitlar:
                 st.info("Kayıtlı fatura bulunamadı.")
             else:
-                _muh_satirlar = []
+                st.markdown(f"**{len(_muh_kayitlar)} fatura** (en fazla 50 kayıt gösterilir)")
+                _muh_baslik_c = st.columns([2, 2, 2, 2, 2, 2, 1])
+                for _c, _t in zip(_muh_baslik_c, ["Fatura No", "Tarih", "Vade", "Net Tutar", "Toplam", "Durum", ""]):
+                    _c.markdown(f"**{_t}**")
                 for _k in _muh_kayitlar:
                     _a = _k.get("attributes", {}) or {}
-                    _muh_satirlar.append({
-                        "Fatura No":  _a.get("invoice_no", ""),
-                        "Tarih":      _a.get("issue_date", ""),
-                        "Vade":       _a.get("due_date", ""),
-                        "Net Tutar":  _a.get("net_total", ""),
-                        "Toplam":     _a.get("gross_total", ""),
-                        "Kalan":      _a.get("remaining", ""),
-                        "Durum":      _a.get("payment_status", ""),
-                    })
-                st.dataframe(pd.DataFrame(_muh_satirlar), use_container_width=True, hide_index=True)
-                st.caption(f"Toplam {len(_muh_satirlar)} fatura listelendi (en fazla 50 kayıt).")
+                    _fid = _k.get("id")
+                    _rc = st.columns([2, 2, 2, 2, 2, 2, 1])
+                    _rc[0].write(_a.get("invoice_no", ""))
+                    _rc[1].write(_a.get("issue_date", ""))
+                    _rc[2].write(_a.get("due_date", ""))
+                    _rc[3].write(_a.get("net_total", ""))
+                    _rc[4].write(_a.get("gross_total", ""))
+                    _rc[5].write(_a.get("payment_status", ""))
+                    _muh_sil_bekliyor_key = f"muh_sil_bekliyor_{_fid}"
+                    if not st.session_state.get(_muh_sil_bekliyor_key):
+                        if _rc[6].button("🗑️", key=f"muh_sil_btn_{_fid}", help="Faturayı sil"):
+                            st.session_state[_muh_sil_bekliyor_key] = True
+                            st.rerun()
+                    else:
+                        st.warning(f"⚠️ **{_a.get('invoice_no','Bu fatura')}** faturasını muhasebe sisteminden kalıcı olarak silmek üzeresiniz. Bu işlem GERİ ALINAMAZ.")
+                        _oc1, _oc2 = st.columns(2)
+                        if _oc1.button("✅ Evet, kalıcı sil", type="primary", key=f"muh_sil_onay_{_fid}"):
+                            with st.spinner("Siliniyor..."):
+                                _muh_sil_sonuc, _muh_sil_hata = _muh_fatura_sil(_fid)
+                            st.session_state.pop(_muh_sil_bekliyor_key, None)
+                            if _muh_sil_hata:
+                                st.error(f"Silinemedi: {_muh_sil_hata}")
+                            else:
+                                st.success("Fatura silindi.")
+                                st.rerun()
+                        if _oc2.button("Vazgeç", key=f"muh_sil_vazgec_{_fid}"):
+                            st.session_state.pop(_muh_sil_bekliyor_key, None)
+                            st.rerun()
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
