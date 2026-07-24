@@ -154,7 +154,7 @@ def _muh_gecerli_token():
     return tok, None
 
 def _muh_api_get(yol, params=None):
-    """Muhasebe API'sinden GET isteği yapar. yol örn: /v4/companies/843974/sales_invoices"""
+    """Muhasebe API'sinden GET isteği yapar. yol örn: /v4/843974/sales_invoices"""
     import urllib.request, urllib.parse, urllib.error
     tok, hata = _muh_gecerli_token()
     if not tok:
@@ -219,7 +219,7 @@ def _muh_contact_id_bul_veya_olustur(cari_id, firma_adi):
         pass
 
     _sonuc, _hata = _muh_api_istek(
-        f"/v4/companies/{_MUH_COMPANY_ID}/contacts", method="POST",
+        f"/v4/{_MUH_COMPANY_ID}/contacts", method="POST",
         body={"data": {"type": "contacts", "attributes": {
             "name": firma_adi, "account_type": "customer", "contact_type": "company",
         }}}
@@ -269,10 +269,10 @@ def _muh_fatura_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fa
             }
         ],
     }
-    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/sales_invoices", method="POST", body=_govde)
+    return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/sales_invoices", method="POST", body=_govde)
 
 def _muh_fatura_sil(invoice_id):
-    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/sales_invoices/{invoice_id}", method="DELETE")
+    return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/sales_invoices/{invoice_id}", method="DELETE")
 
 # ── MUHASEBE — GENİŞLETİLMİŞ KAYNAKLAR (Teklifler/Müşteriler/Tedarikçiler/vb.) ─
 # NOT: Bu fonksiyonlar Parasut API'sinin bilinen JSON:API kurallarına göre
@@ -285,22 +285,22 @@ def _muh_contacts_getir(account_type=None, sayfa_boyutu=100):
     params = {"page[size]": sayfa_boyutu, "sort": "-created_at"}
     if account_type:
         params["filter[account_type]"] = account_type
-    return _muh_api_get(f"/v4/companies/{_MUH_COMPANY_ID}/contacts", params=params)
+    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/contacts", params=params)
 
 def _muh_contact_olustur(ad, account_type="customer", telefon="", email="", adres=""):
     _attrs = {"name": ad, "account_type": account_type, "contact_type": "company"}
     if telefon: _attrs["phone"] = telefon
     if email: _attrs["email"] = email
     if adres: _attrs["address"] = adres
-    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/contacts", method="POST",
+    return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/contacts", method="POST",
                            body={"data": {"type": "contacts", "attributes": _attrs}})
 
 def _muh_contact_sil(contact_id):
-    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/contacts/{contact_id}", method="DELETE")
+    return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/contacts/{contact_id}", method="DELETE")
 
 def _muh_contact_ada_gore_bul_veya_olustur(ad, account_type="supplier"):
     """CRM'de karşılığı olmayan kayıtlar (örn. tedarikçi) için isme göre arar, bulamazsa oluşturur."""
-    veri, hata = _muh_api_get(f"/v4/companies/{_MUH_COMPANY_ID}/contacts",
+    veri, hata = _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/contacts",
                                params={"filter[name]": ad, "page[size]": 5})
     if not hata:
         for _d in (veri or {}).get("data", []):
@@ -309,23 +309,23 @@ def _muh_contact_ada_gore_bul_veya_olustur(ad, account_type="supplier"):
     return _muh_contact_olustur(ad, account_type)
 
 def _muh_employees_getir():
-    return _muh_api_get(f"/v4/companies/{_MUH_COMPANY_ID}/employees", params={"page[size]": 100})
+    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/employees", params={"page[size]": 100})
 
 def _muh_employee_olustur(ad, soyad, email="", tc_no=""):
     _attrs = {"name": ad, "surname": soyad}
     if email: _attrs["email"] = email
     if tc_no: _attrs["identity_number"] = tc_no
-    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/employees", method="POST",
+    return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/employees", method="POST",
                            body={"data": {"type": "employees", "attributes": _attrs}})
 
 def _muh_employee_sil(emp_id):
-    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/employees/{emp_id}", method="DELETE")
+    return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/employees/{emp_id}", method="DELETE")
 
 def _muh_accounts_getir():
-    return _muh_api_get(f"/v4/companies/{_MUH_COMPANY_ID}/accounts", params={"page[size]": 100})
+    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/accounts", params={"page[size]": 100})
 
 def _muh_teklifler_getir():
-    return _muh_api_get(f"/v4/companies/{_MUH_COMPANY_ID}/sales_offers",
+    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/sales_offers",
                          params={"page[size]": 50, "sort": "-issue_date"})
 
 def _muh_teklif_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, teklif_tarihi, gecerlilik_tarihi):
@@ -348,13 +348,13 @@ def _muh_teklif_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, te
                             "vat_rate": float(kdv_orani), "description": aciklama or ""},
         }],
     }
-    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/sales_offers", method="POST", body=_govde)
+    return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/sales_offers", method="POST", body=_govde)
 
 def _muh_teklif_sil(offer_id):
-    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/sales_offers/{offer_id}", method="DELETE")
+    return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/sales_offers/{offer_id}", method="DELETE")
 
 def _muh_giderler_getir():
-    return _muh_api_get(f"/v4/companies/{_MUH_COMPANY_ID}/purchase_bills",
+    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/purchase_bills",
                          params={"page[size]": 50, "sort": "-issue_date"})
 
 def _muh_gider_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fatura_tarihi, vade_tarihi):
@@ -377,13 +377,13 @@ def _muh_gider_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fat
                             "vat_rate": float(kdv_orani), "description": aciklama or ""},
         }],
     }
-    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/purchase_bills", method="POST", body=_govde)
+    return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/purchase_bills", method="POST", body=_govde)
 
 def _muh_gider_sil(bill_id):
-    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/purchase_bills/{bill_id}", method="DELETE")
+    return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/purchase_bills/{bill_id}", method="DELETE")
 
 def _muh_cekler_getir():
-    return _muh_api_get(f"/v4/companies/{_MUH_COMPANY_ID}/checks", params={"page[size]": 50})
+    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/checks", params={"page[size]": 50})
 
 def _muh_liste_render(kayitlar, kolonlar, sil_fn=None, key_prefix="ml", bos_mesaj="Kayıt bulunamadı."):
     """Ortak liste render — kolonlar: [(baslik, attr_anahtari, formatter|None), ...]"""
@@ -11382,7 +11382,7 @@ elif aktif == "muhasebe_fatura":
 
         with st.spinner("Faturalar alınıyor..."):
             _muh_veri, _muh_hata = _muh_api_get(
-                f"/v4/companies/{_MUH_COMPANY_ID}/sales_invoices",
+                f"/v4/{_MUH_COMPANY_ID}/sales_invoices",
                 params={"page[size]": 50, "sort": "-issue_date"}
             )
 
@@ -11746,7 +11746,7 @@ elif aktif in ("muhasebe_satis_raporu", "muhasebe_tahsilat_raporu", "muhasebe_ge
                 return 0.0
 
         _mr_satis_veri, _mr_satis_hata = _muh_api_get(
-            f"/v4/companies/{_MUH_COMPANY_ID}/sales_invoices", params={"page[size]": 100, "sort": "-issue_date"})
+            f"/v4/{_MUH_COMPANY_ID}/sales_invoices", params={"page[size]": 100, "sort": "-issue_date"})
         _mr_gider_veri, _mr_gider_hata = _muh_giderler_getir()
 
         if _mr_satis_hata or _mr_gider_hata:
