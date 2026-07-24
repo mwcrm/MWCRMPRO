@@ -274,6 +274,168 @@ def _muh_fatura_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fa
 def _muh_fatura_sil(invoice_id):
     return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/sales_invoices/{invoice_id}", method="DELETE")
 
+# ── MUHASEBE — GENİŞLETİLMİŞ KAYNAKLAR (Teklifler/Müşteriler/Tedarikçiler/vb.) ─
+# NOT: Bu fonksiyonlar Parasut API'sinin bilinen JSON:API kurallarına göre
+# yazıldı ama gerçek uçlar bu ortamdan test edilemiyor (ağ kısıtı). Canlıda bir
+# alan adı hatası çıkarsa (örn. sales_offers) hata mesajıyla birlikte hızlıca
+# düzeltilecektir — mevcut hata gösterme yapısı zaten ham API hatasını ekranda
+# gösteriyor, uygulama çökmüyor.
+
+def _muh_contacts_getir(account_type=None, sayfa_boyutu=100):
+    params = {"page[size]": sayfa_boyutu, "sort": "-created_at"}
+    if account_type:
+        params["filter[account_type]"] = account_type
+    return _muh_api_get(f"/v4/companies/{_MUH_COMPANY_ID}/contacts", params=params)
+
+def _muh_contact_olustur(ad, account_type="customer", telefon="", email="", adres=""):
+    _attrs = {"name": ad, "account_type": account_type, "contact_type": "company"}
+    if telefon: _attrs["phone"] = telefon
+    if email: _attrs["email"] = email
+    if adres: _attrs["address"] = adres
+    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/contacts", method="POST",
+                           body={"data": {"type": "contacts", "attributes": _attrs}})
+
+def _muh_contact_sil(contact_id):
+    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/contacts/{contact_id}", method="DELETE")
+
+def _muh_contact_ada_gore_bul_veya_olustur(ad, account_type="supplier"):
+    """CRM'de karşılığı olmayan kayıtlar (örn. tedarikçi) için isme göre arar, bulamazsa oluşturur."""
+    veri, hata = _muh_api_get(f"/v4/companies/{_MUH_COMPANY_ID}/contacts",
+                               params={"filter[name]": ad, "page[size]": 5})
+    if not hata:
+        for _d in (veri or {}).get("data", []):
+            if str((_d.get("attributes") or {}).get("name", "")).strip().lower() == ad.strip().lower():
+                return _d.get("id"), None
+    return _muh_contact_olustur(ad, account_type)
+
+def _muh_employees_getir():
+    return _muh_api_get(f"/v4/companies/{_MUH_COMPANY_ID}/employees", params={"page[size]": 100})
+
+def _muh_employee_olustur(ad, soyad, email="", tc_no=""):
+    _attrs = {"name": ad, "surname": soyad}
+    if email: _attrs["email"] = email
+    if tc_no: _attrs["identity_number"] = tc_no
+    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/employees", method="POST",
+                           body={"data": {"type": "employees", "attributes": _attrs}})
+
+def _muh_employee_sil(emp_id):
+    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/employees/{emp_id}", method="DELETE")
+
+def _muh_accounts_getir():
+    return _muh_api_get(f"/v4/companies/{_MUH_COMPANY_ID}/accounts", params={"page[size]": 100})
+
+def _muh_teklifler_getir():
+    return _muh_api_get(f"/v4/companies/{_MUH_COMPANY_ID}/sales_offers",
+                         params={"page[size]": 50, "sort": "-issue_date"})
+
+def _muh_teklif_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, teklif_tarihi, gecerlilik_tarihi):
+    _gid = "det-1"
+    _govde = {
+        "data": {
+            "type": "sales_offers",
+            "attributes": {
+                "description": aciklama or "", "issue_date": str(teklif_tarihi),
+                "expiry_date": str(gecerlilik_tarihi), "currency": "TRL", "exchange_rate": 1,
+            },
+            "relationships": {
+                "contact": {"data": {"id": str(contact_id), "type": "contacts"}},
+                "details": {"data": [{"type": "sales_offer_details", "id": _gid}]},
+            },
+        },
+        "included": [{
+            "type": "sales_offer_details", "id": _gid,
+            "attributes": {"quantity": float(miktar), "unit_price": float(birim_fiyat),
+                            "vat_rate": float(kdv_orani), "description": aciklama or ""},
+        }],
+    }
+    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/sales_offers", method="POST", body=_govde)
+
+def _muh_teklif_sil(offer_id):
+    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/sales_offers/{offer_id}", method="DELETE")
+
+def _muh_giderler_getir():
+    return _muh_api_get(f"/v4/companies/{_MUH_COMPANY_ID}/purchase_bills",
+                         params={"page[size]": 50, "sort": "-issue_date"})
+
+def _muh_gider_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fatura_tarihi, vade_tarihi):
+    _gid = "det-1"
+    _govde = {
+        "data": {
+            "type": "purchase_bills",
+            "attributes": {
+                "item_type": "invoice", "description": aciklama or "", "issue_date": str(fatura_tarihi),
+                "due_date": str(vade_tarihi), "currency": "TRL", "exchange_rate": 1,
+            },
+            "relationships": {
+                "contact": {"data": {"id": str(contact_id), "type": "contacts"}},
+                "details": {"data": [{"type": "purchase_bill_details", "id": _gid}]},
+            },
+        },
+        "included": [{
+            "type": "purchase_bill_details", "id": _gid,
+            "attributes": {"quantity": float(miktar), "unit_price": float(birim_fiyat),
+                            "vat_rate": float(kdv_orani), "description": aciklama or ""},
+        }],
+    }
+    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/purchase_bills", method="POST", body=_govde)
+
+def _muh_gider_sil(bill_id):
+    return _muh_api_istek(f"/v4/companies/{_MUH_COMPANY_ID}/purchase_bills/{bill_id}", method="DELETE")
+
+def _muh_cekler_getir():
+    return _muh_api_get(f"/v4/companies/{_MUH_COMPANY_ID}/checks", params={"page[size]": 50})
+
+def _muh_liste_render(kayitlar, kolonlar, sil_fn=None, key_prefix="ml", bos_mesaj="Kayıt bulunamadı."):
+    """Ortak liste render — kolonlar: [(baslik, attr_anahtari, formatter|None), ...]"""
+    if not kayitlar:
+        st.info(bos_mesaj)
+        return
+    _oranlar = [2] * len(kolonlar) + ([1] if sil_fn else [])
+    _hc = st.columns(_oranlar)
+    for _c, (_b, _k, _f) in zip(_hc, kolonlar):
+        _c.markdown(f"**{_b}**")
+    for _kk in kayitlar:
+        _a = _kk.get("attributes", {}) or {}
+        _rid = _kk.get("id")
+        _rc = st.columns(_oranlar)
+        for _c, (_b, _k, _f) in zip(_rc, kolonlar):
+            _v = _a.get(_k, "")
+            try:
+                _c.write(_f(_v) if _f else _v)
+            except Exception:
+                _c.write(_v)
+        if sil_fn:
+            _bek = f"{key_prefix}_sil_bekliyor_{_rid}"
+            if not st.session_state.get(_bek):
+                if _rc[-1].button("🗑️", key=f"{key_prefix}_sil_btn_{_rid}"):
+                    st.session_state[_bek] = True
+                    st.rerun()
+            else:
+                st.warning("⚠️ Bu kaydı muhasebe sisteminden kalıcı olarak silmek üzeresiniz. Bu işlem GERİ ALINAMAZ.")
+                _oc1, _oc2 = st.columns(2)
+                if _oc1.button("✅ Evet, kalıcı sil", type="primary", key=f"{key_prefix}_sil_onay_{_rid}"):
+                    with st.spinner("Siliniyor..."):
+                        _s_sonuc, _s_hata = sil_fn(_rid)
+                    st.session_state.pop(_bek, None)
+                    if _s_hata:
+                        st.error(f"Silinemedi: {_s_hata}")
+                    else:
+                        st.success("Silindi.")
+                        st.rerun()
+                if _oc2.button("Vazgeç", key=f"{key_prefix}_sil_vazgec_{_rid}"):
+                    st.session_state.pop(_bek, None)
+                    st.rerun()
+
+def _muh_baglanti_var_mi():
+    return bool(_muh_token_oku())
+
+def _muh_baglanti_uyar():
+    st.warning("⚠️ Muhasebe sistemine henüz bağlı değilsiniz.")
+    st.caption("Bağlantıyı 'Faturalar' sayfasından tek seferlik kurabilirsiniz.")
+    if st.button("🔗 Faturalar sayfasına git ve bağlan", key="muh_baglan_yonlendir"):
+        st.session_state["aktif_tab"] = "muhasebe_fatura"
+        st.rerun()
+
 def hesapla_segment(manuel_segment, gerceklesen_ciro):
     """Manuel segment varsa onu normalize et, yoksa ciroya göre otomatik hesapla"""
     # Normalize — eski kayıtlardaki farklı ikonları düzelt
@@ -2445,61 +2607,50 @@ button[data-testid="manage-app-button"] { display: none !important; }
                         st.session_state["aktif_tab"] = _tab_key
                         st.rerun()
 
-    # ── MUHASEBE MENÜSÜ (harici muhasebe altyapısı) ─────────────────────────
-    # NOT: Streamlit, güvenlik nedeniyle harici linklere zorla target=_blank
-    # ekliyor ve javascript:/onclick gibi öznitelikleri temizliyor; component
-    # iframe'i de üst sekmeye yönlendirmeyi engelliyor. Bu yüzden bu linkler
-    # yeni sekmede açılır (Streamlit'in aşılamayan platform kısıtı) — sadece
-    # "Faturalar" CRM içinde tamamen native çalışır (harici gezinme yok).
+    # ── MUHASEBE MENÜSÜ ───────────────────────────────────────────────────────
+    # Tüm alt sayfalar artık CRM içinde native render ediliyor (harici link/yeni
+    # sekme YOK) — her sayfa açıldığında muhasebe sisteminden anlık veri çeker,
+    # CRM'de yapılan her ekleme/silme de anında muhasebe sistemine yazılır.
     st.markdown("""
 <style>
 .mw-muh-baslik{font-size:11px;font-weight:700;color:#0f172a;text-transform:uppercase;
-    letter-spacing:.4px;margin:6px 0 4px;}
-.mw-muh-grup{display:flex;flex-direction:column;gap:1px;margin-bottom:2px;}
-.mw-muh-link{font-size:12.5px;color:#334155;text-decoration:none;padding:5px 8px;
-    border-radius:6px;display:block;}
-.mw-muh-link:hover{background:#f6f8fb;color:#1a4f9e;}
+    letter-spacing:.4px;margin:8px 0 3px;}
 </style>
 """, unsafe_allow_html=True)
     with st.expander("💰 Muhasebe"):
-        st.markdown("""
-<div class="mw-muh-baslik">Satışlar</div>
-<div class="mw-muh-grup">
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/teklifler">Teklifler</a>
-</div>
-""", unsafe_allow_html=True)
-
-        _muh_fatura_aktif = st.session_state.get("aktif_tab") == "muhasebe_fatura"
-        if st.button("📄 Faturalar", use_container_width=True,
-                     type="primary" if _muh_fatura_aktif else "secondary",
-                     key="sb_muh_fatura"):
-            st.session_state["aktif_tab"] = "muhasebe_fatura"
-            st.rerun()
-
-        st.markdown("""
-<div class="mw-muh-grup">
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/musteriler">Müşteriler</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/satislar">Satışlar Raporu</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/tahsilatlar">Tahsilatlar Raporu</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/gelir-ve-gider-raporu">Gelir Gider Raporu</a>
-</div>
-<div class="mw-muh-baslik">Giderler</div>
-<div class="mw-muh-grup">
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/giderler">Gider Listesi</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/tedarikciler">Tedarikçiler</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/calisanlar">Çalışanlar</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/giderler">Giderler Raporu</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/odemeler">Ödemeler Raporu</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/kdv">KDV Raporu</a>
-</div>
-<div class="mw-muh-baslik">Nakit</div>
-<div class="mw-muh-grup">
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/kasa-ve-bankalar">Kasa ve Bankalar</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/cekler">Çekler</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/kasa-banka">Kasa / Banka Raporu</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/nakit-akisi">Nakit Akışı Raporu</a>
-</div>
-""", unsafe_allow_html=True)
+        _MUH_SB_GRUPLAR = [
+            ("Satışlar", [
+                ("muhasebe_teklifler",        "📝 Teklifler"),
+                ("muhasebe_fatura",           "📄 Faturalar"),
+                ("muhasebe_musteriler",       "👥 Müşteriler"),
+                ("muhasebe_satis_raporu",     "📊 Satışlar Raporu"),
+                ("muhasebe_tahsilat_raporu",  "💵 Tahsilatlar Raporu"),
+                ("muhasebe_gelirgider_raporu","📈 Gelir Gider Raporu"),
+            ]),
+            ("Giderler", [
+                ("muhasebe_gider_listesi",  "🧾 Gider Listesi"),
+                ("muhasebe_tedarikciler",   "🚚 Tedarikçiler"),
+                ("muhasebe_calisanlar",     "👔 Çalışanlar"),
+                ("muhasebe_gider_raporu",   "📉 Giderler Raporu"),
+                ("muhasebe_odeme_raporu",   "💳 Ödemeler Raporu"),
+                ("muhasebe_kdv_raporu",     "🧮 KDV Raporu"),
+            ]),
+            ("Nakit", [
+                ("muhasebe_kasa_banka",        "🏦 Kasa ve Bankalar"),
+                ("muhasebe_cekler",            "📑 Çekler"),
+                ("muhasebe_kasabanka_raporu",  "🏦 Kasa / Banka Raporu"),
+                ("muhasebe_nakit_raporu",      "💧 Nakit Akışı Raporu"),
+            ]),
+        ]
+        for _mg_baslik, _mg_items in _MUH_SB_GRUPLAR:
+            st.markdown(f'<div class="mw-muh-baslik">{_mg_baslik}</div>', unsafe_allow_html=True)
+            for _mg_key, _mg_etiket in _mg_items:
+                _mg_aktif = st.session_state.get("aktif_tab") == _mg_key
+                if st.button(_mg_etiket, use_container_width=True,
+                             type="primary" if _mg_aktif else "secondary",
+                             key=f"sb_{_mg_key}"):
+                    st.session_state["aktif_tab"] = _mg_key
+                    st.rerun()
 
     # ── ALT BÖLÜM ─────────────────────────────────────────────────────────────
     st.divider()
@@ -11277,6 +11428,419 @@ elif aktif == "muhasebe_fatura":
                         if _oc2.button("Vazgeç", key=f"muh_sil_vazgec_{_fid}"):
                             st.session_state.pop(_muh_sil_bekliyor_key, None)
                             st.rerun()
+
+# ═══════════════════════════════════════════════════════════════════════════
+# MUHASEBE — GENİŞLETİLMİŞ NATIVE SAYFALAR
+# Her sayfa: açılışta muhasebe sisteminden anlık veri çeker (Parasut'ta yapılan
+# değişiklik hemen görünür), CRM'den eklenen/silinen kayıt da anında muhasebe
+# sistemine yazılır. Harici link / yeni sekme YOK — tamamı CRM içinde çalışır.
+# ═══════════════════════════════════════════════════════════════════════════
+
+elif aktif == "muhasebe_teklifler":
+    sayfa_log("muhasebe_teklifler")
+    st.markdown("## 📝 Muhasebe – Teklifler")
+    st.caption("Teklif oluşturma/silme gerçek muhasebe sistemine anında yansır.")
+    if not _muh_baglanti_var_mi():
+        _muh_baglanti_uyar()
+    else:
+        if st.button("🔄 Yenile", key="mt_yenile"):
+            st.rerun()
+        with st.expander("➕ Yeni Teklif Oluştur"):
+            _mt_cari_df = db_read("cari_kartlar", extra_sql="ORDER BY firma")
+            if not _mt_cari_df.empty and "silindi" in _mt_cari_df.columns:
+                _mt_cari_df = _mt_cari_df[~_mt_cari_df["silindi"].isin([1, "1", True, "true"])]
+            if _mt_cari_df.empty or "firma" not in _mt_cari_df.columns:
+                st.info("Önce bir cari kartı oluşturun.")
+            else:
+                _mt_cari = st.selectbox("Cari", options=_mt_cari_df["id"].tolist(),
+                    format_func=lambda x: _mt_cari_df.loc[_mt_cari_df["id"] == x, "firma"].values[0]
+                                 if x in _mt_cari_df["id"].values else str(x), key="mt_cari_sec")
+                _mtc1, _mtc2 = st.columns(2)
+                _mt_aciklama = _mtc1.text_input("Açıklama / Hizmet", key="mt_aciklama")
+                _mt_miktar = _mtc2.number_input("Miktar", min_value=0.0, value=1.0, step=1.0, key="mt_miktar")
+                _mtc3, _mtc4 = st.columns(2)
+                _mt_fiyat = _mtc3.number_input("Birim Fiyat (₺)", min_value=0.0, value=0.0, step=100.0, key="mt_fiyat")
+                _mt_kdv = _mtc4.selectbox("KDV Oranı (%)", options=[0, 1, 8, 10, 18, 20], index=5, key="mt_kdv")
+                _mtc5, _mtc6 = st.columns(2)
+                _mt_tarih = _mtc5.date_input("Teklif Tarihi", value=datetime.now().date(), key="mt_tarih")
+                _mt_gecerlilik = _mtc6.date_input("Geçerlilik Tarihi", value=datetime.now().date() + timedelta(days=15), key="mt_gecerlilik")
+                if st.button("💾 Teklif Oluştur ve Gönder", type="primary", key="mt_kaydet"):
+                    if not _mt_aciklama.strip():
+                        st.warning("Açıklama boş olamaz.")
+                    elif _mt_fiyat <= 0:
+                        st.warning("Birim fiyat 0'dan büyük olmalı.")
+                    else:
+                        _mt_firma = _mt_cari_df.loc[_mt_cari_df["id"] == _mt_cari, "firma"].values[0]
+                        with st.spinner("Müşteri kontrol ediliyor ve teklif oluşturuluyor..."):
+                            _mt_cid, _mt_ch = _muh_contact_id_bul_veya_olustur(_mt_cari, _mt_firma)
+                            if _mt_ch:
+                                st.error(_mt_ch)
+                            else:
+                                _mt_s, _mt_h = _muh_teklif_olustur(_mt_cid, _mt_aciklama, _mt_miktar, _mt_fiyat, _mt_kdv, _mt_tarih, _mt_gecerlilik)
+                                if _mt_h:
+                                    st.error(f"Teklif oluşturulamadı: {_mt_h}")
+                                else:
+                                    st.success("✅ Teklif oluşturuldu.")
+                                    st.rerun()
+        with st.spinner("Teklifler alınıyor..."):
+            _mt_veri, _mt_hata = _muh_teklifler_getir()
+        if _mt_hata:
+            st.error(f"Teklifler alınamadı: {_mt_hata}")
+        else:
+            _mt_kayit = (_mt_veri or {}).get("data", [])
+            st.markdown(f"**{len(_mt_kayit)} teklif** (en fazla 50 kayıt gösterilir)")
+            _muh_liste_render(_mt_kayit, [
+                ("Teklif No", "invoice_no", None), ("Tarih", "issue_date", None),
+                ("Geçerlilik", "expiry_date", None), ("Net Tutar", "net_total", None),
+                ("Toplam", "gross_total", None), ("Durum", "status", None),
+            ], sil_fn=_muh_teklif_sil, key_prefix="mt", bos_mesaj="Kayıtlı teklif bulunamadı.")
+
+elif aktif == "muhasebe_musteriler":
+    sayfa_log("muhasebe_musteriler")
+    st.markdown("## 👥 Muhasebe – Müşteriler")
+    st.caption("Buradan eklenen müşteri anında muhasebe sisteminde de oluşur.")
+    if not _muh_baglanti_var_mi():
+        _muh_baglanti_uyar()
+    else:
+        if st.button("🔄 Yenile", key="mm_yenile"):
+            st.rerun()
+        with st.expander("➕ Yeni Müşteri Ekle"):
+            _mm_ad = st.text_input("Firma / Ad Soyad", key="mm_ad")
+            _mmc1, _mmc2 = st.columns(2)
+            _mm_tel = _mmc1.text_input("Telefon", key="mm_tel")
+            _mm_email = _mmc2.text_input("Email", key="mm_email")
+            _mm_adres = st.text_input("Adres", key="mm_adres")
+            if st.button("💾 Kaydet", type="primary", key="mm_kaydet"):
+                if not _mm_ad.strip():
+                    st.warning("Ad/firma boş olamaz.")
+                else:
+                    with st.spinner("Kaydediliyor..."):
+                        _mm_s, _mm_h = _muh_contact_olustur(_mm_ad.strip(), "customer", _mm_tel, _mm_email, _mm_adres)
+                    if _mm_h:
+                        st.error(f"Kaydedilemedi: {_mm_h}")
+                    else:
+                        st.success("✅ Müşteri eklendi.")
+                        st.rerun()
+        with st.spinner("Müşteriler alınıyor..."):
+            _mm_veri, _mm_hata = _muh_contacts_getir(account_type="customer")
+        if _mm_hata:
+            st.error(f"Müşteriler alınamadı: {_mm_hata}")
+        else:
+            _mm_kayit = (_mm_veri or {}).get("data", [])
+            st.markdown(f"**{len(_mm_kayit)} müşteri**")
+            _muh_liste_render(_mm_kayit, [
+                ("Ad / Firma", "name", None), ("Telefon", "phone", None),
+                ("Email", "email", None), ("Bakiye", "trl_balance", None),
+            ], sil_fn=_muh_contact_sil, key_prefix="mm", bos_mesaj="Kayıtlı müşteri bulunamadı.")
+
+elif aktif == "muhasebe_gider_listesi":
+    sayfa_log("muhasebe_gider_listesi")
+    st.markdown("## 🧾 Muhasebe – Gider Listesi")
+    st.caption("Gider kaydı oluşturma/silme gerçek muhasebe sistemine anında yansır.")
+    if not _muh_baglanti_var_mi():
+        _muh_baglanti_uyar()
+    else:
+        if st.button("🔄 Yenile", key="mg_yenile"):
+            st.rerun()
+        with st.expander("➕ Yeni Gider Ekle"):
+            _mg_tedarikci = st.text_input("Tedarikçi Adı", key="mg_tedarikci",
+                help="Muhasebe sisteminde bu isimle kayıtlı tedarikçi varsa kullanılır, yoksa otomatik oluşturulur.")
+            _mgc1, _mgc2 = st.columns(2)
+            _mg_aciklama = _mgc1.text_input("Açıklama", key="mg_aciklama")
+            _mg_miktar = _mgc2.number_input("Miktar", min_value=0.0, value=1.0, step=1.0, key="mg_miktar")
+            _mgc3, _mgc4 = st.columns(2)
+            _mg_fiyat = _mgc3.number_input("Birim Fiyat (₺)", min_value=0.0, value=0.0, step=100.0, key="mg_fiyat")
+            _mg_kdv = _mgc4.selectbox("KDV Oranı (%)", options=[0, 1, 8, 10, 18, 20], index=5, key="mg_kdv")
+            _mgc5, _mgc6 = st.columns(2)
+            _mg_tarih = _mgc5.date_input("Fatura Tarihi", value=datetime.now().date(), key="mg_tarih")
+            _mg_vade = _mgc6.date_input("Vade Tarihi", value=datetime.now().date() + timedelta(days=30), key="mg_vade")
+            if st.button("💾 Gider Kaydet ve Gönder", type="primary", key="mg_kaydet"):
+                if not _mg_tedarikci.strip():
+                    st.warning("Tedarikçi adı boş olamaz.")
+                elif not _mg_aciklama.strip():
+                    st.warning("Açıklama boş olamaz.")
+                elif _mg_fiyat <= 0:
+                    st.warning("Birim fiyat 0'dan büyük olmalı.")
+                else:
+                    with st.spinner("Tedarikçi kontrol ediliyor ve gider oluşturuluyor..."):
+                        _mg_cid, _mg_ch = _muh_contact_ada_gore_bul_veya_olustur(_mg_tedarikci.strip(), "supplier")
+                        if _mg_ch:
+                            st.error(_mg_ch)
+                        else:
+                            _mg_s, _mg_h = _muh_gider_olustur(_mg_cid, _mg_aciklama, _mg_miktar, _mg_fiyat, _mg_kdv, _mg_tarih, _mg_vade)
+                            if _mg_h:
+                                st.error(f"Gider oluşturulamadı: {_mg_h}")
+                            else:
+                                st.success("✅ Gider kaydedildi.")
+                                st.rerun()
+        with st.spinner("Giderler alınıyor..."):
+            _mg_veri, _mg_hata = _muh_giderler_getir()
+        if _mg_hata:
+            st.error(f"Giderler alınamadı: {_mg_hata}")
+        else:
+            _mg_kayit = (_mg_veri or {}).get("data", [])
+            st.markdown(f"**{len(_mg_kayit)} gider kaydı** (en fazla 50 kayıt gösterilir)")
+            _muh_liste_render(_mg_kayit, [
+                ("Fiş No", "invoice_no", None), ("Tarih", "issue_date", None),
+                ("Vade", "due_date", None), ("Net Tutar", "net_total", None),
+                ("Toplam", "gross_total", None), ("Durum", "payment_status", None),
+            ], sil_fn=_muh_gider_sil, key_prefix="mg", bos_mesaj="Kayıtlı gider bulunamadı.")
+
+elif aktif == "muhasebe_tedarikciler":
+    sayfa_log("muhasebe_tedarikciler")
+    st.markdown("## 🚚 Muhasebe – Tedarikçiler")
+    st.caption("Buradan eklenen tedarikçi anında muhasebe sisteminde de oluşur.")
+    if not _muh_baglanti_var_mi():
+        _muh_baglanti_uyar()
+    else:
+        if st.button("🔄 Yenile", key="mtd_yenile"):
+            st.rerun()
+        with st.expander("➕ Yeni Tedarikçi Ekle"):
+            _mtd_ad = st.text_input("Firma / Ad Soyad", key="mtd_ad")
+            _mtdc1, _mtdc2 = st.columns(2)
+            _mtd_tel = _mtdc1.text_input("Telefon", key="mtd_tel")
+            _mtd_email = _mtdc2.text_input("Email", key="mtd_email")
+            _mtd_adres = st.text_input("Adres", key="mtd_adres")
+            if st.button("💾 Kaydet", type="primary", key="mtd_kaydet"):
+                if not _mtd_ad.strip():
+                    st.warning("Ad/firma boş olamaz.")
+                else:
+                    with st.spinner("Kaydediliyor..."):
+                        _mtd_s, _mtd_h = _muh_contact_olustur(_mtd_ad.strip(), "supplier", _mtd_tel, _mtd_email, _mtd_adres)
+                    if _mtd_h:
+                        st.error(f"Kaydedilemedi: {_mtd_h}")
+                    else:
+                        st.success("✅ Tedarikçi eklendi.")
+                        st.rerun()
+        with st.spinner("Tedarikçiler alınıyor..."):
+            _mtd_veri, _mtd_hata = _muh_contacts_getir(account_type="supplier")
+        if _mtd_hata:
+            st.error(f"Tedarikçiler alınamadı: {_mtd_hata}")
+        else:
+            _mtd_kayit = (_mtd_veri or {}).get("data", [])
+            st.markdown(f"**{len(_mtd_kayit)} tedarikçi**")
+            _muh_liste_render(_mtd_kayit, [
+                ("Ad / Firma", "name", None), ("Telefon", "phone", None),
+                ("Email", "email", None), ("Bakiye", "trl_balance", None),
+            ], sil_fn=_muh_contact_sil, key_prefix="mtd", bos_mesaj="Kayıtlı tedarikçi bulunamadı.")
+
+elif aktif == "muhasebe_calisanlar":
+    sayfa_log("muhasebe_calisanlar")
+    st.markdown("## 👔 Muhasebe – Çalışanlar")
+    st.caption("Buradan eklenen çalışan anında muhasebe sisteminde de oluşur.")
+    if not _muh_baglanti_var_mi():
+        _muh_baglanti_uyar()
+    else:
+        if st.button("🔄 Yenile", key="mc_yenile"):
+            st.rerun()
+        with st.expander("➕ Yeni Çalışan Ekle"):
+            _mcc1, _mcc2 = st.columns(2)
+            _mc_ad = _mcc1.text_input("Ad", key="mc_ad")
+            _mc_soyad = _mcc2.text_input("Soyad", key="mc_soyad")
+            _mcc3, _mcc4 = st.columns(2)
+            _mc_email = _mcc3.text_input("Email", key="mc_email")
+            _mc_tc = _mcc4.text_input("TC Kimlik No", key="mc_tc")
+            if st.button("💾 Kaydet", type="primary", key="mc_kaydet"):
+                if not _mc_ad.strip() or not _mc_soyad.strip():
+                    st.warning("Ad ve soyad zorunlu.")
+                else:
+                    with st.spinner("Kaydediliyor..."):
+                        _mc_s, _mc_h = _muh_employee_olustur(_mc_ad.strip(), _mc_soyad.strip(), _mc_email, _mc_tc)
+                    if _mc_h:
+                        st.error(f"Kaydedilemedi: {_mc_h}")
+                    else:
+                        st.success("✅ Çalışan eklendi.")
+                        st.rerun()
+        with st.spinner("Çalışanlar alınıyor..."):
+            _mc_veri, _mc_hata = _muh_employees_getir()
+        if _mc_hata:
+            st.error(f"Çalışanlar alınamadı: {_mc_hata}")
+        else:
+            _mc_kayit = (_mc_veri or {}).get("data", [])
+            st.markdown(f"**{len(_mc_kayit)} çalışan**")
+            _muh_liste_render(_mc_kayit, [
+                ("Ad", "name", None), ("Soyad", "surname", None),
+                ("Email", "email", None),
+            ], sil_fn=_muh_employee_sil, key_prefix="mc", bos_mesaj="Kayıtlı çalışan bulunamadı.")
+
+elif aktif == "muhasebe_kasa_banka":
+    sayfa_log("muhasebe_kasa_banka")
+    st.markdown("## 🏦 Muhasebe – Kasa ve Bankalar")
+    st.caption("Bakiyeler muhasebe sisteminden anlık okunur (salt okunur — hesap açma/kapama Parasut'tan yapılır).")
+    if not _muh_baglanti_var_mi():
+        _muh_baglanti_uyar()
+    else:
+        if st.button("🔄 Yenile", key="mkb_yenile"):
+            st.rerun()
+        with st.spinner("Hesaplar alınıyor..."):
+            _mkb_veri, _mkb_hata = _muh_accounts_getir()
+        if _mkb_hata:
+            st.error(f"Hesaplar alınamadı: {_mkb_hata}")
+        else:
+            _mkb_kayit = (_mkb_veri or {}).get("data", [])
+            st.markdown(f"**{len(_mkb_kayit)} hesap**")
+            _muh_liste_render(_mkb_kayit, [
+                ("Hesap Adı", "name", None), ("Tür", "account_type", None),
+                ("Para Birimi", "currency", None), ("Bakiye", "balance", None),
+            ], bos_mesaj="Kayıtlı hesap bulunamadı.")
+
+elif aktif == "muhasebe_cekler":
+    sayfa_log("muhasebe_cekler")
+    st.markdown("## 📑 Muhasebe – Çekler")
+    st.caption("Bu sayfa muhasebe sisteminden anlık veri çeker (salt okunur).")
+    if not _muh_baglanti_var_mi():
+        _muh_baglanti_uyar()
+    else:
+        if st.button("🔄 Yenile", key="mck_yenile"):
+            st.rerun()
+        with st.spinner("Çekler alınıyor..."):
+            _mck_veri, _mck_hata = _muh_cekler_getir()
+        if _mck_hata:
+            st.error(f"Çekler alınamadı: {_mck_hata}")
+            st.caption("Bu özellik muhasebe hesabınızda aktif değilse veya API desteklemiyorsa bu hata normaldir.")
+        else:
+            _mck_kayit = (_mck_veri or {}).get("data", [])
+            st.markdown(f"**{len(_mck_kayit)} çek**")
+            _muh_liste_render(_mck_kayit, [
+                ("Çek No", "check_no", None), ("Vade", "due_date", None),
+                ("Tutar", "amount", None), ("Durum", "status", None),
+            ], bos_mesaj="Kayıtlı çek bulunamadı.")
+
+elif aktif in ("muhasebe_satis_raporu", "muhasebe_tahsilat_raporu", "muhasebe_gelirgider_raporu",
+               "muhasebe_gider_raporu", "muhasebe_odeme_raporu", "muhasebe_kdv_raporu",
+               "muhasebe_kasabanka_raporu", "muhasebe_nakit_raporu"):
+    _mr_baslik = {
+        "muhasebe_satis_raporu": "📊 Satışlar Raporu", "muhasebe_tahsilat_raporu": "💵 Tahsilatlar Raporu",
+        "muhasebe_gelirgider_raporu": "📈 Gelir Gider Raporu", "muhasebe_gider_raporu": "📉 Giderler Raporu",
+        "muhasebe_odeme_raporu": "💳 Ödemeler Raporu", "muhasebe_kdv_raporu": "🧮 KDV Raporu",
+        "muhasebe_kasabanka_raporu": "🏦 Kasa / Banka Raporu", "muhasebe_nakit_raporu": "💧 Nakit Akışı Raporu",
+    }[aktif]
+    sayfa_log(aktif)
+    st.markdown(f"## {_mr_baslik}")
+    st.caption("Bu rapor, CRM'e muhasebe sisteminden anlık çekilen verilerden hesaplanır — "
+               "Parasut'un kendi rapor ekranındaki tutarlarla küçük yuvarlama farkları olabilir.")
+    if not _muh_baglanti_var_mi():
+        _muh_baglanti_uyar()
+    else:
+        if st.button("🔄 Yenile", key=f"{aktif}_yenile"):
+            st.rerun()
+
+        _mr_donem = st.radio("Dönem", ["Bu Ay", "Bu Yıl", "Tümü"], horizontal=True, key=f"{aktif}_donem")
+        _mr_bugun = datetime.now().date()
+        if _mr_donem == "Bu Ay":
+            _mr_bas = _mr_bugun.replace(day=1).isoformat()
+        elif _mr_donem == "Bu Yıl":
+            _mr_bas = _mr_bugun.replace(month=1, day=1).isoformat()
+        else:
+            _mr_bas = "0000-00-00"
+
+        def _mr_tarih_filtrele(kayitlar, alan="issue_date"):
+            if _mr_donem == "Tümü":
+                return kayitlar
+            return [k for k in kayitlar if str((k.get("attributes") or {}).get(alan, "")) >= _mr_bas]
+
+        def _mr_sayi(v):
+            try:
+                return float(str(v).replace(",", ".") or 0)
+            except Exception:
+                return 0.0
+
+        _mr_satis_veri, _mr_satis_hata = _muh_api_get(
+            f"/v4/companies/{_MUH_COMPANY_ID}/sales_invoices", params={"page[size]": 100, "sort": "-issue_date"})
+        _mr_gider_veri, _mr_gider_hata = _muh_giderler_getir()
+
+        if _mr_satis_hata or _mr_gider_hata:
+            if _mr_satis_hata: st.error(f"Satış verisi alınamadı: {_mr_satis_hata}")
+            if _mr_gider_hata: st.error(f"Gider verisi alınamadı: {_mr_gider_hata}")
+        else:
+            _mr_satislar = _mr_tarih_filtrele((_mr_satis_veri or {}).get("data", []))
+            _mr_giderler = _mr_tarih_filtrele((_mr_gider_veri or {}).get("data", []))
+
+            _mr_satis_net = sum(_mr_sayi((k.get("attributes") or {}).get("net_total")) for k in _mr_satislar)
+            _mr_satis_brut = sum(_mr_sayi((k.get("attributes") or {}).get("gross_total")) for k in _mr_satislar)
+            _mr_gider_net = sum(_mr_sayi((k.get("attributes") or {}).get("net_total")) for k in _mr_giderler)
+            _mr_gider_brut = sum(_mr_sayi((k.get("attributes") or {}).get("gross_total")) for k in _mr_giderler)
+            _mr_tahsil = sum(_mr_sayi((k.get("attributes") or {}).get("gross_total"))
+                              for k in _mr_satislar if (k.get("attributes") or {}).get("payment_status") == "paid")
+            _mr_odeme = sum(_mr_sayi((k.get("attributes") or {}).get("gross_total"))
+                             for k in _mr_giderler if (k.get("attributes") or {}).get("payment_status") == "paid")
+            _mr_kdv_satis = _mr_satis_brut - _mr_satis_net
+            _mr_kdv_gider = _mr_gider_brut - _mr_gider_net
+
+            if aktif == "muhasebe_satis_raporu":
+                _c1, _c2, _c3 = st.columns(3)
+                _c1.metric("Toplam Fatura", len(_mr_satislar))
+                _c2.metric("Net Tutar", f"{_mr_satis_net:,.2f} ₺")
+                _c3.metric("Brüt Tutar", f"{_mr_satis_brut:,.2f} ₺")
+                _muh_liste_render(_mr_satislar, [
+                    ("Fatura No", "invoice_no", None), ("Tarih", "issue_date", None),
+                    ("Net Tutar", "net_total", None), ("Toplam", "gross_total", None),
+                    ("Durum", "payment_status", None),
+                ], bos_mesaj="Kayıt bulunamadı.")
+
+            elif aktif == "muhasebe_tahsilat_raporu":
+                _c1, _c2 = st.columns(2)
+                _c1.metric("Tahsil Edilen", f"{_mr_tahsil:,.2f} ₺")
+                _c2.metric("Bekleyen (Tahmini)", f"{max(_mr_satis_brut - _mr_tahsil, 0):,.2f} ₺")
+                _mr_odenmis = [k for k in _mr_satislar if (k.get("attributes") or {}).get("payment_status") == "paid"]
+                _muh_liste_render(_mr_odenmis, [
+                    ("Fatura No", "invoice_no", None), ("Tarih", "issue_date", None),
+                    ("Toplam", "gross_total", None), ("Durum", "payment_status", None),
+                ], bos_mesaj="Tahsil edilmiş kayıt bulunamadı.")
+
+            elif aktif == "muhasebe_gelirgider_raporu":
+                _c1, _c2, _c3 = st.columns(3)
+                _c1.metric("Gelir (Satış)", f"{_mr_satis_brut:,.2f} ₺")
+                _c2.metric("Gider", f"{_mr_gider_brut:,.2f} ₺")
+                _c3.metric("Net", f"{_mr_satis_brut - _mr_gider_brut:,.2f} ₺")
+
+            elif aktif == "muhasebe_gider_raporu":
+                _c1, _c2, _c3 = st.columns(3)
+                _c1.metric("Toplam Gider Kaydı", len(_mr_giderler))
+                _c2.metric("Net Tutar", f"{_mr_gider_net:,.2f} ₺")
+                _c3.metric("Brüt Tutar", f"{_mr_gider_brut:,.2f} ₺")
+                _muh_liste_render(_mr_giderler, [
+                    ("Fiş No", "invoice_no", None), ("Tarih", "issue_date", None),
+                    ("Net Tutar", "net_total", None), ("Toplam", "gross_total", None),
+                    ("Durum", "payment_status", None),
+                ], bos_mesaj="Kayıt bulunamadı.")
+
+            elif aktif == "muhasebe_odeme_raporu":
+                _c1, _c2 = st.columns(2)
+                _c1.metric("Ödenen", f"{_mr_odeme:,.2f} ₺")
+                _c2.metric("Bekleyen (Tahmini)", f"{max(_mr_gider_brut - _mr_odeme, 0):,.2f} ₺")
+                _mr_odenmis_g = [k for k in _mr_giderler if (k.get("attributes") or {}).get("payment_status") == "paid"]
+                _muh_liste_render(_mr_odenmis_g, [
+                    ("Fiş No", "invoice_no", None), ("Tarih", "issue_date", None),
+                    ("Toplam", "gross_total", None), ("Durum", "payment_status", None),
+                ], bos_mesaj="Ödenmiş kayıt bulunamadı.")
+
+            elif aktif == "muhasebe_kdv_raporu":
+                _c1, _c2, _c3 = st.columns(3)
+                _c1.metric("Hesaplanan KDV (Satış)", f"{_mr_kdv_satis:,.2f} ₺")
+                _c2.metric("İndirilecek KDV (Gider)", f"{_mr_kdv_gider:,.2f} ₺")
+                _c3.metric("Ödenecek/Devreden KDV", f"{_mr_kdv_satis - _mr_kdv_gider:,.2f} ₺")
+                st.caption("Yaklaşık hesaplama: brüt tutar - net tutar farkı üzerinden. Kesin KDV beyanı için Parasut'un kendi KDV raporunu esas alın.")
+
+            elif aktif == "muhasebe_kasabanka_raporu":
+                with st.spinner("Hesaplar alınıyor..."):
+                    _mr_hesap_veri, _mr_hesap_hata = _muh_accounts_getir()
+                if _mr_hesap_hata:
+                    st.error(f"Hesaplar alınamadı: {_mr_hesap_hata}")
+                else:
+                    _mr_hesaplar = (_mr_hesap_veri or {}).get("data", [])
+                    _mr_toplam_bakiye = sum(_mr_sayi((k.get("attributes") or {}).get("balance")) for k in _mr_hesaplar)
+                    st.metric("Toplam Bakiye (Tüm Hesaplar)", f"{_mr_toplam_bakiye:,.2f} ₺")
+                    _muh_liste_render(_mr_hesaplar, [
+                        ("Hesap Adı", "name", None), ("Tür", "account_type", None),
+                        ("Para Birimi", "currency", None), ("Bakiye", "balance", None),
+                    ], bos_mesaj="Kayıtlı hesap bulunamadı.")
+
+            elif aktif == "muhasebe_nakit_raporu":
+                _c1, _c2, _c3 = st.columns(3)
+                _c1.metric("Nakit Giriş (Tahsilat)", f"{_mr_tahsil:,.2f} ₺")
+                _c2.metric("Nakit Çıkış (Ödeme)", f"{_mr_odeme:,.2f} ₺")
+                _c3.metric("Net Nakit Akışı", f"{_mr_tahsil - _mr_odeme:,.2f} ₺")
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
