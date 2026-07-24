@@ -825,7 +825,13 @@ def giris_ekrani():
     # ── KÜÇÜK & YUKARIDA GÖRÜNÜM İÇİN CSS ──────────────────────────────────────
     st.markdown("""
 <style>
-.block-container{padding-top:1rem !important;padding-bottom:0.5rem !important;}
+header[data-testid="stHeader"]{display:none !important;}
+section[data-testid="stMain"]{align-items:flex-start !important;}
+div[data-testid="stAppViewContainer"]{align-items:flex-start !important;}
+.block-container{padding-top:0.3rem !important;padding-bottom:0.5rem !important;}
+div[data-testid="stVerticalBlock"]{gap:0.3rem !important;}
+div[data-testid="stElementContainer"]:has(style){display:contents !important;}
+div[data-testid="stElementContainer"]:has(script){display:contents !important;}
 div[data-testid="stForm"]{border:none;padding:0;}
 div[data-testid="stForm"] .stTextInput input{font-size:11px;padding:0.25rem 0.5rem;height:1.8rem;}
 div[data-testid="stForm"] label{font-size:10px;}
@@ -837,7 +843,7 @@ div[data-testid="stRadio"] div[role="radiogroup"]{gap:0.4rem;}
 
     # ── LOGO ──────────────────────────────────────────────────────────────────
     st.markdown("""
-<div style="text-align:center;padding:0.4rem 0 0.5rem;">
+<div style="text-align:center;padding:0.1rem 0 0.3rem;">
   <div style="width:28px;height:28px;background:#1d4ed8;border-radius:8px;
        display:inline-flex;align-items:center;justify-content:center;margin-bottom:5px;">
     <svg width="16" height="16" viewBox="0 0 36 36" fill="none">
@@ -848,7 +854,7 @@ div[data-testid="stRadio"] div[role="radiogroup"]{gap:0.4rem;}
     </svg>
   </div>
   <div style="font-size:13px;font-weight:600;color:#0f172a;letter-spacing:-.5px;">MWCRMPRO</div>
-  <div style="font-size:9px;color:#64748b;margin-top:2px;">Cari Yönetim Sistemi</div>
+  <div style="font-size:9px;color:#64748b;margin-top:2px;margin-bottom:8px;">Cari Yönetim Sistemi</div>
 </div>
 """, unsafe_allow_html=True)
 
@@ -875,16 +881,15 @@ div[data-testid="stRadio"] div[role="radiogroup"]{gap:0.4rem;}
         st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
 
         # ── GİRİŞ FORMU ────────────────────────────────────────────────────────
-        st.markdown("""
-<div style="background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:8px 8px 2px;">
-  <div style="font-size:11px;font-weight:600;color:#0f172a;margin-bottom:2px;">Giriş Yap</div>
-</div>
+        with st.container(border=True):
+            st.markdown("""
+<div style="font-size:11px;font-weight:600;color:#0f172a;margin-bottom:10px;">Giriş Yap</div>
 """, unsafe_allow_html=True)
 
-        with st.form("giris_form", clear_on_submit=False):
-            kullanici = st.text_input("Kullanıcı Adı", placeholder="kullanici_adi")
-            sifre     = st.text_input("Şifre", type="password", placeholder="••••••••")
-            _giris_btn = st.form_submit_button("Giriş Yap →", use_container_width=True, type="primary")
+            with st.form("giris_form", clear_on_submit=False):
+                kullanici = st.text_input("Kullanıcı Adı", placeholder="kullanici_adi")
+                sifre     = st.text_input("Şifre", type="password", placeholder="••••••••")
+                _giris_btn = st.form_submit_button("Giriş Yap →", use_container_width=True, type="primary")
 
         if _giris_btn:
             row = None
