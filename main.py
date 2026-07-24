@@ -281,7 +281,7 @@ def _muh_fatura_sil(invoice_id):
 # düzeltilecektir — mevcut hata gösterme yapısı zaten ham API hatasını ekranda
 # gösteriyor, uygulama çökmüyor.
 
-def _muh_contacts_getir(account_type=None, sayfa_boyutu=100):
+def _muh_contacts_getir(account_type=None, sayfa_boyutu=25):
     params = {"page[size]": sayfa_boyutu, "sort": "-created_at"}
     if account_type:
         params["filter[account_type]"] = account_type
@@ -309,7 +309,7 @@ def _muh_contact_ada_gore_bul_veya_olustur(ad, account_type="supplier"):
     return _muh_contact_olustur(ad, account_type)
 
 def _muh_employees_getir():
-    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/employees", params={"page[size]": 100})
+    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/employees", params={"page[size]": 25})
 
 def _muh_employee_olustur(ad, soyad, email="", tc_no=""):
     _attrs = {"name": ad, "surname": soyad}
@@ -322,11 +322,11 @@ def _muh_employee_sil(emp_id):
     return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/employees/{emp_id}", method="DELETE")
 
 def _muh_accounts_getir():
-    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/accounts", params={"page[size]": 100})
+    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/accounts", params={"page[size]": 25})
 
 def _muh_teklifler_getir():
     return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/sales_offers",
-                         params={"page[size]": 50, "sort": "-issue_date"})
+                         params={"page[size]": 25, "sort": "-issue_date"})
 
 def _muh_teklif_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, teklif_tarihi, gecerlilik_tarihi):
     _gid = "det-1"
@@ -355,7 +355,7 @@ def _muh_teklif_sil(offer_id):
 
 def _muh_giderler_getir():
     return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/purchase_bills",
-                         params={"page[size]": 50, "sort": "-issue_date"})
+                         params={"page[size]": 25, "sort": "-issue_date"})
 
 def _muh_gider_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fatura_tarihi, vade_tarihi):
     _gid = "det-1"
@@ -368,11 +368,11 @@ def _muh_gider_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fat
             },
             "relationships": {
                 "contact": {"data": {"id": str(contact_id), "type": "contacts"}},
-                "details": {"data": [{"type": "purchase_bill_details", "id": _gid}]},
+                "details": {"data": [{"type": "purchase_invoice_details", "id": _gid}]},
             },
         },
         "included": [{
-            "type": "purchase_bill_details", "id": _gid,
+            "type": "purchase_invoice_details", "id": _gid,
             "attributes": {"quantity": float(miktar), "unit_price": float(birim_fiyat),
                             "vat_rate": float(kdv_orani), "description": aciklama or ""},
         }],
@@ -383,7 +383,7 @@ def _muh_gider_sil(bill_id):
     return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/purchase_bills/{bill_id}", method="DELETE")
 
 def _muh_cekler_getir():
-    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/checks", params={"page[size]": 50})
+    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/checks", params={"page[size]": 25})
 
 def _muh_liste_render(kayitlar, kolonlar, sil_fn=None, key_prefix="ml", bos_mesaj="Kayıt bulunamadı."):
     """Ortak liste render — kolonlar: [(baslik, attr_anahtari, formatter|None), ...]"""
@@ -11383,7 +11383,7 @@ elif aktif == "muhasebe_fatura":
         with st.spinner("Faturalar alınıyor..."):
             _muh_veri, _muh_hata = _muh_api_get(
                 f"/v4/{_MUH_COMPANY_ID}/sales_invoices",
-                params={"page[size]": 50, "sort": "-issue_date"}
+                params={"page[size]": 25, "sort": "-issue_date"}
             )
 
         if _muh_hata:
@@ -11746,7 +11746,7 @@ elif aktif in ("muhasebe_satis_raporu", "muhasebe_tahsilat_raporu", "muhasebe_ge
                 return 0.0
 
         _mr_satis_veri, _mr_satis_hata = _muh_api_get(
-            f"/v4/{_MUH_COMPANY_ID}/sales_invoices", params={"page[size]": 100, "sort": "-issue_date"})
+            f"/v4/{_MUH_COMPANY_ID}/sales_invoices", params={"page[size]": 25, "sort": "-issue_date"})
         _mr_gider_veri, _mr_gider_hata = _muh_giderler_getir()
 
         if _mr_satis_hata or _mr_gider_hata:
