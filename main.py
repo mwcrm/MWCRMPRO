@@ -2461,49 +2461,59 @@ button[data-testid="manage-app-button"] { display: none !important; }
                         st.session_state["aktif_tab"] = _tab_key
                         st.rerun()
 
-    # ── MUHASEBE MENÜSÜ (harici muhasebe altyapısı — link menüsü) ─────────────
-    st.markdown("""<style>
-    .mw-muh-baslik{font-size:11px;font-weight:700;color:#0f172a;text-transform:uppercase;
-        letter-spacing:.4px;margin:10px 0 4px;}
-    .mw-muh-grup{display:flex;flex-direction:column;gap:1px;margin-bottom:2px;}
-    .mw-muh-link{font-size:12.5px;color:#334155;text-decoration:none;padding:5px 8px;
-        border-radius:6px;display:block;}
-    .mw-muh-link:hover{background:#f6f8fb;color:#1a4f9e;}
-    </style>""", unsafe_allow_html=True)
+    # ── MUHASEBE MENÜSÜ (harici muhasebe altyapısı) ─────────────────────────
+    # NOT: Streamlit, güvenlik nedeniyle harici linklere zorla target=_blank
+    # ekliyor ve javascript:/onclick gibi öznitelikleri temizliyor; component
+    # iframe'i de üst sekmeye yönlendirmeyi engelliyor. Bu yüzden bu linkler
+    # yeni sekmede açılır (Streamlit'in aşılamayan platform kısıtı) — sadece
+    # "Faturalar" CRM içinde tamamen native çalışır (harici gezinme yok).
+    st.markdown("""
+<style>
+.mw-muh-baslik{font-size:11px;font-weight:700;color:#0f172a;text-transform:uppercase;
+    letter-spacing:.4px;margin:6px 0 4px;}
+.mw-muh-grup{display:flex;flex-direction:column;gap:1px;margin-bottom:2px;}
+.mw-muh-link{font-size:12.5px;color:#334155;text-decoration:none;padding:5px 8px;
+    border-radius:6px;display:block;}
+.mw-muh-link:hover{background:#f6f8fb;color:#1a4f9e;}
+</style>
+""", unsafe_allow_html=True)
     with st.expander("💰 Muhasebe"):
         st.markdown("""
 <div class="mw-muh-baslik">Satışlar</div>
 <div class="mw-muh-grup">
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/teklifler" target="_blank">Teklifler</a>
-</div>""", unsafe_allow_html=True)
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/teklifler">Teklifler</a>
+</div>
+""", unsafe_allow_html=True)
+
         _muh_fatura_aktif = st.session_state.get("aktif_tab") == "muhasebe_fatura"
         if st.button("📄 Faturalar", use_container_width=True,
                      type="primary" if _muh_fatura_aktif else "secondary",
                      key="sb_muh_fatura"):
             st.session_state["aktif_tab"] = "muhasebe_fatura"
             st.rerun()
+
         st.markdown("""
 <div class="mw-muh-grup">
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/musteriler" target="_blank">Müşteriler</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/satislar" target="_blank">Satışlar Raporu</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/tahsilatlar" target="_blank">Tahsilatlar Raporu</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/gelir-ve-gider-raporu" target="_blank">Gelir Gider Raporu</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/musteriler">Müşteriler</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/satislar">Satışlar Raporu</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/tahsilatlar">Tahsilatlar Raporu</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/gelir-ve-gider-raporu">Gelir Gider Raporu</a>
 </div>
 <div class="mw-muh-baslik">Giderler</div>
 <div class="mw-muh-grup">
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/giderler" target="_blank">Gider Listesi</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/tedarikciler" target="_blank">Tedarikçiler</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/calisanlar" target="_blank">Çalışanlar</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/giderler" target="_blank">Giderler Raporu</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/odemeler" target="_blank">Ödemeler Raporu</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/kdv" target="_blank">KDV Raporu</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/giderler">Gider Listesi</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/tedarikciler">Tedarikçiler</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/calisanlar">Çalışanlar</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/giderler">Giderler Raporu</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/odemeler">Ödemeler Raporu</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/kdv">KDV Raporu</a>
 </div>
 <div class="mw-muh-baslik">Nakit</div>
 <div class="mw-muh-grup">
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/kasa-ve-bankalar" target="_blank">Kasa ve Bankalar</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/cekler" target="_blank">Çekler</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/kasa-banka" target="_blank">Kasa / Banka Raporu</a>
-  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/nakit-akisi" target="_blank">Nakit Akışı Raporu</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/kasa-ve-bankalar">Kasa ve Bankalar</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/cekler">Çekler</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/kasa-banka">Kasa / Banka Raporu</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/nakit-akisi">Nakit Akışı Raporu</a>
 </div>
 """, unsafe_allow_html=True)
 
