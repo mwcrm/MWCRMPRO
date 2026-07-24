@@ -822,30 +822,43 @@ def _tanim_guncelle(tip, eski, yeni):
     return False
 
 def giris_ekrani():
+    # ── KÜÇÜK & YUKARIDA GÖRÜNÜM İÇİN CSS ──────────────────────────────────────
+    st.markdown("""
+<style>
+.block-container{padding-top:1rem !important;padding-bottom:0.5rem !important;}
+div[data-testid="stForm"]{border:none;padding:0;}
+div[data-testid="stForm"] .stTextInput input{font-size:11px;padding:0.25rem 0.5rem;height:1.8rem;}
+div[data-testid="stForm"] label{font-size:10px;}
+div[data-testid="stForm"] button{font-size:11px;padding:0.25rem 0.5rem;height:1.8rem;min-height:1.8rem;}
+div[data-testid="stRadio"] label{font-size:10px;}
+div[data-testid="stRadio"] div[role="radiogroup"]{gap:0.4rem;}
+</style>
+""", unsafe_allow_html=True)
+
     # ── LOGO ──────────────────────────────────────────────────────────────────
     st.markdown("""
-<div style="text-align:center;padding:2rem 0 1.5rem;">
-  <div style="width:64px;height:64px;background:#1d4ed8;border-radius:16px;
-       display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px;">
-    <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
+<div style="text-align:center;padding:0.4rem 0 0.5rem;">
+  <div style="width:28px;height:28px;background:#1d4ed8;border-radius:8px;
+       display:inline-flex;align-items:center;justify-content:center;margin-bottom:5px;">
+    <svg width="16" height="16" viewBox="0 0 36 36" fill="none">
       <rect x="4" y="4" width="12" height="12" rx="2" fill="white" opacity=".9"/>
       <rect x="20" y="4" width="12" height="12" rx="2" fill="white" opacity=".7"/>
       <rect x="4" y="20" width="12" height="12" rx="2" fill="white" opacity=".7"/>
       <rect x="20" y="20" width="12" height="12" rx="2" fill="white" opacity=".5"/>
     </svg>
   </div>
-  <div style="font-size:26px;font-weight:600;color:#0f172a;letter-spacing:-.5px;">MWCRMPRO</div>
-  <div style="font-size:13px;color:#64748b;margin-top:4px;">Cari Yönetim Sistemi</div>
+  <div style="font-size:13px;font-weight:600;color:#0f172a;letter-spacing:-.5px;">MWCRMPRO</div>
+  <div style="font-size:9px;color:#64748b;margin-top:2px;">Cari Yönetim Sistemi</div>
 </div>
 """, unsafe_allow_html=True)
 
-    _gc1, _gc2, _gc3 = st.columns([1,2,1])
+    _gc1, _gc2, _gc3 = st.columns([5,2,5])
     with _gc2:
         # ── CİHAZ SEÇİMİ — radio buton ile, rerun YOK ────────────────────────
         st.markdown("""
-<div style="background:white;border:0.5px solid #e2e8f0;border-radius:16px;
-     padding:20px 20px 16px;margin-bottom:12px;">
-  <div style="font-size:13px;color:#64748b;text-align:center;margin-bottom:14px;font-weight:500;">
+<div style="background:white;border:0.5px solid #e2e8f0;border-radius:8px;
+     padding:8px 8px 6px;margin-bottom:6px;">
+  <div style="font-size:9px;color:#64748b;text-align:center;margin-bottom:6px;font-weight:500;">
     Hangi cihazdan bağlanıyorsunuz?
   </div>
 </div>
@@ -859,12 +872,12 @@ def giris_ekrani():
         )
         _mobil_secildi = "Telefon" in _cihaz
 
-        st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
 
         # ── GİRİŞ FORMU ────────────────────────────────────────────────────────
         st.markdown("""
-<div style="background:white;border:0.5px solid #e2e8f0;border-radius:16px;padding:20px 20px 4px;">
-  <div style="font-size:16px;font-weight:600;color:#0f172a;margin-bottom:4px;">Giriş Yap</div>
+<div style="background:white;border:0.5px solid #e2e8f0;border-radius:8px;padding:8px 8px 2px;">
+  <div style="font-size:11px;font-weight:600;color:#0f172a;margin-bottom:2px;">Giriş Yap</div>
 </div>
 """, unsafe_allow_html=True)
 
