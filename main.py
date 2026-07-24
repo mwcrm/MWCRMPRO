@@ -6,6 +6,7 @@ import os
 import io
 import re
 import json
+import time
 from datetime import datetime, timedelta
 
 # ── SUPABASE BAĞLANTISI ───────────────────────────────────────────────────────
@@ -55,6 +56,124 @@ def get_sb_service():
 
 def get_sb():
     return get_sb_client()
+
+# ── MUHASEBE (harici muhasebe altyapısı) BAĞLANTISI ───────────────────────────
+# NOT: Bu bilgiler kullanıcı tarafından verildi, sadece stdlib (urllib) ile
+# çağrı yapılır — requirements.txt'e yeni paket eklenmedi.
+_MUH_CLIENT_ID     = st.secrets.get("MUHASEBE_CLIENT_ID", "Idqed6FhS1AFfc-VH9e7JFvB_vpwLJiMfWibaozKpbE")
+_MUH_CLIENT_SECRET = st.secrets.get("MUHASEBE_CLIENT_SECRET", "EHBUuu5JvCEgg48kcZ90cKYu2ZBHmO1eZVJMQhPalDg")
+_MUH_REDIRECT_URI  = "urn:ietf:wg:oauth:2.0:oob"
+_MUH_COMPANY_ID    = st.secrets.get("MUHASEBE_COMPANY_ID", "843974")
+_MUH_API_BASE      = "https://api.parasut.com"
+
+def _muh_token_oku():
+    """Kayıtlı muhasebe bağlantı token'ını kullanici_tercih tablosundan okur (yeni tablo açılmadı)."""
+    try:
+        sb = get_sb_client()
+        if sb:
+            r = sb.table("kullanici_tercih").select("deger").eq("kullanici", "_sistem").eq("anahtar", "_muh_token").execute()
+            if r.data:
+                return json.loads(r.data[0]["deger"])
+    except:
+        pass
+    return None
+
+def _muh_token_yaz(token_dict):
+    try:
+        sb = get_sb_client()
+        if sb:
+            deger = json.dumps(token_dict)
+            sb.table("kullanici_tercih").delete().eq("kullanici", "_sistem").eq("anahtar", "_muh_token").execute()
+            sb.table("kullanici_tercih").insert({"kullanici": "_sistem", "anahtar": "_muh_token", "deger": deger}).execute()
+            return True
+    except:
+        pass
+    return False
+
+def _muh_authorize_url():
+    import urllib.parse
+    params = {"client_id": _MUH_CLIENT_ID, "redirect_uri": _MUH_REDIRECT_URI, "response_type": "code"}
+    return f"{_MUH_API_BASE}/oauth/authorize?" + urllib.parse.urlencode(params)
+
+def _muh_token_istegi(form_data):
+    """oauth/token uç noktasına POST atar — stdlib urllib ile."""
+    import urllib.request, urllib.parse, urllib.error
+    data = urllib.parse.urlencode(form_data).encode()
+    req = urllib.request.Request(f"{_MUH_API_BASE}/oauth/token", data=data, method="POST",
+                                  headers={"Content-Type": "application/x-www-form-urlencoded"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            token = json.loads(resp.read().decode())
+            token["_alindigi_zaman"] = time.time()
+            _muh_token_yaz(token)
+            return token, None
+    except urllib.error.HTTPError as e:
+        try:
+            detay = e.read().decode()[:300]
+        except:
+            detay = str(e)
+        return None, f"HTTP {e.code}: {detay}"
+    except Exception as e:
+        return None, str(e)
+
+def _muh_kod_ile_baglan(kod):
+    return _muh_token_istegi({
+        "grant_type": "authorization_code",
+        "client_id": _MUH_CLIENT_ID,
+        "client_secret": _MUH_CLIENT_SECRET,
+        "redirect_uri": _MUH_REDIRECT_URI,
+        "code": kod,
+    })
+
+def _muh_token_yenile(refresh_token):
+    return _muh_token_istegi({
+        "grant_type": "refresh_token",
+        "client_id": _MUH_CLIENT_ID,
+        "client_secret": _MUH_CLIENT_SECRET,
+        "redirect_uri": _MUH_REDIRECT_URI,
+        "refresh_token": refresh_token,
+    })
+
+def _muh_gecerli_token():
+    """Kayıtlı token'ı döner; süresi dolmaya yakınsa otomatik yeniler."""
+    tok = _muh_token_oku()
+    if not tok:
+        return None, "Muhasebe bağlantısı henüz kurulmamış."
+    alindigi = tok.get("_alindigi_zaman", 0)
+    expires_in = tok.get("expires_in", 7200)
+    if time.time() - alindigi > (expires_in - 120):
+        if not tok.get("refresh_token"):
+            return None, "Oturum süresi dolmuş, yeniden bağlanmanız gerekiyor."
+        yeni, hata = _muh_token_yenile(tok["refresh_token"])
+        if yeni:
+            return yeni, None
+        return None, f"Bağlantı yenilenemedi: {hata}"
+    return tok, None
+
+def _muh_api_get(yol, params=None):
+    """Muhasebe API'sinden GET isteği yapar. yol örn: /v4/companies/843974/sales_invoices"""
+    import urllib.request, urllib.parse, urllib.error
+    tok, hata = _muh_gecerli_token()
+    if not tok:
+        return None, hata
+    url = f"{_MUH_API_BASE}{yol}"
+    if params:
+        url += "?" + urllib.parse.urlencode(params)
+    req = urllib.request.Request(url, headers={
+        "Authorization": f"Bearer {tok['access_token']}",
+        "Accept": "application/json",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return json.loads(resp.read().decode()), None
+    except urllib.error.HTTPError as e:
+        try:
+            detay = e.read().decode()[:300]
+        except:
+            detay = str(e)
+        return None, f"HTTP {e.code}: {detay}"
+    except Exception as e:
+        return None, str(e)
 
 def hesapla_segment(manuel_segment, gerceklesen_ciro):
     """Manuel segment varsa onu normalize et, yoksa ciroya göre otomatik hesapla"""
@@ -2243,6 +2362,51 @@ button[data-testid="manage-app-button"] { display: none !important; }
                         st.session_state["aktif_tab"] = _tab_key
                         st.rerun()
 
+    # ── MUHASEBE MENÜSÜ (harici muhasebe altyapısı — link menüsü) ─────────────
+    st.markdown("""<style>
+    .mw-muh-baslik{font-size:11px;font-weight:700;color:#0f172a;text-transform:uppercase;
+        letter-spacing:.4px;margin:10px 0 4px;}
+    .mw-muh-grup{display:flex;flex-direction:column;gap:1px;margin-bottom:2px;}
+    .mw-muh-link{font-size:12.5px;color:#334155;text-decoration:none;padding:5px 8px;
+        border-radius:6px;display:block;}
+    .mw-muh-link:hover{background:#f6f8fb;color:#1a4f9e;}
+    </style>""", unsafe_allow_html=True)
+    with st.expander("💰 Muhasebe"):
+        st.markdown("""
+<div class="mw-muh-baslik">Satışlar</div>
+<div class="mw-muh-grup">
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/teklifler" target="_blank">Teklifler</a>
+</div>""", unsafe_allow_html=True)
+        _muh_fatura_aktif = st.session_state.get("aktif_tab") == "muhasebe_fatura"
+        if st.button("📄 Faturalar", use_container_width=True,
+                     type="primary" if _muh_fatura_aktif else "secondary",
+                     key="sb_muh_fatura"):
+            st.session_state["aktif_tab"] = "muhasebe_fatura"
+            st.rerun()
+        st.markdown("""
+<div class="mw-muh-grup">
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/musteriler" target="_blank">Müşteriler</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/satislar" target="_blank">Satışlar Raporu</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/tahsilatlar" target="_blank">Tahsilatlar Raporu</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/gelir-ve-gider-raporu" target="_blank">Gelir Gider Raporu</a>
+</div>
+<div class="mw-muh-baslik">Giderler</div>
+<div class="mw-muh-grup">
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/giderler" target="_blank">Gider Listesi</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/tedarikciler" target="_blank">Tedarikçiler</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/calisanlar" target="_blank">Çalışanlar</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/giderler" target="_blank">Giderler Raporu</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/odemeler" target="_blank">Ödemeler Raporu</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/kdv" target="_blank">KDV Raporu</a>
+</div>
+<div class="mw-muh-baslik">Nakit</div>
+<div class="mw-muh-grup">
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/kasa-ve-bankalar" target="_blank">Kasa ve Bankalar</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/cekler" target="_blank">Çekler</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/kasa-banka" target="_blank">Kasa / Banka Raporu</a>
+  <a class="mw-muh-link" href="https://uygulama.parasut.com/843974/raporlar/nakit-akisi" target="_blank">Nakit Akışı Raporu</a>
+</div>
+""", unsafe_allow_html=True)
 
     # ── ALT BÖLÜM ─────────────────────────────────────────────────────────────
     st.divider()
@@ -12734,6 +12898,67 @@ elif aktif == "bolgeler":
                    else "Bu toplam, tüm kullanıcıların tüm bölgelerdeki tüm müşterilerini kapsar.")
         st.divider()
         st.caption("Yeni müşteri eklemek için mevcut 📥 Excel Aktar sayfasını kullanabilirsiniz — il/ilçe bilgisi girildiğinde bölgesi otomatik hesaplanır. Tek tek bölge listesi için Cari Liste ekranının en üstündeki 📍 Bölgeler kutucuklarını kullanın.")
+
+# ── MUHASEBE – FATURALAR (sadece görüntüleme, veri yazma YOK) ────────────────
+elif aktif == "muhasebe_fatura":
+    sayfa_log("muhasebe_fatura")
+    st.markdown("## 💰 Muhasebe – Faturalar")
+    st.caption("Bu ekran salt-okunurdur; hiçbir veri CRM veritabanına yazılmaz. Fatura kesme/silme işlemi yapılmaz.")
+
+    _muh_tok = _muh_token_oku()
+    if not _muh_tok:
+        st.warning("⚠️ Muhasebe sistemine henüz bağlı değilsiniz.")
+        st.markdown("**Bağlantı kurmak için:**")
+        st.markdown(f"1️⃣ Aşağıdaki bağlantıya tıklayın, muhasebe hesabınızla giriş yapıp erişime izin verin:")
+        st.markdown(f"[🔗 Bağlantı kur]({_muh_authorize_url()})")
+        st.markdown("2️⃣ Ekranda size gösterilen kodu kopyalayıp aşağıya yapıştırın:")
+        _muh_kod = st.text_input("Doğrulama kodu", key="muh_kod_input")
+        if st.button("Bağlan", key="muh_baglan_btn"):
+            if _muh_kod.strip():
+                with st.spinner("Bağlanılıyor..."):
+                    _muh_yeni, _muh_hata = _muh_kod_ile_baglan(_muh_kod.strip())
+                if _muh_yeni:
+                    st.success("✅ Bağlantı başarılı!")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Bağlantı kurulamadı: {_muh_hata}")
+            else:
+                st.info("Lütfen önce kodu girin.")
+    else:
+        st.success("✅ Muhasebe sistemine bağlı.")
+        _muh_c1, _muh_c2 = st.columns([1, 5])
+        with _muh_c1:
+            if st.button("🔄 Yenile", key="muh_yenile_btn"):
+                st.rerun()
+
+        with st.spinner("Faturalar alınıyor..."):
+            _muh_veri, _muh_hata = _muh_api_get(
+                f"/v4/companies/{_MUH_COMPANY_ID}/sales_invoices",
+                params={"page[size]": 50, "sort": "-issue_date"}
+            )
+
+        if _muh_hata:
+            st.error(f"Faturalar alınamadı: {_muh_hata}")
+            st.caption("Bağlantı süresi dolmuş olabilir — 'Yenile'ye basıp tekrar deneyin, sorun devam ederse yeniden bağlanmanız gerekebilir.")
+        else:
+            _muh_kayitlar = (_muh_veri or {}).get("data", [])
+            if not _muh_kayitlar:
+                st.info("Kayıtlı fatura bulunamadı.")
+            else:
+                _muh_satirlar = []
+                for _k in _muh_kayitlar:
+                    _a = _k.get("attributes", {}) or {}
+                    _muh_satirlar.append({
+                        "Fatura No":  _a.get("invoice_no", ""),
+                        "Tarih":      _a.get("issue_date", ""),
+                        "Vade":       _a.get("due_date", ""),
+                        "Net Tutar":  _a.get("net_total", ""),
+                        "Toplam":     _a.get("gross_total", ""),
+                        "Kalan":      _a.get("remaining", ""),
+                        "Durum":      _a.get("payment_status", ""),
+                    })
+                st.dataframe(pd.DataFrame(_muh_satirlar), use_container_width=True, hide_index=True)
+                st.caption(f"Toplam {len(_muh_satirlar)} fatura listelendi (en fazla 50 kayıt).")
 
 # ── FOOTER ────────────────────────────────────────────────────────────────────
 st.markdown(
