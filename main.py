@@ -368,11 +368,11 @@ def _muh_gider_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fat
             },
             "relationships": {
                 "contact": {"data": {"id": str(contact_id), "type": "contacts"}},
-                "details": {"data": [{"type": "purchase_invoice_details", "id": _gid}]},
+                "details": {"data": [{"type": "purchase_bill_details", "id": _gid}]},
             },
         },
         "included": [{
-            "type": "purchase_invoice_details", "id": _gid,
+            "type": "purchase_bill_details", "id": _gid,
             "attributes": {"quantity": float(miktar), "unit_price": float(birim_fiyat),
                             "vat_rate": float(kdv_orani), "description": aciklama or ""},
         }],
