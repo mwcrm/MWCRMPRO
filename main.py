@@ -238,8 +238,10 @@ def _muh_contact_id_bul_veya_olustur(cari_id, firma_adi):
     return _yeni_id, None
 
 def _muh_fatura_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fatura_tarihi, vade_tarihi):
-    """Yeni satış faturası oluşturur — tek kalemli basit fatura."""
-    _gecici_id = "det-1"
+    """Yeni satış faturası oluşturur — tek kalemli basit fatura.
+    NOT: Parasut, kalem (detail) verisini ayrı bir "included" bölümü ile DEĞİL,
+    relationships.details.data[] içine doğrudan gömülü "attributes" ile bekliyor
+    (resmi PHP istemci örneğinden doğrulandı)."""
     _govde = {
         "data": {
             "type": "sales_invoices",
@@ -252,22 +254,22 @@ def _muh_fatura_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fa
                 "exchange_rate": 1,
             },
             "relationships": {
-                "contact": {"data": {"id": str(contact_id), "type": "contacts"}},
-                "details": {"data": [{"type": "sales_invoice_details", "id": _gecici_id}]},
+                "contact": {"data": {"type": "contacts", "id": str(contact_id)}},
+                "details": {
+                    "data": [
+                        {
+                            "type": "sales_invoice_details",
+                            "attributes": {
+                                "quantity": float(miktar),
+                                "unit_price": float(birim_fiyat),
+                                "vat_rate": float(kdv_orani),
+                                "description": aciklama or "",
+                            },
+                        }
+                    ]
+                },
             },
         },
-        "included": [
-            {
-                "type": "sales_invoice_details",
-                "id": _gecici_id,
-                "attributes": {
-                    "quantity": float(miktar),
-                    "unit_price": float(birim_fiyat),
-                    "vat_rate": float(kdv_orani),
-                    "description": aciklama or "",
-                },
-            }
-        ],
     }
     return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/sales_invoices", method="POST", body=_govde)
 
@@ -329,7 +331,7 @@ def _muh_teklifler_getir():
                          params={"page[size]": 25, "sort": "-issue_date"})
 
 def _muh_teklif_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, teklif_tarihi, gecerlilik_tarihi):
-    _gid = "det-1"
+    """NOT: sales_invoices ile aynı gömülü-attributes yapısı kullanılıyor (bkz. _muh_fatura_olustur notu)."""
     _govde = {
         "data": {
             "type": "sales_offers",
@@ -338,15 +340,20 @@ def _muh_teklif_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, te
                 "expiry_date": str(gecerlilik_tarihi), "currency": "TRL", "exchange_rate": 1,
             },
             "relationships": {
-                "contact": {"data": {"id": str(contact_id), "type": "contacts"}},
-                "details": {"data": [{"type": "sales_offer_details", "id": _gid}]},
+                "contact": {"data": {"type": "contacts", "id": str(contact_id)}},
+                "details": {
+                    "data": [
+                        {
+                            "type": "sales_offer_details",
+                            "attributes": {
+                                "quantity": float(miktar), "unit_price": float(birim_fiyat),
+                                "vat_rate": float(kdv_orani), "description": aciklama or "",
+                            },
+                        }
+                    ]
+                },
             },
         },
-        "included": [{
-            "type": "sales_offer_details", "id": _gid,
-            "attributes": {"quantity": float(miktar), "unit_price": float(birim_fiyat),
-                            "vat_rate": float(kdv_orani), "description": aciklama or ""},
-        }],
     }
     return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/sales_offers", method="POST", body=_govde)
 
@@ -358,7 +365,7 @@ def _muh_giderler_getir():
                          params={"page[size]": 25, "sort": "-issue_date"})
 
 def _muh_gider_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fatura_tarihi, vade_tarihi):
-    _gid = "det-1"
+    """NOT: sales_invoices ile aynı gömülü-attributes yapısı kullanılıyor (bkz. _muh_fatura_olustur notu)."""
     _govde = {
         "data": {
             "type": "purchase_bills",
@@ -367,15 +374,20 @@ def _muh_gider_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fat
                 "due_date": str(vade_tarihi), "currency": "TRL", "exchange_rate": 1,
             },
             "relationships": {
-                "contact": {"data": {"id": str(contact_id), "type": "contacts"}},
-                "details": {"data": [{"type": "purchase_bill_details", "id": _gid}]},
+                "contact": {"data": {"type": "contacts", "id": str(contact_id)}},
+                "details": {
+                    "data": [
+                        {
+                            "type": "purchase_bill_details",
+                            "attributes": {
+                                "quantity": float(miktar), "unit_price": float(birim_fiyat),
+                                "vat_rate": float(kdv_orani), "description": aciklama or "",
+                            },
+                        }
+                    ]
+                },
             },
         },
-        "included": [{
-            "type": "purchase_bill_details", "id": _gid,
-            "attributes": {"quantity": float(miktar), "unit_price": float(birim_fiyat),
-                            "vat_rate": float(kdv_orani), "description": aciklama or ""},
-        }],
     }
     return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/purchase_bills", method="POST", body=_govde)
 
