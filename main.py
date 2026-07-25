@@ -9,6 +9,51 @@ import json
 import time
 from datetime import datetime, timedelta
 
+# ═══════════════════════════════════════════════════════════════════════════
+# 📌 PROJE_KURALLARI — MWCRMPRO geliştirme kuralları (Claude için otomatik bağlam)
+# main.py yeni bir Claude sohbetine yüklendiğinde bu blok otomatik okunur.
+# Aynı metin CRM içinde: Kullanıcı Yönetimi → 📌 Kurallar sekmesinde de görünür.
+# ═══════════════════════════════════════════════════════════════════════════
+KURALLAR_PIN = "1907"  # Kurallar sekmesi için erişim PIN'i — değiştirmek istersen söyle yeter
+
+PROJE_KURALLARI = """
+### 1) Git Komutları
+Her kod teslimatının sonunda:
+```
+git add main.py
+git commit -m "..."   (değişikliği özetleyen mesaj)
+git push
+```
+
+### 2) Kesin Çalışma Kuralları
+- Yeni SQL migration yok, sadece mevcut tabloları kullan.
+- requirements.txt'e yeni pip paketi ekleme, sadece stdlib (urllib vb.).
+- Kullanıcıya asla manuel/elle kod değişikliği yaptırma; her değişikliği tam çalışır main.py dosyası olarak ver.
+- Stabilite önceliklidir, çalışan özellikleri bozma. (Not arşivleme özelliğinde geçmişte veri kaybı yaşandı — bu alanda ekstra dikkatli ol.)
+- `cari_aciklamalar` tablosuna insert: sadece `cari_id`, `aciklama`, `olusturan` kolonları var; `tip` / `tarih` kolonu YOK.
+
+### 3) Veri Güvenliği — KRİTİK
+Asla veri silinmeyecek/kaybolmayacak. Silme gerektiren hiçbir işlem (toplu silme dahil) önce açık kullanıcı onayı olmadan YAPILMAZ.
+
+### 4) MacroDroid Entegrasyonu
+- Supabase proje: `asinwzxwmkkrcbtjrkoq.supabase.co` — tablolar: `islem_kaydi`, `cari_kartlar`, `kisiler`
+- Amaç: Gelen/Giden Arama & SMS'te arayan/gönderen adını rehberden bulup CRM'e (`musteri_adi`) otomatik yazdırmak.
+- Kullanıcı MacroDroid'i Türkçe arayüzde kullanıyor, teknik bilgisi sınırlı — adımlar tek tek, ekran görüntüsüyle doğrulanarak anlatılmalı.
+- "Kişileri Al" + sözlük yöntemi ÇOK YAVAŞ (8000 kişide ~4 dk) — bunun yerine anılık sistem değişkenleri kullanılmalı: `*Çağrı ismi`, `*Gelen SMS kişisi`, `*Giden SMS kişisi`
+
+### 5) Supabase Erişim Bilgileri
+- `SUPABASE_URL` = `https://asinwzxwmkkrcbtjrkoq.supabase.co`
+- `SUPABASE_ANON_KEY` = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzaW53enh3bWtrcmNidGpya29xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA3MzM4MzQsImV4cCI6MjA5NjMwOTgzNH0.7WNPNWG-uXO7COSOhzVyAbR-MTaP6RdSlOTI0IfyNAU`
+
+### 6) Muhasebe (Paraşüt) Entegrasyonu
+CRM arayüzünde **"Muhasebe"** adıyla görünür; **"Paraşüt"** ismi hiçbir yerde geçmez.
+- `CLIENT_ID` = `Idqed6FhS1AFfc-VH9e7JFvB_vpwLJiMfWibaozKpbE`
+- `CLIENT_SECRET` = `EHBUuu5JvCEgg48kcZ90cKYu2ZBHmO1eZVJMQhPalDg`
+- `CALLBACK_URL` = `urn:ietf:wg:oauth:2.0:oob`
+- `COMPANY_ID` = `843974`
+- `API_BASE` = `https://api.parasut.com` (doğru yol: `/v4/{company_id}/...` — `companies/` YOK)
+"""
+
 # ── SUPABASE BAĞLANTISI ───────────────────────────────────────────────────────
 def sb_or_sqlite():
     """Supabase varsa True, yoksa SQLite kullan"""
@@ -5349,11 +5394,11 @@ elif aktif == "kullanici":
     )
 
     if st.session_state.get("rol") == "admin":
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_font = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_font, kul_tab_kural = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar","📌 Kurallar"])
     elif _surum_yetkisi:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_font = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_font, kul_tab_kural = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🚀 Sürüm Yönetimi","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar","📌 Kurallar"])
     else:
-        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_font = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar"])
+        kul_tab1, kul_tab2, kul_tab3, kul_tab4, kul_tab5_ekran, kul_tab_tanim, kul_tab_kolon, kul_tab_toplu, kul_tab_font, kul_tab_kural = st.tabs(["📋 Kullanıcılar","➕ Yeni Kullanıcı","🔐 Yetki Düzenle","📊 Kullanıcı Log","🎨 Ekran Ayarları","⚙️ Tanımlar","📐 Kolon Ayarları","🔄 Toplu Değiştir","🔤 Fontlar","📌 Kurallar"])
         kul_tab5 = None
 
     with kul_tab1:
@@ -6352,6 +6397,25 @@ function updateBot(v){{
                         file_name="DejaVuSans-Bold.ttf", mime="font/ttf", use_container_width=True, key="fnt_dl_bold")
             else:
                 _fnt2.warning("DejaVuSans-Bold.ttf bulunamadı")
+
+    with kul_tab_kural:
+        st.markdown("### 📌 Proje Kuralları & Bilgileri")
+        if not st.session_state.get("kurallar_pin_dogru", False):
+            st.caption("Bu alanda hassas bilgiler var (Supabase anahtarı, Paraşüt secret vb.) — devam etmek için PIN girin.")
+            _kp1, _kp2 = st.columns([2,1])
+            _kural_pin_giris = _kp1.text_input("PIN:", type="password", key="kurallar_pin_input", label_visibility="collapsed", placeholder="PIN girin")
+            if _kp2.button("🔓 Aç", key="kurallar_pin_btn", use_container_width=True):
+                if _kural_pin_giris == KURALLAR_PIN:
+                    st.session_state["kurallar_pin_dogru"] = True
+                    st.rerun()
+                else:
+                    st.error("❌ PIN hatalı!")
+        else:
+            st.caption("Bu kurallar Claude ile yeni bir sohbet başlatıldığında main.py'nin en üstünden otomatik okunur — kodla birebir aynıdır. Sadece admin görür.")
+            st.markdown(PROJE_KURALLARI)
+            if st.button("🔒 Kilitle", key="kurallar_kilitle_btn"):
+                st.session_state["kurallar_pin_dogru"] = False
+                st.rerun()
 
 elif aktif == "rapor":
     sayfa_log("rapor")
