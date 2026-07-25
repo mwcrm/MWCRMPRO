@@ -2693,7 +2693,8 @@ button[data-testid="manage-app-button"] { display: none !important; }
     st.markdown("""
 <style>
 .mw-muh-baslik{font-size:11px;font-weight:700;color:#0f172a;text-transform:uppercase;
-    letter-spacing:.4px;margin:8px 0 3px;}
+    letter-spacing:.4px;line-height:1.6;margin:0;padding:10px 0 4px;overflow:visible;}
+section[data-testid="stSidebar"] div[data-testid="stExpander"]:has(.mw-muh-baslik) > div { padding: 4px 2px !important; }
 </style>
 """, unsafe_allow_html=True)
     with st.expander("💰 Muhasebe"):
