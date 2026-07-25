@@ -411,7 +411,10 @@ def _muh_fatura_sil(invoice_id):
 # gösteriyor, uygulama çökmüyor.
 
 def _muh_contacts_getir(account_type=None, sayfa_boyutu=25):
-    params = {"sort": "-created_at"}
+    # NOT: Parasut contacts uç noktası "created_at" sıralamasını kabul etmiyor
+    # (sadece id, balance, abs_balance, name, email) — en yeni ekleneni en üstte
+    # göstermek için "-id" kullanılıyor (id arttıkça daha yeni kayıt demek).
+    params = {"sort": "-id"}
     if account_type:
         params["filter[account_type]"] = account_type
     return _muh_api_get_tumu(f"/v4/{_MUH_COMPANY_ID}/contacts", params=params)
