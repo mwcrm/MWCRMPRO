@@ -227,8 +227,12 @@ def _muh_api_get(yol, params=None):
 def _muh_api_get_tumu(yol, params=None, sayfa_limiti=40):
     """Parasut sayfa başına en fazla 25 kayıt veriyor — 'ne varsa birebir' tüm kayıtları
     getirmek için sayfa sayfa gezip birleştirir. Çağıran kod tarafında değişiklik
-    gerekmesin diye sonucu aynı {"data": [...]} JSON:API zarfı içinde döner."""
+    gerekmesin diye sonucu aynı {"data": [...]} JSON:API zarfı içinde döner.
+    "include" parametresi verilmişse (örn. include=contact,details.product), Parasut'un
+    döndüğü "included" (ilişkili kayıt: müşteri adı, ürün adı vb.) bilgisi de "included"
+    anahtarı altında, sayfalar arası tekrarsız birleştirilerek döner."""
     _tum = []
+    _tum_included = {}
     _sayfa = 1
     _params = dict(params or {})
     _params["page[size]"] = 25
@@ -240,13 +244,58 @@ def _muh_api_get_tumu(yol, params=None, sayfa_limiti=40):
                 break  # bir kısmı gelmişse elimizdekiyle devam et, hatayı yutma
             return None, _hata
         _bu_sayfa = (_veri or {}).get("data", [])
+        for _inc in (_veri or {}).get("included", []) or []:
+            _tum_included[(_inc.get("type"), _inc.get("id"))] = _inc
         if not _bu_sayfa:
             break
         _tum.extend(_bu_sayfa)
         if len(_bu_sayfa) < 25:
             break
         _sayfa += 1
-    return {"data": _tum}, None
+    return {"data": _tum, "included": list(_tum_included.values())}, None
+
+def _muh_dahil_index(veri):
+    """JSON:API "included" listesinden (type,id) -> kayıt sözlüğü oluşturur.
+    Müşteri adı, ürün adı gibi ilişkili kayıtları hızlıca bulmak için kullanılır."""
+    _idx = {}
+    for _inc in (veri or {}).get("included", []) or []:
+        _idx[(_inc.get("type"), _inc.get("id"))] = _inc
+    return _idx
+
+def _muh_iliski_kayit(kayit, iliski_adi, dahil_index):
+    """Bir kaydın TEKİL ilişkisinin (örn. 'contact') included içindeki tam halini döner."""
+    _ref = ((kayit.get("relationships") or {}).get(iliski_adi) or {}).get("data")
+    if not _ref or not dahil_index:
+        return None
+    return dahil_index.get((_ref.get("type"), _ref.get("id")))
+
+def _muh_iliski_liste(kayit, iliski_adi, dahil_index):
+    """Bir kaydın ÇOĞUL ilişkisinin (örn. 'details') included içindeki tam hallerini liste olarak döner."""
+    _refs = ((kayit.get("relationships") or {}).get(iliski_adi) or {}).get("data") or []
+    if not dahil_index:
+        return []
+    _sonuc = []
+    for _r in _refs:
+        _bulunan = dahil_index.get((_r.get("type"), _r.get("id")))
+        if _bulunan:
+            _sonuc.append(_bulunan)
+    return _sonuc
+
+def _muh_kalem_detay_goster(kayit, dahil_index):
+    """Bir fatura/teklif/gider kaydının kalemlerini (ürün/hizmet, miktar, fiyat, KDV) listeler."""
+    _kalemler = _muh_iliski_liste(kayit, "details", dahil_index)
+    if not _kalemler:
+        st.caption("Kalem bilgisi bulunamadı (eski kayıt veya API'den include gelmedi).")
+        return
+    for _kl in _kalemler:
+        _ka = _kl.get("attributes") or {}
+        _urun = _muh_iliski_kayit(_kl, "product", dahil_index)
+        _urun_ad = ((_urun or {}).get("attributes") or {}).get("name", "—") if _urun else "—"
+        _miktar = _ka.get("quantity", "")
+        _fiyat = _ka.get("unit_price", "")
+        _kdv = _ka.get("vat_rate", "")
+        _acik = _ka.get("description", "")
+        st.markdown(f"- **{_urun_ad}** — {_acik} · {_miktar} × {_fiyat} ₺ · KDV %{_kdv}")
 
 def _muh_api_istek(yol, method="POST", body=None):
     """Muhasebe API'sine POST/PUT/DELETE isteği yapar (JSON:API gövdesiyle)."""
@@ -457,7 +506,8 @@ def _muh_accounts_getir():
     return _muh_api_get_tumu(f"/v4/{_MUH_COMPANY_ID}/accounts")
 
 def _muh_teklifler_getir():
-    return _muh_api_get_tumu(f"/v4/{_MUH_COMPANY_ID}/sales_offers", params={"sort": "-issue_date"})
+    return _muh_api_get_tumu(f"/v4/{_MUH_COMPANY_ID}/sales_offers",
+                              params={"sort": "-issue_date", "include": "contact,details.product"})
 
 def _muh_teklif_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, teklif_tarihi, gecerlilik_tarihi):
     """NOT: sales_invoices ile aynı gömülü-attributes yapısı kullanılıyor (bkz. _muh_fatura_olustur notu).
@@ -497,7 +547,8 @@ def _muh_teklif_sil(offer_id):
     return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/sales_offers/{offer_id}", method="DELETE")
 
 def _muh_giderler_getir():
-    return _muh_api_get_tumu(f"/v4/{_MUH_COMPANY_ID}/purchase_bills", params={"sort": "-issue_date"})
+    return _muh_api_get_tumu(f"/v4/{_MUH_COMPANY_ID}/purchase_bills",
+                              params={"sort": "-issue_date", "include": "contact,details.product"})
 
 def _muh_gider_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fatura_tarihi, vade_tarihi):
     """NOT: sales_invoices ile aynı gömülü-attributes yapısı kullanılıyor (bkz. _muh_fatura_olustur notu).
@@ -539,12 +590,18 @@ def _muh_gider_sil(bill_id):
 def _muh_cekler_getir():
     return _muh_api_get_tumu(f"/v4/{_MUH_COMPANY_ID}/checks")
 
-def _muh_liste_render(kayitlar, kolonlar, sil_fn=None, key_prefix="ml", bos_mesaj="Kayıt bulunamadı."):
-    """Ortak liste render — kolonlar: [(baslik, attr_anahtari, formatter|None), ...]"""
+def _muh_liste_render(kayitlar, kolonlar, sil_fn=None, key_prefix="ml", bos_mesaj="Kayıt bulunamadı.",
+                       dahil_index=None, detay_fn=None):
+    """Ortak liste render — kolonlar: [(baslik, attr_anahtari, formatter|None), ...]
+    attr_anahtari "@iliski_adi" ile başlarsa (örn. "@contact"), o kaydın ilişkili
+    kaydının adı dahil_index'ten bulunup gösterilir (Müşteri/Tedarikçi sütunu için).
+    detay_fn(kayit, dahil_index) verilirse her satırın altına, "🔍" butonuna
+    basılınca açılan bir kalem/detay paneli eklenir."""
     if not kayitlar:
         st.info(bos_mesaj)
         return
-    _oranlar = [2] * len(kolonlar) + ([1] if sil_fn else [])
+    _buton_sayisi = (1 if sil_fn else 0) + (1 if detay_fn else 0)
+    _oranlar = [2] * len(kolonlar) + ([1] * _buton_sayisi if _buton_sayisi else [])
     _hc = st.columns(_oranlar)
     for _c, (_b, _k, _f) in zip(_hc, kolonlar):
         _c.markdown(f"**{_b}**")
@@ -553,15 +610,26 @@ def _muh_liste_render(kayitlar, kolonlar, sil_fn=None, key_prefix="ml", bos_mesa
         _rid = _kk.get("id")
         _rc = st.columns(_oranlar)
         for _c, (_b, _k, _f) in zip(_rc, kolonlar):
-            _v = _a.get(_k, "")
+            if isinstance(_k, str) and _k.startswith("@"):
+                _iliskili = _muh_iliski_kayit(_kk, _k[1:], dahil_index)
+                _v = ((_iliskili or {}).get("attributes") or {}).get("name", "—") if _iliskili else "—"
+            else:
+                _v = _a.get(_k, "")
             try:
                 _c.write(_f(_v) if _f else _v)
             except Exception:
                 _c.write(_v)
+        _buton_idx = len(kolonlar)
+        if detay_fn:
+            if _rc[_buton_idx].button("🔍", key=f"{key_prefix}_detay_btn_{_rid}", help="Kalemleri gör"):
+                _dk = f"{key_prefix}_detay_acik_{_rid}"
+                st.session_state[_dk] = not st.session_state.get(_dk, False)
+                st.rerun()
+            _buton_idx += 1
         if sil_fn:
             _bek = f"{key_prefix}_sil_bekliyor_{_rid}"
             if not st.session_state.get(_bek):
-                if _rc[-1].button("🗑️", key=f"{key_prefix}_sil_btn_{_rid}"):
+                if _rc[_buton_idx].button("🗑️", key=f"{key_prefix}_sil_btn_{_rid}"):
                     st.session_state[_bek] = True
                     st.rerun()
             else:
@@ -579,6 +647,9 @@ def _muh_liste_render(kayitlar, kolonlar, sil_fn=None, key_prefix="ml", bos_mesa
                 if _oc2.button("Vazgeç", key=f"{key_prefix}_sil_vazgec_{_rid}"):
                     st.session_state.pop(_bek, None)
                     st.rerun()
+        if detay_fn and st.session_state.get(f"{key_prefix}_detay_acik_{_rid}"):
+            with st.container(border=True):
+                detay_fn(_kk, dahil_index)
 
 def _muh_baglanti_var_mi():
     return bool(_muh_token_oku())
@@ -11566,7 +11637,7 @@ elif aktif == "muhasebe_fatura":
         with st.spinner("Faturalar alınıyor..."):
             _muh_veri, _muh_hata = _muh_api_get_tumu(
                 f"/v4/{_MUH_COMPANY_ID}/sales_invoices",
-                params={"sort": "-issue_date"}
+                params={"sort": "-issue_date", "include": "contact,details.product"}
             )
 
         if _muh_hata:
@@ -11574,43 +11645,15 @@ elif aktif == "muhasebe_fatura":
             st.caption("Bağlantı süresi dolmuş olabilir — 'Yenile'ye basıp tekrar deneyin, sorun devam ederse yeniden bağlanmanız gerekebilir.")
         else:
             _muh_kayitlar = (_muh_veri or {}).get("data", [])
-            if not _muh_kayitlar:
-                st.info("Kayıtlı fatura bulunamadı.")
-            else:
-                st.markdown(f"**{len(_muh_kayitlar)} fatura**")
-                _muh_baslik_c = st.columns([2, 2, 2, 2, 2, 2, 1])
-                for _c, _t in zip(_muh_baslik_c, ["Fatura No", "Tarih", "Vade", "Net Tutar", "Toplam", "Durum", ""]):
-                    _c.markdown(f"**{_t}**")
-                for _k in _muh_kayitlar:
-                    _a = _k.get("attributes", {}) or {}
-                    _fid = _k.get("id")
-                    _rc = st.columns([2, 2, 2, 2, 2, 2, 1])
-                    _rc[0].write(_a.get("invoice_no", ""))
-                    _rc[1].write(_a.get("issue_date", ""))
-                    _rc[2].write(_a.get("due_date", ""))
-                    _rc[3].write(_a.get("net_total", ""))
-                    _rc[4].write(_a.get("gross_total", ""))
-                    _rc[5].write(_a.get("payment_status", ""))
-                    _muh_sil_bekliyor_key = f"muh_sil_bekliyor_{_fid}"
-                    if not st.session_state.get(_muh_sil_bekliyor_key):
-                        if _rc[6].button("🗑️", key=f"muh_sil_btn_{_fid}", help="Faturayı sil"):
-                            st.session_state[_muh_sil_bekliyor_key] = True
-                            st.rerun()
-                    else:
-                        st.warning(f"⚠️ **{_a.get('invoice_no','Bu fatura')}** faturasını muhasebe sisteminden kalıcı olarak silmek üzeresiniz. Bu işlem GERİ ALINAMAZ.")
-                        _oc1, _oc2 = st.columns(2)
-                        if _oc1.button("✅ Evet, kalıcı sil", type="primary", key=f"muh_sil_onay_{_fid}"):
-                            with st.spinner("Siliniyor..."):
-                                _muh_sil_sonuc, _muh_sil_hata = _muh_fatura_sil(_fid)
-                            st.session_state.pop(_muh_sil_bekliyor_key, None)
-                            if _muh_sil_hata:
-                                st.error(f"Silinemedi: {_muh_sil_hata}")
-                            else:
-                                st.success("Fatura silindi.")
-                                st.rerun()
-                        if _oc2.button("Vazgeç", key=f"muh_sil_vazgec_{_fid}"):
-                            st.session_state.pop(_muh_sil_bekliyor_key, None)
-                            st.rerun()
+            st.markdown(f"**{len(_muh_kayitlar)} fatura**")
+            _muh_index = _muh_dahil_index(_muh_veri)
+            _muh_liste_render(_muh_kayitlar, [
+                ("Fatura No", "invoice_no", None), ("Müşteri", "@contact", None),
+                ("Tarih", "issue_date", None), ("Vade", "due_date", None),
+                ("Net Tutar", "net_total", None), ("Toplam", "gross_total", None),
+                ("Durum", "payment_status", None),
+            ], sil_fn=_muh_fatura_sil, key_prefix="muh", dahil_index=_muh_index,
+               detay_fn=_muh_kalem_detay_goster, bos_mesaj="Kayıtlı fatura bulunamadı.")
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MUHASEBE — GENİŞLETİLMİŞ NATIVE SAYFALAR
@@ -11672,11 +11715,14 @@ elif aktif == "muhasebe_teklifler":
         else:
             _mt_kayit = (_mt_veri or {}).get("data", [])
             st.markdown(f"**{len(_mt_kayit)} teklif**")
+            _mt_index = _muh_dahil_index(_mt_veri)
             _muh_liste_render(_mt_kayit, [
-                ("Teklif No", "invoice_no", None), ("Tarih", "issue_date", None),
-                ("Geçerlilik", "expiry_date", None), ("Net Tutar", "net_total", None),
-                ("Toplam", "gross_total", None), ("Durum", "status", None),
-            ], sil_fn=_muh_teklif_sil, key_prefix="mt", bos_mesaj="Kayıtlı teklif bulunamadı.")
+                ("Teklif No", "invoice_no", None), ("Müşteri", "@contact", None),
+                ("Tarih", "issue_date", None), ("Geçerlilik", "expiry_date", None),
+                ("Net Tutar", "net_total", None), ("Toplam", "gross_total", None),
+                ("Durum", "status", None),
+            ], sil_fn=_muh_teklif_sil, key_prefix="mt", dahil_index=_mt_index,
+               detay_fn=_muh_kalem_detay_goster, bos_mesaj="Kayıtlı teklif bulunamadı.")
 
 elif aktif == "muhasebe_musteriler":
     sayfa_log("muhasebe_musteriler")
@@ -11763,11 +11809,14 @@ elif aktif == "muhasebe_gider_listesi":
         else:
             _mg_kayit = (_mg_veri or {}).get("data", [])
             st.markdown(f"**{len(_mg_kayit)} gider kaydı**")
+            _mg_index = _muh_dahil_index(_mg_veri)
             _muh_liste_render(_mg_kayit, [
-                ("Fiş No", "invoice_no", None), ("Tarih", "issue_date", None),
-                ("Vade", "due_date", None), ("Net Tutar", "net_total", None),
-                ("Toplam", "gross_total", None), ("Durum", "payment_status", None),
-            ], sil_fn=_muh_gider_sil, key_prefix="mg", bos_mesaj="Kayıtlı gider bulunamadı.")
+                ("Fiş No", "invoice_no", None), ("Tedarikçi", "@contact", None),
+                ("Tarih", "issue_date", None), ("Vade", "due_date", None),
+                ("Net Tutar", "net_total", None), ("Toplam", "gross_total", None),
+                ("Durum", "payment_status", None),
+            ], sil_fn=_muh_gider_sil, key_prefix="mg", dahil_index=_mg_index,
+               detay_fn=_muh_kalem_detay_goster, bos_mesaj="Kayıtlı gider bulunamadı.")
             if _mg_kayit:
                 with st.expander("🔍 Teknik Detay (ilk kaydın ham verisi)"):
                     st.caption("Gider oluşturma hatası devam ederse bu ham veriyi ekran görüntüsüyle paylaşın — "
@@ -11934,13 +11983,16 @@ elif aktif in ("muhasebe_satis_raporu", "muhasebe_tahsilat_raporu", "muhasebe_ge
                 return 0.0
 
         _mr_satis_veri, _mr_satis_hata = _muh_api_get_tumu(
-            f"/v4/{_MUH_COMPANY_ID}/sales_invoices", params={"sort": "-issue_date"})
+            f"/v4/{_MUH_COMPANY_ID}/sales_invoices",
+            params={"sort": "-issue_date", "include": "contact,details.product"})
         _mr_gider_veri, _mr_gider_hata = _muh_giderler_getir()
 
         if _mr_satis_hata or _mr_gider_hata:
             if _mr_satis_hata: st.error(f"Satış verisi alınamadı: {_mr_satis_hata}")
             if _mr_gider_hata: st.error(f"Gider verisi alınamadı: {_mr_gider_hata}")
         else:
+            _mr_satis_index = _muh_dahil_index(_mr_satis_veri)
+            _mr_gider_index = _muh_dahil_index(_mr_gider_veri)
             _mr_satislar = _mr_tarih_filtrele((_mr_satis_veri or {}).get("data", []))
             _mr_giderler = _mr_tarih_filtrele((_mr_gider_veri or {}).get("data", []))
 
@@ -11961,10 +12013,11 @@ elif aktif in ("muhasebe_satis_raporu", "muhasebe_tahsilat_raporu", "muhasebe_ge
                 _c2.metric("Net Tutar", f"{_mr_satis_net:,.2f} ₺")
                 _c3.metric("Brüt Tutar", f"{_mr_satis_brut:,.2f} ₺")
                 _muh_liste_render(_mr_satislar, [
-                    ("Fatura No", "invoice_no", None), ("Tarih", "issue_date", None),
-                    ("Net Tutar", "net_total", None), ("Toplam", "gross_total", None),
-                    ("Durum", "payment_status", None),
-                ], bos_mesaj="Kayıt bulunamadı.")
+                    ("Fatura No", "invoice_no", None), ("Müşteri", "@contact", None),
+                    ("Tarih", "issue_date", None), ("Net Tutar", "net_total", None),
+                    ("Toplam", "gross_total", None), ("Durum", "payment_status", None),
+                ], dahil_index=_mr_satis_index, detay_fn=_muh_kalem_detay_goster,
+                   key_prefix="mrsr", bos_mesaj="Kayıt bulunamadı.")
 
             elif aktif == "muhasebe_tahsilat_raporu":
                 _c1, _c2 = st.columns(2)
@@ -11972,9 +12025,11 @@ elif aktif in ("muhasebe_satis_raporu", "muhasebe_tahsilat_raporu", "muhasebe_ge
                 _c2.metric("Bekleyen (Tahmini)", f"{max(_mr_satis_brut - _mr_tahsil, 0):,.2f} ₺")
                 _mr_odenmis = [k for k in _mr_satislar if (k.get("attributes") or {}).get("payment_status") == "paid"]
                 _muh_liste_render(_mr_odenmis, [
-                    ("Fatura No", "invoice_no", None), ("Tarih", "issue_date", None),
-                    ("Toplam", "gross_total", None), ("Durum", "payment_status", None),
-                ], bos_mesaj="Tahsil edilmiş kayıt bulunamadı.")
+                    ("Fatura No", "invoice_no", None), ("Müşteri", "@contact", None),
+                    ("Tarih", "issue_date", None), ("Toplam", "gross_total", None),
+                    ("Durum", "payment_status", None),
+                ], dahil_index=_mr_satis_index, detay_fn=_muh_kalem_detay_goster,
+                   key_prefix="mrth", bos_mesaj="Tahsil edilmiş kayıt bulunamadı.")
 
             elif aktif == "muhasebe_gelirgider_raporu":
                 _c1, _c2, _c3 = st.columns(3)
@@ -11988,10 +12043,11 @@ elif aktif in ("muhasebe_satis_raporu", "muhasebe_tahsilat_raporu", "muhasebe_ge
                 _c2.metric("Net Tutar", f"{_mr_gider_net:,.2f} ₺")
                 _c3.metric("Brüt Tutar", f"{_mr_gider_brut:,.2f} ₺")
                 _muh_liste_render(_mr_giderler, [
-                    ("Fiş No", "invoice_no", None), ("Tarih", "issue_date", None),
-                    ("Net Tutar", "net_total", None), ("Toplam", "gross_total", None),
-                    ("Durum", "payment_status", None),
-                ], bos_mesaj="Kayıt bulunamadı.")
+                    ("Fiş No", "invoice_no", None), ("Tedarikçi", "@contact", None),
+                    ("Tarih", "issue_date", None), ("Net Tutar", "net_total", None),
+                    ("Toplam", "gross_total", None), ("Durum", "payment_status", None),
+                ], dahil_index=_mr_gider_index, detay_fn=_muh_kalem_detay_goster,
+                   key_prefix="mrgd", bos_mesaj="Kayıt bulunamadı.")
 
             elif aktif == "muhasebe_odeme_raporu":
                 _c1, _c2 = st.columns(2)
@@ -11999,9 +12055,11 @@ elif aktif in ("muhasebe_satis_raporu", "muhasebe_tahsilat_raporu", "muhasebe_ge
                 _c2.metric("Bekleyen (Tahmini)", f"{max(_mr_gider_brut - _mr_odeme, 0):,.2f} ₺")
                 _mr_odenmis_g = [k for k in _mr_giderler if (k.get("attributes") or {}).get("payment_status") == "paid"]
                 _muh_liste_render(_mr_odenmis_g, [
-                    ("Fiş No", "invoice_no", None), ("Tarih", "issue_date", None),
-                    ("Toplam", "gross_total", None), ("Durum", "payment_status", None),
-                ], bos_mesaj="Ödenmiş kayıt bulunamadı.")
+                    ("Fiş No", "invoice_no", None), ("Tedarikçi", "@contact", None),
+                    ("Tarih", "issue_date", None), ("Toplam", "gross_total", None),
+                    ("Durum", "payment_status", None),
+                ], dahil_index=_mr_gider_index, detay_fn=_muh_kalem_detay_goster,
+                   key_prefix="mrod", bos_mesaj="Ödenmiş kayıt bulunamadı.")
 
             elif aktif == "muhasebe_kdv_raporu":
                 _c1, _c2, _c3 = st.columns(3)
