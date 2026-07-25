@@ -306,11 +306,66 @@ def _muh_contact_id_bul_veya_olustur(cari_id, firma_adi):
         pass
     return _yeni_id, None
 
+def _muh_urun_id_bul_veya_olustur(urun_adi, kdv_orani=18):
+    """Fatura/teklif/gider kalemi (detail) için Parasut'ta ürün/hizmet kaydını bulur,
+    yoksa yeni oluşturur. Parasut API'si her kalemde mutlaka bir 'product' ilişkisi
+    istiyor — bu olmadan HTTP 422 'Ürün/hizmet doldurulmalı' hatası dönüyor.
+    Kalemin 'Açıklama / Hizmet' alanı aynı zamanda ürün/hizmet adı olarak kullanılır;
+    aynı isimle bir daha çağrıldığında tekrar ürün oluşturmaz, kaydı Supabase'te
+    (kullanici_tercih) önbelleğe alır."""
+    _ad_norm = (urun_adi or "").strip()[:200] or "Genel Hizmet"
+    _anahtar = f"_muh_urun_{_ad_norm.lower()}"
+    try:
+        sb = get_sb_client()
+        if sb:
+            r = sb.table("kullanici_tercih").select("deger").eq("kullanici", "_sistem").eq("anahtar", _anahtar).execute()
+            if r.data:
+                return r.data[0]["deger"], None
+    except:
+        pass
+
+    _veri, _hata = _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/products",
+                                 params={"filter[name]": _ad_norm, "page[size]": 5})
+    if not _hata:
+        for _d in (_veri or {}).get("data", []):
+            if str((_d.get("attributes") or {}).get("name", "")).strip().lower() == _ad_norm.lower():
+                _bulunan_id = _d.get("id")
+                try:
+                    sb = get_sb_client()
+                    if sb:
+                        sb.table("kullanici_tercih").insert({"kullanici": "_sistem", "anahtar": _anahtar, "deger": str(_bulunan_id)}).execute()
+                except:
+                    pass
+                return _bulunan_id, None
+
+    _sonuc, _hata2 = _muh_api_istek(
+        f"/v4/{_MUH_COMPANY_ID}/products", method="POST",
+        body={"data": {"type": "products", "attributes": {
+            "name": _ad_norm, "vat_rate": float(kdv_orani or 18),
+        }}}
+    )
+    if _hata2:
+        return None, f"Ürün/hizmet kaydı oluşturulamadı: {_hata2}"
+    _yeni_urun_id = ((_sonuc or {}).get("data") or {}).get("id")
+    if not _yeni_urun_id:
+        return None, "Ürün/hizmet kaydı oluşturuldu ama id alınamadı."
+    try:
+        sb = get_sb_client()
+        if sb:
+            sb.table("kullanici_tercih").insert({"kullanici": "_sistem", "anahtar": _anahtar, "deger": str(_yeni_urun_id)}).execute()
+    except:
+        pass
+    return _yeni_urun_id, None
+
 def _muh_fatura_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fatura_tarihi, vade_tarihi):
     """Yeni satış faturası oluşturur — tek kalemli basit fatura.
     NOT: Parasut, kalem (detail) verisini ayrı bir "included" bölümü ile DEĞİL,
     relationships.details.data[] içine doğrudan gömülü "attributes" ile bekliyor
-    (resmi PHP istemci örneğinden doğrulandı)."""
+    (resmi PHP istemci örneğinden doğrulandı). Ayrıca her kalemde bir "product"
+    ilişkisi zorunlu (bkz. _muh_urun_id_bul_veya_olustur)."""
+    _urun_id, _urun_hata = _muh_urun_id_bul_veya_olustur(aciklama, kdv_orani)
+    if _urun_hata:
+        return None, _urun_hata
     _govde = {
         "data": {
             "type": "sales_invoices",
@@ -333,6 +388,9 @@ def _muh_fatura_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fa
                                 "unit_price": float(birim_fiyat),
                                 "vat_rate": float(kdv_orani),
                                 "description": aciklama or "",
+                            },
+                            "relationships": {
+                                "product": {"data": {"type": "products", "id": str(_urun_id)}}
                             },
                         }
                     ]
@@ -399,7 +457,11 @@ def _muh_teklifler_getir():
     return _muh_api_get_tumu(f"/v4/{_MUH_COMPANY_ID}/sales_offers", params={"sort": "-issue_date"})
 
 def _muh_teklif_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, teklif_tarihi, gecerlilik_tarihi):
-    """NOT: sales_invoices ile aynı gömülü-attributes yapısı kullanılıyor (bkz. _muh_fatura_olustur notu)."""
+    """NOT: sales_invoices ile aynı gömülü-attributes yapısı kullanılıyor (bkz. _muh_fatura_olustur notu).
+    Her kalemde bir "product" ilişkisi zorunlu (bkz. _muh_urun_id_bul_veya_olustur)."""
+    _urun_id, _urun_hata = _muh_urun_id_bul_veya_olustur(aciklama, kdv_orani)
+    if _urun_hata:
+        return None, _urun_hata
     _govde = {
         "data": {
             "type": "sales_offers",
@@ -417,6 +479,9 @@ def _muh_teklif_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, te
                                 "quantity": float(miktar), "unit_price": float(birim_fiyat),
                                 "vat_rate": float(kdv_orani), "description": aciklama or "",
                             },
+                            "relationships": {
+                                "product": {"data": {"type": "products", "id": str(_urun_id)}}
+                            },
                         }
                     ]
                 },
@@ -432,7 +497,11 @@ def _muh_giderler_getir():
     return _muh_api_get_tumu(f"/v4/{_MUH_COMPANY_ID}/purchase_bills", params={"sort": "-issue_date"})
 
 def _muh_gider_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fatura_tarihi, vade_tarihi):
-    """NOT: sales_invoices ile aynı gömülü-attributes yapısı kullanılıyor (bkz. _muh_fatura_olustur notu)."""
+    """NOT: sales_invoices ile aynı gömülü-attributes yapısı kullanılıyor (bkz. _muh_fatura_olustur notu).
+    Her kalemde bir "product" ilişkisi zorunlu (bkz. _muh_urun_id_bul_veya_olustur)."""
+    _urun_id, _urun_hata = _muh_urun_id_bul_veya_olustur(aciklama, kdv_orani)
+    if _urun_hata:
+        return None, _urun_hata
     _govde = {
         "data": {
             "type": "purchase_bills",
@@ -449,6 +518,9 @@ def _muh_gider_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fat
                             "attributes": {
                                 "quantity": float(miktar), "unit_price": float(birim_fiyat),
                                 "vat_rate": float(kdv_orani), "description": aciklama or "",
+                            },
+                            "relationships": {
+                                "product": {"data": {"type": "products", "id": str(_urun_id)}}
                             },
                         }
                     ]
