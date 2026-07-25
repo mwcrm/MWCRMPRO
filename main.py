@@ -179,6 +179,30 @@ def _muh_api_get(yol, params=None):
     except Exception as e:
         return None, str(e)
 
+def _muh_api_get_tumu(yol, params=None, sayfa_limiti=40):
+    """Parasut sayfa başına en fazla 25 kayıt veriyor — 'ne varsa birebir' tüm kayıtları
+    getirmek için sayfa sayfa gezip birleştirir. Çağıran kod tarafında değişiklik
+    gerekmesin diye sonucu aynı {"data": [...]} JSON:API zarfı içinde döner."""
+    _tum = []
+    _sayfa = 1
+    _params = dict(params or {})
+    _params["page[size]"] = 25
+    while _sayfa <= sayfa_limiti:
+        _params["page[number]"] = _sayfa
+        _veri, _hata = _muh_api_get(yol, params=_params)
+        if _hata:
+            if _tum:
+                break  # bir kısmı gelmişse elimizdekiyle devam et, hatayı yutma
+            return None, _hata
+        _bu_sayfa = (_veri or {}).get("data", [])
+        if not _bu_sayfa:
+            break
+        _tum.extend(_bu_sayfa)
+        if len(_bu_sayfa) < 25:
+            break
+        _sayfa += 1
+    return {"data": _tum}, None
+
 def _muh_api_istek(yol, method="POST", body=None):
     """Muhasebe API'sine POST/PUT/DELETE isteği yapar (JSON:API gövdesiyle)."""
     import urllib.request, urllib.error
@@ -284,10 +308,10 @@ def _muh_fatura_sil(invoice_id):
 # gösteriyor, uygulama çökmüyor.
 
 def _muh_contacts_getir(account_type=None, sayfa_boyutu=25):
-    params = {"page[size]": sayfa_boyutu, "sort": "-created_at"}
+    params = {"sort": "-created_at"}
     if account_type:
         params["filter[account_type]"] = account_type
-    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/contacts", params=params)
+    return _muh_api_get_tumu(f"/v4/{_MUH_COMPANY_ID}/contacts", params=params)
 
 def _muh_contact_olustur(ad, account_type="customer", telefon="", email="", adres=""):
     _attrs = {"name": ad, "account_type": account_type, "contact_type": "company"}
@@ -311,7 +335,7 @@ def _muh_contact_ada_gore_bul_veya_olustur(ad, account_type="supplier"):
     return _muh_contact_olustur(ad, account_type)
 
 def _muh_employees_getir():
-    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/employees", params={"page[size]": 25})
+    return _muh_api_get_tumu(f"/v4/{_MUH_COMPANY_ID}/employees")
 
 def _muh_employee_olustur(ad, soyad, email="", tc_no=""):
     _attrs = {"name": ad, "surname": soyad}
@@ -324,11 +348,10 @@ def _muh_employee_sil(emp_id):
     return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/employees/{emp_id}", method="DELETE")
 
 def _muh_accounts_getir():
-    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/accounts", params={"page[size]": 25})
+    return _muh_api_get_tumu(f"/v4/{_MUH_COMPANY_ID}/accounts")
 
 def _muh_teklifler_getir():
-    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/sales_offers",
-                         params={"page[size]": 25, "sort": "-issue_date"})
+    return _muh_api_get_tumu(f"/v4/{_MUH_COMPANY_ID}/sales_offers", params={"sort": "-issue_date"})
 
 def _muh_teklif_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, teklif_tarihi, gecerlilik_tarihi):
     """NOT: sales_invoices ile aynı gömülü-attributes yapısı kullanılıyor (bkz. _muh_fatura_olustur notu)."""
@@ -361,8 +384,7 @@ def _muh_teklif_sil(offer_id):
     return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/sales_offers/{offer_id}", method="DELETE")
 
 def _muh_giderler_getir():
-    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/purchase_bills",
-                         params={"page[size]": 25, "sort": "-issue_date"})
+    return _muh_api_get_tumu(f"/v4/{_MUH_COMPANY_ID}/purchase_bills", params={"sort": "-issue_date"})
 
 def _muh_gider_olustur(contact_id, aciklama, miktar, birim_fiyat, kdv_orani, fatura_tarihi, vade_tarihi):
     """NOT: sales_invoices ile aynı gömülü-attributes yapısı kullanılıyor (bkz. _muh_fatura_olustur notu)."""
@@ -395,7 +417,7 @@ def _muh_gider_sil(bill_id):
     return _muh_api_istek(f"/v4/{_MUH_COMPANY_ID}/purchase_bills/{bill_id}", method="DELETE")
 
 def _muh_cekler_getir():
-    return _muh_api_get(f"/v4/{_MUH_COMPANY_ID}/checks", params={"page[size]": 25})
+    return _muh_api_get_tumu(f"/v4/{_MUH_COMPANY_ID}/checks")
 
 def _muh_liste_render(kayitlar, kolonlar, sil_fn=None, key_prefix="ml", bos_mesaj="Kayıt bulunamadı."):
     """Ortak liste render — kolonlar: [(baslik, attr_anahtari, formatter|None), ...]"""
@@ -11393,9 +11415,9 @@ elif aktif == "muhasebe_fatura":
                                     st.rerun()
 
         with st.spinner("Faturalar alınıyor..."):
-            _muh_veri, _muh_hata = _muh_api_get(
+            _muh_veri, _muh_hata = _muh_api_get_tumu(
                 f"/v4/{_MUH_COMPANY_ID}/sales_invoices",
-                params={"page[size]": 25, "sort": "-issue_date"}
+                params={"sort": "-issue_date"}
             )
 
         if _muh_hata:
@@ -11406,7 +11428,7 @@ elif aktif == "muhasebe_fatura":
             if not _muh_kayitlar:
                 st.info("Kayıtlı fatura bulunamadı.")
             else:
-                st.markdown(f"**{len(_muh_kayitlar)} fatura** (en fazla 50 kayıt gösterilir)")
+                st.markdown(f"**{len(_muh_kayitlar)} fatura**")
                 _muh_baslik_c = st.columns([2, 2, 2, 2, 2, 2, 1])
                 for _c, _t in zip(_muh_baslik_c, ["Fatura No", "Tarih", "Vade", "Net Tutar", "Toplam", "Durum", ""]):
                     _c.markdown(f"**{_t}**")
@@ -11500,7 +11522,7 @@ elif aktif == "muhasebe_teklifler":
             st.error(f"Teklifler alınamadı: {_mt_hata}")
         else:
             _mt_kayit = (_mt_veri or {}).get("data", [])
-            st.markdown(f"**{len(_mt_kayit)} teklif** (en fazla 50 kayıt gösterilir)")
+            st.markdown(f"**{len(_mt_kayit)} teklif**")
             _muh_liste_render(_mt_kayit, [
                 ("Teklif No", "invoice_no", None), ("Tarih", "issue_date", None),
                 ("Geçerlilik", "expiry_date", None), ("Net Tutar", "net_total", None),
@@ -11591,12 +11613,17 @@ elif aktif == "muhasebe_gider_listesi":
             st.error(f"Giderler alınamadı: {_mg_hata}")
         else:
             _mg_kayit = (_mg_veri or {}).get("data", [])
-            st.markdown(f"**{len(_mg_kayit)} gider kaydı** (en fazla 50 kayıt gösterilir)")
+            st.markdown(f"**{len(_mg_kayit)} gider kaydı**")
             _muh_liste_render(_mg_kayit, [
                 ("Fiş No", "invoice_no", None), ("Tarih", "issue_date", None),
                 ("Vade", "due_date", None), ("Net Tutar", "net_total", None),
                 ("Toplam", "gross_total", None), ("Durum", "payment_status", None),
             ], sil_fn=_muh_gider_sil, key_prefix="mg", bos_mesaj="Kayıtlı gider bulunamadı.")
+            if _mg_kayit:
+                with st.expander("🔍 Teknik Detay (ilk kaydın ham verisi)"):
+                    st.caption("Gider oluşturma hatası devam ederse bu ham veriyi ekran görüntüsüyle paylaşın — "
+                               "gerçek alan adlarını görüp oluşturma isteğini buna göre düzeltebiliriz.")
+                    st.json(_mg_kayit[0])
 
 elif aktif == "muhasebe_tedarikciler":
     sayfa_log("muhasebe_tedarikciler")
@@ -11757,8 +11784,8 @@ elif aktif in ("muhasebe_satis_raporu", "muhasebe_tahsilat_raporu", "muhasebe_ge
             except Exception:
                 return 0.0
 
-        _mr_satis_veri, _mr_satis_hata = _muh_api_get(
-            f"/v4/{_MUH_COMPANY_ID}/sales_invoices", params={"page[size]": 25, "sort": "-issue_date"})
+        _mr_satis_veri, _mr_satis_hata = _muh_api_get_tumu(
+            f"/v4/{_MUH_COMPANY_ID}/sales_invoices", params={"sort": "-issue_date"})
         _mr_gider_veri, _mr_gider_hata = _muh_giderler_getir()
 
         if _mr_satis_hata or _mr_gider_hata:
