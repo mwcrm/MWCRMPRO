@@ -5259,59 +5259,12 @@ function kartSec(id){
     except:
         pass
 
-    # ── ANINDA NOT ARŞİVLEME — "Kaydet"e basılmasa bile, arama/filtre değişse bile
-    # Açıklama hücresine yazılmış bir not asla kaybolmasın VE asla mükerrer kaydedilmesin.
-    # Her render'da otomatik çalışır; boş olmayan aciklama varsa hemen arşivler.
-    try:
-        _edf_pos = edited_df.reset_index(drop=True)
-        if "aciklama" in _edf_pos.columns and "id" in _edf_pos.columns:
-            _anlik_mask = _edf_pos["aciklama"].fillna("").astype(str).str.strip().replace("nan","") != ""
-            if _anlik_mask.any():
-                _sb_anlik = get_sb_client()
-                # Mükerrer kaydı önlemek için: bu tam metni bu müşteri için daha önce
-                # arşivlediysek bir daha arşivleme (widget eski metni göstermeye devam etse bile).
-                _arsiv_takip = st.session_state.setdefault("_ac_arsiv_takip", {})
-                _yeni_arsivlendi = []
-                for _pos in _edf_pos[_anlik_mask].index:
-                    _anr = _edf_pos.loc[_pos]
-                    _anlik_id = int(float(str(_anr.get("id",0))))
-                    _anlik_txt = str(_anr.get("aciklama","")).strip()
-                    _anlik_firma = str(_anr.get("firma",""))
-                    if not _anlik_id or not _anlik_txt or _anlik_txt == "nan":
-                        continue
-                    if _arsiv_takip.get(_anlik_id) == _anlik_txt:
-                        continue  # bu metin bu müşteri için zaten arşivlendi, tekrar etme
-                    try:
-                        if _sb_anlik:
-                            _ins_r = _sb_anlik.table("cari_aciklamalar").insert({
-                                "cari_id": _anlik_id,
-                                "aciklama": _anlik_txt,
-                                "olusturan": st.session_state.get("kullanici",""),
-                            }).execute()
-                            _upd_r = _sb_anlik.table("cari_kartlar").update({"aciklama":""}).eq("id", _anlik_id).execute()
-                        else:
-                            _cx_anlik = get_conn()
-                            _cx_anlik.execute("INSERT INTO cari_aciklamalar (cari_id,cari_adi,aciklama,olusturan) VALUES (?,?,?,?)",
-                                (_anlik_id, _anlik_firma, _anlik_txt, st.session_state.get("kullanici","")))
-                            _cx_anlik.execute("UPDATE cari_kartlar SET aciklama='' WHERE id=?", (_anlik_id,))
-                            _cx_anlik.commit(); _cx_anlik.close()
-                        _arsiv_takip[_anlik_id] = _anlik_txt  # bu metni bir daha arşivleme
-                        _yeni_arsivlendi.append(_anlik_firma)
-                    except Exception as _ac_hata:
-                        # ARTIK GİZLEMİYORUZ — hata varsa ekranda görünsün ki nedenini bulabilelim
-                        st.error(f"⚠️ '{_anlik_firma}' notu arşivlenemedi: {_ac_hata}")
-                if _yeni_arsivlendi:
-                    # ÖNEMLİ: Widget'ı ARTIK tam sıfırlamıyoruz — bu, aynı satırda henüz
-                    # "Kaydet"e basılmamış BAŞKA hücrelerdeki (Ara İşlem, Durum vb.) yazılmış
-                    # ama kaydedilmemiş değişiklikleri sessizce siliyordu. Not zaten DB'de güvende
-                    # (arşivlendi + idempotency takibi var) — hücre görsel olarak eski metni
-                    # göstermeye devam edebilir ama tekrar arşivlenmez, veri kaybı olmaz.
-                    try: st.cache_data.clear()
-                    except: pass
-                    st.toast("✅ Arşivlendi: " + ", ".join(_yeni_arsivlendi), icon="✅")
-                    st.rerun()
-    except Exception:
-        pass
+    # NOT: Burada eskiden "anında not arşivleme" vardı — Açıklama hücresine her
+    # yazıldığında (Kaydet'e basılmadan) otomatik olarak sorgu atıp sayfayı
+    # yeniliyordu. Bu, kullanıcı henüz TÜM değişikliklerini bitirmeden ekranın
+    # yanıp sönmesine ve işlemin yarıda kalmasına sebep oluyordu. Kaldırıldı —
+    # artık hiçbir şey otomatik çalışmıyor, arşivleme sadece "Değişiklikleri
+    # Kaydet" butonuna basılınca yapılıyor.
 
     secili_df = edited_df[edited_df["Seç"] == True]
     secili_sayi = len(secili_df)
