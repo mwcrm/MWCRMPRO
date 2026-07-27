@@ -7070,10 +7070,11 @@ elif aktif == "ozel_teklif":
             st.session_state["oz2_mus_reset"] = True
             st.rerun()
 
-    _oz_mus = None; _oz_gsm=""; _oz_eml=""
+    _oz_mus = None; _oz_gsm=""; _oz_eml=""; _oz_sec_id = None
     if _oz_sec != "-- Müşteri Seçin --" and "[" in _oz_sec:
         try:
             _mid = int(_oz_sec.split("]")[0].replace("[","").strip())
+            _oz_sec_id = _mid
             _mr  = _oz_dfm[_oz_dfm["id"]==_mid]
             if not _mr.empty:
                 _oz_mus = _mr.iloc[0]
@@ -7321,8 +7322,17 @@ elif aktif == "ozel_teklif":
         if not _oz_hedef:
             st.warning("Müşteri adı boş!")
         else:
+            if _oz_mus is None and not _oz_sec_id:
+                # NOT: Eskiden burada müşteri eşleşmediğinde musteri_id sessizce 0
+                # yazılıyordu — bu da teklifin o müşteriyle hiç ilişkilendirilmemesine
+                # ve Cari Liste'deki "🧾 Teklif" rozetinde hiç görünmemesine sebep
+                # oluyordu (özellikle yeni eklenen müşterilerde, 2 dakikalık önbellek
+                # onları henüz listeye almamış olabiliyordu). "-- Müşteri Seçin --"
+                # kutusundan seçim yapılmadıysa (serbest metin girişi) bunu bilerek
+                # yapıyor olabilirsiniz, o yüzden burada sadece uyarıyoruz, engellemiyoruz.
+                st.warning("⚠️ Müşteri listeden seçilmedi — bu teklif hiçbir cari karta bağlanmayacak, Cari Liste'deki teklif sayısında görünmeyecek. Bağlanmasını istiyorsanız 'Müşteri Seçin' kutusundan seçip tekrar deneyin (yeni eklediyseniz sayfayı yenilemeniz gerekebilir).")
             _oz_veri = {
-                "musteri_id": int(_oz_mus["id"]) if _oz_mus is not None else 0,
+                "musteri_id": int(_oz_mus["id"]) if _oz_mus is not None else (int(_oz_sec_id) if _oz_sec_id else 0),
                 "musteri_adi": _oz_hedef,
                 "satirlar": _ozj.dumps({"tip":"ozel","grp":grp}, ensure_ascii=False),
                 "toplam_tutar": sum(float(s.get("fiyat",0) or 0) for g in grp for s in g.get("satirlar",[])),
