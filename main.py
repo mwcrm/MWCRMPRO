@@ -5196,6 +5196,7 @@ function kartSec(id){
         with _sb1:
             if st.button("💾 Değişiklikleri Kaydet", use_container_width=True, type="primary", key="liste_kaydet_ust"):
                 st.session_state["_kaydet_flag"] = True
+            st.caption("⚠️ Bir hücreye yazdıktan sonra **Enter'a basın veya başka bir hücreye tıklayın**, sonra Kaydet'e basın — yazarken direkt Kaydet'e basarsanız o hücredeki yazı kaydedilmeyebilir.")
         with _sb3:
             if st.button("🔄 Kolon Sıfırla", use_container_width=True, key="cl_kolon_sifirla_ust"):
                 st.session_state.pop("_cl_kolon_sira", None)
