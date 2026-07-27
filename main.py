@@ -934,6 +934,22 @@ def get_kullanici_listesi():
 def _cached_placeholder(): pass  # cache decorator boş bırakılamaz
 
 
+def _teklifler_oku():
+    """teklifler tablosunu DOĞRUDAN Supabase client ile okur.
+    NOT: db_read() bu tabloda bazı ortamlarda sessizce başarısız olup neredeyse
+    boş yerel SQLite yedeğine düşüyordu (177 gerçek kayıt varken "6 kayıt"
+    gösteriyordu) — bu fonksiyon o sorunu bypass eder, Kurallar sayfasındaki
+    çalışan "Bağlantısız Teklif Onarımı" aracıyla AYNI, kanıtlanmış yöntemi kullanır."""
+    try:
+        sb = get_sb_client()
+        if sb:
+            _res = sb.table("teklifler").select("*").order("id", desc=True).execute()
+            _data = _res.data or []
+            return pd.DataFrame(_data) if _data else pd.DataFrame()
+    except Exception:
+        pass
+    return db_read("teklifler", order_col="id")  # son çare
+
 def _teklifler_tarih_normalize(df):
     """teklifler tablosunda gerçek Supabase şemasında 'tarih' kolonu olmayabilir
     (otomatik 'created_at' kullanılıyor olabilir, cari_aciklamalar'da olduğu gibi).
@@ -6754,7 +6770,7 @@ elif aktif == "rapor":
     df_rapor = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi=\'0\' OR silindi IS NULL)")
     df_rapor = _atama_filtresi_uygula(df_rapor)
     df_rand_r = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC")
-    df_tek_r  = _teklifler_tarih_normalize(db_read("teklifler", order_col="id"))
+    df_tek_r  = _teklifler_tarih_normalize(_teklifler_oku())
     # Randevu ve teklifleri de filtrele
     if not df_rand_r.empty and "musteri_adi" in df_rand_r.columns:
         _rp_atanan = _get_atanmis_firmalar()
@@ -7179,7 +7195,7 @@ elif aktif == "ozel_teklif":
 
         # ── DAHA ÖNCE BU MÜŞTERİYE ÖZEL TEKLİF VERİLMİŞ Mİ? ────────────────────
         try:
-            _oz_gecmis_df = _teklifler_tarih_normalize(db_read("teklifler", order_col="id"))
+            _oz_gecmis_df = _teklifler_tarih_normalize(_teklifler_oku())
             if not _oz_gecmis_df.empty and "satirlar" in _oz_gecmis_df.columns:
                 _oz_gecmis_ozel = _oz_gecmis_df[_oz_gecmis_df["satirlar"].str.contains('ozel', case=False, na=False)]
                 _oz_gecmis_bu = _oz_gecmis_ozel[_oz_gecmis_ozel["musteri_adi"].astype(str).str.strip().str.upper() == _oz_hedef.strip().upper()] if not _oz_gecmis_ozel.empty else pd.DataFrame()
@@ -7449,7 +7465,7 @@ elif aktif == "ozel_teklif":
     # ── KAYITLI TEKLİFLER ────────────────────────────────────────────────────
     with st.expander("📋 Kayıtlı Özel Teklifler"):
         try:
-            _oz_df_tek = _teklifler_tarih_normalize(db_read("teklifler", order_col="id"))
+            _oz_df_tek = _teklifler_tarih_normalize(_teklifler_oku())
             if not _oz_df_tek.empty and "satirlar" in _oz_df_tek.columns:
                 _oz_df_tek2 = _oz_df_tek[_oz_df_tek["satirlar"].str.contains('ozel', case=False, na=False)]
             else:
@@ -7573,7 +7589,7 @@ elif aktif == "kayitli_teklifler":
     st.caption("Kendisine teklif hazırlanmış tüm müşteriler — cari ana liste ile aynı kolon yapısında.")
 
     with st.spinner("Yükleniyor..."):
-        _kt_tek_df = _teklifler_tarih_normalize(db_read("teklifler", order_col="id"))
+        _kt_tek_df = _teklifler_tarih_normalize(_teklifler_oku())
         _kt_cari_df = get_cari_listesi()
 
     # ── DOĞRULAMA: veritabanındaki HAM kayıt sayısı — hiçbir filtre/eşleştirme
@@ -8117,7 +8133,7 @@ elif aktif == "sozlesme":
             st.markdown("**MADDE 3 — Fiyat Tarifesi** (son Özel Teklif'ten otomatik çekilir)")
             _sz_teklif_df = pd.DataFrame()
             try:
-                _sz_tekliflerdf = _teklifler_tarih_normalize(db_read("teklifler", order_col="id"))
+                _sz_tekliflerdf = _teklifler_tarih_normalize(_teklifler_oku())
                 if not _sz_tekliflerdf.empty and "satirlar" in _sz_tekliflerdf.columns:
                     _sz_ozel = _sz_tekliflerdf[_sz_tekliflerdf["satirlar"].str.contains("ozel", case=False, na=False)]
                     _sz_teklif_df = _sz_ozel[_sz_ozel["musteri_adi"].astype(str).str.strip().str.upper() == _sz_uzun.strip().upper()]
@@ -11324,7 +11340,7 @@ elif aktif == "patron":
     # Veri çek
     _p_cari = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
     _p_rand = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC")
-    _p_tek  = _teklifler_tarih_normalize(db_read("teklifler", order_col="id"))
+    _p_tek  = _teklifler_tarih_normalize(_teklifler_oku())
     _p_an   = db_read("musteri_analiz")
     try:
         _sb_pat = get_sb_client()
