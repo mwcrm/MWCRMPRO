@@ -5196,7 +5196,6 @@ function kartSec(id){
         with _sb1:
             if st.button("💾 Değişiklikleri Kaydet", use_container_width=True, type="primary", key="liste_kaydet_ust"):
                 st.session_state["_kaydet_flag"] = True
-            st.caption("⚠️ Bir hücreye yazdıktan sonra **Enter'a basın veya başka bir hücreye tıklayın**, sonra Kaydet'e basın — yazarken direkt Kaydet'e basarsanız o hücredeki yazı kaydedilmeyebilir.")
         with _sb3:
             if st.button("🔄 Kolon Sıfırla", use_container_width=True, key="cl_kolon_sifirla_ust"):
                 st.session_state.pop("_cl_kolon_sira", None)
@@ -5340,15 +5339,20 @@ function kartSec(id){
             _do_kaydet = True
         if _do_kaydet:
             _editor_state = st.session_state.get("cari_editor", {})
-            _edited_rows  = _editor_state.get("edited_rows", {})
-            # edited_rows yoksa edited_df'ten al
-            if not _edited_rows and "edited_df" in dir():
+            _edited_rows  = dict(_editor_state.get("edited_rows", {}))
+            # ── GÜVENLİK AĞI: session_state'teki edited_rows bazen son hücreyi
+            # kaçırabiliyor (widget'ın kendi zamanlama davranışı). Bu yüzden HER
+            # zaman df_edit ile edited_df'i satır satır karşılaştırıp gerçek
+            # farkı da hesaplıyoruz ve edited_rows ile BİRLEŞTİRİYORUZ — sadece
+            # edited_rows boşsa değil, her durumda. edited_df zaten ekranda o an
+            # görünen/kaydedilmiş son hâl olduğu için bu karşılaştırma en güvenilir
+            # kaynak.
+            if "edited_df" in dir():
                 try:
                     _orig = df_edit.reset_index(drop=True)
                     _ed   = edited_df.reset_index(drop=True)
-                    _edited_rows = {}
                     for _ei in range(min(len(_orig), len(_ed))):
-                        _rd = {}
+                        _rd = dict(_edited_rows.get(str(_ei), {}))
                         for _ec in _ed.columns:
                             if str(_orig.at[_ei,_ec]) != str(_ed.at[_ei,_ec]):
                                 _rd[_ec] = _ed.at[_ei,_ec]
@@ -5454,6 +5458,10 @@ function kartSec(id){
                                     pass
                 except: pass
                 st.session_state.pop("_ls_tablo", None)
+                # Widget'ın eski edited_rows durumunu temizle — kaydedilenler artık
+                # veritabanında, bir sonraki render'da taze veriyle baştan başlasın.
+                # Bu, eski izlerin yeni bir düzenlemeyi maskelemesini de önler.
+                st.session_state.pop("cari_editor", None)
                 if kayit_sayi > 0:
                     _ozet_msg = f"{kayit_sayi} satır kaydedildi!" + (f" · {_arsiv_sayi} not arşivlendi!" if _arsiv_sayi > 0 else "")
                 elif _arsiv_sayi > 0:
