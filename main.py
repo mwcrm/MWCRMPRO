@@ -2586,9 +2586,37 @@ div[data-testid="stVerticalBlock"] > div:empty { display: none !important; }
 div[data-testid="stVerticalBlock"] { gap: 0.3rem !important; }
 hr { margin: 0.3rem 0 !important; }
 div[data-testid="stHorizontalBlock"] { gap: 0.3rem !important; }
-/* Tüm scroll barları gizle */
+/* Scroll barlar: sidebar/menü gibi dar alanlarda gizli kalsın (eski görünüm),
+   ama ana içerik alanı ve tablolarda mausla sürüklenebilsin diye görünür yapıldı. */
 * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
 *::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+section[data-testid="stMain"],
+div[data-testid="stDataEditor"],
+div[data-testid="stDataEditor"] > div,
+div[data-testid="stDataFrame"],
+div[data-testid="stDataFrame"] > div {
+    scrollbar-width: thin !important;
+    -ms-overflow-style: auto !important;
+}
+section[data-testid="stMain"]::-webkit-scrollbar,
+div[data-testid="stDataEditor"]::-webkit-scrollbar,
+div[data-testid="stDataEditor"] > div::-webkit-scrollbar,
+div[data-testid="stDataFrame"]::-webkit-scrollbar,
+div[data-testid="stDataFrame"] > div::-webkit-scrollbar {
+    display: block !important; width: 10px !important; height: 10px !important;
+}
+section[data-testid="stMain"]::-webkit-scrollbar-thumb,
+div[data-testid="stDataEditor"]::-webkit-scrollbar-thumb,
+div[data-testid="stDataEditor"] > div::-webkit-scrollbar-thumb,
+div[data-testid="stDataFrame"]::-webkit-scrollbar-thumb,
+div[data-testid="stDataFrame"] > div::-webkit-scrollbar-thumb {
+    background: #cbd5e1 !important; border-radius: 6px !important;
+}
+section[data-testid="stMain"]::-webkit-scrollbar-track,
+div[data-testid="stDataEditor"]::-webkit-scrollbar-track,
+div[data-testid="stDataFrame"]::-webkit-scrollbar-track {
+    background: #f1f5f9 !important;
+}
 button[data-testid="collapsedControl"] { display: none !important; }
 section[data-testid="stSidebar"] .stButton>button {
     text-align: left !important;
