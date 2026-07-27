@@ -3645,8 +3645,25 @@ section[data-testid="stSidebar"] { display: none !important; }
     try: get_cari_listesi.clear()
     except: pass
     df = get_cari_listesi()
-    if not df.empty and "tarih" in df.columns:
-        df = df.sort_values("tarih", ascending=False).reset_index(drop=True)
+    # NOT: "tarih" (İşlem Tarih) sütunu tablonun içinde DÜZENLENEBİLİR bir alan.
+    # Eskiden her rerun'da canlı "tarih" değerine göre yeniden sıralanıyordu —
+    # yani bir müşterinin İşlem Tarihini değiştirip kaydetmek o müşterinin
+    # satırını kaydırıyordu. Streamlit'te "Seç" işareti satır POZİSYONUNA göre
+    # tutulduğu için, sıra kayınca işaret başka bir müşteride kalmış gibi
+    # görünüyordu. Çözüm: sıralamayı sadece müşteri KÜMESİ değiştiğinde
+    # (yeni/silinen kayıt) yeniden hesapla, aynı kümede kalan bir düzenleme +
+    # kayıt sırasında sırayı SABİT tut.
+    if not df.empty and "tarih" in df.columns and "id" in df.columns:
+        _cl_id_kume = tuple(sorted(int(x) for x in df["id"].tolist()))
+        if st.session_state.get("_cl_sira_id_kume") != _cl_id_kume or not st.session_state.get("_cl_sabit_sira"):
+            _cl_sirali_idler = df.sort_values("tarih", ascending=False)["id"].tolist()
+            st.session_state["_cl_sabit_sira"] = _cl_sirali_idler
+            st.session_state["_cl_sira_id_kume"] = _cl_id_kume
+        else:
+            _cl_sirali_idler = st.session_state["_cl_sabit_sira"]
+        _cl_sira_map = {v: i for i, v in enumerate(_cl_sirali_idler)}
+        df["_cl_sira_key"] = df["id"].map(_cl_sira_map).fillna(len(_cl_sirali_idler))
+        df = df.sort_values("_cl_sira_key").drop(columns=["_cl_sira_key"]).reset_index(drop=True)
 
     if not df.empty:
         for _tk in ["gsm","sabit"]:
@@ -5071,12 +5088,15 @@ function kartSec(id){
                     })
                 if "id" in df_edit.columns:
                     df_edit["📨 Notlar"] = df_edit["id"].apply(lambda x: f"📨 {_not_sayac.get(str(int(x)),0)}" if _not_sayac.get(str(int(x)),0) > 0 else "")
-                    df_edit["_not_sayi"] = df_edit["id"].apply(lambda x: _not_sayac.get(str(int(x)),0))
                 else:
                     df_edit["📨 Notlar"] = ""
-                    df_edit["_not_sayi"] = 0
-                if "_not_sayi" in df_edit.columns:
-                    df_edit = df_edit.sort_values("_not_sayi", ascending=False).drop(columns=["_not_sayi"]).reset_index(drop=True)
+                # NOT: burada eskiden "_not_sayi"ye göre azalan sıralama yapılıyordu.
+                # Bu sıralama not sayısı DEĞİŞTİKÇE (yani tam olarak bir not kaydedince)
+                # satır sırasını kaydırıyordu — ve "Seç" işareti Streamlit'te satır
+                # POZİSYONUNA göre tutulduğu için, sıra kayınca işaret başka bir
+                # müşteriye "geçmiş" gibi görünüyordu. Sıralama kaldırıldı ki satır
+                # sırası bir işlemden diğerine SABİT kalsın, Seç işareti doğru
+                # müşteride kalsın.
             else:
                 df_edit["📨 Notlar"] = ""
         except Exception as _not_err:
@@ -5143,19 +5163,11 @@ function kartSec(id){
     _kayitli_sira = st.session_state.get("_cl_kolon_sira", [])
     _aktif_col_order = _kayitli_sira if _kayitli_sira else col_order
 
-    # Notlu satırları sarı yap — kaç tane notlu var
-    _notlu_kac = len(df_edit[df_edit["📨 Notlar"] != ""]) if "📨 Notlar" in df_edit.columns else 0
-    if _notlu_kac > 0:
-        # data_editor'da ilk N satır notlu — CSS ile sarı yap
-        st.markdown(f"""<style>
-/* İlk {_notlu_kac} veri satırı — notlu müşteriler sarı */
-div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}) td {{
-    background-color: #fefce8 !important;
-}}
-div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover td {{
-    background-color: #fef9c3 !important;
-}}
-</style>""", unsafe_allow_html=True)
+    # NOT: Eskiden burada notlu satırları sarı yapan bir CSS triki vardı
+    # (ilk N satır notluydu, çünkü tablo not sayısına göre sıralanıyordu).
+    # Sıralama kaldırıldığı için bu trik artık rastgele satırları sarı
+    # yapardı — bu yüzden kaldırıldı. Notlu müşteriler "📨 Notlar" sütunundaki
+    # sayıdan hâlâ görülebiliyor.
 
     # Sağda not paneli açık mı?
     _not_panel_id = st.session_state.get("_cl_not_panel_id")
