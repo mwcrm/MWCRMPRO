@@ -3643,9 +3643,13 @@ section[data-testid="stSidebar"] { display: none !important; }
 
     # ── VERİ YÜKLE ──────────────────────────────────────────────────────────────
     sb_liste = get_sb_client()
-    # Cache'i temizle — her zaman taze veri gelsin
-    try: get_cari_listesi.clear()
-    except: pass
+    # NOT: Burada eskiden HER render'da (yani her tek hücre düzenlemesinde bile)
+    # get_cari_listesi.clear() ile önbellek zorla temizlenip TÜM müşteri
+    # tablosu (3700+ kayıt) yeniden Supabase'den çekiliyordu. Bu, düzenleme
+    # yaparken her hücre değişiminde gözle görülür bir "sorgu çalışıyor" gecikmesi
+    # ve ekran titremesine sebep oluyordu. Artık önbellek SADECE gerçek bir
+    # kayıt/silme/arşivleme işleminden SONRA (ilgili yerlerde zaten çağrılıyor)
+    # temizleniyor; salt düzenleme sırasında 60 saniyelik önbellek kullanılıyor.
     df = get_cari_listesi()
     # NOT: "tarih" (İşlem Tarih) sütunu tablonun içinde DÜZENLENEBİLİR bir alan.
     # Eskiden her rerun'da canlı "tarih" değerine göre yeniden sıralanıyordu —
@@ -5372,6 +5376,8 @@ function kartSec(id){
                             hata_list.append(str(e_row))
 
                 try: db_read.clear()
+                except: pass
+                try: get_cari_listesi.clear()
                 except: pass
                 # ── AÇIKLAMA HÜCRESI DOLUYSA ARŞİVLE ─────────────────────────
                 _arsiv_sayi = 0
