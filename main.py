@@ -6674,6 +6674,42 @@ function updateBot(v){{
                 _fnt2.warning("DejaVuSans-Bold.ttf bulunamadı")
 
     with kul_tab_kural:
+        st.markdown("### 🔧 Bağlantısız Teklif Onarımı")
+        st.caption("Eskiden bazı teklifler hiçbir cari karta bağlanmadan (musteri_id=0) kaydediliyordu — bu yüzden Cari Liste'deki '🧾 Teklif' rozetinde hiç görünmüyorlardı. Bu araç, teklif üzerindeki müşteri adını cari kartlardaki firma adıyla eşleştirip düzeltir.")
+        if st.button("🔍 Bağlantısız Teklifleri Tara", key="kural_teklif_tara"):
+            _tor_sb = get_sb_client()
+            if _tor_sb:
+                with st.spinner("Taranıyor..."):
+                    _tor_tek = _tor_sb.table("teklifler").select("id,musteri_id,musteri_adi").execute().data or []
+                    _tor_cari = _tor_sb.table("cari_kartlar").select("id,firma").execute().data or []
+                _tor_bagsiz = [t for t in _tor_tek if not t.get("musteri_id")]
+                _tor_firma_map = {str(c.get("firma","")).strip().lower(): c.get("id") for c in _tor_cari if c.get("firma")}
+                _tor_eslesen = []
+                for _t in _tor_bagsiz:
+                    _ad = str(_t.get("musteri_adi","")).strip().lower()
+                    _bulunan_id = _tor_firma_map.get(_ad)
+                    if _bulunan_id:
+                        _tor_eslesen.append({"teklif_id": _t["id"], "musteri_adi": _t.get("musteri_adi",""), "bulunan_cari_id": _bulunan_id})
+                st.session_state["_tor_eslesen"] = _tor_eslesen
+                st.session_state["_tor_bagsiz_sayi"] = len(_tor_bagsiz)
+        if "_tor_eslesen" in st.session_state:
+            _tor_e = st.session_state["_tor_eslesen"]
+            st.info(f"Toplam {st.session_state.get('_tor_bagsiz_sayi',0)} bağlantısız teklif bulundu, {len(_tor_e)} tanesi isimden otomatik eşleşti.")
+            if _tor_e:
+                st.dataframe(pd.DataFrame(_tor_e), use_container_width=True, hide_index=True)
+                if st.button(f"✅ {len(_tor_e)} teklifi düzelt", type="primary", key="kural_teklif_onar"):
+                    _tor_sb2 = get_sb_client()
+                    _tor_ok = 0
+                    for _e in _tor_e:
+                        try:
+                            _tor_sb2.table("teklifler").update({"musteri_id": _e["bulunan_cari_id"]}).eq("id", _e["teklif_id"]).execute()
+                            _tor_ok += 1
+                        except Exception:
+                            pass
+                    st.success(f"✅ {_tor_ok} teklif düzeltildi. Cari Liste'yi yenileyince rozetlerde görünecek.")
+                    st.session_state.pop("_tor_eslesen", None)
+                    st.session_state.pop("_tor_bagsiz_sayi", None)
+        st.divider()
         st.markdown("### 📌 Proje Kuralları & Bilgileri")
         if not st.session_state.get("kurallar_pin_dogru", False):
             st.caption("Bu alanda hassas bilgiler var (Supabase anahtarı, Paraşüt secret vb.) — devam etmek için PIN girin.")
