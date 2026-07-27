@@ -694,8 +694,23 @@ def segment_renk(seg):
 def get_supabase():
     return get_sb_client()
 
+def _tel_gruplu(s):
+    """Ham rakamlardan '541 357 80 20' gibi gruplu, baştaki 0/90'sız görünüm
+    oluşturur. 10 haneli bir GSM/sabit numarasına indirgenemiyorsa (eksik/
+    hatalı veri), veri kaybı olmasın diye olduğu gibi bırakır."""
+    if not s:
+        return s
+    _digits = "".join(ch for ch in str(s) if ch.isdigit())
+    if _digits.startswith("90") and len(_digits) == 12:
+        _digits = _digits[2:]
+    elif _digits.startswith("0") and len(_digits) == 11:
+        _digits = _digits[1:]
+    if len(_digits) == 10:
+        return f"{_digits[0:3]} {_digits[3:6]} {_digits[6:8]} {_digits[8:10]}"
+    return s
+
 def _telefon_temizle(seri):
-    """5413578020.0 gibi float telefonları 5413578020 string'ine çevirir"""
+    """5413578020.0 gibi float telefonları '541 357 80 20' gruplu gösterime çevirir"""
     def _tek(v):
         if v is None:
             return ""
@@ -711,7 +726,7 @@ def _telefon_temizle(seri):
                 s = str(int(float(s)))
         except:
             pass
-        return s
+        return _tel_gruplu(s)
     return seri.apply(_tek)
 
 def _no_temizle(v):
@@ -1963,7 +1978,7 @@ def fmt_para(n):
 
 
 def fmt_tel(n):
-    """5544929309.0 → 5544929309"""
+    """5544929309.0 → 554 492 93 09"""
     try:
         if not n or str(n).strip() in ["", "None", "nan", "-"]: return ""
         s = str(n).strip()
@@ -1976,7 +1991,7 @@ def fmt_tel(n):
         # Sadece rakam, +, boşluk, tire bırak
         import re as _re2
         s = _re2.sub(r"[^0-9\+\s\-]", "", s).strip()
-        return s
+        return _tel_gruplu(s)
     except: return ""
 
 def _duzenleme_form_key_temizle(fid):
@@ -2599,7 +2614,15 @@ div[data-testid="stDataEditor"] *,
 div[data-testid="stDataFrame"],
 div[data-testid="stDataFrame"] *,
 div[data-testid="stElementContainer"]:has(div[data-testid="stDataEditor"]),
-div[data-testid="stElementContainer"]:has(div[data-testid="stDataEditor"]) * {
+div[data-testid="stElementContainer"]:has(div[data-testid="stDataEditor"]) *,
+div[data-baseweb="popover"],
+div[data-baseweb="popover"] *,
+div[data-baseweb="menu"],
+div[data-baseweb="menu"] *,
+ul[data-baseweb="menu"],
+ul[data-baseweb="menu"] *,
+[role="listbox"],
+[role="listbox"] * {
     scrollbar-width: thin !important;
     -ms-overflow-style: auto !important;
 }
@@ -2608,7 +2631,15 @@ section[data-testid="stMain"] *::-webkit-scrollbar,
 div[data-testid="stDataEditor"]::-webkit-scrollbar,
 div[data-testid="stDataEditor"] *::-webkit-scrollbar,
 div[data-testid="stDataFrame"]::-webkit-scrollbar,
-div[data-testid="stDataFrame"] *::-webkit-scrollbar {
+div[data-testid="stDataFrame"] *::-webkit-scrollbar,
+div[data-baseweb="popover"]::-webkit-scrollbar,
+div[data-baseweb="popover"] *::-webkit-scrollbar,
+div[data-baseweb="menu"]::-webkit-scrollbar,
+div[data-baseweb="menu"] *::-webkit-scrollbar,
+ul[data-baseweb="menu"]::-webkit-scrollbar,
+ul[data-baseweb="menu"] *::-webkit-scrollbar,
+[role="listbox"]::-webkit-scrollbar,
+[role="listbox"] *::-webkit-scrollbar {
     display: block !important; width: 10px !important; height: 10px !important;
 }
 section[data-testid="stMain"]::-webkit-scrollbar-thumb,
@@ -2616,12 +2647,24 @@ section[data-testid="stMain"] *::-webkit-scrollbar-thumb,
 div[data-testid="stDataEditor"]::-webkit-scrollbar-thumb,
 div[data-testid="stDataEditor"] *::-webkit-scrollbar-thumb,
 div[data-testid="stDataFrame"]::-webkit-scrollbar-thumb,
-div[data-testid="stDataFrame"] *::-webkit-scrollbar-thumb {
+div[data-testid="stDataFrame"] *::-webkit-scrollbar-thumb,
+div[data-baseweb="popover"]::-webkit-scrollbar-thumb,
+div[data-baseweb="popover"] *::-webkit-scrollbar-thumb,
+div[data-baseweb="menu"]::-webkit-scrollbar-thumb,
+div[data-baseweb="menu"] *::-webkit-scrollbar-thumb,
+ul[data-baseweb="menu"]::-webkit-scrollbar-thumb,
+ul[data-baseweb="menu"] *::-webkit-scrollbar-thumb,
+[role="listbox"]::-webkit-scrollbar-thumb,
+[role="listbox"] *::-webkit-scrollbar-thumb {
     background: #94a3b8 !important; border-radius: 6px !important;
 }
 section[data-testid="stMain"]::-webkit-scrollbar-track,
 div[data-testid="stDataEditor"]::-webkit-scrollbar-track,
-div[data-testid="stDataFrame"]::-webkit-scrollbar-track {
+div[data-testid="stDataFrame"]::-webkit-scrollbar-track,
+div[data-baseweb="popover"]::-webkit-scrollbar-track,
+div[data-baseweb="menu"]::-webkit-scrollbar-track,
+ul[data-baseweb="menu"]::-webkit-scrollbar-track,
+[role="listbox"]::-webkit-scrollbar-track {
     background: #f1f5f9 !important;
 }
 button[data-testid="collapsedControl"] { display: none !important; }
@@ -3233,6 +3276,14 @@ if aktif == "yeni":
                 _durum_kayit = "Özel Müşteri" if beklenen_ciro >= 100000 else "Portföy"
             if not firma:
                 st.warning("Firma adı boş bırakılamaz!")
+            else:
+                # Ekranda "541 357 80 20" gruplu görünse de veritabanına her zaman
+                # sade rakamlarla yazılır (WhatsApp vb. entegrasyonlar boşluksuz
+                # rakam bekliyor).
+                gsm = "".join(ch for ch in str(gsm or "") if ch.isdigit())
+                sabit = "".join(ch for ch in str(sabit or "") if ch.isdigit())
+            if not firma:
+                pass
             elif duzenle:
                 ok = db_update("cari_kartlar", {
                     "firma": firma, "rakip_firma": rakip_firma, "yetkili": yetkili, "gsm": gsm,
@@ -3383,6 +3434,9 @@ elif aktif == "mukerrer":
                             if _mkk == "id": continue
                             _yeni_v = _mkr.get(_mkk, "")
                             _eski_v = _mk_orig.get(_mkk, "")
+                            if _mkk in ("gsm", "sabit"):
+                                # Ekranda gruplu görünüyor ama veritabanına sade rakam yazılır.
+                                _yeni_v = "".join(ch for ch in str(_yeni_v or "") if ch.isdigit())
                             if str(_yeni_v) != str(_eski_v):
                                 _mk_guncel[_mkk] = _yeni_v
                         if _mk_guncel:
@@ -5347,6 +5401,11 @@ function kartSec(id){
                         elif k in ("Gerçek ₺",):
                             try: guncelle["gerceklesen_ciro"] = float(str(v or "").replace(".","").replace("₺","").replace(",",".").strip() or 0)
                             except: guncelle["gerceklesen_ciro"] = 0
+                        elif k in ("gsm", "sabit"):
+                            # Ekranda "541 357 80 20" gruplu görünüyor ama veritabanına
+                            # her zaman sade rakamlarla yazılır (WhatsApp vb. entegrasyonlar
+                            # boşluksuz rakam bekliyor).
+                            guncelle[k] = "".join(ch for ch in str(v or "") if ch.isdigit())
                         else:
                             guncelle[k] = str(v) if v is not None else ""
                     if not guncelle:
