@@ -2220,7 +2220,6 @@ def not_dialog(cari_id, firma_adi=""):
                     }, ensure_ascii=False)
                     _yk_sb2.table("cari_aciklamalar").insert({
                         "cari_id": int(cari_id),
-                        "cari_adi": firma_adi,
                         "aciklama": _YK_ETIKET + _yk_json,
                         "olusturan": st.session_state.get("kullanici",""),
                     }).execute()
@@ -2337,7 +2336,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
         if _yeni and _yeni.strip():
             try:
                 _yazar = st.session_state.get("kullanici","")
-                _veri = {"cari_id": int(cari_id), "aciklama": _yeni.strip(), "olusturan": _yazar, "cari_adi": str(firma_adi)}
+                _veri = {"cari_id": int(cari_id), "aciklama": _yeni.strip(), "olusturan": _yazar}
                 if _sb: _sb.table("cari_aciklamalar").insert(_veri).execute()
                 try: _notlar_yukle.clear()
                 except: pass
@@ -5266,7 +5265,6 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                         if _sb_anlik:
                             _ins_r = _sb_anlik.table("cari_aciklamalar").insert({
                                 "cari_id": _anlik_id,
-                                "cari_adi": _anlik_firma,
                                 "aciklama": _anlik_txt,
                                 "olusturan": st.session_state.get("kullanici",""),
                             }).execute()
@@ -5412,7 +5410,7 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                     def _tek_not_arsivle(rid2, firma2, ac2):
                         if sb_liste:
                             sb_liste.table("cari_aciklamalar").insert({
-                                "cari_id": rid2, "cari_adi": firma2, "aciklama": ac2,
+                                "cari_id": rid2, "aciklama": ac2,
                                 "olusturan": st.session_state.get("kullanici",""),
                             }).execute()
                             sb_liste.table("cari_kartlar").update({"aciklama":""}).eq("id",rid2).execute()
@@ -9804,13 +9802,9 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
                             _sb_rn = get_sb_client()
                             _yazar_rn = st.session_state.get("kullanici_ad", st.session_state.get("kullanici",""))
                             _not_metni = f"📅 Randevu notu ({rand_tarih.strftime('%d.%m.%Y')} {rand_saat}): {rand_aciklama.strip()}"
-                            _rn_veri = {"cari_id": int(musteri_id), "aciklama": _not_metni, "olusturan": _yazar_rn, "cari_adi": str(musteri_adi)}
+                            _rn_veri = {"cari_id": int(musteri_id), "aciklama": _not_metni, "olusturan": _yazar_rn}
                             if _sb_rn:
-                                try:
-                                    _sb_rn.table("cari_aciklamalar").insert(_rn_veri).execute()
-                                except Exception:
-                                    _rn_veri2 = {"cari_id": int(musteri_id), "aciklama": _not_metni, "olusturan": _yazar_rn}
-                                    _sb_rn.table("cari_aciklamalar").insert(_rn_veri2).execute()
+                                _sb_rn.table("cari_aciklamalar").insert(_rn_veri).execute()
                         except Exception:
                             pass  # not kaydı başarısız olsa bile randevu kaydı bozulmasın
 
@@ -10398,12 +10392,21 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
             _df_notlu = pd.DataFrame()
             if sb_liste:
                 try:
-                    _rn = sb_liste.table("cari_aciklamalar").select("cari_id, cari_adi").execute()
+                    _rn = sb_liste.table("cari_aciklamalar").select("cari_id").execute()
                     if _rn.data:
                         import collections as _col
-                        _sayac = _col.Counter([(r["cari_id"], r["cari_adi"]) for r in _rn.data])
+                        _sayac = _col.Counter([r["cari_id"] for r in _rn.data])
+                        # NOT: cari_aciklamalar'da "cari_adi" kolonu yok — firma adını
+                        # cari_kartlar'dan eşleştiriyoruz.
+                        _cari_ad_map = {}
+                        try:
+                            _df_ck_map = db_read("cari_kartlar")
+                            if not _df_ck_map.empty and "id" in _df_ck_map.columns and "firma" in _df_ck_map.columns:
+                                _cari_ad_map = dict(zip(_df_ck_map["id"], _df_ck_map["firma"]))
+                        except Exception:
+                            pass
                         _df_notlu = pd.DataFrame([
-                            {"cari_id": k[0], "firma": k[1], "not_sayi": v}
+                            {"cari_id": k, "firma": _cari_ad_map.get(k, f"#{k}"), "not_sayi": v}
                             for k, v in _sayac.items()
                         ]).sort_values("not_sayi", ascending=False)
                 except:
@@ -10433,7 +10436,7 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
                 if not _df_notlar.empty:
                     for _, _nr in _df_notlar.iterrows():
                         _nid   = _nr.get("id", 0)
-                        _ntarih = fmt_tarih(_nr.get("tarih",""))
+                        _ntarih = fmt_tarih(str(_nr.get("created_at","") or _nr.get("tarih","") or ""))
                         _nkim  = str(_nr.get("olusturan",""))
                         _nmetin = str(_nr.get("aciklama",""))
                         _nozet = _nmetin[:60] + ("..." if len(_nmetin)>60 else "")
