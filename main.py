@@ -3305,9 +3305,11 @@ elif aktif == "mukerrer":
             _mk_not_sayac, _mk_rand_sayac, _mk_analiz_set = {}, {}, set()
             if _mk_sb_ek:
                 try:
-                    _mk_not_ham = _mk_sb_ek.table("cari_aciklamalar").select("cari_id").in_(
+                    _mk_not_ham = _mk_sb_ek.table("cari_aciklamalar").select("cari_id,aciklama").in_(
                         "cari_id", _mk_tum_idler).execute().data or []
                     for _r in _mk_not_ham:
+                        if str(_r.get("aciklama","") or "").startswith("##YETKILI##"):
+                            continue
                         _cid = int(_r.get("cari_id", 0) or 0)
                         _mk_not_sayac[_cid] = _mk_not_sayac.get(_cid, 0) + 1
                 except Exception: pass
@@ -4256,7 +4258,8 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
         # Not sayılarını al
         try:
             _sb_kbn = get_sb_client()
-            _kb_not_data = _sb_kbn.table("cari_aciklamalar").select("cari_id").execute().data or [] if _sb_kbn else []
+            _kb_not_data = _sb_kbn.table("cari_aciklamalar").select("cari_id,aciklama").execute().data or [] if _sb_kbn else []
+            _kb_not_data = [r for r in _kb_not_data if not str(r.get("aciklama","") or "").startswith("##YETKILI##")]
             import collections as _kbc2
             _kb_not_sayac = _kbc2.Counter([str(r["cari_id"]) for r in _kb_not_data])
         except: _kb_not_sayac = {}
@@ -5073,6 +5076,11 @@ function kartSec(id){
                     return _r2.data or []
                 return []
             _res_notlar_data = _tum_notlari_yukle()
+            # NOT: Yetkililer sekmesi de aynı cari_aciklamalar tablosuna "##YETKILI##"
+            # etiketiyle kayıt atıyor — bunlar gerçek not değil, rozet sayısına dahil
+            # edilmemeli (Notlar penceresindeki sayıyla tutarlı olsun diye).
+            _res_notlar_data = [r for r in _res_notlar_data
+                                 if not str(r.get("aciklama","") or "").startswith("##YETKILI##")]
             if _res_notlar_data:
                 import collections
                 _not_sayac = collections.Counter([str(r["cari_id"]) for r in _res_notlar_data])
@@ -9655,10 +9663,14 @@ elif aktif == "randevu":
             try:
                 _sb_rmn = get_sb_client()
                 if _sb_rmn:
-                    _rmn_r = _sb_rmn.table("cari_aciklamalar").select("aciklama,created_at").eq("cari_id", int(_rmid)).order("id", desc=True).limit(1).execute()
+                    _rmn_r = _sb_rmn.table("cari_aciklamalar").select("aciklama,created_at").eq("cari_id", int(_rmid)).order("id", desc=True).limit(5).execute()
                     if _rmn_r.data:
-                        _rm_son_not = str(_rmn_r.data[0].get("aciklama","") or "")
-                        _rm_not_tarih = str(_rmn_r.data[0].get("created_at","") or "")[:10]
+                        for _rmn_row in _rmn_r.data:
+                            if str(_rmn_row.get("aciklama","") or "").startswith("##YETKILI##"):
+                                continue
+                            _rm_son_not = str(_rmn_row.get("aciklama","") or "")
+                            _rm_not_tarih = str(_rmn_row.get("created_at","") or "")[:10]
+                            break
             except: pass
 
             # Son teklif çek
@@ -10404,10 +10416,11 @@ div[data-testid="stHorizontalBlock"]:has(.rand-tarih-marker) [data-testid="stDat
             _df_notlu = pd.DataFrame()
             if sb_liste:
                 try:
-                    _rn = sb_liste.table("cari_aciklamalar").select("cari_id").execute()
+                    _rn = sb_liste.table("cari_aciklamalar").select("cari_id,aciklama").execute()
                     if _rn.data:
                         import collections as _col
-                        _sayac = _col.Counter([r["cari_id"] for r in _rn.data])
+                        _rn_data_filtreli = [r for r in _rn.data if not str(r.get("aciklama","") or "").startswith("##YETKILI##")]
+                        _sayac = _col.Counter([r["cari_id"] for r in _rn_data_filtreli])
                         # NOT: cari_aciklamalar'da "cari_adi" kolonu yok — firma adını
                         # cari_kartlar'dan eşleştiriyoruz.
                         _cari_ad_map = {}
@@ -11112,8 +11125,12 @@ elif aktif == "patron":
         except: _p_notlar_raw = []
 
     # Tarih normalize — created_at veya tarih kolonundan al
+    # NOT: Yetkililer sekmesi de aynı tabloya "##YETKILI##" etiketiyle kayıt
+    # atıyor — bunlar gerçek not değil, "not yazıldı" istatistiğine dahil edilmemeli.
     _p_notlar = []
     for _nn in _p_notlar_raw:
+        if str(_nn.get("aciklama","") or "").startswith("##YETKILI##"):
+            continue
         _nt = str(_nn.get("created_at","") or _nn.get("tarih","") or "")[:10]
         if _nt:
             _p_notlar.append({"cari_id": _nn.get("cari_id",""), "tarih": _nt})
