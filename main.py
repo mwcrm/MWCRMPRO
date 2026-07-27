@@ -697,10 +697,15 @@ def get_supabase():
 def _tel_gruplu(s):
     """Ham rakamlardan '541 357 80 20' gibi gruplu, baştaki 0/90'sız görünüm
     oluşturur. 10 haneli bir GSM/sabit numarasına indirgenemiyorsa (eksik/
-    hatalı veri), veri kaybı olmasın diye olduğu gibi bırakır."""
+    hatalı veri), veri kaybı olmasın diye olduğu gibi bırakır.
+    Float ".0" artığını (2163679000.0 gibi) da kendi içinde temizler —
+    çağıran taraf ayrıca temizlemek zorunda değil."""
     if not s:
         return s
-    _digits = "".join(ch for ch in str(s) if ch.isdigit())
+    _s = str(s).strip()
+    if _s.endswith(".0"):
+        _s = _s[:-2]
+    _digits = "".join(ch for ch in _s if ch.isdigit())
     if _digits.startswith("90") and len(_digits) == 12:
         _digits = _digits[2:]
     elif _digits.startswith("0") and len(_digits) == 11:
@@ -2364,12 +2369,13 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "ozel_teklif", "sozlesme", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "mukerrer"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
     "rapor": "📊 Raporlar",
     "ozel_teklif": "⭐ Özel Teklif",
+    "kayitli_teklifler": "📋 Kayıtlı Teklifler",
     "sozlesme": "📜 Sözleşmeler",
     "excel": "📥 Excel Aktar",
     "analiz": "🔍 Müşteri Analizi",
@@ -2837,7 +2843,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
     _MENU_GRUPLARI = [
         ("🧾 Cari işlemleri",    ["yeni", "liste", "excel", "mukerrer"]),
         ("🔎 Analiz ve takip",   ["analiz"]),
-        ("📅 Randevu ve teklif", ["randevu", "ozel_teklif", "sozlesme"]),
+        ("📅 Randevu ve teklif", ["randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler"]),
         ("🚚 Saha",              ["harita"]),
         ("⚙️ Yönetim",          ["kullanici", "patron"]),
         ("📊 Raporlar",          ["admin_rapor", "rapor"]),
@@ -4334,7 +4340,7 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
                     "id": _kid,
                     "firma": str(_kr.get("firma","") or "")[:30],
                     "yetkili": str(_kr.get("yetkili","") or "")[:20],
-                    "gsm": str(_kr.get("gsm","") or ""),
+                    "gsm": _tel_gruplu(str(_kr.get("gsm","") or "")),
                     "il": str(_kr.get("il","") or ""),
                     "ilce": str(_kr.get("ilce","") or ""),
                     "durum": str(_kr.get("durum","") or ""),
@@ -4777,8 +4783,8 @@ function kartSec(id){
             def _temiz(v):
                 s = str(v or "").strip()
                 return s if s and s not in ["nan","None","-",""] else "-"
-            _gsm     = _temiz(kart_row.get("gsm","") or kart_row.get("telefon","") or kart_row.get("tel",""))
-            _sabit   = _temiz(kart_row.get("sabit","") or kart_row.get("sabit_hat",""))
+            _gsm     = _tel_gruplu(_temiz(kart_row.get("gsm","") or kart_row.get("telefon","") or kart_row.get("tel","")))
+            _sabit   = _tel_gruplu(_temiz(kart_row.get("sabit","") or kart_row.get("sabit_hat","")))
             _email   = _temiz(kart_row.get("email","") or kart_row.get("eposta",""))
             _yetkili = _temiz(kart_row.get("yetkili","") or kart_row.get("yetkili_adi",""))
             _il = str(kart_row.get("il","") or "-")
@@ -7114,15 +7120,15 @@ elif aktif == "ozel_teklif":
             _mr  = _oz_dfm[_oz_dfm["id"]==_mid]
             if not _mr.empty:
                 _oz_mus = _mr.iloc[0]
-                _oz_gsm = str(_oz_mus.get("gsm","") or "")
+                _oz_gsm = _no_temizle(_oz_mus.get("gsm","") or "")
                 _oz_eml = str(_oz_mus.get("email","") or "")
         except: pass
 
     _oz_gsm = ""; _oz_eml = ""; _oz_sabit = ""
     if _oz_mus is not None:
-        _oz_gsm   = str(_oz_mus.get("gsm","") or "")
+        _oz_gsm   = _no_temizle(_oz_mus.get("gsm","") or "")
         _oz_eml   = str(_oz_mus.get("email","") or "")
-        _oz_sabit = str(_oz_mus.get("sabit","") or "")
+        _oz_sabit = _no_temizle(_oz_mus.get("sabit","") or "")
         if not _oz_gsm:
             _oz_gsm = _oz_sabit  # GSM boşsa sabit telefonu göster
 
@@ -7432,6 +7438,13 @@ elif aktif == "ozel_teklif":
             else:
                 _oz_df_tek2 = pd.DataFrame()
 
+            # Sadece o an seçili olan müşterinin tekliflerini göster.
+            _oz_aktif_id = int(_oz_mus["id"]) if _oz_mus is not None else (int(_oz_sec_id) if _oz_sec_id else None)
+            if _oz_aktif_id and not _oz_df_tek2.empty and "musteri_id" in _oz_df_tek2.columns:
+                _oz_df_tek2 = _oz_df_tek2[pd.to_numeric(_oz_df_tek2["musteri_id"], errors="coerce") == _oz_aktif_id]
+
+            if not _oz_aktif_id:
+                st.caption("Tekliflerini görmek için yukarıdan bir müşteri seçin.")
             if _oz_df_tek2.empty:
                 st.info("Henüz kayıtlı özel teklif yok.")
             else:
@@ -7536,6 +7549,69 @@ elif aktif == "ozel_teklif":
                         st.success(f"✅ '{_yeni_urun}' eklendi!"); st.rerun()
                     else: st.error("Kaydedilemedi!")
 
+
+elif aktif == "kayitli_teklifler":
+    sayfa_log("kayitli_teklifler")
+    st.markdown("## 📋 Kayıtlı Teklifler")
+    st.caption("Kendisine teklif hazırlanmış tüm müşteriler — cari ana liste ile aynı kolon yapısında.")
+
+    with st.spinner("Yükleniyor..."):
+        _kt_tek_df = db_read("teklifler", order_col="tarih")
+        _kt_cari_df = get_cari_listesi()
+
+    if _kt_tek_df.empty or "musteri_id" not in _kt_tek_df.columns:
+        st.info("Henüz hiçbir müşteriye teklif hazırlanmamış.")
+    else:
+        _kt_tek_df = _kt_tek_df.copy()
+        _kt_tek_df["musteri_id"] = pd.to_numeric(_kt_tek_df["musteri_id"], errors="coerce")
+        _kt_tek_df = _kt_tek_df[_kt_tek_df["musteri_id"] > 0]  # bağlantısız (0) teklifler hariç
+        if _kt_tek_df.empty or _kt_cari_df.empty:
+            st.info("Henüz hiçbir müşteriye bağlı teklif yok.")
+        else:
+            _kt_grup = _kt_tek_df.groupby("musteri_id").agg(
+                teklif_sayisi=("id", "count"),
+                son_teklif_tarihi=("tarih", "max"),
+            ).reset_index()
+            _kt_grup["musteri_id"] = _kt_grup["musteri_id"].astype(int)
+
+            _kt_birlesik = _kt_grup.merge(_kt_cari_df, left_on="musteri_id", right_on="id", how="left")
+            _kt_birlesik = _kt_birlesik.dropna(subset=["firma"])  # cari kartı silinmiş olabilir
+
+            for _tk in ["gsm", "sabit"]:
+                if _tk in _kt_birlesik.columns:
+                    _kt_birlesik[_tk] = _telefon_temizle(_kt_birlesik[_tk])
+
+            _kt_ara = st.text_input("🔍 Firma / yetkili ara", key="kt_ara")
+            if _kt_ara:
+                _m = pd.Series(False, index=_kt_birlesik.index)
+                if "firma" in _kt_birlesik.columns:
+                    _m = _m | _kt_birlesik["firma"].astype(str).str.contains(_kt_ara, case=False, na=False)
+                if "yetkili" in _kt_birlesik.columns:
+                    _m = _m | _kt_birlesik["yetkili"].astype(str).str.contains(_kt_ara, case=False, na=False)
+                _kt_birlesik = _kt_birlesik[_m]
+
+            _kt_birlesik = _kt_birlesik.sort_values("son_teklif_tarihi", ascending=False).reset_index(drop=True)
+            st.markdown(f"**{len(_kt_birlesik)} müşteri**")
+
+            _kt_kolonlar = [c for c in ["firma", "yetkili", "gsm", "il", "ilce", "durum", "teklif_sayisi", "son_teklif_tarihi"] if c in _kt_birlesik.columns]
+            _kt_goster = _kt_birlesik[_kt_kolonlar].copy()
+            if "son_teklif_tarihi" in _kt_goster.columns:
+                _kt_goster["son_teklif_tarihi"] = _kt_goster["son_teklif_tarihi"].apply(fmt_tarih)
+            _kt_baslik_map = {"firma": "Firma", "yetkili": "Yetkili", "gsm": "GSM", "il": "İl", "ilce": "İlçe",
+                               "durum": "Durum", "teklif_sayisi": "Teklif Sayısı", "son_teklif_tarihi": "Son Teklif"}
+            _kt_goster.columns = [_kt_baslik_map.get(c, c) for c in _kt_kolonlar]
+
+            st.dataframe(_kt_goster, use_container_width=True, hide_index=True, height=560)
+
+            st.divider()
+            st.markdown("#### 🔍 Detay — Notlar & Randevu Aç")
+            _kt_opts = ["-- Müşteri Seçin --"] + [f"[{int(r['musteri_id'])}] {r.get('firma','')}" for _, r in _kt_birlesik.iterrows()]
+            _kt_sec = st.selectbox("", _kt_opts, key="kt_detay_sec", label_visibility="collapsed")
+            if _kt_sec != "-- Müşteri Seçin --" and "[" in _kt_sec:
+                _kt_id = int(_kt_sec.split("]")[0].replace("[", "").strip())
+                _kt_firma_ad = _kt_sec.split("]", 1)[1].strip()
+                if st.button("📋 Notlar & Randevu Aç", key="kt_detay_btn"):
+                    not_dialog(_kt_id, _kt_firma_ad)
 
 elif aktif == "sozlesme":
     sayfa_log("sozlesme")
