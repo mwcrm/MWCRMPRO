@@ -7,6 +7,7 @@ import io
 import re
 import json
 import time
+import concurrent.futures
 from datetime import datetime, timedelta
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -2587,30 +2588,37 @@ div[data-testid="stVerticalBlock"] { gap: 0.3rem !important; }
 hr { margin: 0.3rem 0 !important; }
 div[data-testid="stHorizontalBlock"] { gap: 0.3rem !important; }
 /* Scroll barlar: sidebar/menü gibi dar alanlarda gizli kalsın (eski görünüm),
-   ama ana içerik alanı ve tablolarda mausla sürüklenebilsin diye görünür yapıldı. */
+   ama ana içerik alanı ve tablolarda mausla sürüklenebilsin diye görünür yapıldı.
+   Not: st.data_editor/st.dataframe içeride kaydırma kutusunu birkaç seviye iç
+   içe div ile sarabiliyor, bu yüzden "*" ile TÜM alt elemanlar hedeflendi. */
 * { scrollbar-width: none !important; -ms-overflow-style: none !important; }
 *::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
 section[data-testid="stMain"],
+section[data-testid="stMain"] *,
 div[data-testid="stDataEditor"],
-div[data-testid="stDataEditor"] > div,
+div[data-testid="stDataEditor"] *,
 div[data-testid="stDataFrame"],
-div[data-testid="stDataFrame"] > div {
+div[data-testid="stDataFrame"] *,
+div[data-testid="stElementContainer"]:has(div[data-testid="stDataEditor"]),
+div[data-testid="stElementContainer"]:has(div[data-testid="stDataEditor"]) * {
     scrollbar-width: thin !important;
     -ms-overflow-style: auto !important;
 }
 section[data-testid="stMain"]::-webkit-scrollbar,
+section[data-testid="stMain"] *::-webkit-scrollbar,
 div[data-testid="stDataEditor"]::-webkit-scrollbar,
-div[data-testid="stDataEditor"] > div::-webkit-scrollbar,
+div[data-testid="stDataEditor"] *::-webkit-scrollbar,
 div[data-testid="stDataFrame"]::-webkit-scrollbar,
-div[data-testid="stDataFrame"] > div::-webkit-scrollbar {
+div[data-testid="stDataFrame"] *::-webkit-scrollbar {
     display: block !important; width: 10px !important; height: 10px !important;
 }
 section[data-testid="stMain"]::-webkit-scrollbar-thumb,
+section[data-testid="stMain"] *::-webkit-scrollbar-thumb,
 div[data-testid="stDataEditor"]::-webkit-scrollbar-thumb,
-div[data-testid="stDataEditor"] > div::-webkit-scrollbar-thumb,
+div[data-testid="stDataEditor"] *::-webkit-scrollbar-thumb,
 div[data-testid="stDataFrame"]::-webkit-scrollbar-thumb,
-div[data-testid="stDataFrame"] > div::-webkit-scrollbar-thumb {
-    background: #cbd5e1 !important; border-radius: 6px !important;
+div[data-testid="stDataFrame"] *::-webkit-scrollbar-thumb {
+    background: #94a3b8 !important; border-radius: 6px !important;
 }
 section[data-testid="stMain"]::-webkit-scrollbar-track,
 div[data-testid="stDataEditor"]::-webkit-scrollbar-track,
@@ -3417,6 +3425,11 @@ elif aktif == "mukerrer":
 
 elif aktif == "liste":
     sayfa_log("liste")
+
+    # ── KAYDETME SONRASI ONAY BANNER'I — toast kaçırılırsa diye burada da göster ──
+    _son_kaydet_msg = st.session_state.pop("_son_kaydet_ozeti", None)
+    if _son_kaydet_msg:
+        st.success(_son_kaydet_msg, icon="✅")
 
     # ── MOBİL KART GÖRÜNÜMÜ ──────────────────────────────────────────────────
     if st.session_state.get("_mobil_mod", False):
@@ -5328,42 +5341,60 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
             if not _edited_rows:
                 st.info("Değişiklik yok.")
             else:
+              with st.spinner(f"💾 {len(_edited_rows)} satır kaydediliyor..."):
                 try:
                     _rows = _json_ls.loads(_tablo_json) if _tablo_json else []
                 except:
                     _rows = []
-                for idx_str, degisiklikler in _edited_rows.items():
-                    try:
-                        idx = int(idx_str)
-                        if idx >= len(_rows): continue
-                        rid = int(float(str(_rows[idx].get("id",0))))
-                        if not rid: continue
-                        guncelle = {}
-                        for k, v in degisiklikler.items():
-                            if k in ("Seç", "🗑️ Sil"): continue
-                            if k in ("beklenen_ciro", "gerceklesen_ciro"):
-                                try: guncelle[k] = float(v or 0)
-                                except: guncelle[k] = 0
-                            elif k in ("Hedef ₺",):
-                                try: guncelle["beklenen_ciro"] = float(str(v or "").replace(".","").replace("₺","").replace(",",".").strip() or 0)
-                                except: guncelle["beklenen_ciro"] = 0
-                            elif k in ("Gerçek ₺",):
-                                try: guncelle["gerceklesen_ciro"] = float(str(v or "").replace(".","").replace("₺","").replace(",",".").strip() or 0)
-                                except: guncelle["gerceklesen_ciro"] = 0
-                            else:
-                                guncelle[k] = str(v) if v is not None else ""
-                        if not guncelle: continue
-                        if sb_liste:
-                            sb_liste.table("cari_kartlar").update(guncelle).eq("id", rid).execute()
+
+                def _tek_satir_guncelle(idx_str, degisiklikler):
+                    """Tek bir satırı DB'ye yazar — paralel çalıştırılabilsin diye ayrı fonksiyon."""
+                    idx = int(idx_str)
+                    if idx >= len(_rows):
+                        return None
+                    rid = int(float(str(_rows[idx].get("id", 0))))
+                    if not rid:
+                        return None
+                    guncelle = {}
+                    for k, v in degisiklikler.items():
+                        if k in ("Seç", "🗑️ Sil"): continue
+                        if k in ("beklenen_ciro", "gerceklesen_ciro"):
+                            try: guncelle[k] = float(v or 0)
+                            except: guncelle[k] = 0
+                        elif k in ("Hedef ₺",):
+                            try: guncelle["beklenen_ciro"] = float(str(v or "").replace(".","").replace("₺","").replace(",",".").strip() or 0)
+                            except: guncelle["beklenen_ciro"] = 0
+                        elif k in ("Gerçek ₺",):
+                            try: guncelle["gerceklesen_ciro"] = float(str(v or "").replace(".","").replace("₺","").replace(",",".").strip() or 0)
+                            except: guncelle["gerceklesen_ciro"] = 0
                         else:
-                            conn_u = get_conn()
-                            sets = ", ".join([f"{k}=?" for k in guncelle])
-                            conn_u.execute(f"UPDATE cari_kartlar SET {sets} WHERE id=?",
-                                list(guncelle.values()) + [rid])
-                            conn_u.commit(); conn_u.close()
-                        kayit_sayi += 1
-                    except Exception as e_row:
-                        hata_list.append(str(e_row))
+                            guncelle[k] = str(v) if v is not None else ""
+                    if not guncelle:
+                        return None
+                    if sb_liste:
+                        sb_liste.table("cari_kartlar").update(guncelle).eq("id", rid).execute()
+                    else:
+                        conn_u = get_conn()
+                        sets = ", ".join([f"{k}=?" for k in guncelle])
+                        conn_u.execute(f"UPDATE cari_kartlar SET {sets} WHERE id=?",
+                            list(guncelle.values()) + [rid])
+                        conn_u.commit(); conn_u.close()
+                    return True
+
+                # ── SATIRLARI PARALEL KAYDET — sıra sıra beklemek yerine aynı anda
+                # gönderilir, N satır için toplam süre ~1 satırlık süreye yakın olur.
+                with concurrent.futures.ThreadPoolExecutor(max_workers=8) as _havuz:
+                    _gelecekler = {
+                        _havuz.submit(_tek_satir_guncelle, idx_str, degisiklikler): idx_str
+                        for idx_str, degisiklikler in _edited_rows.items()
+                    }
+                    for _gelecek in concurrent.futures.as_completed(_gelecekler):
+                        try:
+                            if _gelecek.result():
+                                kayit_sayi += 1
+                        except Exception as e_row:
+                            hata_list.append(str(e_row))
+
                 try: db_read.clear()
                 except: pass
                 # ── AÇIKLAMA HÜCRESI DOLUYSA ARŞİVLE ─────────────────────────
@@ -5371,34 +5402,49 @@ div[data-testid="stDataEditor"] table tbody tr:nth-child(-n+{_notlu_kac}):hover 
                 try:
                     _tablo_json2 = st.session_state.get("_ls_tablo")
                     _rows2 = _json_ls.loads(_tablo_json2) if _tablo_json2 else []
+                    _arsivlenecekler = []
                     for _row2 in _rows2:
                         _rid2 = _row2.get("id")
                         _ac2 = str(_row2.get("aciklama","") or "").strip()
                         if not _rid2 or not _ac2 or _ac2 == "nan": continue
-                        _rid2 = int(float(str(_rid2)))
+                        _arsivlenecekler.append((int(float(str(_rid2))), str(_row2.get("firma",""))," ".join([_ac2])))
+
+                    def _tek_not_arsivle(rid2, firma2, ac2):
                         if sb_liste:
                             sb_liste.table("cari_aciklamalar").insert({
-                                "cari_id": _rid2,
-                                "cari_adi": str(_row2.get("firma","")),
-                                "aciklama": _ac2,
+                                "cari_id": rid2, "cari_adi": firma2, "aciklama": ac2,
                                 "olusturan": st.session_state.get("kullanici",""),
                             }).execute()
-                            sb_liste.table("cari_kartlar").update({"aciklama":""}).eq("id",_rid2).execute()
+                            sb_liste.table("cari_kartlar").update({"aciklama":""}).eq("id",rid2).execute()
                         else:
                             _cx = get_conn()
                             _cx.execute("INSERT INTO cari_aciklamalar (cari_id,cari_adi,aciklama,olusturan) VALUES (?,?,?,?)",
-                                (_rid2, str(_row2.get("firma","")), _ac2, st.session_state.get("kullanici","")))
-                            _cx.execute("UPDATE cari_kartlar SET aciklama='' WHERE id=?", (_rid2,))
+                                (rid2, firma2, ac2, st.session_state.get("kullanici","")))
+                            _cx.execute("UPDATE cari_kartlar SET aciklama='' WHERE id=?", (rid2,))
                             _cx.commit(); _cx.close()
-                        _arsiv_sayi += 1
+                        return True
+
+                    if _arsivlenecekler:
+                        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as _havuz2:
+                            _gelecekler2 = [_havuz2.submit(_tek_not_arsivle, *_a) for _a in _arsivlenecekler]
+                            for _g2 in concurrent.futures.as_completed(_gelecekler2):
+                                try:
+                                    if _g2.result():
+                                        _arsiv_sayi += 1
+                                except Exception:
+                                    pass
                 except: pass
                 st.session_state.pop("_ls_tablo", None)
                 if kayit_sayi > 0:
-                    st.toast(f"✅ {kayit_sayi} satır kaydedildi!" + (f" · {_arsiv_sayi} not arşivlendi!" if _arsiv_sayi > 0 else ""), icon="✅")
+                    _ozet_msg = f"{kayit_sayi} satır kaydedildi!" + (f" · {_arsiv_sayi} not arşivlendi!" if _arsiv_sayi > 0 else "")
                 elif _arsiv_sayi > 0:
-                    st.toast(f"✅ {_arsiv_sayi} not arşivlendi!", icon="📨")
+                    _ozet_msg = f"{_arsiv_sayi} not arşivlendi!"
                 else:
-                    st.toast("Değişiklik kaydedildi.", icon="ℹ️")
+                    _ozet_msg = "Değişiklik kaydedildi."
+                # Toast rerun sonrası da görünür ama kalıcı bir banner için ayrıca sakla —
+                # kullanıcı notunun/kaydının gerçekten kaydedildiğini rerun sonrası da görsün.
+                st.session_state["_son_kaydet_ozeti"] = "✅ " + _ozet_msg
+                st.toast("✅ " + _ozet_msg, icon="✅")
                 if hata_list:
                     st.error(f"Hata: {'; '.join(hata_list[:2])}")
                 st.rerun()
