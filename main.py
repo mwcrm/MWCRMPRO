@@ -5132,8 +5132,36 @@ function kartSec(id){
                       "asama1":"asama1","asama2":"asama2","asama3":"asama3","sonuc":"sonuc","ara_islem":"ara_islem"}
     col_order = [c for c in col_order if not any(c == _kol_gizli_map.get(g,g) for g in _GIZLI_KOLONLAR)]
 
+    # ── SAYFALAMA — sayfa başına 15 müşteri, altta 1-2-3 sayfa butonları,
+    # istenirse "Tümü" ile tüm liste tek seferde görülebilir. ────────────────
+    _cl_sayfa_boyutu = 15
+    _cl_toplam_kayit = len(df_f)
+    _cl_toplam_sayfa = max(1, -(-_cl_toplam_kayit // _cl_sayfa_boyutu))  # yukarı yuvarlama
+
+    _cl_gorunen_id_kume = tuple(sorted(int(x) for x in df_f["id"].tolist())) if not df_f.empty and "id" in df_f.columns else ()
+    if st.session_state.get("_cl_sayfa_id_kume") != _cl_gorunen_id_kume:
+        # Filtre değişti (görünen müşteri kümesi farklı) — 1. sayfaya dön ve
+        # eski sayfanın hücre-pozisyon tabanlı düzenleme izlerini temizle.
+        _cl_ilk_yukleme = "_cl_sayfa_id_kume" not in st.session_state
+        st.session_state["_cl_sayfa_no"] = 1
+        st.session_state["_cl_sayfa_id_kume"] = _cl_gorunen_id_kume
+        if not _cl_ilk_yukleme:
+            st.session_state.pop("cari_editor", None)
+            st.session_state.pop("_ls_tablo", None)
+
+    _cl_sayfa_no = st.session_state.get("_cl_sayfa_no", 1)
+    _cl_tumu_mu = (_cl_sayfa_no == "tumu")
+    if not _cl_tumu_mu:
+        _cl_sayfa_no = max(1, min(int(_cl_sayfa_no), _cl_toplam_sayfa))
+        _cl_baslangic = (_cl_sayfa_no - 1) * _cl_sayfa_boyutu
+        _cl_bitis = _cl_baslangic + _cl_sayfa_boyutu
+        df_f_sayfali = df_f.iloc[_cl_baslangic:_cl_bitis].reset_index(drop=True)
+    else:
+        _cl_baslangic, _cl_bitis = 0, _cl_toplam_kayit
+        df_f_sayfali = df_f
+
     # ── DATA EDITOR ─────────────────────────────────────────────────────────────
-    df_edit = df_f.copy()
+    df_edit = df_f_sayfali.copy()
     # "None" / "nan" string değerlerini temizle — boş göster
     for _col in df_edit.columns:
         if df_edit[_col].dtype == object:
@@ -5689,6 +5717,50 @@ function kartSec(id){
                     st.success("✅ Silindi!"); st.rerun()
 
 
+
+    # ── SAYFALAMA KONTROLLERİ — altta, 1-2-3 sayfa butonları + Tümü ──────────
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
+    if _cl_toplam_kayit > 0:
+        if _cl_tumu_mu:
+            st.caption(f"**Tümü** gösteriliyor — {_cl_toplam_kayit} kayıt")
+        else:
+            st.caption(f"**{_cl_baslangic+1}-{min(_cl_bitis,_cl_toplam_kayit)} / {_cl_toplam_kayit}** kayıt gösteriliyor · Sayfa {_cl_sayfa_no}/{_cl_toplam_sayfa}")
+
+        def _cl_sayfa_degistir(_yeni):
+            # Sayfa değişince eski sayfanın hücre-pozisyon tabanlı düzenleme
+            # izleri yeni sayfaya yanlış satırlara uygulanmasın diye temizlenir.
+            st.session_state["_cl_sayfa_no"] = _yeni
+            st.session_state.pop("cari_editor", None)
+            st.session_state.pop("_ls_tablo", None)
+            st.rerun()
+
+        _cl_pg_kols = st.columns([1] + [1]*min(_cl_toplam_sayfa, 10) + [1, 1.3])
+        with _cl_pg_kols[0]:
+            if st.button("◀", key="cl_pg_geri", use_container_width=True, disabled=_cl_tumu_mu or _cl_sayfa_no <= 1):
+                if not _cl_tumu_mu and _cl_sayfa_no > 1:
+                    _cl_sayfa_degistir(_cl_sayfa_no - 1)
+        # 10'dan fazla sayfa varsa sadece aktif sayfanın etrafındaki 10'u göster
+        if _cl_toplam_sayfa <= 10:
+            _cl_gosterilecek = list(range(1, _cl_toplam_sayfa + 1))
+        else:
+            _cl_orta = _cl_sayfa_no if not _cl_tumu_mu else 1
+            _cl_alt = max(1, min(_cl_orta - 4, _cl_toplam_sayfa - 9))
+            _cl_gosterilecek = list(range(_cl_alt, _cl_alt + 10))
+        for _i, _pno in enumerate(_cl_gosterilecek):
+            with _cl_pg_kols[_i + 1]:
+                _aktif_mi = (not _cl_tumu_mu and _pno == _cl_sayfa_no)
+                if st.button(str(_pno), key=f"cl_pg_{_pno}", use_container_width=True,
+                             type="primary" if _aktif_mi else "secondary"):
+                    _cl_sayfa_degistir(_pno)
+        with _cl_pg_kols[-2]:
+            if st.button("▶", key="cl_pg_ileri", use_container_width=True,
+                         disabled=(not _cl_tumu_mu and _cl_sayfa_no >= _cl_toplam_sayfa) or _cl_tumu_mu):
+                if not _cl_tumu_mu and _cl_sayfa_no < _cl_toplam_sayfa:
+                    _cl_sayfa_degistir(_cl_sayfa_no + 1)
+        with _cl_pg_kols[-1]:
+            if st.button("📄 Tümü", key="cl_pg_tumu", use_container_width=True,
+                         type="primary" if _cl_tumu_mu else "secondary"):
+                _cl_sayfa_degistir("tumu" if not _cl_tumu_mu else 1)
 
     st.divider()
 elif aktif == "kullanici":
