@@ -5097,6 +5097,27 @@ function kartSec(id){
     # Sütun sırası — sizin verdiğiniz şablonla birebir: Seç, İşlem Tarih, Id, Firma, Yetkili,
     # Gsm, S.Tel, E-Mail, Adres, İlçe, İl, Hedef(+Gerçek), Durum, Analiz, Aşama, 1-2-3.Aşama,
     # Açıklama, Notlar, Son Randevu, Teklif, Mesaj, Sonuç. Temsilci silinmedi, en sona eklendi.
+    # ── SATIR SIRASINI DONDUR — segment/ciro gibi kayıt sırasında değişebilen
+    # alanlara göre yapılan sıralama (yukarıda), her kayıttan sonra o müşterinin
+    # segmenti/cirosu değiştiği için satırın yerini kaydırıyordu. Bu da "Seç"
+    # işaretinin ve genel çalışma sırasının bir kayıttan diğerine kaymasına
+    # sebep oluyordu. Çözüm: GÖRÜNEN (filtrelenmiş) müşteri KÜMESİ değişmediği
+    # sürece (yeni/silinen/filtre dışı kalan müşteri yoksa) sırayı burada
+    # sabitliyoruz — bir alanı düzenleyip kaydetmek artık satırların yerini
+    # değiştirmiyor.
+    if not df_f.empty and "id" in df_f.columns:
+        _cl2_id_kume = tuple(sorted(int(x) for x in df_f["id"].tolist()))  # SIRASIZ küme — sadece hangi müşteriler görünüyor, onu karşılaştırır
+        _cl2_anahtar = (str(siralama_kol), _cl2_id_kume)
+        if st.session_state.get("_cl2_son_anahtar") != _cl2_anahtar or not st.session_state.get("_cl2_sabit_sira"):
+            st.session_state["_cl2_sabit_sira"] = df_f["id"].tolist()
+            st.session_state["_cl2_son_anahtar"] = _cl2_anahtar
+        else:
+            _cl2_sirali = st.session_state["_cl2_sabit_sira"]
+            _cl2_map = {v: i for i, v in enumerate(_cl2_sirali)}
+            df_f = df_f.copy()
+            df_f["_cl2_key"] = df_f["id"].map(_cl2_map).fillna(len(_cl2_sirali))
+            df_f = df_f.sort_values("_cl2_key").drop(columns=["_cl2_key"]).reset_index(drop=True)
+
     col_order = ["Seç","tarih","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
                  "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","islem_asamasi",
                  "asama1","asama2","asama3","aciklama","📨 Notlar","📅 Son Randevu",
