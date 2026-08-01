@@ -1924,7 +1924,35 @@ st.markdown("""<div id="mw-mobile-nav">
   <a class="mw-nav-btn" id="mwnav-analiz" href="?_nav=analiz"><span class="nav-ikon">🔍</span>Analiz</a>
   <a class="mw-nav-btn" id="mwnav-randevu" href="?_nav=randevu"><span class="nav-ikon">📅</span>Randevu</a>
   <a class="mw-nav-btn" id="mwnav-harita" href="?_nav=harita"><span class="nav-ikon">🗺️</span>Harita</a>
-</div>""", unsafe_allow_html=True)
+</div>
+<a href="?_masaustune_gec=1" style="
+  position:fixed; top:8px; right:8px; z-index:100000;
+  background:#0f172a; color:white; text-decoration:none;
+  font-size:11px; font-weight:600; padding:7px 12px;
+  border-radius:20px; box-shadow:0 2px 8px rgba(0,0,0,.25);
+  display:none;" id="mw-masaustu-btn">🖥️ Masaüstüne geç</a>
+<script>
+(function(){
+  var _b = window.parent ? window.parent.document.body : document.body;
+  var _btn = document.getElementById('mw-masaustu-btn');
+  if(_btn && _b.classList.contains('mw-mobil-aktif')){ _btn.style.display = 'block'; }
+})();
+</script>""", unsafe_allow_html=True)
+
+# Mobilde menüye hiç girmeden tek dokunuşla masaüstü moduna geçiş
+try:
+    if st.query_params.get("_masaustune_gec", "") == "1":
+        st.session_state["_mobil_mod"] = False
+        st.markdown("""<script>
+try{
+  var _eski = localStorage.getItem('mwcrm_oturum');
+  if(_eski){ var _o = JSON.parse(_eski); _o.mobil = false; localStorage.setItem('mwcrm_oturum', JSON.stringify(_o)); }
+}catch(e){}
+</script>""", unsafe_allow_html=True)
+        st.query_params.clear()
+        st.rerun()
+except Exception:
+    pass
 
 # Gizli tab geçiş butonları — mobil nav bunları tetikler
 # Mobil nav — query param ile tab geçişi (sadece mobil nav için)
