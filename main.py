@@ -5134,7 +5134,7 @@ function kartSec(id){
 
     # ── SAYFALAMA — sayfa başına 15 müşteri, altta 1-2-3 sayfa butonları,
     # istenirse "Tümü" ile tüm liste tek seferde görülebilir. ────────────────
-    _cl_sayfa_boyutu = 15
+    _cl_sayfa_boyutu = 12
     _cl_toplam_kayit = len(df_f)
     _cl_toplam_sayfa = max(1, -(-_cl_toplam_kayit // _cl_sayfa_boyutu))  # yukarı yuvarlama
 
@@ -5394,6 +5394,11 @@ function kartSec(id){
     _tbl_col = st.container()
     _not_col = None
 
+    # Tablo yüksekliğini görünen satır sayısına göre hesapla — sabit 800px'lik
+    # yükseklik, sayfa başına 12 satır varken altında boş satırlar bırakıyordu.
+    # "Tümü" modunda (binlerce satır) yükseklik 800px'de sabit kalıp iç kaydırma kullanır.
+    _cl_editor_yukseklik = min(800, 38 + (len(df_edit) * 35) + 3)
+
     with _tbl_col:
         edited_df = st.data_editor(
             df_edit,
@@ -5401,7 +5406,7 @@ function kartSec(id){
             num_rows="fixed",
             column_config=col_config,
             column_order=_aktif_col_order,
-            height=800,
+            height=_cl_editor_yukseklik,
             key="cari_editor"
         )
 
