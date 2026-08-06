@@ -7864,36 +7864,45 @@ elif aktif == "ozel_calisma":
                     _mask &= (_ocr_df[_k].isna() | _ocr_df[_k].astype(str).str.strip().isin(["","None","nan"]))
             return int(_mask.sum())
 
+        _ocr_gruplar = [
+            ("📊 GENEL", [
+                ("📊", "Toplam", len(_ocr_df)),
+                ("📦", "Portföy", _ocr_durum_sayi("Portföy")),
+                ("⭐", "Özel Müşteri", _ocr_durum_sayi("Özel Müşteri")),
+                ("📋", "Aşamasız", _ocr_asamasiz()),
+            ]),
+            ("📞 AŞAMA", [
+                ("📞", "Arama", _ocr_kolon_sayi("islem_asamasi", "Arama")),
+                ("📲", "Tekrar Ara", _ocr_kolon_sayi("islem_asamasi", "Tekrar Ara")),
+                ("📧", "E-Mail", _ocr_kolon_sayi("islem_asamasi", "E-Mail")),
+            ]),
+            ("📅 1.AŞAMA", [("📅", "Randevu", _ocr_kolon_sayi("asama1", "Randevu"))]),
+            ("📄 2.AŞAMA", [("📄", "Teklif", _ocr_kolon_sayi("asama2", "Teklif"))]),
+            ("🧪 3.AŞAMA", [
+                ("🧪", "Deneme", _ocr_kolon_sayi("asama3", "Deneme")),
+                ("💰", "Fiyat Hazırla", _ocr_kolon_sayi("asama3", "Fiyat Hazırla")),
+                ("📝", "Sözleşme", _ocr_kolon_sayi("asama3", "Sözleşme")),
+                ("📌", "TAKİP", _ocr_kolon_sayi("asama3", "TAKİP")),
+            ]),
+            ("🏆 SONUÇ", [
+                ("❌", "Kaybedildi", _ocr_kolon_sayi("sonuc", "Kaybedildi")),
+                ("🏆", "Kazanıldı", _ocr_kolon_sayi("sonuc", "Kazanıldı")),
+                ("⏳", "Devam Ediyor", _ocr_kolon_sayi("sonuc", "Devam Ediyor")),
+            ]),
+        ]
+        _ocr_html = '<div style="overflow-x:auto;"><table style="border-collapse:separate;border-spacing:0;font-family:inherit;font-size:12px;width:100%;">'
+        _ocr_html += '<thead><tr>'
+        for _og_ilk, (_og_ad, _og_items) in enumerate(_ocr_gruplar):
+            _bl = 'border-left:2px solid #cbd5e1;' if _og_ilk > 0 else ''
+            _ocr_html += f'<th colspan="{len(_og_items)}" style="border:0.5px solid #e2e8f0;{_bl}padding:4px 8px;background:#f8fafc;text-align:center;font-size:11px;font-weight:700;color:#374151;white-space:nowrap;">{_og_ad}</th>'
+        _ocr_html += '</tr></thead><tbody><tr>'
+        for _og_ad, _og_items in _ocr_gruplar:
+            for _ic, _ad, _sayi in _og_items:
+                _ocr_html += f'<td style="border:0.5px solid #f1f5f9;padding:5px 9px;text-align:center;white-space:nowrap;vertical-align:middle;"><div style="font-size:11px;color:#64748b;">{_ic} {_ad}</div><div style="font-size:15px;font-weight:700;color:#0f172a;">{_sayi}</div></td>'
+        _ocr_html += '</tr></tbody></table></div>'
+
         with st.expander("📊 Üst Rapor (Cari Liste özeti — bilgi amaçlı, tıklanamaz)", expanded=True):
-            st.markdown("**GENEL**")
-            _ocr_g = st.columns(4)
-            _ocr_g[0].metric("📊 Toplam", len(_ocr_df))
-            _ocr_g[1].metric("📦 Portföy", _ocr_durum_sayi("Portföy"))
-            _ocr_g[2].metric("⭐ Özel Müşteri", _ocr_durum_sayi("Özel Müşteri"))
-            _ocr_g[3].metric("📋 Aşamasız", _ocr_asamasiz())
-
-            st.markdown("**AŞAMA**")
-            _ocr_a = st.columns(3)
-            _ocr_a[0].metric("📞 Arama", _ocr_kolon_sayi("islem_asamasi","Arama"))
-            _ocr_a[1].metric("📲 Tekrar Ara", _ocr_kolon_sayi("islem_asamasi","Tekrar Ara"))
-            _ocr_a[2].metric("📧 E-Mail", _ocr_kolon_sayi("islem_asamasi","E-Mail"))
-
-            _ocr_b = st.columns(2)
-            _ocr_b[0].metric("📅 1.Aşama Randevu", _ocr_kolon_sayi("asama1","Randevu"))
-            _ocr_b[1].metric("📄 2.Aşama Teklif", _ocr_kolon_sayi("asama2","Teklif"))
-
-            st.markdown("**3. AŞAMA**")
-            _ocr_c = st.columns(4)
-            _ocr_c[0].metric("🧪 Deneme", _ocr_kolon_sayi("asama3","Deneme"))
-            _ocr_c[1].metric("💰 Fiyat Hazırla", _ocr_kolon_sayi("asama3","Fiyat Hazırla"))
-            _ocr_c[2].metric("📝 Sözleşme", _ocr_kolon_sayi("asama3","Sözleşme"))
-            _ocr_c[3].metric("📌 TAKİP", _ocr_kolon_sayi("asama3","TAKİP"))
-
-            st.markdown("**SONUÇ**")
-            _ocr_d = st.columns(3)
-            _ocr_d[0].metric("❌ Kaybedildi", _ocr_kolon_sayi("sonuc","Kaybedildi"))
-            _ocr_d[1].metric("🏆 Kazanıldı", _ocr_kolon_sayi("sonuc","Kazanıldı"))
-            _ocr_d[2].metric("⏳ Devam Ediyor", _ocr_kolon_sayi("sonuc","Devam Ediyor"))
+            st.markdown(_ocr_html, unsafe_allow_html=True)
 
     _oc_kullanici = st.session_state.get("kullanici", "")
     _oc_kolon_harita = {
