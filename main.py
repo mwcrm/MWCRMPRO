@@ -7841,10 +7841,30 @@ elif aktif == "kayitli_teklifler":
 elif aktif == "ozel_calisma":
     sayfa_log("ozel_calisma")
     st.markdown("## 📝 Özel Çalışma Sistemi")
-    st.caption("Serbest çalışma alanı — tamamen sana özel, istediğin gibi satır/sütun ekleyip silebilirsin. Kaydet'e basmadan hiçbir şey kalıcı olmaz.")
+    st.caption("Cari Liste'deki tüm müşterilerle başlıyor, ama tamamen bağımsız — burada satır/sütun ekleyip silmen Cari Liste'yi etkilemez. Kaydet'e basmadan hiçbir şey kalıcı olmaz.")
 
     _oc_kullanici = st.session_state.get("kullanici", "")
-    _oc_varsayilan_kolonlar = ["Firma", "İl", "İlçe", "Arama", "Mesaj", "Teklif", "Analiz", "Aşama"]
+    _oc_kolon_harita = {
+        "tarih": "Tarih", "firma": "Firma", "yetkili": "Yetkili", "gsm": "GSM", "sabit": "Sabit",
+        "email": "Email", "adres": "Adres", "ilce": "İlçe", "il": "İl", "durum": "Durum",
+        "asama1": "Aşama 1", "asama2": "Aşama 2", "asama3": "Aşama 3", "sonuc": "Sonuç",
+        "aciklama": "Açıklama", "beklenen_ciro": "Hedef ₺", "gerceklesen_ciro": "Gerçek ₺",
+    }
+
+    def _oc_cari_listeden_yukle():
+        """Cari Liste'deki tüm müşterileri, aynı başlıklarla, bağımsız bir kopya olarak getirir."""
+        _df = get_cari_listesi()
+        if _df.empty:
+            return pd.DataFrame([{k: "" for k in _oc_kolon_harita.values()} for _ in range(8)])
+        _df = _df.copy()
+        for _tk in ["gsm", "sabit"]:
+            if _tk in _df.columns:
+                _df[_tk] = _telefon_temizle(_df[_tk])
+        _mevcut = [c for c in _oc_kolon_harita if c in _df.columns]
+        _sonuc = _df[_mevcut].rename(columns=_oc_kolon_harita)
+        for _c in _sonuc.columns:
+            _sonuc[_c] = _sonuc[_c].fillna("").astype(str).replace({"None": "", "nan": ""})
+        return _sonuc
 
     def _oc_yukle():
         try:
@@ -7874,17 +7894,17 @@ elif aktif == "ozel_calisma":
 
     if "_oc_veri" not in st.session_state:
         _oc_yuklenen = _oc_yukle()
-        if _oc_yuklenen and _oc_yuklenen.get("kolonlar"):
+        if _oc_yuklenen and _oc_yuklenen.get("kolonlar") and _oc_yuklenen.get("satirlar"):
             st.session_state["_oc_kolonlar"] = _oc_yuklenen["kolonlar"]
-            st.session_state["_oc_veri"] = pd.DataFrame(_oc_yuklenen.get("satirlar", []))
-            if st.session_state["_oc_veri"].empty:
-                st.session_state["_oc_veri"] = pd.DataFrame([{k: "" for k in _oc_yuklenen["kolonlar"]} for _ in range(5)])
+            st.session_state["_oc_veri"] = pd.DataFrame(_oc_yuklenen["satirlar"])
         else:
-            st.session_state["_oc_kolonlar"] = _oc_varsayilan_kolonlar.copy()
-            st.session_state["_oc_veri"] = pd.DataFrame([{k: "" for k in _oc_varsayilan_kolonlar} for _ in range(8)])
+            with st.spinner("Cari Liste'den yükleniyor..."):
+                _ilk_df = _oc_cari_listeden_yukle()
+            st.session_state["_oc_kolonlar"] = list(_ilk_df.columns)
+            st.session_state["_oc_veri"] = _ilk_df
 
-    # ── SÜTUN EKLE / SİL ──────────────────────────────────────────────────────
-    _oc_c1, _oc_c2 = st.columns(2)
+    # ── SÜTUN EKLE / SİL / YENİDEN YÜKLE ──────────────────────────────────────
+    _oc_c1, _oc_c2, _oc_c3 = st.columns([2, 2, 1.3])
     with _oc_c1:
         with st.form("oc_kolon_ekle_form", clear_on_submit=True):
             _oc_yc1, _oc_yc2 = st.columns([3, 1])
@@ -7903,13 +7923,35 @@ elif aktif == "ozel_calisma":
                 st.session_state["_oc_kolonlar"].remove(_oc_silinecek)
                 st.session_state["_oc_veri"] = st.session_state["_oc_veri"].drop(columns=[_oc_silinecek])
                 st.rerun()
+    with _oc_c3:
+        _oc_yeniden_yukle_onay = f"oc_reload_bekliyor"
+        if not st.session_state.get(_oc_yeniden_yukle_onay):
+            if st.button("🔄 Cari Liste'den Yeniden Yükle", use_container_width=True, key="oc_reload_btn"):
+                st.session_state[_oc_yeniden_yukle_onay] = True
+                st.rerun()
+        else:
+            st.warning("⚠️ Bu alandaki mevcut düzenlemeleriniz silinip Cari Liste'nin güncel hâliyle DEĞİŞTİRİLECEK. Emin misiniz?")
+            _oc_rc1, _oc_rc2 = st.columns(2)
+            if _oc_rc1.button("✅ Evet, yeniden yükle", type="primary", key="oc_reload_onay"):
+                with st.spinner("Cari Liste'den yükleniyor..."):
+                    _ilk_df = _oc_cari_listeden_yukle()
+                st.session_state["_oc_kolonlar"] = list(_ilk_df.columns)
+                st.session_state["_oc_veri"] = _ilk_df
+                st.session_state.pop(_oc_yeniden_yukle_onay, None)
+                st.session_state.pop("oc_editor", None)
+                st.rerun()
+            if _oc_rc2.button("Vazgeç", key="oc_reload_vazgec"):
+                st.session_state.pop(_oc_yeniden_yukle_onay, None)
+                st.rerun()
+
+    st.caption(f"{len(st.session_state['_oc_veri'])} satır")
 
     # ── HÜCRESEL TABLO — satır ekleme/silme serbest ───────────────────────────
     _oc_edited = st.data_editor(
         st.session_state["_oc_veri"],
         num_rows="dynamic",
         use_container_width=True,
-        height=520,
+        height=650,
         key="oc_editor",
     )
 
