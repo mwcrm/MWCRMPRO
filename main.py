@@ -7843,9 +7843,61 @@ elif aktif == "ozel_calisma":
     st.markdown("## 📝 Özel Çalışma Sistemi")
     st.caption("Cari Liste'deki tüm müşterilerle başlıyor, ama tamamen bağımsız — burada satır/sütun ekleyip silmen Cari Liste'yi etkilemez. Kaydet'e basmadan hiçbir şey kalıcı olmaz.")
 
+    # ── ÜST RAPOR — Cari Liste'deki özet kartlarının salt-okunur hâli ─────────
+    with st.spinner("Özet hesaplanıyor..."):
+        _ocr_df = get_cari_listesi()
+    if not _ocr_df.empty:
+        def _ocr_norm(s):
+            return (str(s or "").strip().upper().replace("İ","I").replace("Ş","S")
+                    .replace("Ğ","G").replace("Ü","U").replace("Ö","O").replace("Ç","C"))
+        def _ocr_kolon_sayi(kolon, ad):
+            if kolon not in _ocr_df.columns: return 0
+            _n = _ocr_norm(ad)
+            return int((_ocr_df[kolon].apply(_ocr_norm) == _n).sum())
+        def _ocr_durum_sayi(ad):
+            if "durum" not in _ocr_df.columns: return 0
+            return int((_ocr_df["durum"] == ad).sum())
+        def _ocr_asamasiz():
+            _mask = pd.Series([True]*len(_ocr_df), index=_ocr_df.index)
+            for _k in ["islem_asamasi","asama1","asama2","asama3"]:
+                if _k in _ocr_df.columns:
+                    _mask &= (_ocr_df[_k].isna() | _ocr_df[_k].astype(str).str.strip().isin(["","None","nan"]))
+            return int(_mask.sum())
+
+        with st.expander("📊 Üst Rapor (Cari Liste özeti — bilgi amaçlı, tıklanamaz)", expanded=True):
+            st.markdown("**GENEL**")
+            _ocr_g = st.columns(4)
+            _ocr_g[0].metric("📊 Toplam", len(_ocr_df))
+            _ocr_g[1].metric("📦 Portföy", _ocr_durum_sayi("Portföy"))
+            _ocr_g[2].metric("⭐ Özel Müşteri", _ocr_durum_sayi("Özel Müşteri"))
+            _ocr_g[3].metric("📋 Aşamasız", _ocr_asamasiz())
+
+            st.markdown("**AŞAMA**")
+            _ocr_a = st.columns(3)
+            _ocr_a[0].metric("📞 Arama", _ocr_kolon_sayi("islem_asamasi","Arama"))
+            _ocr_a[1].metric("📲 Tekrar Ara", _ocr_kolon_sayi("islem_asamasi","Tekrar Ara"))
+            _ocr_a[2].metric("📧 E-Mail", _ocr_kolon_sayi("islem_asamasi","E-Mail"))
+
+            _ocr_b = st.columns(2)
+            _ocr_b[0].metric("📅 1.Aşama Randevu", _ocr_kolon_sayi("asama1","Randevu"))
+            _ocr_b[1].metric("📄 2.Aşama Teklif", _ocr_kolon_sayi("asama2","Teklif"))
+
+            st.markdown("**3. AŞAMA**")
+            _ocr_c = st.columns(4)
+            _ocr_c[0].metric("🧪 Deneme", _ocr_kolon_sayi("asama3","Deneme"))
+            _ocr_c[1].metric("💰 Fiyat Hazırla", _ocr_kolon_sayi("asama3","Fiyat Hazırla"))
+            _ocr_c[2].metric("📝 Sözleşme", _ocr_kolon_sayi("asama3","Sözleşme"))
+            _ocr_c[3].metric("📌 TAKİP", _ocr_kolon_sayi("asama3","TAKİP"))
+
+            st.markdown("**SONUÇ**")
+            _ocr_d = st.columns(3)
+            _ocr_d[0].metric("❌ Kaybedildi", _ocr_kolon_sayi("sonuc","Kaybedildi"))
+            _ocr_d[1].metric("🏆 Kazanıldı", _ocr_kolon_sayi("sonuc","Kazanıldı"))
+            _ocr_d[2].metric("⏳ Devam Ediyor", _ocr_kolon_sayi("sonuc","Devam Ediyor"))
+
     _oc_kullanici = st.session_state.get("kullanici", "")
     _oc_kolon_harita = {
-        "tarih": "Tarih", "firma": "Firma", "yetkili": "Yetkili", "gsm": "GSM", "sabit": "Sabit",
+        "id": "ID", "tarih": "Tarih", "firma": "Firma", "yetkili": "Yetkili", "gsm": "GSM", "sabit": "Sabit",
         "email": "Email", "adres": "Adres", "ilce": "İlçe", "il": "İl", "durum": "Durum",
         "asama1": "Aşama 1", "asama2": "Aşama 2", "asama3": "Aşama 3", "sonuc": "Sonuç",
         "aciklama": "Açıklama", "beklenen_ciro": "Hedef ₺", "gerceklesen_ciro": "Gerçek ₺",
@@ -7897,6 +7949,29 @@ elif aktif == "ozel_calisma":
         if _oc_yuklenen and _oc_yuklenen.get("kolonlar") and _oc_yuklenen.get("satirlar"):
             st.session_state["_oc_kolonlar"] = _oc_yuklenen["kolonlar"]
             st.session_state["_oc_veri"] = pd.DataFrame(_oc_yuklenen["satirlar"])
+            # ── OTOMATİK EKLEME: Cari Liste'de olup burada henüz olmayan
+            # müşterileri, MEVCUT SATIR/DÜZENLEMELERE DOKUNMADAN sona ekler.
+            # Sadece EKLER, asla üzerine yazmaz/silmez — veri kaybı riski yok.
+            if "ID" in st.session_state["_oc_veri"].columns:
+                with st.spinner("Yeni müşteriler kontrol ediliyor..."):
+                    _oc_guncel = _oc_cari_listeden_yukle()
+                if "ID" in _oc_guncel.columns:
+                    _oc_mevcut_idler = set(str(x) for x in st.session_state["_oc_veri"]["ID"].tolist() if str(x).strip())
+                    _oc_yeni_satirlar = _oc_guncel[~_oc_guncel["ID"].astype(str).isin(_oc_mevcut_idler)]
+                    if not _oc_yeni_satirlar.empty:
+                        # Sadece bu sayfada zaten var olan sütunlara ekle — kullanıcının
+                        # eklediği özel sütunlar boş kalsın, mevcut yapı bozulmasın.
+                        _oc_ortak_kolonlar = [c for c in st.session_state["_oc_kolonlar"] if c in _oc_yeni_satirlar.columns]
+                        _oc_eklenecek = _oc_yeni_satirlar[_oc_ortak_kolonlar].copy()
+                        for _ek in st.session_state["_oc_kolonlar"]:
+                            if _ek not in _oc_eklenecek.columns:
+                                _oc_eklenecek[_ek] = ""
+                        _oc_eklenecek = _oc_eklenecek[st.session_state["_oc_kolonlar"]]
+                        st.session_state["_oc_veri"] = pd.concat(
+                            [st.session_state["_oc_veri"], _oc_eklenecek], ignore_index=True)
+                        _oc_kaydet_db({"kolonlar": st.session_state["_oc_kolonlar"],
+                                       "satirlar": st.session_state["_oc_veri"].fillna("").to_dict(orient="records")})
+                        st.toast(f"➕ {len(_oc_eklenecek)} yeni müşteri otomatik eklendi (mevcut düzenlemeleriniz korundu)", icon="✅")
         else:
             with st.spinner("Cari Liste'den yükleniyor..."):
                 _ilk_df = _oc_cari_listeden_yukle()
