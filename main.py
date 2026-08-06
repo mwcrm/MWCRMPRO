@@ -2425,13 +2425,14 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "mukerrer"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "analiz", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "ozel_calisma", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
     "rapor": "📊 Raporlar",
     "ozel_teklif": "⭐ Özel Teklif",
     "kayitli_teklifler": "📋 Kayıtlı Teklifler",
+    "ozel_calisma": "📝 Özel Çalışma Sistemi",
     "sozlesme": "📜 Sözleşmeler",
     "excel": "📥 Excel Aktar",
     "analiz": "🔍 Müşteri Analizi",
@@ -7836,6 +7837,86 @@ elif aktif == "kayitli_teklifler":
                         if _oc2.button("Vazgeç", key=f"kt_sil_vazgec_{_ktr_id}"):
                             st.session_state.pop(_kt_sil_bek, None)
                             st.rerun()
+
+elif aktif == "ozel_calisma":
+    sayfa_log("ozel_calisma")
+    st.markdown("## 📝 Özel Çalışma Sistemi")
+    st.caption("Serbest çalışma alanı — tamamen sana özel, istediğin gibi satır/sütun ekleyip silebilirsin. Kaydet'e basmadan hiçbir şey kalıcı olmaz.")
+
+    _oc_kullanici = st.session_state.get("kullanici", "")
+    _oc_varsayilan_kolonlar = ["Firma", "İl", "İlçe", "Arama", "Mesaj", "Teklif", "Analiz", "Aşama"]
+
+    def _oc_yukle():
+        try:
+            sb = get_sb_client()
+            if sb:
+                r = sb.table("kullanici_tercih").select("deger").eq("kullanici", _oc_kullanici).eq("anahtar", "ozel_calisma_sistemi").execute()
+                if r.data:
+                    return json.loads(r.data[0]["deger"])
+        except Exception:
+            pass
+        return None
+
+    def _oc_kaydet_db(veri):
+        try:
+            sb = get_sb_client()
+            if sb:
+                mevcut = sb.table("kullanici_tercih").select("id").eq("kullanici", _oc_kullanici).eq("anahtar", "ozel_calisma_sistemi").execute()
+                _deger = json.dumps(veri, ensure_ascii=False)
+                if mevcut.data:
+                    sb.table("kullanici_tercih").update({"deger": _deger}).eq("id", mevcut.data[0]["id"]).execute()
+                else:
+                    sb.table("kullanici_tercih").insert({"kullanici": _oc_kullanici, "anahtar": "ozel_calisma_sistemi", "deger": _deger}).execute()
+                return True
+        except Exception as _oc_e:
+            st.error(f"Kaydedilemedi: {_oc_e}")
+        return False
+
+    if "_oc_veri" not in st.session_state:
+        _oc_yuklenen = _oc_yukle()
+        if _oc_yuklenen and _oc_yuklenen.get("kolonlar"):
+            st.session_state["_oc_kolonlar"] = _oc_yuklenen["kolonlar"]
+            st.session_state["_oc_veri"] = pd.DataFrame(_oc_yuklenen.get("satirlar", []))
+            if st.session_state["_oc_veri"].empty:
+                st.session_state["_oc_veri"] = pd.DataFrame([{k: "" for k in _oc_yuklenen["kolonlar"]} for _ in range(5)])
+        else:
+            st.session_state["_oc_kolonlar"] = _oc_varsayilan_kolonlar.copy()
+            st.session_state["_oc_veri"] = pd.DataFrame([{k: "" for k in _oc_varsayilan_kolonlar} for _ in range(8)])
+
+    # ── SÜTUN EKLE / SİL ──────────────────────────────────────────────────────
+    _oc_c1, _oc_c2 = st.columns(2)
+    with _oc_c1:
+        with st.form("oc_kolon_ekle_form", clear_on_submit=True):
+            _oc_yc1, _oc_yc2 = st.columns([3, 1])
+            _oc_yeni_kolon = _oc_yc1.text_input("➕ Yeni sütun adı", label_visibility="collapsed", placeholder="Yeni sütun adı...")
+            _oc_ekle_tikla = _oc_yc2.form_submit_button("Ekle", use_container_width=True)
+            if _oc_ekle_tikla and _oc_yeni_kolon.strip():
+                if _oc_yeni_kolon.strip() not in st.session_state["_oc_kolonlar"]:
+                    st.session_state["_oc_kolonlar"].append(_oc_yeni_kolon.strip())
+                    st.session_state["_oc_veri"][_oc_yeni_kolon.strip()] = ""
+                    st.rerun()
+    with _oc_c2:
+        _oc_sc1, _oc_sc2 = st.columns([3, 1])
+        _oc_silinecek = _oc_sc1.selectbox("🗑️ Sütun sil", ["-- Sütun Seç --"] + st.session_state["_oc_kolonlar"], label_visibility="collapsed")
+        if _oc_sc2.button("Sil", use_container_width=True, key="oc_kolon_sil_btn"):
+            if _oc_silinecek != "-- Sütun Seç --":
+                st.session_state["_oc_kolonlar"].remove(_oc_silinecek)
+                st.session_state["_oc_veri"] = st.session_state["_oc_veri"].drop(columns=[_oc_silinecek])
+                st.rerun()
+
+    # ── HÜCRESEL TABLO — satır ekleme/silme serbest ───────────────────────────
+    _oc_edited = st.data_editor(
+        st.session_state["_oc_veri"],
+        num_rows="dynamic",
+        use_container_width=True,
+        height=520,
+        key="oc_editor",
+    )
+
+    if st.button("💾 Kaydet", type="primary", use_container_width=True, key="oc_kaydet_btn"):
+        st.session_state["_oc_veri"] = _oc_edited
+        if _oc_kaydet_db({"kolonlar": st.session_state["_oc_kolonlar"], "satirlar": _oc_edited.fillna("").to_dict(orient="records")}):
+            st.success("✅ Kaydedildi!")
 
 elif aktif == "sozlesme":
     sayfa_log("sozlesme")
