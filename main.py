@@ -2380,7 +2380,8 @@ def not_dialog(cari_id, firma_adi=""):
                         _sb_rk.table("kullanici_tercih").update({"deger": _deger_rk}).eq("id", _mevcut_rk.data[0]["id"]).execute()
                     else:
                         _sb_rk.table("kullanici_tercih").insert({"kullanici": st.session_state.get("kullanici",""), "anahtar":"cari_renkleri", "deger": _deger_rk}).execute()
-                st.success("✅ Boyandı! Cari Liste'ye dönünce görünecek.")
+                st.toast("✅ Boyandı!", icon="✅")
+                st.rerun()
             except Exception as _renk_e:
                 st.error(f"Kaydedilemedi: {_renk_e}")
     with _tab_duz:
