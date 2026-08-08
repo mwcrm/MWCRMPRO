@@ -2155,7 +2155,7 @@ def _notlar_yukle(cari_id):
 @st.dialog("📋 Notlar & Randevu", width="large")
 def not_dialog(cari_id, firma_adi=""):
     """Ekran ortasında açılan not + randevu + silme + düzenleme penceresi"""
-    _tab_not, _tab_rdv, _tab_yetkili, _tab_teklif, _tab_sozlesme, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
+    _tab_not, _tab_rdv, _tab_yetkili, _tab_teklif, _tab_sozlesme, _tab_renk, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "🎨 Satırı Boya", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
     with _tab_not:
         not_paneli(cari_id, firma_adi, key_prefix="dlg")
     with _tab_rdv:
@@ -2343,6 +2343,46 @@ def not_dialog(cari_id, firma_adi=""):
             st.session_state["aktif_tab"] = "sozlesme"
             st.session_state["sozlesme_musteri_onsel"] = firma_adi
             st.rerun()
+    with _tab_renk:
+        st.caption(f"**{firma_adi}** satırını Cari Liste'nin üstündeki '🎨 Renkli Görünüm'de boyar.")
+        _renk_secenekleri = ["", "🟢 Yeşil", "🔴 Kırmızı", "🟡 Sarı", "🟠 Turuncu", "🔵 Mavi", "🟣 Mor", "⚫ Siyah"]
+
+        def _dlg_renk_haritasi_yukle():
+            try:
+                sb = get_sb_client()
+                if sb:
+                    r = sb.table("kullanici_tercih").select("deger").eq(
+                        "kullanici", st.session_state.get("kullanici","")).eq("anahtar","cari_renkleri").execute()
+                    if r.data:
+                        return json.loads(r.data[0]["deger"])
+            except Exception:
+                pass
+            return {}
+        if "_cl_renk_haritasi" not in st.session_state:
+            st.session_state["_cl_renk_haritasi"] = _dlg_renk_haritasi_yukle()
+
+        _renk_mevcut = st.session_state["_cl_renk_haritasi"].get(str(int(cari_id)), "")
+        _renk_secili = st.selectbox("Renk seç", _renk_secenekleri,
+            index=_renk_secenekleri.index(_renk_mevcut) if _renk_mevcut in _renk_secenekleri else 0,
+            key=f"dlg_renk_sec_{cari_id}")
+        if st.button("🎨 Satırı Boya", key=f"dlg_renk_kaydet_{cari_id}", type="primary", use_container_width=True):
+            if _renk_secili:
+                st.session_state["_cl_renk_haritasi"][str(int(cari_id))] = _renk_secili
+            else:
+                st.session_state["_cl_renk_haritasi"].pop(str(int(cari_id)), None)
+            try:
+                _sb_rk = get_sb_client()
+                if _sb_rk:
+                    _mevcut_rk = _sb_rk.table("kullanici_tercih").select("id").eq(
+                        "kullanici", st.session_state.get("kullanici","")).eq("anahtar","cari_renkleri").execute()
+                    _deger_rk = json.dumps(st.session_state["_cl_renk_haritasi"], ensure_ascii=False)
+                    if _mevcut_rk.data:
+                        _sb_rk.table("kullanici_tercih").update({"deger": _deger_rk}).eq("id", _mevcut_rk.data[0]["id"]).execute()
+                    else:
+                        _sb_rk.table("kullanici_tercih").insert({"kullanici": st.session_state.get("kullanici",""), "anahtar":"cari_renkleri", "deger": _deger_rk}).execute()
+                st.success("✅ Boyandı! Cari Liste'ye dönünce görünecek.")
+            except Exception as _renk_e:
+                st.error(f"Kaydedilemedi: {_renk_e}")
     with _tab_duz:
         st.caption(f"**{firma_adi}** — kayıtlı tüm bilgilerle eksiksiz düzenleme ekranı açılır.")
         if st.button("✏️ Cari Kartı Düzenle", key=f"dlg_cari_duzenle_{cari_id}", type="primary", use_container_width=True):
@@ -5072,7 +5112,6 @@ function kartSec(id){
 
     col_config = {
         "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
-        "🎨 Renk":       st.column_config.SelectboxColumn("🎨 Renk", options=["", "🟢 Yeşil", "🔴 Kırmızı", "🟡 Sarı", "🟠 Turuncu", "🔵 Mavi", "🟣 Mor", "⚫ Siyah"], width="small"),
         "tarih":         st.column_config.TextColumn("İşlem Tarih", disabled=True, width=_w("tarih") if "tarih" in _KOL_VARSAYILAN else "small"),
         "id":            st.column_config.NumberColumn("ID", disabled=True, width=_w("id")),
         "olusturan": None, "silindi": None,
@@ -5126,7 +5165,7 @@ function kartSec(id){
             df_f["_cl2_key"] = df_f["id"].map(_cl2_map).fillna(len(_cl2_sirali))
             df_f = df_f.sort_values("_cl2_key").drop(columns=["_cl2_key"]).reset_index(drop=True)
 
-    col_order = ["Seç","🎨 Renk","tarih","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
+    col_order = ["Seç","tarih","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
                  "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","islem_asamasi",
                  "asama1","asama2","asama3","aciklama","📨 Notlar","📅 Son Randevu",
                  "🧾 Teklif","💬 Mesaj","ara_islem","sonuc","temsilci"]
@@ -5362,9 +5401,9 @@ function kartSec(id){
 
     df_edit.insert(0, "Seç", False)
 
-    # ── 🎨 RENK — kullanıcının satırlara kendi seçtiği renk. Yeni bir DB
-    # sütunu açmadan (kural gereği), mevcut kullanici_tercih tablosunda
-    # {cari_id: renk} eşlemesi olarak saklanıyor.
+    # ── 🎨 RENK HARİTASI — sadece "Renkli Görünüm" için yükleniyor, ana
+    # tabloya artık sütun olarak EKLENMİYOR (kullanıcı ayrı, sade bir yerden
+    # -- Notlar & Randevu penceresinden -- renk seçiyor).
     def _cl_renk_haritasi_yukle():
         try:
             sb = get_sb_client()
@@ -5379,22 +5418,15 @@ function kartSec(id){
     if "_cl_renk_haritasi" not in st.session_state:
         st.session_state["_cl_renk_haritasi"] = _cl_renk_haritasi_yukle()
     _cl_renk_map = st.session_state["_cl_renk_haritasi"]
-    if "id" in df_edit.columns:
-        df_edit.insert(1, "🎨 Renk", df_edit["id"].apply(lambda x: _cl_renk_map.get(str(int(x)), "")))
-    else:
-        df_edit.insert(1, "🎨 Renk", "")
 
     import json as _json_ls
 
     # ── TÜMÜ GÖSTER — tablo sol, not paneli sağ ──────────────────────────────
     _kayitli_sira = st.session_state.get("_cl_kolon_sira", [])
-    if _kayitli_sira and "🎨 Renk" not in _kayitli_sira:
-        # Daha önce kaydedilmiş özel kolon sırasında yeni eklenen "🎨 Renk"
-        # sütunu yoktu — otomatik olarak başa (Seç'in hemen yanına) ekle,
-        # yoksa sütun var ama hiç görünmüyor/seçilemiyor oluyordu.
-        _kayitli_sira = list(_kayitli_sira)
-        _seç_idx = _kayitli_sira.index("Seç") if "Seç" in _kayitli_sira else -1
-        _kayitli_sira.insert(_seç_idx + 1, "🎨 Renk")
+    if _kayitli_sira and "🎨 Renk" in _kayitli_sira:
+        # Renk artık ana tabloda bir sütun değil — eski kayıtlı sıralamada
+        # kalmış olabilir, temizle (yoksa olmayan bir sütuna referans hatası verir).
+        _kayitli_sira = [c for c in _kayitli_sira if c != "🎨 Renk"]
         st.session_state["_cl_kolon_sira"] = _kayitli_sira
         try:
             _sb_ko = get_sb_client()
@@ -5439,60 +5471,16 @@ function kartSec(id){
         st.markdown('</div>', unsafe_allow_html=True)
 
     # ── 🎨 RENKLİ GÖRÜNÜM — TABLONUN ÜSTÜNDE, gerçek satır boyamalı, salt-okunur.
-    # Kaydedilmiş renklere göre (df_edit) gösterir. Renk değiştirmek için
-    # FİRMA ADINA tıklanır — küçük bir renk seçici açılır. Ana düzenlenebilir
-    # tabloya (aşağıda) hiç dokunulmuyor, o olduğu gibi çalışmaya devam ediyor.
-    if "🎨 Renk" in df_edit.columns:
+    # Renk, "Seç" işaretleyip Notlar & Randevu penceresini açtığında oradaki
+    # "🎨 Satırı Boya" sekmesinden seçiliyor. Burada sadece gösteriliyor.
+    if not df_edit.empty and "id" in df_edit.columns:
         _cl_renk_bg = {
             "🟢 Yeşil": "#bbf7d0", "🔴 Kırmızı": "#fecaca", "🟡 Sarı": "#fef08a",
             "🟠 Turuncu": "#fed7aa", "🔵 Mavi": "#bfdbfe", "🟣 Mor": "#e9d5ff", "⚫ Siyah": "#374151",
         }
         _cl_renk_metin = {"⚫ Siyah": "#ffffff"}
-        _cl_renk_secenekleri = ["", "🟢 Yeşil", "🔴 Kırmızı", "🟡 Sarı", "🟠 Turuncu", "🔵 Mavi", "🟣 Mor", "⚫ Siyah"]
         st.markdown("## 🎨 Renkli Görünüm — satırların TAMAMI boyalı")
-        st.caption("Rengi değiştirmek için firma adına tıkla.")
-
-        # Firma adına tıklayınca (?renk_id=...) küçük bir renk seçici aç.
-        try:
-            _cl_renk_id_qp = st.query_params.get("renk_id", "")
-        except Exception:
-            _cl_renk_id_qp = ""
-        if _cl_renk_id_qp:
-            try:
-                _cl_renk_id_int = int(_cl_renk_id_qp)
-                _cl_renk_satir = df_edit[df_edit["id"] == _cl_renk_id_int]
-                _cl_renk_firma_ad = str(_cl_renk_satir.iloc[0].get("firma","")) if not _cl_renk_satir.empty else ""
-                _cl_renk_mevcut = str(_cl_renk_satir.iloc[0].get("🎨 Renk","")) if not _cl_renk_satir.empty else ""
-                with st.container(border=True):
-                    st.markdown(f"**🎨 {_cl_renk_firma_ad} — renk seç**")
-                    _crc1, _crc2, _crc3 = st.columns([2, 1, 1])
-                    _cl_yeni_renk = _crc1.selectbox("", _cl_renk_secenekleri,
-                        index=_cl_renk_secenekleri.index(_cl_renk_mevcut) if _cl_renk_mevcut in _cl_renk_secenekleri else 0,
-                        label_visibility="collapsed", key=f"cl_renk_pick_{_cl_renk_id_int}")
-                    if _crc2.button("✅ Kaydet", key=f"cl_renk_kaydet_{_cl_renk_id_int}", type="primary", use_container_width=True):
-                        if _cl_yeni_renk:
-                            st.session_state["_cl_renk_haritasi"][str(_cl_renk_id_int)] = _cl_yeni_renk
-                        else:
-                            st.session_state["_cl_renk_haritasi"].pop(str(_cl_renk_id_int), None)
-                        try:
-                            _sb_rk = get_sb_client()
-                            if _sb_rk:
-                                _mevcut_rk = _sb_rk.table("kullanici_tercih").select("id").eq(
-                                    "kullanici", st.session_state.get("kullanici","")).eq("anahtar","cari_renkleri").execute()
-                                _deger_rk = json.dumps(st.session_state["_cl_renk_haritasi"], ensure_ascii=False)
-                                if _mevcut_rk.data:
-                                    _sb_rk.table("kullanici_tercih").update({"deger": _deger_rk}).eq("id", _mevcut_rk.data[0]["id"]).execute()
-                                else:
-                                    _sb_rk.table("kullanici_tercih").insert({"kullanici": st.session_state.get("kullanici",""), "anahtar":"cari_renkleri", "deger": _deger_rk}).execute()
-                        except Exception:
-                            pass
-                        st.query_params.clear()
-                        st.rerun()
-                    if _crc3.button("✖️ Kapat", key=f"cl_renk_kapat_{_cl_renk_id_int}", use_container_width=True):
-                        st.query_params.clear()
-                        st.rerun()
-            except Exception:
-                pass
+        st.caption("Rengi değiştirmek için satırı 'Seç' ile işaretleyip açılan pencereden '🎨 Satırı Boya' sekmesini kullan.")
 
         _crv_kolonlar = [c for c in ["firma","yetkili","gsm","il","ilce","durum","islem_asamasi","asama1","asama2","asama3","sonuc"] if c in df_edit.columns]
         _crv_baslik = {"firma":"Firma","yetkili":"Yetkili","gsm":"GSM","il":"İl","ilce":"İlçe","durum":"Durum",
@@ -5503,24 +5491,19 @@ function kartSec(id){
             _crv_html += f'<th style="border:0.5px solid #e2e8f0;padding:5px 8px;text-align:left;white-space:nowrap;">{_crv_baslik.get(_ck,_ck)}</th>'
         _crv_html += '</tr></thead><tbody>'
         for _, _crow in df_edit.iterrows():
-            _renk_ad = str(_crow.get("🎨 Renk","") or "").strip()
+            _crv_id = str(int(_crow.get("id", 0) or 0))
+            _renk_ad = str(_cl_renk_map.get(_crv_id, "") or "").strip()
             _bg = _cl_renk_bg.get(_renk_ad, "#ffffff")
             _tc = _cl_renk_metin.get(_renk_ad, "#0f172a")
             _crv_html += f'<tr style="background:{_bg};color:{_tc};">'
             for _ck in _crv_kolonlar:
                 _v = _crow.get(_ck, "")
                 _v = "" if str(_v) in ("None","nan") else _v
-                if _ck == "firma":
-                    _rid = int(_crow.get("id", 0) or 0)
-                    _crv_html += f'<td style="border:0.5px solid rgba(0,0,0,.06);padding:5px 8px;white-space:nowrap;"><a href="?renk_id={_rid}" style="color:inherit;text-decoration:underline dotted;cursor:pointer;font-weight:600;">{_v}</a></td>'
-                else:
-                    _crv_html += f'<td style="border:0.5px solid rgba(0,0,0,.06);padding:5px 8px;white-space:nowrap;">{_v}</td>'
+                _crv_html += f'<td style="border:0.5px solid rgba(0,0,0,.06);padding:5px 8px;white-space:nowrap;">{_v}</td>'
             _crv_html += '</tr>'
         _crv_html += '</tbody></table></div>'
         st.markdown(_crv_html, unsafe_allow_html=True)
         st.markdown("---")
-    else:
-        st.warning("⚠️ '🎨 Renk' sütunu bulunamadı.")
 
     _tbl_col = st.container()
     _not_col = None
@@ -5649,37 +5632,6 @@ function kartSec(id){
                 except:
                     _rows = []
 
-                # ── 🎨 RENK değişikliklerini ayrıca kaydet — cari_kartlar'da
-                # sütun olmadığı için kullanici_tercih'te tek bir haritada tutulur.
-                _cl_renk_degisti = False
-                for _idx_str, _degisiklikler in _edited_rows.items():
-                    if "🎨 Renk" in _degisiklikler:
-                        try:
-                            _idx = int(_idx_str)
-                            if _idx < len(_rows):
-                                _rid_renk = str(int(float(str(_rows[_idx].get("id", 0)))))
-                                _yeni_renk = _degisiklikler["🎨 Renk"]
-                                if _yeni_renk:
-                                    st.session_state["_cl_renk_haritasi"][_rid_renk] = _yeni_renk
-                                else:
-                                    st.session_state["_cl_renk_haritasi"].pop(_rid_renk, None)
-                                _cl_renk_degisti = True
-                        except Exception:
-                            pass
-                if _cl_renk_degisti:
-                    try:
-                        sb_renk = get_sb_client()
-                        if sb_renk:
-                            _mevcut_renk = sb_renk.table("kullanici_tercih").select("id").eq(
-                                "kullanici", st.session_state.get("kullanici","")).eq("anahtar","cari_renkleri").execute()
-                            _renk_deger = json.dumps(st.session_state["_cl_renk_haritasi"], ensure_ascii=False)
-                            if _mevcut_renk.data:
-                                sb_renk.table("kullanici_tercih").update({"deger": _renk_deger}).eq("id", _mevcut_renk.data[0]["id"]).execute()
-                            else:
-                                sb_renk.table("kullanici_tercih").insert({"kullanici": st.session_state.get("kullanici",""), "anahtar":"cari_renkleri", "deger": _renk_deger}).execute()
-                    except Exception:
-                        pass
-
                 def _tek_satir_guncelle(idx_str, degisiklikler):
                     """Tek bir satırı DB'ye yazar — paralel çalıştırılabilsin diye ayrı fonksiyon."""
                     idx = int(idx_str)
@@ -5690,7 +5642,7 @@ function kartSec(id){
                         return None
                     guncelle = {}
                     for k, v in degisiklikler.items():
-                        if k in ("Seç", "🗑️ Sil", "🎨 Renk"): continue
+                        if k in ("Seç", "🗑️ Sil"): continue
                         if k in ("beklenen_ciro", "gerceklesen_ciro"):
                             try: guncelle[k] = float(v or 0)
                             except: guncelle[k] = 0
