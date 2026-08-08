@@ -5388,6 +5388,23 @@ function kartSec(id){
 
     # ── TÜMÜ GÖSTER — tablo sol, not paneli sağ ──────────────────────────────
     _kayitli_sira = st.session_state.get("_cl_kolon_sira", [])
+    if _kayitli_sira and "🎨 Renk" not in _kayitli_sira:
+        # Daha önce kaydedilmiş özel kolon sırasında yeni eklenen "🎨 Renk"
+        # sütunu yoktu — otomatik olarak başa (Seç'in hemen yanına) ekle,
+        # yoksa sütun var ama hiç görünmüyor/seçilemiyor oluyordu.
+        _kayitli_sira = list(_kayitli_sira)
+        _seç_idx = _kayitli_sira.index("Seç") if "Seç" in _kayitli_sira else -1
+        _kayitli_sira.insert(_seç_idx + 1, "🎨 Renk")
+        st.session_state["_cl_kolon_sira"] = _kayitli_sira
+        try:
+            _sb_ko = get_sb_client()
+            if _sb_ko:
+                _sb_ko.table("kullanici_tercih").upsert({
+                    "kullanici": "__liste_ui__", "anahtar": "_cl_kolon_sira",
+                    "deger": json.dumps(_kayitli_sira)
+                }, on_conflict="kullanici,anahtar").execute()
+        except Exception:
+            pass
     _aktif_col_order = _kayitli_sira if _kayitli_sira else col_order
 
     # NOT: Eskiden burada notlu satırları sarı yapan bir CSS triki vardı
@@ -5446,33 +5463,41 @@ function kartSec(id){
     # Düzenleme yukarıdaki tablodan yapılır; bu sadece renklerin GERÇEKTEN
     # satırı boyadığı bir görünüm sağlar (yukarıdaki tablo teknik olarak
     # buna izin vermiyor, sadece hücre içi emoji gösterebiliyor).
-    if "🎨 Renk" in edited_df.columns and (edited_df["🎨 Renk"].astype(str).str.strip() != "").any():
+    # NOT: Artık tıklanması gereken bir açılır kutu (expander) DEĞİL —
+    # doğrudan, her zaman açık şekilde gösteriliyor, kaçırılmasın diye.
+    if "🎨 Renk" in edited_df.columns:
         _cl_renk_bg = {
             "🟢 Yeşil": "#bbf7d0", "🔴 Kırmızı": "#fecaca", "🟡 Sarı": "#fef08a",
             "🟠 Turuncu": "#fed7aa", "🔵 Mavi": "#bfdbfe", "🟣 Mor": "#e9d5ff", "⚫ Siyah": "#374151",
         }
         _cl_renk_metin = {"⚫ Siyah": "#ffffff"}
-        with st.expander("🎨 Renkli Görünüm (satırların tamamı boyalı — salt okunur)", expanded=True):
-            _crv_kolonlar = [c for c in ["firma","yetkili","gsm","il","ilce","durum","islem_asamasi","asama1","asama2","asama3","sonuc"] if c in edited_df.columns]
-            _crv_baslik = {"firma":"Firma","yetkili":"Yetkili","gsm":"GSM","il":"İl","ilce":"İlçe","durum":"Durum",
-                           "islem_asamasi":"Aşama","asama1":"Aşama 1","asama2":"Aşama 2","asama3":"Aşama 3","sonuc":"Sonuç"}
-            _crv_html = '<div style="overflow-x:auto;max-height:600px;overflow-y:auto;"><table style="border-collapse:collapse;font-size:12px;width:100%;">'
-            _crv_html += '<thead style="position:sticky;top:0;"><tr style="background:#f8fafc;">'
+        st.markdown("---")
+        st.markdown("## 🎨 Renkli Görünüm — satırların TAMAMI boyalı")
+        st.caption("Yukarıdaki tablodaki '🎨 Renk' seçiminize göre; bu tablo salt okunur, düzenleme yukarıdan yapılır.")
+        _crv_kolonlar = [c for c in ["firma","yetkili","gsm","il","ilce","durum","islem_asamasi","asama1","asama2","asama3","sonuc"] if c in edited_df.columns]
+        _crv_baslik = {"firma":"Firma","yetkili":"Yetkili","gsm":"GSM","il":"İl","ilce":"İlçe","durum":"Durum",
+                       "islem_asamasi":"Aşama","asama1":"Aşama 1","asama2":"Aşama 2","asama3":"Aşama 3","sonuc":"Sonuç"}
+        _crv_html = '<div style="overflow-x:auto;max-height:600px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;"><table style="border-collapse:collapse;font-size:12px;width:100%;">'
+        _crv_html += '<thead style="position:sticky;top:0;"><tr style="background:#f8fafc;">'
+        for _ck in _crv_kolonlar:
+            _crv_html += f'<th style="border:0.5px solid #e2e8f0;padding:5px 8px;text-align:left;white-space:nowrap;">{_crv_baslik.get(_ck,_ck)}</th>'
+        _crv_html += '</tr></thead><tbody>'
+        for _, _crow in edited_df.iterrows():
+            _renk_ad = str(_crow.get("🎨 Renk","") or "").strip()
+            _bg = _cl_renk_bg.get(_renk_ad, "#ffffff")
+            _tc = _cl_renk_metin.get(_renk_ad, "#0f172a")
+            _crv_html += f'<tr style="background:{_bg};color:{_tc};">'
             for _ck in _crv_kolonlar:
-                _crv_html += f'<th style="border:0.5px solid #e2e8f0;padding:5px 8px;text-align:left;white-space:nowrap;">{_crv_baslik.get(_ck,_ck)}</th>'
-            _crv_html += '</tr></thead><tbody>'
-            for _, _crow in edited_df.iterrows():
-                _renk_ad = str(_crow.get("🎨 Renk","") or "").strip()
-                _bg = _cl_renk_bg.get(_renk_ad, "#ffffff")
-                _tc = _cl_renk_metin.get(_renk_ad, "#0f172a")
-                _crv_html += f'<tr style="background:{_bg};color:{_tc};">'
-                for _ck in _crv_kolonlar:
-                    _v = _crow.get(_ck, "")
-                    _v = "" if str(_v) in ("None","nan") else _v
-                    _crv_html += f'<td style="border:0.5px solid rgba(0,0,0,.06);padding:5px 8px;white-space:nowrap;">{_v}</td>'
-                _crv_html += '</tr>'
-            _crv_html += '</tbody></table></div>'
-            st.markdown(_crv_html, unsafe_allow_html=True)
+                _v = _crow.get(_ck, "")
+                _v = "" if str(_v) in ("None","nan") else _v
+                _crv_html += f'<td style="border:0.5px solid rgba(0,0,0,.06);padding:5px 8px;white-space:nowrap;">{_v}</td>'
+            _crv_html += '</tr>'
+        _crv_html += '</tbody></table></div>'
+        st.markdown(_crv_html, unsafe_allow_html=True)
+        st.markdown("---")
+    else:
+        st.warning("⚠️ '🎨 Renk' sütunu şu an tabloda bulunamadı — 'Kolon Sıfırla' butonuna basıp sayfayı yenilemeyi dene.")
+
 
     # Kolon sırası değiştiyse kaydet — hem session_state hem DB
     try:
