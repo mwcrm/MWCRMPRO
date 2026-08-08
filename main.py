@@ -1948,7 +1948,7 @@ body.mw-mobil-aktif div[data-testid="stHorizontalBlock"]:has(.an-kart-btn) > div
 # ── MOBİL ALT NAVİGASYON ─────────────────────────────────────────────────────
 st.markdown("""<div id="mw-mobile-nav">
   <a class="mw-nav-btn" id="mwnav-liste" href="?_nav=liste"><span class="nav-ikon">📋</span>Liste</a>
-  <a class="mw-nav-btn" id="mwnav-analiz" href="?_nav=ozel_calisma"><span class="nav-ikon">📝</span>Çalışma</a>
+  <a class="mw-nav-btn" id="mwnav-analiz" href="?_nav=rapor"><span class="nav-ikon">📊</span>Rapor</a>
   <a class="mw-nav-btn" id="mwnav-randevu" href="?_nav=randevu"><span class="nav-ikon">📅</span>Randevu</a>
   <a class="mw-nav-btn" id="mwnav-harita" href="?_nav=harita"><span class="nav-ikon">🗺️</span>Harita</a>
 </div>
@@ -1985,7 +1985,7 @@ except Exception:
 # Mobil nav — query param ile tab geçişi (sadece mobil nav için)
 try:
     _mob_nav_qp = st.query_params.get("_nav", "")
-    _mob_nav_tablar = ["liste","ozel_calisma","randevu","harita","rapor","yeni","harita"]
+    _mob_nav_tablar = ["liste","rapor","randevu","harita","yeni"]
     if _mob_nav_qp and _mob_nav_qp in _mob_nav_tablar:
         st.session_state["aktif_tab"] = _mob_nav_qp
         st.query_params.clear()
@@ -2446,14 +2446,13 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "ozel_calisma", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "mukerrer"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
     "rapor": "📊 Raporlar",
     "ozel_teklif": "⭐ Özel Teklif",
     "kayitli_teklifler": "📋 Kayıtlı Teklifler",
-    "ozel_calisma": "📝 Özel Çalışma Sistemi",
     "sozlesme": "📜 Sözleşmeler",
     "excel": "📥 Excel Aktar",
     
@@ -2906,7 +2905,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
     </style>""", unsafe_allow_html=True)
 
     _MENU_GRUPLARI = [
-        ("🧾 Cari işlemleri",    ["yeni", "liste", "excel", "mukerrer", "ozel_calisma"]),
+        ("🧾 Cari işlemleri",    ["yeni", "liste", "excel", "mukerrer"]),
         ("📅 Randevu ve teklif", ["randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler"]),
         ("🚚 Saha",              ["harita"]),
         ("⚙️ Yönetim",          ["kullanici", "patron"]),
@@ -7844,228 +7843,6 @@ elif aktif == "kayitli_teklifler":
                         if _oc2.button("Vazgeç", key=f"kt_sil_vazgec_{_ktr_id}"):
                             st.session_state.pop(_kt_sil_bek, None)
                             st.rerun()
-
-elif aktif == "ozel_calisma":
-    sayfa_log("ozel_calisma")
-    st.markdown("## 📝 Özel Çalışma Sistemi")
-    st.caption("Cari Liste'deki tüm müşterilerle başlıyor, ama tamamen bağımsız — burada satır/sütun ekleyip silmen Cari Liste'yi etkilemez. Kaydet'e basmadan hiçbir şey kalıcı olmaz.")
-
-    # ── ÜST RAPOR — Cari Liste'deki özet kartlarının salt-okunur hâli ─────────
-    with st.spinner("Özet hesaplanıyor..."):
-        _ocr_df = get_cari_listesi()
-    if not _ocr_df.empty:
-        def _ocr_norm(s):
-            return (str(s or "").strip().upper().replace("İ","I").replace("Ş","S")
-                    .replace("Ğ","G").replace("Ü","U").replace("Ö","O").replace("Ç","C"))
-        def _ocr_kolon_sayi(kolon, ad):
-            if kolon not in _ocr_df.columns: return 0
-            _n = _ocr_norm(ad)
-            return int((_ocr_df[kolon].apply(_ocr_norm) == _n).sum())
-        def _ocr_durum_sayi(ad):
-            if "durum" not in _ocr_df.columns: return 0
-            return int((_ocr_df["durum"] == ad).sum())
-        def _ocr_asamasiz():
-            _mask = pd.Series([True]*len(_ocr_df), index=_ocr_df.index)
-            for _k in ["islem_asamasi","asama1","asama2","asama3"]:
-                if _k in _ocr_df.columns:
-                    _mask &= (_ocr_df[_k].isna() | _ocr_df[_k].astype(str).str.strip().isin(["","None","nan"]))
-            return int(_mask.sum())
-
-        _ocr_gruplar = [
-            ("📊 GENEL", [
-                ("📊", "Toplam", len(_ocr_df)),
-                ("📦", "Portföy", _ocr_durum_sayi("Portföy")),
-                ("⭐", "Özel Müşteri", _ocr_durum_sayi("Özel Müşteri")),
-                ("📋", "Aşamasız", _ocr_asamasiz()),
-            ]),
-            ("📞 AŞAMA", [
-                ("📞", "Arama", _ocr_kolon_sayi("islem_asamasi", "Arama")),
-                ("📲", "Tekrar Ara", _ocr_kolon_sayi("islem_asamasi", "Tekrar Ara")),
-                ("📧", "E-Mail", _ocr_kolon_sayi("islem_asamasi", "E-Mail")),
-            ]),
-            ("📅 1.AŞAMA", [("📅", "Randevu", _ocr_kolon_sayi("asama1", "Randevu"))]),
-            ("📄 2.AŞAMA", [("📄", "Teklif", _ocr_kolon_sayi("asama2", "Teklif"))]),
-            ("🧪 3.AŞAMA", [
-                ("🧪", "Deneme", _ocr_kolon_sayi("asama3", "Deneme")),
-                ("💰", "Fiyat Hazırla", _ocr_kolon_sayi("asama3", "Fiyat Hazırla")),
-                ("📝", "Sözleşme", _ocr_kolon_sayi("asama3", "Sözleşme")),
-                ("📌", "TAKİP", _ocr_kolon_sayi("asama3", "TAKİP")),
-            ]),
-            ("🏆 SONUÇ", [
-                ("❌", "Kaybedildi", _ocr_kolon_sayi("sonuc", "Kaybedildi")),
-                ("🏆", "Kazanıldı", _ocr_kolon_sayi("sonuc", "Kazanıldı")),
-                ("⏳", "Devam Ediyor", _ocr_kolon_sayi("sonuc", "Devam Ediyor")),
-            ]),
-        ]
-        _ocr_html = '<div style="overflow-x:auto;"><table style="border-collapse:separate;border-spacing:0;font-family:inherit;font-size:12px;width:100%;">'
-        _ocr_html += '<thead><tr>'
-        for _og_ilk, (_og_ad, _og_items) in enumerate(_ocr_gruplar):
-            _bl = 'border-left:2px solid #cbd5e1;' if _og_ilk > 0 else ''
-            _ocr_html += f'<th colspan="{len(_og_items)}" style="border:0.5px solid #e2e8f0;{_bl}padding:4px 8px;background:#f8fafc;text-align:center;font-size:11px;font-weight:700;color:#374151;white-space:nowrap;">{_og_ad}</th>'
-        _ocr_html += '</tr></thead><tbody><tr>'
-        for _og_ad, _og_items in _ocr_gruplar:
-            for _ic, _ad, _sayi in _og_items:
-                _ocr_html += f'<td style="border:0.5px solid #f1f5f9;padding:5px 9px;text-align:center;white-space:nowrap;vertical-align:middle;"><div style="font-size:11px;color:#64748b;">{_ic} {_ad}</div><div style="font-size:15px;font-weight:700;color:#0f172a;">{_sayi}</div></td>'
-        _ocr_html += '</tr></tbody></table></div>'
-
-        with st.expander("📊 Üst Rapor (Cari Liste özeti — bilgi amaçlı, tıklanamaz)", expanded=True):
-            st.markdown(_ocr_html, unsafe_allow_html=True)
-
-    _oc_kullanici = st.session_state.get("kullanici", "")
-    _oc_kolon_harita = {
-        "id": "ID", "tarih": "Tarih", "firma": "Firma", "yetkili": "Yetkili", "gsm": "GSM", "sabit": "Sabit",
-        "email": "Email", "adres": "Adres", "ilce": "İlçe", "il": "İl", "durum": "Durum",
-        "asama1": "Aşama 1", "asama2": "Aşama 2", "asama3": "Aşama 3", "sonuc": "Sonuç",
-        "aciklama": "Açıklama", "beklenen_ciro": "Hedef ₺", "gerceklesen_ciro": "Gerçek ₺",
-    }
-
-    def _oc_cari_listeden_yukle():
-        """Cari Liste'deki tüm müşterileri, aynı başlıklarla, bağımsız bir kopya olarak getirir."""
-        _df = get_cari_listesi()
-        if _df.empty:
-            return pd.DataFrame([{k: "" for k in _oc_kolon_harita.values()} for _ in range(8)])
-        _df = _df.copy()
-        for _tk in ["gsm", "sabit"]:
-            if _tk in _df.columns:
-                _df[_tk] = _telefon_temizle(_df[_tk])
-        _mevcut = [c for c in _oc_kolon_harita if c in _df.columns]
-        _sonuc = _df[_mevcut].rename(columns=_oc_kolon_harita)
-        for _c in _sonuc.columns:
-            _sonuc[_c] = _sonuc[_c].fillna("").astype(str).replace({"None": "", "nan": ""})
-        return _sonuc
-
-    def _oc_yukle():
-        try:
-            sb = get_sb_client()
-            if sb:
-                r = sb.table("kullanici_tercih").select("deger").eq("kullanici", _oc_kullanici).eq("anahtar", "ozel_calisma_sistemi").execute()
-                if r.data:
-                    return json.loads(r.data[0]["deger"])
-        except Exception:
-            pass
-        return None
-
-    def _oc_kaydet_db(veri):
-        try:
-            sb = get_sb_client()
-            if sb:
-                mevcut = sb.table("kullanici_tercih").select("id").eq("kullanici", _oc_kullanici).eq("anahtar", "ozel_calisma_sistemi").execute()
-                _deger = json.dumps(veri, ensure_ascii=False)
-                if mevcut.data:
-                    sb.table("kullanici_tercih").update({"deger": _deger}).eq("id", mevcut.data[0]["id"]).execute()
-                else:
-                    sb.table("kullanici_tercih").insert({"kullanici": _oc_kullanici, "anahtar": "ozel_calisma_sistemi", "deger": _deger}).execute()
-                return True
-        except Exception as _oc_e:
-            st.error(f"Kaydedilemedi: {_oc_e}")
-        return False
-
-    if "_oc_veri" not in st.session_state:
-        _oc_yuklenen = _oc_yukle()
-        if _oc_yuklenen and _oc_yuklenen.get("kolonlar") and _oc_yuklenen.get("satirlar"):
-            st.session_state["_oc_kolonlar"] = _oc_yuklenen["kolonlar"]
-            st.session_state["_oc_veri"] = pd.DataFrame(_oc_yuklenen["satirlar"])
-            # ── OTOMATİK EKLEME: Cari Liste'de olup burada henüz olmayan
-            # müşterileri, MEVCUT SATIR/DÜZENLEMELERE DOKUNMADAN sona ekler.
-            # Sadece EKLER, asla üzerine yazmaz/silmez — veri kaybı riski yok.
-            if "ID" in st.session_state["_oc_veri"].columns:
-                with st.spinner("Yeni müşteriler kontrol ediliyor..."):
-                    _oc_guncel = _oc_cari_listeden_yukle()
-                if "ID" in _oc_guncel.columns:
-                    _oc_mevcut_idler = set(str(x) for x in st.session_state["_oc_veri"]["ID"].tolist() if str(x).strip())
-                    _oc_yeni_satirlar = _oc_guncel[~_oc_guncel["ID"].astype(str).isin(_oc_mevcut_idler)]
-                    if not _oc_yeni_satirlar.empty:
-                        # Sadece bu sayfada zaten var olan sütunlara ekle — kullanıcının
-                        # eklediği özel sütunlar boş kalsın, mevcut yapı bozulmasın.
-                        _oc_ortak_kolonlar = [c for c in st.session_state["_oc_kolonlar"] if c in _oc_yeni_satirlar.columns]
-                        _oc_eklenecek = _oc_yeni_satirlar[_oc_ortak_kolonlar].copy()
-                        for _ek in st.session_state["_oc_kolonlar"]:
-                            if _ek not in _oc_eklenecek.columns:
-                                _oc_eklenecek[_ek] = ""
-                        _oc_eklenecek = _oc_eklenecek[st.session_state["_oc_kolonlar"]]
-                        st.session_state["_oc_veri"] = pd.concat(
-                            [st.session_state["_oc_veri"], _oc_eklenecek], ignore_index=True)
-                        _oc_kaydet_db({"kolonlar": st.session_state["_oc_kolonlar"],
-                                       "satirlar": st.session_state["_oc_veri"].fillna("").to_dict(orient="records")})
-                        st.toast(f"➕ {len(_oc_eklenecek)} yeni müşteri otomatik eklendi (mevcut düzenlemeleriniz korundu)", icon="✅")
-        else:
-            with st.spinner("Cari Liste'den yükleniyor..."):
-                _ilk_df = _oc_cari_listeden_yukle()
-            st.session_state["_oc_kolonlar"] = list(_ilk_df.columns)
-            st.session_state["_oc_veri"] = _ilk_df
-
-    # "🎨 Renk" sütunu her zaman olsun — satırları kendi seçtiğin renkle
-    # işaretleyebilesin diye. Kanvas tabanlı bu tabloda gerçek arka plan rengi
-    # verilemiyor (Excel gibi değil) ama bu sütundan seçtiğin renk emoji'si
-    # satırın en başında büyük ve net görünüyor, aynı işi görüyor.
-    if "🎨 Renk" not in st.session_state["_oc_kolonlar"]:
-        st.session_state["_oc_kolonlar"].insert(0, "🎨 Renk")
-        st.session_state["_oc_veri"].insert(0, "🎨 Renk", "")
-    elif list(st.session_state["_oc_veri"].columns)[0] != "🎨 Renk":
-        st.session_state["_oc_kolonlar"] = ["🎨 Renk"] + [c for c in st.session_state["_oc_kolonlar"] if c != "🎨 Renk"]
-        st.session_state["_oc_veri"] = st.session_state["_oc_veri"][["🎨 Renk"] + [c for c in st.session_state["_oc_veri"].columns if c != "🎨 Renk"]]
-
-    # ── SÜTUN EKLE / SİL / YENİDEN YÜKLE ──────────────────────────────────────
-    _oc_c1, _oc_c2, _oc_c3 = st.columns([2, 2, 1.3])
-    with _oc_c1:
-        with st.form("oc_kolon_ekle_form", clear_on_submit=True):
-            _oc_yc1, _oc_yc2 = st.columns([3, 1])
-            _oc_yeni_kolon = _oc_yc1.text_input("➕ Yeni sütun adı", label_visibility="collapsed", placeholder="Yeni sütun adı...")
-            _oc_ekle_tikla = _oc_yc2.form_submit_button("Ekle", use_container_width=True)
-            if _oc_ekle_tikla and _oc_yeni_kolon.strip():
-                if _oc_yeni_kolon.strip() not in st.session_state["_oc_kolonlar"]:
-                    st.session_state["_oc_kolonlar"].append(_oc_yeni_kolon.strip())
-                    st.session_state["_oc_veri"][_oc_yeni_kolon.strip()] = ""
-                    st.rerun()
-    with _oc_c2:
-        _oc_sc1, _oc_sc2 = st.columns([3, 1])
-        _oc_silinecek = _oc_sc1.selectbox("🗑️ Sütun sil", ["-- Sütun Seç --"] + st.session_state["_oc_kolonlar"], label_visibility="collapsed")
-        if _oc_sc2.button("Sil", use_container_width=True, key="oc_kolon_sil_btn"):
-            if _oc_silinecek != "-- Sütun Seç --":
-                st.session_state["_oc_kolonlar"].remove(_oc_silinecek)
-                st.session_state["_oc_veri"] = st.session_state["_oc_veri"].drop(columns=[_oc_silinecek])
-                st.rerun()
-    with _oc_c3:
-        _oc_yeniden_yukle_onay = f"oc_reload_bekliyor"
-        if not st.session_state.get(_oc_yeniden_yukle_onay):
-            if st.button("🔄 Cari Liste'den Yeniden Yükle", use_container_width=True, key="oc_reload_btn"):
-                st.session_state[_oc_yeniden_yukle_onay] = True
-                st.rerun()
-        else:
-            st.warning("⚠️ Bu alandaki mevcut düzenlemeleriniz silinip Cari Liste'nin güncel hâliyle DEĞİŞTİRİLECEK. Emin misiniz?")
-            _oc_rc1, _oc_rc2 = st.columns(2)
-            if _oc_rc1.button("✅ Evet, yeniden yükle", type="primary", key="oc_reload_onay"):
-                with st.spinner("Cari Liste'den yükleniyor..."):
-                    _ilk_df = _oc_cari_listeden_yukle()
-                st.session_state["_oc_kolonlar"] = list(_ilk_df.columns)
-                st.session_state["_oc_veri"] = _ilk_df
-                st.session_state.pop(_oc_yeniden_yukle_onay, None)
-                st.session_state.pop("oc_editor", None)
-                st.rerun()
-            if _oc_rc2.button("Vazgeç", key="oc_reload_vazgec"):
-                st.session_state.pop(_oc_yeniden_yukle_onay, None)
-                st.rerun()
-
-    st.caption(f"{len(st.session_state['_oc_veri'])} satır")
-
-    # ── HÜCRESEL TABLO — satır ekleme/silme serbest ───────────────────────────
-    _oc_renk_secenekleri = ["", "🟢 Yeşil", "🔴 Kırmızı", "🟡 Sarı", "🟠 Turuncu", "🔵 Mavi", "🟣 Mor", "⚫ Siyah"]
-    _oc_col_config = {
-        "🎨 Renk": st.column_config.SelectboxColumn("🎨 Renk", options=_oc_renk_secenekleri, width="small"),
-    }
-    _oc_edited = st.data_editor(
-        st.session_state["_oc_veri"],
-        num_rows="dynamic",
-        use_container_width=True,
-        height=650,
-        column_config=_oc_col_config,
-        key="oc_editor",
-    )
-
-    if st.button("💾 Kaydet", type="primary", use_container_width=True, key="oc_kaydet_btn"):
-        st.session_state["_oc_veri"] = _oc_edited
-        if _oc_kaydet_db({"kolonlar": st.session_state["_oc_kolonlar"], "satirlar": _oc_edited.fillna("").to_dict(orient="records")}):
-            st.success("✅ Kaydedildi!")
 
 elif aktif == "sozlesme":
     sayfa_log("sozlesme")
