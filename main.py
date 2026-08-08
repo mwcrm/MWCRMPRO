@@ -5442,6 +5442,38 @@ function kartSec(id){
 
     # (not paneli artık tablonun altında expander olarak açılıyor)
 
+    # ── 🎨 RENKLİ GÖRÜNÜM — gerçek satır boyamalı, salt-okunur referans tablo.
+    # Düzenleme yukarıdaki tablodan yapılır; bu sadece renklerin GERÇEKTEN
+    # satırı boyadığı bir görünüm sağlar (yukarıdaki tablo teknik olarak
+    # buna izin vermiyor, sadece hücre içi emoji gösterebiliyor).
+    if "🎨 Renk" in edited_df.columns and (edited_df["🎨 Renk"].astype(str).str.strip() != "").any():
+        _cl_renk_bg = {
+            "🟢 Yeşil": "#bbf7d0", "🔴 Kırmızı": "#fecaca", "🟡 Sarı": "#fef08a",
+            "🟠 Turuncu": "#fed7aa", "🔵 Mavi": "#bfdbfe", "🟣 Mor": "#e9d5ff", "⚫ Siyah": "#374151",
+        }
+        _cl_renk_metin = {"⚫ Siyah": "#ffffff"}
+        with st.expander("🎨 Renkli Görünüm (satırların tamamı boyalı — salt okunur)", expanded=True):
+            _crv_kolonlar = [c for c in ["firma","yetkili","gsm","il","ilce","durum","islem_asamasi","asama1","asama2","asama3","sonuc"] if c in edited_df.columns]
+            _crv_baslik = {"firma":"Firma","yetkili":"Yetkili","gsm":"GSM","il":"İl","ilce":"İlçe","durum":"Durum",
+                           "islem_asamasi":"Aşama","asama1":"Aşama 1","asama2":"Aşama 2","asama3":"Aşama 3","sonuc":"Sonuç"}
+            _crv_html = '<div style="overflow-x:auto;max-height:600px;overflow-y:auto;"><table style="border-collapse:collapse;font-size:12px;width:100%;">'
+            _crv_html += '<thead style="position:sticky;top:0;"><tr style="background:#f8fafc;">'
+            for _ck in _crv_kolonlar:
+                _crv_html += f'<th style="border:0.5px solid #e2e8f0;padding:5px 8px;text-align:left;white-space:nowrap;">{_crv_baslik.get(_ck,_ck)}</th>'
+            _crv_html += '</tr></thead><tbody>'
+            for _, _crow in edited_df.iterrows():
+                _renk_ad = str(_crow.get("🎨 Renk","") or "").strip()
+                _bg = _cl_renk_bg.get(_renk_ad, "#ffffff")
+                _tc = _cl_renk_metin.get(_renk_ad, "#0f172a")
+                _crv_html += f'<tr style="background:{_bg};color:{_tc};">'
+                for _ck in _crv_kolonlar:
+                    _v = _crow.get(_ck, "")
+                    _v = "" if str(_v) in ("None","nan") else _v
+                    _crv_html += f'<td style="border:0.5px solid rgba(0,0,0,.06);padding:5px 8px;white-space:nowrap;">{_v}</td>'
+                _crv_html += '</tr>'
+            _crv_html += '</tbody></table></div>'
+            st.markdown(_crv_html, unsafe_allow_html=True)
+
     # Kolon sırası değiştiyse kaydet — hem session_state hem DB
     try:
         _editor_meta = st.session_state.get("cari_editor", {})
