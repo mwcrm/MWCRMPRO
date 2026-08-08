@@ -5439,16 +5439,61 @@ function kartSec(id){
         st.markdown('</div>', unsafe_allow_html=True)
 
     # ── 🎨 RENKLİ GÖRÜNÜM — TABLONUN ÜSTÜNDE, gerçek satır boyamalı, salt-okunur.
-    # Kaydedilmiş renklere göre (df_edit) gösterir. Düzenleme aşağıdaki asıl
-    # tablodan yapılır; kaydettikten sonra buradaki renkler güncellenir.
+    # Kaydedilmiş renklere göre (df_edit) gösterir. Renk değiştirmek için
+    # FİRMA ADINA tıklanır — küçük bir renk seçici açılır. Ana düzenlenebilir
+    # tabloya (aşağıda) hiç dokunulmuyor, o olduğu gibi çalışmaya devam ediyor.
     if "🎨 Renk" in df_edit.columns:
         _cl_renk_bg = {
             "🟢 Yeşil": "#bbf7d0", "🔴 Kırmızı": "#fecaca", "🟡 Sarı": "#fef08a",
             "🟠 Turuncu": "#fed7aa", "🔵 Mavi": "#bfdbfe", "🟣 Mor": "#e9d5ff", "⚫ Siyah": "#374151",
         }
         _cl_renk_metin = {"⚫ Siyah": "#ffffff"}
+        _cl_renk_secenekleri = ["", "🟢 Yeşil", "🔴 Kırmızı", "🟡 Sarı", "🟠 Turuncu", "🔵 Mavi", "🟣 Mor", "⚫ Siyah"]
         st.markdown("## 🎨 Renkli Görünüm — satırların TAMAMI boyalı")
-        st.caption("'🎨 Renk' seçimine göre son kaydedilmiş hâl. Düzenleme AŞAĞIDAKİ tablodan yapılır, buradan yapılmaz.")
+        st.caption("Rengi değiştirmek için firma adına tıkla.")
+
+        # Firma adına tıklayınca (?renk_id=...) küçük bir renk seçici aç.
+        try:
+            _cl_renk_id_qp = st.query_params.get("renk_id", "")
+        except Exception:
+            _cl_renk_id_qp = ""
+        if _cl_renk_id_qp:
+            try:
+                _cl_renk_id_int = int(_cl_renk_id_qp)
+                _cl_renk_satir = df_edit[df_edit["id"] == _cl_renk_id_int]
+                _cl_renk_firma_ad = str(_cl_renk_satir.iloc[0].get("firma","")) if not _cl_renk_satir.empty else ""
+                _cl_renk_mevcut = str(_cl_renk_satir.iloc[0].get("🎨 Renk","")) if not _cl_renk_satir.empty else ""
+                with st.container(border=True):
+                    st.markdown(f"**🎨 {_cl_renk_firma_ad} — renk seç**")
+                    _crc1, _crc2, _crc3 = st.columns([2, 1, 1])
+                    _cl_yeni_renk = _crc1.selectbox("", _cl_renk_secenekleri,
+                        index=_cl_renk_secenekleri.index(_cl_renk_mevcut) if _cl_renk_mevcut in _cl_renk_secenekleri else 0,
+                        label_visibility="collapsed", key=f"cl_renk_pick_{_cl_renk_id_int}")
+                    if _crc2.button("✅ Kaydet", key=f"cl_renk_kaydet_{_cl_renk_id_int}", type="primary", use_container_width=True):
+                        if _cl_yeni_renk:
+                            st.session_state["_cl_renk_haritasi"][str(_cl_renk_id_int)] = _cl_yeni_renk
+                        else:
+                            st.session_state["_cl_renk_haritasi"].pop(str(_cl_renk_id_int), None)
+                        try:
+                            _sb_rk = get_sb_client()
+                            if _sb_rk:
+                                _mevcut_rk = _sb_rk.table("kullanici_tercih").select("id").eq(
+                                    "kullanici", st.session_state.get("kullanici","")).eq("anahtar","cari_renkleri").execute()
+                                _deger_rk = json.dumps(st.session_state["_cl_renk_haritasi"], ensure_ascii=False)
+                                if _mevcut_rk.data:
+                                    _sb_rk.table("kullanici_tercih").update({"deger": _deger_rk}).eq("id", _mevcut_rk.data[0]["id"]).execute()
+                                else:
+                                    _sb_rk.table("kullanici_tercih").insert({"kullanici": st.session_state.get("kullanici",""), "anahtar":"cari_renkleri", "deger": _deger_rk}).execute()
+                        except Exception:
+                            pass
+                        st.query_params.clear()
+                        st.rerun()
+                    if _crc3.button("✖️ Kapat", key=f"cl_renk_kapat_{_cl_renk_id_int}", use_container_width=True):
+                        st.query_params.clear()
+                        st.rerun()
+            except Exception:
+                pass
+
         _crv_kolonlar = [c for c in ["firma","yetkili","gsm","il","ilce","durum","islem_asamasi","asama1","asama2","asama3","sonuc"] if c in df_edit.columns]
         _crv_baslik = {"firma":"Firma","yetkili":"Yetkili","gsm":"GSM","il":"İl","ilce":"İlçe","durum":"Durum",
                        "islem_asamasi":"Aşama","asama1":"Aşama 1","asama2":"Aşama 2","asama3":"Aşama 3","sonuc":"Sonuç"}
@@ -5465,7 +5510,11 @@ function kartSec(id){
             for _ck in _crv_kolonlar:
                 _v = _crow.get(_ck, "")
                 _v = "" if str(_v) in ("None","nan") else _v
-                _crv_html += f'<td style="border:0.5px solid rgba(0,0,0,.06);padding:5px 8px;white-space:nowrap;">{_v}</td>'
+                if _ck == "firma":
+                    _rid = int(_crow.get("id", 0) or 0)
+                    _crv_html += f'<td style="border:0.5px solid rgba(0,0,0,.06);padding:5px 8px;white-space:nowrap;"><a href="?renk_id={_rid}" style="color:inherit;text-decoration:underline dotted;cursor:pointer;font-weight:600;">{_v}</a></td>'
+                else:
+                    _crv_html += f'<td style="border:0.5px solid rgba(0,0,0,.06);padding:5px 8px;white-space:nowrap;">{_v}</td>'
             _crv_html += '</tr>'
         _crv_html += '</tbody></table></div>'
         st.markdown(_crv_html, unsafe_allow_html=True)
