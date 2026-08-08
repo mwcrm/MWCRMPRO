@@ -5480,7 +5480,7 @@ function kartSec(id){
             "🟠 Turuncu": "#fed7aa", "🔵 Mavi": "#bfdbfe", "🟣 Mor": "#e9d5ff", "⚫ Siyah": "#374151",
         }
         _cl_renk_metin = {"⚫ Siyah": "#ffffff"}
-        st.markdown("## 🎨 Renkli Görünüm — satırların TAMAMI boyalı")
+        st.markdown("## 📋 Cari Liste")
         st.caption("Rengi değiştirmek için satırı 'Seç' ile işaretleyip açılan pencereden '🎨 Satırı Boya' sekmesini kullan.")
 
         _crv_kolonlar = [c for c in ["firma","yetkili","gsm","il","ilce","durum","islem_asamasi","asama1","asama2","asama3","sonuc"] if c in df_edit.columns]
@@ -5506,7 +5506,6 @@ function kartSec(id){
         st.markdown(_crv_html, unsafe_allow_html=True)
         st.markdown("---")
 
-    _tbl_col = st.container()
     _not_col = None
 
     # Tablo yüksekliğini görünen satır sayısına göre hesapla — sabit 800px'lik
@@ -5514,7 +5513,10 @@ function kartSec(id){
     # "Tümü" modunda (binlerce satır) yükseklik 800px'de sabit kalıp iç kaydırma kullanır.
     _cl_editor_yukseklik = min(800, 38 + (len(df_edit) * 35) + 3)
 
-    with _tbl_col:
+    # Düzenlenebilir tablo artık kapalı bir bölümde — üstteki 🎨 Renkli Görünüm
+    # tek/ana görünen tablo. Hücre bazlı düzenleme/kayıt/sayfalama/toplu işlem
+    # hiçbir şey kaybolmadı, sadece varsayılan olarak gizli.
+    with st.expander("✏️ Hücre Bazlı Tabloyu Aç (düzenleme buradan yapılır)", expanded=False):
         edited_df = st.data_editor(
             df_edit,
             use_container_width=True,
