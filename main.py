@@ -5072,6 +5072,7 @@ function kartSec(id){
 
     col_config = {
         "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
+        "🎨 Renk":       st.column_config.SelectboxColumn("🎨 Renk", options=["", "🟢 Yeşil", "🔴 Kırmızı", "🟡 Sarı", "🟠 Turuncu", "🔵 Mavi", "🟣 Mor", "⚫ Siyah"], width="small"),
         "tarih":         st.column_config.TextColumn("İşlem Tarih", disabled=True, width=_w("tarih") if "tarih" in _KOL_VARSAYILAN else "small"),
         "id":            st.column_config.NumberColumn("ID", disabled=True, width=_w("id")),
         "olusturan": None, "silindi": None,
@@ -5125,7 +5126,7 @@ function kartSec(id){
             df_f["_cl2_key"] = df_f["id"].map(_cl2_map).fillna(len(_cl2_sirali))
             df_f = df_f.sort_values("_cl2_key").drop(columns=["_cl2_key"]).reset_index(drop=True)
 
-    col_order = ["Seç","tarih","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
+    col_order = ["Seç","🎨 Renk","tarih","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
                  "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","islem_asamasi",
                  "asama1","asama2","asama3","aciklama","📨 Notlar","📅 Son Randevu",
                  "🧾 Teklif","💬 Mesaj","ara_islem","sonuc","temsilci"]
@@ -5361,6 +5362,28 @@ function kartSec(id){
 
     df_edit.insert(0, "Seç", False)
 
+    # ── 🎨 RENK — kullanıcının satırlara kendi seçtiği renk. Yeni bir DB
+    # sütunu açmadan (kural gereği), mevcut kullanici_tercih tablosunda
+    # {cari_id: renk} eşlemesi olarak saklanıyor.
+    def _cl_renk_haritasi_yukle():
+        try:
+            sb = get_sb_client()
+            if sb:
+                r = sb.table("kullanici_tercih").select("deger").eq(
+                    "kullanici", st.session_state.get("kullanici","")).eq("anahtar","cari_renkleri").execute()
+                if r.data:
+                    return json.loads(r.data[0]["deger"])
+        except Exception:
+            pass
+        return {}
+    if "_cl_renk_haritasi" not in st.session_state:
+        st.session_state["_cl_renk_haritasi"] = _cl_renk_haritasi_yukle()
+    _cl_renk_map = st.session_state["_cl_renk_haritasi"]
+    if "id" in df_edit.columns:
+        df_edit.insert(1, "🎨 Renk", df_edit["id"].apply(lambda x: _cl_renk_map.get(str(int(x)), "")))
+    else:
+        df_edit.insert(1, "🎨 Renk", "")
+
     import json as _json_ls
 
     # ── TÜMÜ GÖSTER — tablo sol, not paneli sağ ──────────────────────────────
@@ -5524,6 +5547,37 @@ function kartSec(id){
                 except:
                     _rows = []
 
+                # ── 🎨 RENK değişikliklerini ayrıca kaydet — cari_kartlar'da
+                # sütun olmadığı için kullanici_tercih'te tek bir haritada tutulur.
+                _cl_renk_degisti = False
+                for _idx_str, _degisiklikler in _edited_rows.items():
+                    if "🎨 Renk" in _degisiklikler:
+                        try:
+                            _idx = int(_idx_str)
+                            if _idx < len(_rows):
+                                _rid_renk = str(int(float(str(_rows[_idx].get("id", 0)))))
+                                _yeni_renk = _degisiklikler["🎨 Renk"]
+                                if _yeni_renk:
+                                    st.session_state["_cl_renk_haritasi"][_rid_renk] = _yeni_renk
+                                else:
+                                    st.session_state["_cl_renk_haritasi"].pop(_rid_renk, None)
+                                _cl_renk_degisti = True
+                        except Exception:
+                            pass
+                if _cl_renk_degisti:
+                    try:
+                        sb_renk = get_sb_client()
+                        if sb_renk:
+                            _mevcut_renk = sb_renk.table("kullanici_tercih").select("id").eq(
+                                "kullanici", st.session_state.get("kullanici","")).eq("anahtar","cari_renkleri").execute()
+                            _renk_deger = json.dumps(st.session_state["_cl_renk_haritasi"], ensure_ascii=False)
+                            if _mevcut_renk.data:
+                                sb_renk.table("kullanici_tercih").update({"deger": _renk_deger}).eq("id", _mevcut_renk.data[0]["id"]).execute()
+                            else:
+                                sb_renk.table("kullanici_tercih").insert({"kullanici": st.session_state.get("kullanici",""), "anahtar":"cari_renkleri", "deger": _renk_deger}).execute()
+                    except Exception:
+                        pass
+
                 def _tek_satir_guncelle(idx_str, degisiklikler):
                     """Tek bir satırı DB'ye yazar — paralel çalıştırılabilsin diye ayrı fonksiyon."""
                     idx = int(idx_str)
@@ -5534,7 +5588,7 @@ function kartSec(id){
                         return None
                     guncelle = {}
                     for k, v in degisiklikler.items():
-                        if k in ("Seç", "🗑️ Sil"): continue
+                        if k in ("Seç", "🗑️ Sil", "🎨 Renk"): continue
                         if k in ("beklenen_ciro", "gerceklesen_ciro"):
                             try: guncelle[k] = float(v or 0)
                             except: guncelle[k] = 0
