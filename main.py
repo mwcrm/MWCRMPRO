@@ -1641,6 +1641,33 @@ _aktif_cfg = st.session_state.get("aktif_tab","liste")
 _baslik_cfg = "MWCRMPRO | " + _sayfa_adlari_cfg.get(_aktif_cfg,"MWCRMPRO")
 st.set_page_config(page_title=_baslik_cfg, layout="wide", initial_sidebar_state="expanded")
 
+# ── UYGULAMAYI HER ZAMAN AÇIK TEMADA SABİTLE ─────────────────────────────────
+# Bazı bilgisayarlarda Windows/tarayıcı karanlık mod (dark mode) kullanıyor,
+# Streamlit da otomatik koyu temaya geçiyor — ama uygulamanın tasarımı hep
+# açık tema (beyaz zemin, koyu yazı) varsayımıyla yapıldı. Koyu modda bazı
+# yazılar koyu zemin üstünde koyu kalıp okunmaz oluyordu. Bu blok, Streamlit'in
+# kendi renk değişkenlerini zorla açık temaya sabitler — hangi bilgisayarda,
+# hangi sistem/tarayıcı ayarıyla açılırsa açılsın görünüm hep aynı kalır.
+st.markdown("""
+<style>
+:root, html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"] {
+    color-scheme: light !important;
+    --background-color: #ffffff !important;
+    --secondary-background-color: #f8fafc !important;
+    --text-color: #0f172a !important;
+    --primary-color: #ef4444 !important;
+}
+[data-testid="stAppViewContainer"], [data-testid="stApp"], .main, .block-container,
+section[data-testid="stMain"], section[data-testid="stSidebar"] {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+}
+section[data-testid="stSidebar"] {
+    background-color: #f8fafc !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # Sekme başlığını aktif menüye göre güncelle
 _sayfa_adlari = {
     "yeni":"Yeni Kart","liste":"Cari Liste","analiz":"Müşteri Analizi",
