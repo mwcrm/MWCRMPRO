@@ -7994,6 +7994,17 @@ elif aktif == "ozel_calisma":
             st.session_state["_oc_kolonlar"] = list(_ilk_df.columns)
             st.session_state["_oc_veri"] = _ilk_df
 
+    # "🎨 Renk" sütunu her zaman olsun — satırları kendi seçtiğin renkle
+    # işaretleyebilesin diye. Kanvas tabanlı bu tabloda gerçek arka plan rengi
+    # verilemiyor (Excel gibi değil) ama bu sütundan seçtiğin renk emoji'si
+    # satırın en başında büyük ve net görünüyor, aynı işi görüyor.
+    if "🎨 Renk" not in st.session_state["_oc_kolonlar"]:
+        st.session_state["_oc_kolonlar"].insert(0, "🎨 Renk")
+        st.session_state["_oc_veri"].insert(0, "🎨 Renk", "")
+    elif list(st.session_state["_oc_veri"].columns)[0] != "🎨 Renk":
+        st.session_state["_oc_kolonlar"] = ["🎨 Renk"] + [c for c in st.session_state["_oc_kolonlar"] if c != "🎨 Renk"]
+        st.session_state["_oc_veri"] = st.session_state["_oc_veri"][["🎨 Renk"] + [c for c in st.session_state["_oc_veri"].columns if c != "🎨 Renk"]]
+
     # ── SÜTUN EKLE / SİL / YENİDEN YÜKLE ──────────────────────────────────────
     _oc_c1, _oc_c2, _oc_c3 = st.columns([2, 2, 1.3])
     with _oc_c1:
@@ -8038,11 +8049,16 @@ elif aktif == "ozel_calisma":
     st.caption(f"{len(st.session_state['_oc_veri'])} satır")
 
     # ── HÜCRESEL TABLO — satır ekleme/silme serbest ───────────────────────────
+    _oc_renk_secenekleri = ["", "🟢 Yeşil", "🔴 Kırmızı", "🟡 Sarı", "🟠 Turuncu", "🔵 Mavi", "🟣 Mor", "⚫ Siyah"]
+    _oc_col_config = {
+        "🎨 Renk": st.column_config.SelectboxColumn("🎨 Renk", options=_oc_renk_secenekleri, width="small"),
+    }
     _oc_edited = st.data_editor(
         st.session_state["_oc_veri"],
         num_rows="dynamic",
         use_container_width=True,
         height=650,
+        column_config=_oc_col_config,
         key="oc_editor",
     )
 
