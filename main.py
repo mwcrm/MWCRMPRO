@@ -5559,6 +5559,24 @@ function kartSec(id){
     secili_sayi = len(secili_df)
     secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
 
+    # ── Tablodaki "Seç" işaretli satırları taslak olarak kaydet ─────────────
+    if secili_sayi > 0:
+        with st.expander(f"📂 İşaretli {secili_sayi} Firmayı Taslak Olarak Kaydet", expanded=False):
+            _tsk_dict_cb = st.session_state.get("_cok_firma_taslaklar", {})
+            _cbk1, _cbk2 = st.columns([3, 1])
+            _tsk_cb_ad = _cbk1.text_input("Taslak adı", key="_cb_tsk_ad", placeholder="Örn: Bu haftaki seçim", label_visibility="collapsed")
+            if _cbk2.button("💾 Kaydet", key="_cb_tsk_kaydet_btn", use_container_width=True, type="primary"):
+                _cb_ad_temiz = (_tsk_cb_ad or "").strip()
+                if _cb_ad_temiz:
+                    _tsk_dict_cb[_cb_ad_temiz] = sorted(int(x) for x in secili_idler)
+                    st.session_state["_cok_firma_taslaklar"] = _tsk_dict_cb
+                    _cok_firma_taslak_kaydet_db()
+                    st.toast(f"💾 '{_cb_ad_temiz}' kaydedildi — {secili_sayi} firma", icon="💾")
+                    st.rerun()
+                else:
+                    st.warning("Bir taslak adı yazın.")
+            st.caption("💡 Bu taslak, yukarıdaki '🔍 Filtreler & Arama' panelindeki '📂 Çoklu Firma Taslakları' listesinden de yüklenebilir.")
+
     # ── NOT DİALOG — sadece seçili olunca açılır ────────────────────────────
     if secili_sayi == 1:
         _sel_id = int(secili_idler[0])
