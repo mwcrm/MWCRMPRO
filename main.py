@@ -4657,7 +4657,9 @@ function kartSec(id){
        not st.session_state.get("_cl_fil_asama1") and \
        not st.session_state.get("_cl_fil_asama2") and \
        not st.session_state.get("_cl_fil_asama3") and \
-       not st.session_state.get("_cl_fil_sonuc"):
+       not st.session_state.get("_cl_fil_sonuc") and \
+       not st.session_state.get("_cl_fil_il_multi") and \
+       not st.session_state.get("_cl_fil_ilce_multi"):
         st.session_state["_toplam_aktif"] = True
 
     # Filtre uygula
