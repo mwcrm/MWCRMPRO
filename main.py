@@ -4649,6 +4649,16 @@ function kartSec(id){
             except:
                 pass
 
+        # İl/İlçe filtresiyle eşleşen firma ID'leri — çoklu firma kutusu boşken de taslağa kaydedebilmek için
+        _il_ilce_secili_idler = set()
+        if (_il_sec or _ilce_sec) and "id" in df.columns:
+            _df_ilfiltre_tsk = df.copy()
+            if _il_sec and "il" in _df_ilfiltre_tsk.columns:
+                _df_ilfiltre_tsk = _df_ilfiltre_tsk[_df_ilfiltre_tsk["il"].astype(str).isin(_il_sec)]
+            if _ilce_sec and "ilce" in _df_ilfiltre_tsk.columns:
+                _df_ilfiltre_tsk = _df_ilfiltre_tsk[_df_ilfiltre_tsk["ilce"].astype(str).isin(_ilce_sec)]
+            _il_ilce_secili_idler = set(int(x) for x in _df_ilfiltre_tsk["id"].dropna().astype(int).tolist())
+
         with st.expander(f"📂 Çoklu Firma Taslakları ({len(st.session_state['_cok_firma_taslaklar'])})", expanded=False):
             _tsk_dict = st.session_state["_cok_firma_taslaklar"]
             _tsk_opts = ["-- Taslak Seç --"] + sorted(_tsk_dict.keys())
@@ -4666,19 +4676,24 @@ function kartSec(id){
                 st.toast(f"🗑️ '{_tsk_sec}' silindi", icon="🗑️")
                 st.rerun()
             st.divider()
+            _tsk_kaynak_idler = _cok_secili_idler if _cok_secili_ham else _il_ilce_secili_idler
+            _tsk_kaynak_var = bool(_cok_secili_ham) or bool(_il_sec) or bool(_ilce_sec)
+            if not _cok_secili_ham and (_il_sec or _ilce_sec):
+                _il_ilce_etiket = " / ".join([x for x in [", ".join(_il_sec), ", ".join(_ilce_sec)] if x])
+                st.caption(f"📍 İl/İlçe seçimine göre kaydedilecek: **{_il_ilce_etiket}** ({len(_tsk_kaynak_idler)} firma)")
             _tk1, _tk2 = st.columns([3, 1])
             _tsk_yeni_ad = _tk1.text_input("Yeni taslak adı", key="_cok_tsk_yeni_ad", placeholder="Örn: Ataşehir Kampanya", label_visibility="collapsed")
-            if _tk2.button("💾 Kaydet", key="_cok_tsk_kaydet_btn", use_container_width=True, type="primary", disabled=not _cok_secili_ham):
+            if _tk2.button("💾 Kaydet", key="_cok_tsk_kaydet_btn", use_container_width=True, type="primary", disabled=not _tsk_kaynak_var):
                 _ad_temiz = (_tsk_yeni_ad or "").strip()
                 if _ad_temiz:
-                    _tsk_dict[_ad_temiz] = sorted(_cok_secili_idler)
+                    _tsk_dict[_ad_temiz] = sorted(_tsk_kaynak_idler)
                     _cok_firma_taslak_kaydet_db()
-                    st.toast(f"💾 '{_ad_temiz}' kaydedildi — {len(_cok_secili_idler)} firma", icon="💾")
+                    st.toast(f"💾 '{_ad_temiz}' kaydedildi — {len(_tsk_kaynak_idler)} firma", icon="💾")
                     st.rerun()
                 else:
-                    st.warning("Önce üstteki 'Çoklu firma' kutusundan firma seçin ve bir taslak adı yazın.")
-            if not _cok_secili_ham:
-                st.caption("💡 Önce yukarıdaki '🔍 Çoklu firma...' kutusundan firma seçin, sonra isim verip kaydedin.")
+                    st.warning("Bir taslak adı yazın.")
+            if not _tsk_kaynak_var:
+                st.caption("💡 Yukarıdaki '🔍 Çoklu firma...' kutusundan firma seçin YA DA İl/İlçe filtresi uygulayın, sonra isim verip kaydedin.")
 
         if st.session_state.get("_filtre_sifirla_flag"):
             del st.session_state["_filtre_sifirla_flag"]
