@@ -4624,6 +4624,62 @@ function kartSec(id){
             try: _cok_secili_idler.add(int(_cs.split("]")[0].replace("[","").strip()))
             except: pass
 
+        # ── Çoklu Firma Taslakları — seçili firmaları isimle kaydet, sonra tek tıkla geri yükle ──
+        if "_cok_firma_taslaklar" not in st.session_state:
+            st.session_state["_cok_firma_taslaklar"] = {}
+            try:
+                _sb_tsk0 = get_sb_client()
+                if _sb_tsk0:
+                    import json as _tskj0
+                    _r_tsk0 = _sb_tsk0.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_cok_firma_taslaklar").execute()
+                    if _r_tsk0.data:
+                        st.session_state["_cok_firma_taslaklar"] = _tskj0.loads(_r_tsk0.data[0]["deger"])
+            except:
+                pass
+
+        def _cok_firma_taslak_kaydet_db():
+            try:
+                _sb_tsk1 = get_sb_client()
+                if _sb_tsk1:
+                    import json as _tskj1
+                    _sb_tsk1.table("kullanici_tercih").upsert({
+                        "kullanici": "__liste_ui__", "anahtar": "_cok_firma_taslaklar",
+                        "deger": _tskj1.dumps(st.session_state["_cok_firma_taslaklar"], ensure_ascii=False)
+                    }, on_conflict="kullanici,anahtar").execute()
+            except:
+                pass
+
+        with st.expander(f"📂 Çoklu Firma Taslakları ({len(st.session_state['_cok_firma_taslaklar'])})", expanded=False):
+            _tsk_dict = st.session_state["_cok_firma_taslaklar"]
+            _tsk_opts = ["-- Taslak Seç --"] + sorted(_tsk_dict.keys())
+            _tc1, _tc2, _tc3 = st.columns([2, 1, 1])
+            _tsk_sec = _tc1.selectbox("Kayıtlı taslaklar", _tsk_opts, key="_cok_tsk_sec", label_visibility="collapsed")
+            if _tc2.button("📂 Yükle", key="_cok_tsk_yukle", use_container_width=True, disabled=(_tsk_sec == "-- Taslak Seç --")):
+                _tsk_ids = set(_tsk_dict.get(_tsk_sec, []))
+                _yuklenen_opts = [o for o in _cok_sec_opts if int(o.split("]")[0].replace("[","").strip()) in _tsk_ids]
+                st.session_state["_cl_cok_secim"] = _yuklenen_opts
+                st.toast(f"✅ '{_tsk_sec}' taslağı yüklendi — {len(_yuklenen_opts)} firma", icon="📂")
+                st.rerun()
+            if _tc3.button("🗑️ Sil", key="_cok_tsk_sil", use_container_width=True, disabled=(_tsk_sec == "-- Taslak Seç --")):
+                _tsk_dict.pop(_tsk_sec, None)
+                _cok_firma_taslak_kaydet_db()
+                st.toast(f"🗑️ '{_tsk_sec}' silindi", icon="🗑️")
+                st.rerun()
+            st.divider()
+            _tk1, _tk2 = st.columns([3, 1])
+            _tsk_yeni_ad = _tk1.text_input("Yeni taslak adı", key="_cok_tsk_yeni_ad", placeholder="Örn: Ataşehir Kampanya", label_visibility="collapsed")
+            if _tk2.button("💾 Kaydet", key="_cok_tsk_kaydet_btn", use_container_width=True, type="primary", disabled=not _cok_secili_ham):
+                _ad_temiz = (_tsk_yeni_ad or "").strip()
+                if _ad_temiz:
+                    _tsk_dict[_ad_temiz] = sorted(_cok_secili_idler)
+                    _cok_firma_taslak_kaydet_db()
+                    st.toast(f"💾 '{_ad_temiz}' kaydedildi — {len(_cok_secili_idler)} firma", icon="💾")
+                    st.rerun()
+                else:
+                    st.warning("Önce üstteki 'Çoklu firma' kutusundan firma seçin ve bir taslak adı yazın.")
+            if not _cok_secili_ham:
+                st.caption("💡 Önce yukarıdaki '🔍 Çoklu firma...' kutusundan firma seçin, sonra isim verip kaydedin.")
+
         if st.session_state.get("_filtre_sifirla_flag"):
             del st.session_state["_filtre_sifirla_flag"]
 
