@@ -4618,6 +4618,11 @@ function kartSec(id){
 
         # Çoklu firma seçimi — filtre satırında son sütun
         _cok_sec_opts = [f"[{int(i)}] {f}" for i, f in zip(df["id"], df["firma"]) if str(f) not in ["","nan","None"]] if not df.empty and "firma" in df.columns else []
+        # Taslak "Yükle" butonundan gelen bekleyen değeri — widget OLUŞTURULMADAN ÖNCE uygulanmalı
+        # (Streamlit, widget instantiate edildikten SONRA aynı key'e session_state ataması yapılmasına izin vermiyor)
+        if "_cok_tsk_bekleyen" in st.session_state:
+            _bekleyen_idler = set(st.session_state.pop("_cok_tsk_bekleyen"))
+            st.session_state["_cl_cok_secim"] = [o for o in _cok_sec_opts if int(o.split("]")[0].replace("[","").strip()) in _bekleyen_idler]
         _cok_secili_ham = _fc[6].multiselect("c", _cok_sec_opts, key="_cl_cok_secim", placeholder="🔍 Çoklu firma...", label_visibility="collapsed")
         _cok_secili_idler = set()
         for _cs in _cok_secili_ham:
@@ -4666,9 +4671,8 @@ function kartSec(id){
             _tsk_sec = _tc1.selectbox("Kayıtlı taslaklar", _tsk_opts, key="_cok_tsk_sec", label_visibility="collapsed")
             if _tc2.button("📂 Yükle", key="_cok_tsk_yukle", use_container_width=True, disabled=(_tsk_sec == "-- Taslak Seç --")):
                 _tsk_ids = set(_tsk_dict.get(_tsk_sec, []))
-                _yuklenen_opts = [o for o in _cok_sec_opts if int(o.split("]")[0].replace("[","").strip()) in _tsk_ids]
-                st.session_state["_cl_cok_secim"] = _yuklenen_opts
-                st.toast(f"✅ '{_tsk_sec}' taslağı yüklendi — {len(_yuklenen_opts)} firma", icon="📂")
+                st.session_state["_cok_tsk_bekleyen"] = list(_tsk_ids)
+                st.toast(f"✅ '{_tsk_sec}' taslağı yükleniyor — {len(_tsk_ids)} firma", icon="📂")
                 st.rerun()
             if _tc3.button("🗑️ Sil", key="_cok_tsk_sil", use_container_width=True, disabled=(_tsk_sec == "-- Taslak Seç --")):
                 _tsk_dict.pop(_tsk_sec, None)
