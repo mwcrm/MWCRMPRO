@@ -2123,6 +2123,30 @@ def fmt_tarih(v):
         pass
     return s[:10]
 
+def _guncelleme_tarih_parse(s):
+    """Farklı formatlardaki (ISO 'T', boşluklu, Türkçe nokta) tarih string'lerini
+    gerçek datetime nesnesine çevirir. String karşılaştırması ('2026-08-12 ...' ile
+    '2026-08-12T...' gibi farklı ayraçlar) yanlış sonuç verdiği için Güncelleme
+    Tarihi hesabında SADECE bu fonksiyonla parse edilmiş datetime'lar karşılaştırılır."""
+    if not s:
+        return None
+    s = str(s).strip()
+    if not s or s.lower() in ("nan", "none", ""):
+        return None
+    import re as _gtre
+    _s_temiz = _gtre.sub(r"(\+\d{2}:\d{2}|Z)$", "", s.replace("Z", "+00:00").replace("+00:00", ""))
+    for _cand in (_s_temiz, s):
+        try:
+            return datetime.fromisoformat(_cand)
+        except Exception:
+            continue
+    for _fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%d.%m.%Y %H:%M", "%d.%m.%Y"):
+        try:
+            return datetime.strptime(s, _fmt)
+        except Exception:
+            continue
+    return None
+
 def fmt_tarih_saat(v):
     """Herhangi bir tarih-saat string'ini '22.06.2026 14:23' formatına çevirir (sadece tarih+saat, başka bilgi yok)"""
     if not v: return ""
@@ -5527,7 +5551,11 @@ function kartSec(id){
             if not _mid_ham or not _tarih_ham:
                 return
             _mid = str(_mid_ham)
-            if _mid not in _sonuc or str(_tarih_ham) > _sonuc[_mid]:
+            _yeni_dt = _guncelleme_tarih_parse(_tarih_ham)
+            if _yeni_dt is None:
+                return
+            _mevcut_dt = _guncelleme_tarih_parse(_sonuc.get(_mid)) if _mid in _sonuc else None
+            if _mevcut_dt is None or _yeni_dt > _mevcut_dt:
                 _sonuc[_mid] = str(_tarih_ham)
 
         # 1) Notlar/açıklamalar — created_at Supabase'in otomatik alanı
@@ -5569,7 +5597,13 @@ function kartSec(id){
             _aday1 = _son_aktivite.get(_sid, "")          # not/teklif/mesaj kaydı
             _aday2 = _cari_son_guncelleme.get(_sid, "")   # gerçek alan/aşama/durum düzenlemesi
             _ilk = str(_ilk_kayit_ham or "")
-            _en_son = max([t for t in [_aday1, _aday2, _ilk] if t], default="")
+            _adaylar = [t for t in [_aday1, _aday2, _ilk] if t]
+            if not _adaylar:
+                return ""
+            # ÖNEMLİ: düz string karşılaştırması (max()) farklı tarih formatlarını
+            # (ISO 'T' ayraçlı vs boşluklu) yanlış sıralıyordu — gerçek datetime'a
+            # çevirip öyle karşılaştırıyoruz.
+            _en_son = max(_adaylar, key=lambda t: _guncelleme_tarih_parse(t) or datetime.min)
             return fmt_tarih_saat(_en_son)
         df_edit["guncelleme_tarihi"] = [
             _guncelleme_tarihi_hesapla(rid, ilk) for rid, ilk in zip(df_edit["id"], df_edit.get("tarih_ham_ilk_kayit", df_edit["id"]*0))
@@ -5884,10 +5918,11 @@ function kartSec(id){
 
                 # ── Güncelleme Tarihi izi — gerçekten bir alan (aşama, durum, açıklama,
                 # ciro vb.) değişen HER satır için "şu an" damgası basılır. "Seç"
-                # (checkbox işaretleme) tek başına değişiklik sayılmaz.
-                import datetime as _dtsg
+                # (checkbox işaretleme) tek başına değişiklik sayılmaz. ISO format
+                # kullanılıyor (diğer tarih kaynaklarıyla — cari_kartlar.tarih,
+                # created_at — aynı ayraç/biçim, karşılaştırma tutarlı olsun diye).
                 _sg_guncel = dict(st.session_state.get("_cari_son_guncelleme", {}))
-                _sg_simdi = _dtsg.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                _sg_simdi = datetime.now().isoformat()
                 _sg_degisti = False
                 for _idx_str_sg, _deg_sg in _edited_rows.items():
                     _gercek_degisiklik = any(k not in ("Seç", "🗑️ Sil") for k in _deg_sg.keys())
