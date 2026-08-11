@@ -3303,12 +3303,25 @@ if aktif == "yeni":
     r2c1,r2c2,r2c3,r2c4,r2c5,r2c6 = st.columns(6)
     il_idx  = il_listesi.index(mevcut_il) if mevcut_il in il_listesi else 0
     il      = r2c1.selectbox("İl", il_listesi, index=il_idx, key=f"yeni_il_dis_{_form_id}")
-    ilce_list = ILLER_ILCELER.get(il, [""])
-    _ilce_normalize_harita = {_bl_sadelestir(_ad): _ad for _ad in ilce_list}
+    ilce_list_tum = ILLER_ILCELER.get(il, [""])
+    _ilce_normalize_harita = {_bl_sadelestir(_ad): _ad for _ad in ilce_list_tum}
     _kayitli_ilce_ham = duzenle.get("ilce","") if duzenle else ""
-    mevcut_ilce = _ilce_normalize_harita.get(_bl_sadelestir(_kayitli_ilce_ham), ilce_list[0] if ilce_list else "")
+    mevcut_ilce = _ilce_normalize_harita.get(_bl_sadelestir(_kayitli_ilce_ham), ilce_list_tum[0] if ilce_list_tum else "")
+    # Streamlit'in yerleşik dropdown araması Türkçe karakterlerde (ş,ğ,ç,ı,ö,ü)
+    # güvenilir eşleşmiyor ("baş" yazınca "Başakşehir" bulunamıyor). Bu yüzden
+    # kendi Türkçe-toleranslı arama kutumuzu kullanıyoruz (_bl_sadelestir ile).
+    _ilce_arama = r2c2.text_input("İlçe", key=f"yeni_ilce_arama_{_form_id}", placeholder="🔍 İlçe ara...")
+    if _ilce_arama.strip():
+        _arama_norm = _bl_sadelestir(_ilce_arama)
+        ilce_list = [i for i in ilce_list_tum if _arama_norm in _bl_sadelestir(i)]
+        if mevcut_ilce and mevcut_ilce not in ilce_list:
+            ilce_list = [mevcut_ilce] + ilce_list
+        if not ilce_list:
+            ilce_list = ilce_list_tum  # arama sonuçsuzsa tam listeye düş, kullanıcı kilitlenmesin
+    else:
+        ilce_list = ilce_list_tum
     ilce_idx = ilce_list.index(mevcut_ilce) if mevcut_ilce in ilce_list else 0
-    ilce    = r2c2.selectbox("İlçe", ilce_list, index=ilce_idx, key=f"yeni_ilce_dis_{_form_id}")
+    ilce    = r2c2.selectbox(" ", ilce_list, index=ilce_idx, key=f"yeni_ilce_dis_{_form_id}", label_visibility="collapsed")
     durum_opts = _tanimlar_yukle("durum") or ["Özel Müşteri","Portföy"]
     durum_idx  = durum_opts.index(duzenle.get("durum","")) if duzenle and duzenle.get("durum","") in durum_opts else 0
     durum   = r2c3.selectbox("Durum", durum_opts, index=durum_idx, key=f"yeni_durum_dis_{_form_id}")
@@ -5170,8 +5183,8 @@ function kartSec(id){
         "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
         "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=True, width=_w("✅ Analiz")),
-        "🧾 Teklif":     st.column_config.TextColumn("🧾 Teklif", disabled=True, width="small"),
-        "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=True, width="small"),
+        "🧾 Teklif":     st.column_config.TextColumn("🧾 Teklif", disabled=False, width="small", help="Manuel düzenlenebilir. Boş bırakırsan otomatik hesaplanan sayı geri döner."),
+        "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=False, width="small", help="Manuel düzenlenebilir. Boş bırakırsan otomatik hesaplanan sayı geri döner."),
         "asama1":        st.column_config.SelectboxColumn("1. Aşama", options=_asama_secenek_guvenli("asama1", ["", "Randevu"]), width=_w("asama1")),
         "asama2":        st.column_config.SelectboxColumn("2. Aşama", options=_asama_secenek_guvenli("asama2", ["", "Teklif"]), width=_w("asama2")),
         "asama3":        st.column_config.SelectboxColumn("3. Aşama", options=_asama_secenek_guvenli("asama3", ["Tümü", "Deneme", "TAKİP", "Fiyat Hazırla", "Sözleşme"]), width=_w("asama3")),
@@ -5386,6 +5399,23 @@ function kartSec(id){
     else:
         df_edit["📨 Notlar"] = ""
 
+    # ── Manuel Teklif/Mesaj override'ları — DB'den yükle (bir kere) ──
+    if "_teklif_manuel_override" not in st.session_state or "_mesaj_manuel_override" not in st.session_state:
+        st.session_state["_teklif_manuel_override"] = {}
+        st.session_state["_mesaj_manuel_override"] = {}
+        try:
+            _sb_ov0 = get_sb_client()
+            if _sb_ov0:
+                import json as _ovj0
+                _r_ov0 = _sb_ov0.table("kullanici_tercih").select("anahtar,deger").eq("kullanici","__liste_ui__").in_(
+                    "anahtar", ["_teklif_manuel_override", "_mesaj_manuel_override"]).execute()
+                for _row_ov in (_r_ov0.data or []):
+                    st.session_state[_row_ov["anahtar"]] = _ovj0.loads(_row_ov["deger"])
+        except:
+            pass
+    _teklif_override = st.session_state.get("_teklif_manuel_override", {})
+    _mesaj_override  = st.session_state.get("_mesaj_manuel_override", {})
+
     # ── Teklif sayısı (yeni sütun, Notlar ile aynı mantık) ──
     _tek_sayac_cl = {}
     if sb_liste:
@@ -5404,7 +5434,10 @@ function kartSec(id){
         except Exception:
             _tek_sayac_cl = {}
     if "id" in df_edit.columns:
-        df_edit["🧾 Teklif"] = df_edit["id"].apply(lambda x: f"🧾 {_tek_sayac_cl.get(str(int(x)),0)}" if _tek_sayac_cl.get(str(int(x)),0) > 0 else "")
+        # Manuel override varsa onu göster, yoksa otomatik hesaplanan sayıyı göster
+        df_edit["🧾 Teklif"] = df_edit["id"].apply(
+            lambda x: _teklif_override.get(str(int(x))) if str(int(x)) in _teklif_override
+            else (f"🧾 {_tek_sayac_cl.get(str(int(x)),0)}" if _tek_sayac_cl.get(str(int(x)),0) > 0 else ""))
     else:
         df_edit["🧾 Teklif"] = ""
 
@@ -5428,7 +5461,10 @@ function kartSec(id){
         except Exception:
             _mesaj_sayac_cl = {}
     if "id" in df_edit.columns:
-        df_edit["💬 Mesaj"] = df_edit["id"].apply(lambda x: f"💬 {_mesaj_sayac_cl.get(str(int(x)),0)}" if _mesaj_sayac_cl.get(str(int(x)),0) > 0 else "")
+        # Manuel override varsa onu göster, yoksa otomatik hesaplanan sayıyı göster
+        df_edit["💬 Mesaj"] = df_edit["id"].apply(
+            lambda x: _mesaj_override.get(str(int(x))) if str(int(x)) in _mesaj_override
+            else (f"💬 {_mesaj_sayac_cl.get(str(int(x)),0)}" if _mesaj_sayac_cl.get(str(int(x)),0) > 0 else ""))
     else:
         df_edit["💬 Mesaj"] = ""
 
@@ -5634,6 +5670,49 @@ function kartSec(id){
                 except:
                     _rows = []
 
+                # ── Teklif/Mesaj manuel override'ları — cari_kartlar'da bu isimde
+                # kolon yok, bu yüzden ayrı kullanici_tercih JSON'unda saklanır.
+                # Hücre boş bırakılırsa override silinir, otomatik sayı geri döner.
+                _teklif_ov_guncel = dict(st.session_state.get("_teklif_manuel_override", {}))
+                _mesaj_ov_guncel  = dict(st.session_state.get("_mesaj_manuel_override", {}))
+                _ov_degisti = False
+                for _idx_str_ov, _deg_ov in _edited_rows.items():
+                    _idxn_ov = int(_idx_str_ov)
+                    if _idxn_ov >= len(_rows):
+                        continue
+                    _rid_ov = int(float(str(_rows[_idxn_ov].get("id", 0))))
+                    if not _rid_ov:
+                        continue
+                    if "🧾 Teklif" in _deg_ov:
+                        _v_ov = str(_deg_ov["🧾 Teklif"] or "").strip()
+                        if _v_ov:
+                            _teklif_ov_guncel[str(_rid_ov)] = _v_ov
+                        else:
+                            _teklif_ov_guncel.pop(str(_rid_ov), None)
+                        _ov_degisti = True
+                    if "💬 Mesaj" in _deg_ov:
+                        _v_ov = str(_deg_ov["💬 Mesaj"] or "").strip()
+                        if _v_ov:
+                            _mesaj_ov_guncel[str(_rid_ov)] = _v_ov
+                        else:
+                            _mesaj_ov_guncel.pop(str(_rid_ov), None)
+                        _ov_degisti = True
+                if _ov_degisti:
+                    st.session_state["_teklif_manuel_override"] = _teklif_ov_guncel
+                    st.session_state["_mesaj_manuel_override"] = _mesaj_ov_guncel
+                    try:
+                        _sb_ov1 = get_sb_client()
+                        if _sb_ov1:
+                            import json as _ovj1
+                            _sb_ov1.table("kullanici_tercih").upsert([
+                                {"kullanici": "__liste_ui__", "anahtar": "_teklif_manuel_override",
+                                 "deger": _ovj1.dumps(_teklif_ov_guncel, ensure_ascii=False)},
+                                {"kullanici": "__liste_ui__", "anahtar": "_mesaj_manuel_override",
+                                 "deger": _ovj1.dumps(_mesaj_ov_guncel, ensure_ascii=False)},
+                            ], on_conflict="kullanici,anahtar").execute()
+                    except:
+                        pass
+
                 def _tek_satir_guncelle(idx_str, degisiklikler):
                     """Tek bir satırı DB'ye yazar — paralel çalıştırılabilsin diye ayrı fonksiyon."""
                     idx = int(idx_str)
@@ -5644,7 +5723,7 @@ function kartSec(id){
                         return None
                     guncelle = {}
                     for k, v in degisiklikler.items():
-                        if k in ("Seç", "🗑️ Sil"): continue
+                        if k in ("Seç", "🗑️ Sil", "🧾 Teklif", "💬 Mesaj"): continue
                         if k in ("beklenen_ciro", "gerceklesen_ciro"):
                             try: guncelle[k] = float(v or 0)
                             except: guncelle[k] = 0
