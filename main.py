@@ -5113,7 +5113,7 @@ function kartSec(id){
         "firma":90,"rakip_firma":90,"yetkili":90,"gsm":100,"sabit":90,"email":90,
         "adres":110,"il":70,"ilce":60,"durum":80,"temsilci":80,
         "islem_asamasi":80,"aciklama":110,"📅 Son Randevu":170,"📨 Notlar":50,"id":40,
-        "beklenen_ciro":70,"gerceklesen_ciro":70,"✅ Analiz":70,
+        "beklenen_ciro":70,"gerceklesen_ciro":70,"✅ Analiz":70,"Çıkış İli":90,"Koli/Palet":110,
         "asama1":90,"asama2":90,"asama3":90,"sonuc":90,"ara_islem":90
     }
     # Gizli kolonları DB'den yükle
@@ -5183,9 +5183,11 @@ function kartSec(id){
         "aciklama":      st.column_config.TextColumn("Açıklama",  width=_w("aciklama")),
         "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
-        "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=True, width=_w("✅ Analiz")),
+        "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=False, width=_w("✅ Analiz"), help="Herhangi bir şey yazıp kaydedin (örn. bir nokta) — ✅ ikonu manuel olarak gösterilir. Boş bırakırsan otomatik eşleşme geri döner."),
         "🧾 Teklif":     st.column_config.TextColumn("🧾 Teklif", disabled=False, width="small", help="Sadece rakam girin (örn. 5). İkon otomatik eklenir. Boş bırakırsan otomatik hesaplanan sayı geri döner."),
         "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=False, width="small", help="Sadece rakam girin (örn. 3). İkon otomatik eklenir. Boş bırakırsan otomatik hesaplanan sayı geri döner."),
+        "Çıkış İli":     st.column_config.TextColumn("Çıkış İli", disabled=False, width=_w("Çıkış İli"), help="Müşterinin kargo çıkış ili — manuel serbest metin."),
+        "Koli/Palet":    st.column_config.TextColumn("Koli/Palet", disabled=False, width=_w("Koli/Palet"), help="Koli, palet vb. bilgiler — manuel, sınırsız serbest metin."),
         "asama1":        st.column_config.SelectboxColumn("1. Aşama", options=_asama_secenek_guvenli("asama1", ["", "Randevu"]), width=_w("asama1")),
         "asama2":        st.column_config.SelectboxColumn("2. Aşama", options=_asama_secenek_guvenli("asama2", ["", "Teklif"]), width=_w("asama2")),
         "asama3":        st.column_config.SelectboxColumn("3. Aşama", options=_asama_secenek_guvenli("asama3", ["Tümü", "Deneme", "TAKİP", "Fiyat Hazırla", "Sözleşme"]), width=_w("asama3")),
@@ -5217,7 +5219,7 @@ function kartSec(id){
             df_f = df_f.sort_values("_cl2_key").drop(columns=["_cl2_key"]).reset_index(drop=True)
 
     col_order = ["Seç","tarih","guncelleme_tarihi","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
-                 "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","islem_asamasi",
+                 "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","Çıkış İli","Koli/Palet","islem_asamasi",
                  "asama1","asama2","asama3","aciklama","📨 Notlar","📅 Son Randevu",
                  "🧾 Teklif","💬 Mesaj","ara_islem","sonuc","temsilci"]
     # Gizli kolonları çıkar
@@ -5226,7 +5228,7 @@ function kartSec(id){
                       "islem_asamasi":"islem_asamasi","aciklama":"aciklama","tarih":"tarih",
                       "📅 Son Randevu":"📅 Son Randevu","📨 Notlar":"📨 Notlar","id":"id",
                       "beklenen_ciro":"beklenen_ciro","gerceklesen_ciro":"gerceklesen_ciro","✅ Analiz":"✅ Analiz",
-                      "🧾 Teklif":"🧾 Teklif","💬 Mesaj":"💬 Mesaj",
+                      "🧾 Teklif":"🧾 Teklif","💬 Mesaj":"💬 Mesaj","Çıkış İli":"Çıkış İli","Koli/Palet":"Koli/Palet",
                       "asama1":"asama1","asama2":"asama2","asama3":"asama3","sonuc":"sonuc","ara_islem":"ara_islem"}
     col_order = [c for c in col_order if not any(c == _kol_gizli_map.get(g,g) for g in _GIZLI_KOLONLAR)]
 
@@ -5327,6 +5329,21 @@ function kartSec(id){
             df_edit["✅ Analiz"] = ""
     except:
         df_edit["✅ Analiz"] = ""
+
+    # Manuel Analiz override — otomatik eşleşme olmasa bile hücreye bir şey
+    # yazılırsa (örn. "." veya "ok") ✅ ikonu manuel olarak gösterilir.
+    if "id" in df_edit.columns:
+        df_edit["✅ Analiz"] = [
+            ("✅" if (str(int(rid)) in _analiz_override or str(otomatik or "").strip()) else "")
+            for rid, otomatik in zip(df_edit["id"], df_edit["✅ Analiz"])
+        ]
+        # ── Çıkış İli — serbest metin, manuel giriş ──
+        df_edit["Çıkış İli"] = [_cikis_ili_map.get(str(int(rid)), "") for rid in df_edit["id"]]
+        # ── Koli/Palet Bilgisi — serbest metin, manuel giriş, sınırsız ──
+        df_edit["Koli/Palet"] = [_koli_palet_map.get(str(int(rid)), "") for rid in df_edit["id"]]
+    else:
+        df_edit["Çıkış İli"] = ""
+        df_edit["Koli/Palet"] = ""
     _not_detay = {}
     _not_sayac = {}
     if sb_liste:
@@ -5411,6 +5428,26 @@ function kartSec(id){
         except:
             pass
     _cari_son_guncelleme = st.session_state.get("_cari_son_guncelleme", {})
+
+    # ── Manuel Analiz / Çıkış İli / Koli-Palet override'ları — DB'den yükle ──
+    for _ov_key in ["_analiz_manuel_override", "_cikis_ili_manuel", "_koli_palet_manuel"]:
+        if _ov_key not in st.session_state:
+            st.session_state[_ov_key] = {}
+    if not st.session_state.get("_ekstra_override_yuklendi"):
+        st.session_state["_ekstra_override_yuklendi"] = True
+        try:
+            _sb_ex0 = get_sb_client()
+            if _sb_ex0:
+                import json as _exj0
+                _r_ex0 = _sb_ex0.table("kullanici_tercih").select("anahtar,deger").eq("kullanici","__liste_ui__").in_(
+                    "anahtar", ["_analiz_manuel_override", "_cikis_ili_manuel", "_koli_palet_manuel"]).execute()
+                for _row_ex in (_r_ex0.data or []):
+                    st.session_state[_row_ex["anahtar"]] = _exj0.loads(_row_ex["deger"])
+        except:
+            pass
+    _analiz_override = st.session_state.get("_analiz_manuel_override", {})
+    _cikis_ili_map   = st.session_state.get("_cikis_ili_manuel", {})
+    _koli_palet_map  = st.session_state.get("_koli_palet_manuel", {})
 
     # ── Teklif sayısı (yeni sütun, Notlar ile aynı mantık) ──
 
@@ -5789,6 +5826,58 @@ function kartSec(id){
                     except:
                         pass
 
+                # ── Analiz / Çıkış İli / Koli-Palet manuel override'ları ────────────────
+                _analiz_ov_guncel = dict(st.session_state.get("_analiz_manuel_override", {}))
+                _cikis_ov_guncel  = dict(st.session_state.get("_cikis_ili_manuel", {}))
+                _koli_ov_guncel   = dict(st.session_state.get("_koli_palet_manuel", {}))
+                _ex_degisti = False
+                for _idx_str_ex, _deg_ex in _edited_rows.items():
+                    _idxn_ex = int(_idx_str_ex)
+                    if _idxn_ex >= len(_rows):
+                        continue
+                    _rid_ex = int(float(str(_rows[_idxn_ex].get("id", 0))))
+                    if not _rid_ex:
+                        continue
+                    if "✅ Analiz" in _deg_ex:
+                        _v_ex = str(_deg_ex["✅ Analiz"] or "").strip()
+                        if _v_ex:
+                            _analiz_ov_guncel[str(_rid_ex)] = "1"
+                        else:
+                            _analiz_ov_guncel.pop(str(_rid_ex), None)
+                        _ex_degisti = True
+                    if "Çıkış İli" in _deg_ex:
+                        _v_ex = str(_deg_ex["Çıkış İli"] or "").strip()
+                        if _v_ex:
+                            _cikis_ov_guncel[str(_rid_ex)] = _v_ex
+                        else:
+                            _cikis_ov_guncel.pop(str(_rid_ex), None)
+                        _ex_degisti = True
+                    if "Koli/Palet" in _deg_ex:
+                        _v_ex = str(_deg_ex["Koli/Palet"] or "").strip()
+                        if _v_ex:
+                            _koli_ov_guncel[str(_rid_ex)] = _v_ex
+                        else:
+                            _koli_ov_guncel.pop(str(_rid_ex), None)
+                        _ex_degisti = True
+                if _ex_degisti:
+                    st.session_state["_analiz_manuel_override"] = _analiz_ov_guncel
+                    st.session_state["_cikis_ili_manuel"] = _cikis_ov_guncel
+                    st.session_state["_koli_palet_manuel"] = _koli_ov_guncel
+                    try:
+                        _sb_ex1 = get_sb_client()
+                        if _sb_ex1:
+                            import json as _exj1
+                            _sb_ex1.table("kullanici_tercih").upsert([
+                                {"kullanici": "__liste_ui__", "anahtar": "_analiz_manuel_override",
+                                 "deger": _exj1.dumps(_analiz_ov_guncel, ensure_ascii=False)},
+                                {"kullanici": "__liste_ui__", "anahtar": "_cikis_ili_manuel",
+                                 "deger": _exj1.dumps(_cikis_ov_guncel, ensure_ascii=False)},
+                                {"kullanici": "__liste_ui__", "anahtar": "_koli_palet_manuel",
+                                 "deger": _exj1.dumps(_koli_ov_guncel, ensure_ascii=False)},
+                            ], on_conflict="kullanici,anahtar").execute()
+                    except:
+                        pass
+
                 # ── Güncelleme Tarihi izi — gerçekten bir alan (aşama, durum, açıklama,
                 # ciro vb.) değişen HER satır için "şu an" damgası basılır. "Seç"
                 # (checkbox işaretleme) tek başına değişiklik sayılmaz.
@@ -5831,7 +5920,7 @@ function kartSec(id){
                         return None
                     guncelle = {}
                     for k, v in degisiklikler.items():
-                        if k in ("Seç", "🗑️ Sil", "🧾 Teklif", "💬 Mesaj"): continue
+                        if k in ("Seç", "🗑️ Sil", "🧾 Teklif", "💬 Mesaj", "✅ Analiz", "Çıkış İli", "Koli/Palet"): continue
                         if k in ("beklenen_ciro", "gerceklesen_ciro"):
                             try: guncelle[k] = float(v or 0)
                             except: guncelle[k] = 0
@@ -6770,7 +6859,7 @@ function updateBot(v){{
             "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
             "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50,
             "asama1":100,"asama2":100,"asama3":100,"sonuc":100,"ara_islem":100,
-            "beklenen_ciro":80,"gerceklesen_ciro":80,"✅ Analiz":80
+            "beklenen_ciro":80,"gerceklesen_ciro":80,"✅ Analiz":80,"Çıkış İli":100,"Koli/Palet":120
         }
         _KG_UI_ETIKET = {
             "firma":"Firma","rakip_firma":"Rakip Firma","yetkili":"Yetkili","gsm":"GSM","sabit":"S.Tel",
@@ -6778,7 +6867,7 @@ function updateBot(v){{
             "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"Aşama",
             "aciklama":"Açıklama","📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID",
             "asama1":"1. Aşama","asama2":"2. Aşama","asama3":"3. Aşama","sonuc":"Sonuç","ara_islem":"Ara İşlem",
-            "beklenen_ciro":"Hedef ₺","gerceklesen_ciro":"Gerçek ₺","✅ Analiz":"Analiz"
+            "beklenen_ciro":"Hedef ₺","gerceklesen_ciro":"Gerçek ₺","✅ Analiz":"Analiz","Çıkış İli":"Çıkış İli","Koli/Palet":"Koli/Palet"
         }
         # ÖNEMLİ: Ana listenin de kullandığı session_state["_kol_genislik"] tek doğruluk kaynağıdır.
         # Burada AYRI bir DB sorgusu yapmıyoruz — aksi halde iki farklı kaynak birbirini
