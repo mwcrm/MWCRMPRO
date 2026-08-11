@@ -6862,7 +6862,8 @@ function updateBot(v){{
             "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
             "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50,
             "asama1":100,"asama2":100,"asama3":100,"sonuc":100,"ara_islem":100,
-            "beklenen_ciro":80,"gerceklesen_ciro":80,"✅ Analiz":80,"Varış İli":100,"Koli/Palet":120
+            "beklenen_ciro":80,"gerceklesen_ciro":80,"✅ Analiz":80,"Varış İli":100,"Koli/Palet":120,
+            "🧾 Teklif":70,"💬 Mesaj":70
         }
         _KG_UI_ETIKET = {
             "tarih":"İşlem Tarih","guncelleme_tarihi":"Güncelleme Tarihi",
@@ -6871,7 +6872,8 @@ function updateBot(v){{
             "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"Aşama",
             "aciklama":"Açıklama","📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID",
             "asama1":"1. Aşama","asama2":"2. Aşama","asama3":"3. Aşama","sonuc":"Sonuç","ara_islem":"Ara İşlem",
-            "beklenen_ciro":"Hedef ₺","gerceklesen_ciro":"Gerçek ₺","✅ Analiz":"Analiz","Varış İli":"Varış İli","Koli/Palet":"Koli/Palet"
+            "beklenen_ciro":"Hedef ₺","gerceklesen_ciro":"Gerçek ₺","✅ Analiz":"Analiz","Varış İli":"Varış İli","Koli/Palet":"Koli/Palet",
+            "🧾 Teklif":"Teklif","💬 Mesaj":"Mesaj"
         }
         # ÖNEMLİ: Ana listenin de kullandığı session_state["_kol_genislik"] tek doğruluk kaynağıdır.
         # Burada AYRI bir DB sorgusu yapmıyoruz — aksi halde iki farklı kaynak birbirini
