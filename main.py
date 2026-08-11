@@ -5110,10 +5110,12 @@ function kartSec(id){
     # ── KOLON AYARLARI ──────────────────────────────────────────────────────────
     # ── KOLON GENİŞLİKLERİ — DB'den oku ─────────────────────────────────────
     _KOL_VARSAYILAN = {
+        "tarih":90,"guncelleme_tarihi":100,
         "firma":90,"rakip_firma":90,"yetkili":90,"gsm":100,"sabit":90,"email":90,
         "adres":110,"il":70,"ilce":60,"durum":80,"temsilci":80,
         "islem_asamasi":80,"aciklama":110,"📅 Son Randevu":170,"📨 Notlar":50,"id":40,
         "beklenen_ciro":70,"gerceklesen_ciro":70,"✅ Analiz":70,"Varış İli":90,"Koli/Palet":110,
+        "🧾 Teklif":70,"💬 Mesaj":70,
         "asama1":90,"asama2":90,"asama3":90,"sonuc":90,"ara_islem":90
     }
     # Gizli kolonları DB'den yükle
@@ -5162,8 +5164,8 @@ function kartSec(id){
 
     col_config = {
         "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
-        "tarih":         st.column_config.TextColumn("İşlem Tarih", disabled=True, width=_w("tarih") if "tarih" in _KOL_VARSAYILAN else "small"),
-        "guncelleme_tarihi": st.column_config.TextColumn("Güncelleme Tarihi", disabled=True, width=_w("guncelleme_tarihi") if "guncelleme_tarihi" in _KOL_VARSAYILAN else "small", help="Bu müşteriye en son ne zaman not, teklif veya mesaj/işlem eklendiğini gösterir."),
+        "tarih":         st.column_config.TextColumn("İşlem Tarih", disabled=True, width=_w("tarih")),
+        "guncelleme_tarihi": st.column_config.TextColumn("Güncelleme Tarihi", disabled=True, width=_w("guncelleme_tarihi"), help="Bu müşteriye en son ne zaman not, teklif veya mesaj/işlem eklendiğini gösterir."),
         "id":            st.column_config.NumberColumn("ID", disabled=True, width=_w("id")),
         "olusturan": None, "silindi": None,
         "beklenen_ciro":    st.column_config.NumberColumn("Hedef ₺",  format="%,.0f ₺", width=_w("beklenen_ciro")),
@@ -5184,8 +5186,8 @@ function kartSec(id){
         "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
         "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=False, width=_w("✅ Analiz"), help="Herhangi bir şey yazıp kaydedin (örn. bir nokta) — ✅ ikonu manuel olarak gösterilir. Boş bırakırsan otomatik eşleşme geri döner."),
-        "🧾 Teklif":     st.column_config.TextColumn("🧾 Teklif", disabled=False, width="small", help="Sadece rakam girin (örn. 5). İkon otomatik eklenir. Boş bırakırsan otomatik hesaplanan sayı geri döner."),
-        "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=False, width="small", help="Sadece rakam girin (örn. 3). İkon otomatik eklenir. Boş bırakırsan otomatik hesaplanan sayı geri döner."),
+        "🧾 Teklif":     st.column_config.TextColumn("🧾 Teklif", disabled=False, width=_w("🧾 Teklif"), help="Sadece rakam girin (örn. 5). İkon otomatik eklenir. Boş bırakırsan otomatik hesaplanan sayı geri döner."),
+        "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=False, width=_w("💬 Mesaj"), help="Sadece rakam girin (örn. 3). İkon otomatik eklenir. Boş bırakırsan otomatik hesaplanan sayı geri döner."),
         "Varış İli":     st.column_config.TextColumn("Varış İli", disabled=False, width=_w("Varış İli"), help="Müşterinin kargo varış ili — manuel serbest metin. Buraya veya Koli/Palet'e bir şey yazılırsa Analiz otomatik ✅ olur."),
         "Koli/Palet":    st.column_config.TextColumn("Koli/Palet", disabled=False, width=_w("Koli/Palet"), help="Koli, palet vb. bilgiler — manuel, sınırsız serbest metin."),
         "asama1":        st.column_config.SelectboxColumn("1. Aşama", options=_asama_secenek_guvenli("asama1", ["", "Randevu"]), width=_w("asama1")),
@@ -5225,7 +5227,7 @@ function kartSec(id){
     # Gizli kolonları çıkar
     _kol_gizli_map = {"firma":"firma","rakip_firma":"rakip_firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email",
                       "adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci",
-                      "islem_asamasi":"islem_asamasi","aciklama":"aciklama","tarih":"tarih",
+                      "islem_asamasi":"islem_asamasi","aciklama":"aciklama","tarih":"tarih","guncelleme_tarihi":"guncelleme_tarihi",
                       "📅 Son Randevu":"📅 Son Randevu","📨 Notlar":"📨 Notlar","id":"id",
                       "beklenen_ciro":"beklenen_ciro","gerceklesen_ciro":"gerceklesen_ciro","✅ Analiz":"✅ Analiz",
                       "🧾 Teklif":"🧾 Teklif","💬 Mesaj":"💬 Mesaj","Varış İli":"Varış İli","Koli/Palet":"Koli/Palet",
