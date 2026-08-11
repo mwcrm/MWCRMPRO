@@ -5393,7 +5393,27 @@ function kartSec(id){
     _teklif_override = st.session_state.get("_teklif_manuel_override", {})
     _mesaj_override  = st.session_state.get("_mesaj_manuel_override", {})
 
+    # ── Cari kartında GERÇEKTEN yapılan her kaydetme (aşama/durum/alan
+    # değişikliği vb.) burada iz bırakır — "Güncelleme Tarihi" bunun üzerinden
+    # hesaplanır. cari_kartlar'da updated_at kolonu/tetikleyicisi olmadığı için
+    # (yeni kolon açmadan) kullanici_tercih'te ayrı bir JSON haritada tutulur:
+    # {cari_id_str: "YYYY-MM-DD HH:MM:SS"}.
+    if "_cari_son_guncelleme" not in st.session_state:
+        st.session_state["_cari_son_guncelleme"] = {}
+        try:
+            _sb_sg0 = get_sb_client()
+            if _sb_sg0:
+                import json as _sgj0
+                _r_sg0 = _sb_sg0.table("kullanici_tercih").select("deger").eq(
+                    "kullanici","__liste_ui__").eq("anahtar","_cari_son_guncelleme").execute()
+                if _r_sg0.data:
+                    st.session_state["_cari_son_guncelleme"] = _sgj0.loads(_r_sg0.data[0]["deger"])
+        except:
+            pass
+    _cari_son_guncelleme = st.session_state.get("_cari_son_guncelleme", {})
+
     # ── Teklif sayısı (yeni sütun, Notlar ile aynı mantık) ──
+
     _tek_sayac_cl = {}
     if sb_liste:
         try:
@@ -5505,9 +5525,10 @@ function kartSec(id){
     if "id" in df_edit.columns:
         def _guncelleme_tarihi_hesapla(_rid, _ilk_kayit_ham):
             _sid = str(int(_rid))
-            _aday = _son_aktivite.get(_sid, "")
+            _aday1 = _son_aktivite.get(_sid, "")          # not/teklif/mesaj kaydı
+            _aday2 = _cari_son_guncelleme.get(_sid, "")   # gerçek alan/aşama/durum düzenlemesi
             _ilk = str(_ilk_kayit_ham or "")
-            _en_son = max([t for t in [_aday, _ilk] if t], default="")
+            _en_son = max([t for t in [_aday1, _aday2, _ilk] if t], default="")
             return fmt_tarih_saat(_en_son)
         df_edit["guncelleme_tarihi"] = [
             _guncelleme_tarihi_hesapla(rid, ilk) for rid, ilk in zip(df_edit["id"], df_edit.get("tarih_ham_ilk_kayit", df_edit["id"]*0))
@@ -5765,6 +5786,38 @@ function kartSec(id){
                                 {"kullanici": "__liste_ui__", "anahtar": "_mesaj_manuel_override",
                                  "deger": _ovj1.dumps(_mesaj_ov_guncel, ensure_ascii=False)},
                             ], on_conflict="kullanici,anahtar").execute()
+                    except:
+                        pass
+
+                # ── Güncelleme Tarihi izi — gerçekten bir alan (aşama, durum, açıklama,
+                # ciro vb.) değişen HER satır için "şu an" damgası basılır. "Seç"
+                # (checkbox işaretleme) tek başına değişiklik sayılmaz.
+                import datetime as _dtsg
+                _sg_guncel = dict(st.session_state.get("_cari_son_guncelleme", {}))
+                _sg_simdi = _dtsg.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                _sg_degisti = False
+                for _idx_str_sg, _deg_sg in _edited_rows.items():
+                    _gercek_degisiklik = any(k not in ("Seç", "🗑️ Sil") for k in _deg_sg.keys())
+                    if not _gercek_degisiklik:
+                        continue
+                    _idxn_sg = int(_idx_str_sg)
+                    if _idxn_sg >= len(_rows):
+                        continue
+                    _rid_sg = int(float(str(_rows[_idxn_sg].get("id", 0))))
+                    if not _rid_sg:
+                        continue
+                    _sg_guncel[str(_rid_sg)] = _sg_simdi
+                    _sg_degisti = True
+                if _sg_degisti:
+                    st.session_state["_cari_son_guncelleme"] = _sg_guncel
+                    try:
+                        _sb_sg1 = get_sb_client()
+                        if _sb_sg1:
+                            import json as _sgj1
+                            _sb_sg1.table("kullanici_tercih").upsert({
+                                "kullanici": "__liste_ui__", "anahtar": "_cari_son_guncelleme",
+                                "deger": _sgj1.dumps(_sg_guncel, ensure_ascii=False)
+                            }, on_conflict="kullanici,anahtar").execute()
                     except:
                         pass
 
