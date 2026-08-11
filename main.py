@@ -5183,8 +5183,8 @@ function kartSec(id){
         "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
         "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=True, width=_w("✅ Analiz")),
-        "🧾 Teklif":     st.column_config.TextColumn("🧾 Teklif", disabled=False, width="small", help="Manuel düzenlenebilir. Boş bırakırsan otomatik hesaplanan sayı geri döner."),
-        "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=False, width="small", help="Manuel düzenlenebilir. Boş bırakırsan otomatik hesaplanan sayı geri döner."),
+        "🧾 Teklif":     st.column_config.TextColumn("🧾 Teklif", disabled=False, width="small", help="Sadece rakam girin (örn. 5). İkon otomatik eklenir. Boş bırakırsan otomatik hesaplanan sayı geri döner."),
+        "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=False, width="small", help="Sadece rakam girin (örn. 3). İkon otomatik eklenir. Boş bırakırsan otomatik hesaplanan sayı geri döner."),
         "asama1":        st.column_config.SelectboxColumn("1. Aşama", options=_asama_secenek_guvenli("asama1", ["", "Randevu"]), width=_w("asama1")),
         "asama2":        st.column_config.SelectboxColumn("2. Aşama", options=_asama_secenek_guvenli("asama2", ["", "Teklif"]), width=_w("asama2")),
         "asama3":        st.column_config.SelectboxColumn("3. Aşama", options=_asama_secenek_guvenli("asama3", ["Tümü", "Deneme", "TAKİP", "Fiyat Hazırla", "Sözleşme"]), width=_w("asama3")),
@@ -5436,8 +5436,8 @@ function kartSec(id){
     if "id" in df_edit.columns:
         # Manuel override varsa onu göster, yoksa otomatik hesaplanan sayıyı göster
         df_edit["🧾 Teklif"] = df_edit["id"].apply(
-            lambda x: _teklif_override.get(str(int(x))) if str(int(x)) in _teklif_override
-            else (f"🧾 {_tek_sayac_cl.get(str(int(x)),0)}" if _tek_sayac_cl.get(str(int(x)),0) > 0 else ""))
+            lambda x: (f"🧾 {_teklif_override.get(str(int(x)))}" if str(int(x)) in _teklif_override
+            else (f"🧾 {_tek_sayac_cl.get(str(int(x)),0)}" if _tek_sayac_cl.get(str(int(x)),0) > 0 else "")))
     else:
         df_edit["🧾 Teklif"] = ""
 
@@ -5463,8 +5463,8 @@ function kartSec(id){
     if "id" in df_edit.columns:
         # Manuel override varsa onu göster, yoksa otomatik hesaplanan sayıyı göster
         df_edit["💬 Mesaj"] = df_edit["id"].apply(
-            lambda x: _mesaj_override.get(str(int(x))) if str(int(x)) in _mesaj_override
-            else (f"💬 {_mesaj_sayac_cl.get(str(int(x)),0)}" if _mesaj_sayac_cl.get(str(int(x)),0) > 0 else ""))
+            lambda x: (f"💬 {_mesaj_override.get(str(int(x)))}" if str(int(x)) in _mesaj_override
+            else (f"💬 {_mesaj_sayac_cl.get(str(int(x)),0)}" if _mesaj_sayac_cl.get(str(int(x)),0) > 0 else "")))
     else:
         df_edit["💬 Mesaj"] = ""
 
@@ -5684,14 +5684,16 @@ function kartSec(id){
                     if not _rid_ov:
                         continue
                     if "🧾 Teklif" in _deg_ov:
-                        _v_ov = str(_deg_ov["🧾 Teklif"] or "").strip()
+                        _v_ov_ham = str(_deg_ov["🧾 Teklif"] or "")
+                        _v_ov = "".join(ch for ch in _v_ov_ham if ch.isdigit())  # sadece rakam — ikon zaten otomatik eklenir
                         if _v_ov:
                             _teklif_ov_guncel[str(_rid_ov)] = _v_ov
                         else:
                             _teklif_ov_guncel.pop(str(_rid_ov), None)
                         _ov_degisti = True
                     if "💬 Mesaj" in _deg_ov:
-                        _v_ov = str(_deg_ov["💬 Mesaj"] or "").strip()
+                        _v_ov_ham = str(_deg_ov["💬 Mesaj"] or "")
+                        _v_ov = "".join(ch for ch in _v_ov_ham if ch.isdigit())  # sadece rakam — ikon zaten otomatik eklenir
                         if _v_ov:
                             _mesaj_ov_guncel[str(_rid_ov)] = _v_ov
                         else:
