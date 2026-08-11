@@ -5163,6 +5163,7 @@ function kartSec(id){
     col_config = {
         "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
         "tarih":         st.column_config.TextColumn("İşlem Tarih", disabled=True, width=_w("tarih") if "tarih" in _KOL_VARSAYILAN else "small"),
+        "guncelleme_tarihi": st.column_config.TextColumn("Güncelleme Tarihi", disabled=True, width=_w("guncelleme_tarihi") if "guncelleme_tarihi" in _KOL_VARSAYILAN else "small", help="Bu müşteriye en son ne zaman not, teklif veya mesaj/işlem eklendiğini gösterir."),
         "id":            st.column_config.NumberColumn("ID", disabled=True, width=_w("id")),
         "olusturan": None, "silindi": None,
         "beklenen_ciro":    st.column_config.NumberColumn("Hedef ₺",  format="%,.0f ₺", width=_w("beklenen_ciro")),
@@ -5215,7 +5216,7 @@ function kartSec(id){
             df_f["_cl2_key"] = df_f["id"].map(_cl2_map).fillna(len(_cl2_sirali))
             df_f = df_f.sort_values("_cl2_key").drop(columns=["_cl2_key"]).reset_index(drop=True)
 
-    col_order = ["Seç","tarih","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
+    col_order = ["Seç","tarih","guncelleme_tarihi","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
                  "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","islem_asamasi",
                  "asama1","asama2","asama3","aciklama","📨 Notlar","📅 Son Randevu",
                  "🧾 Teklif","💬 Mesaj","ara_islem","sonuc","temsilci"]
@@ -5446,7 +5447,75 @@ function kartSec(id){
 
     # ── İşlem Tarih — sadece tarih+saat gösterir, ham/karışık format değil ──
     if "tarih" in df_edit.columns:
+        df_edit["tarih_ham_ilk_kayit"] = df_edit["tarih"]  # güncelleme hesabı için ham hali sakla
         df_edit["tarih"] = df_edit["tarih"].apply(fmt_tarih_saat)
+
+    # ── Güncelleme Tarihi — bu müşteriye ait EN SON aktiviteyi gösterir:
+    # yeni not/açıklama, yeni teklif, ya da mesaj/arama kaydı eklenmişse en
+    # güncel tarih burada görünür. Hiçbiri yoksa ilk kayıt (İşlem Tarih) tarihi
+    # gösterilir. cari_kartlar'da yeni kolon açmadan, mevcut ilişkili
+    # tablolardan (cari_aciklamalar, teklifler, islem_kaydi) hesaplanır.
+    @st.cache_data(ttl=60, show_spinner=False)
+    def _son_aktivite_tarihleri_yukle():
+        _sonuc = {}
+        _sb5 = get_sb_client()
+        if not _sb5:
+            return _sonuc
+
+        def _guncelle(_mid_ham, _tarih_ham):
+            if not _mid_ham or not _tarih_ham:
+                return
+            _mid = str(_mid_ham)
+            if _mid not in _sonuc or str(_tarih_ham) > _sonuc[_mid]:
+                _sonuc[_mid] = str(_tarih_ham)
+
+        # 1) Notlar/açıklamalar — created_at Supabase'in otomatik alanı
+        try:
+            _r5 = _sb5.table("cari_aciklamalar").select("cari_id,created_at").execute()
+            for _row in (_r5.data or []):
+                _guncelle(_row.get("cari_id"), _row.get("created_at"))
+        except Exception:
+            pass
+
+        # 2) Teklifler — created_at varsa kullan (tarih kolonu production'da güvenilir değil)
+        try:
+            _r6 = _sb5.table("teklifler").select("musteri_id,created_at").execute()
+            for _row in (_r6.data or []):
+                _guncelle(_row.get("musteri_id"), _row.get("created_at"))
+        except Exception:
+            pass
+
+        # 3) Mesaj/arama/whatsapp kayıtları — islem_kaydi.tarih güvenilir
+        try:
+            _r7 = _sb5.table("islem_kaydi").select("musteri_id,tarih").execute()
+            for _row in (_r7.data or []):
+                _guncelle(_row.get("musteri_id"), _row.get("tarih"))
+        except Exception:
+            pass
+
+        return _sonuc
+
+    _son_aktivite = {}
+    if sb_liste:
+        try:
+            _son_aktivite = _son_aktivite_tarihleri_yukle()
+        except Exception:
+            _son_aktivite = {}
+
+    if "id" in df_edit.columns:
+        def _guncelleme_tarihi_hesapla(_rid, _ilk_kayit_ham):
+            _sid = str(int(_rid))
+            _aday = _son_aktivite.get(_sid, "")
+            _ilk = str(_ilk_kayit_ham or "")
+            _en_son = max([t for t in [_aday, _ilk] if t], default="")
+            return fmt_tarih_saat(_en_son)
+        df_edit["guncelleme_tarihi"] = [
+            _guncelleme_tarihi_hesapla(rid, ilk) for rid, ilk in zip(df_edit["id"], df_edit.get("tarih_ham_ilk_kayit", df_edit["id"]*0))
+        ]
+    else:
+        df_edit["guncelleme_tarihi"] = ""
+    if "tarih_ham_ilk_kayit" in df_edit.columns:
+        df_edit.drop(columns=["tarih_ham_ilk_kayit"], inplace=True)
 
     df_edit.insert(0, "Seç", False)
 
@@ -5508,6 +5577,14 @@ function kartSec(id){
     # yükseklik, sayfa başına 12 satır varken altında boş satırlar bırakıyordu.
     # "Tümü" modunda (binlerce satır) yükseklik 800px'de sabit kalıp iç kaydırma kullanır.
     _cl_editor_yukseklik = min(800, 38 + (len(df_edit) * 35) + 3)
+
+    # ── Sol Index Kolonu — "Sıra No" başlıklı, temiz sıralı (1,2,3...) numara.
+    # Streamlit'te index kolonu zaten otomatik olarak sol tarafta SABİT kalır
+    # (kaydırmada kaymaz). Eskiden burada firma id'sinin ham/karışık index'i
+    # görünüyordu (17, 1692, 0, 5...) — artık temiz 1'den başlayan sıra no var.
+    df_edit = df_edit.reset_index(drop=True)
+    df_edit.index = df_edit.index + 1
+    df_edit.index.name = "S.No"
 
     with _tbl_col:
         edited_df = st.data_editor(
