@@ -6857,6 +6857,7 @@ function updateBot(v){{
         st.markdown("### 📐 Cari Liste Kolon Ayarları")
         st.caption("Genişlik ayarlayın, gizlemek istediklerinizi kapatın → Kaydet")
         _KOL_VARS_UI = {
+            "tarih":90,"guncelleme_tarihi":100,
             "firma":100,"rakip_firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
             "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
             "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50,
@@ -6864,6 +6865,7 @@ function updateBot(v){{
             "beklenen_ciro":80,"gerceklesen_ciro":80,"✅ Analiz":80,"Varış İli":100,"Koli/Palet":120
         }
         _KG_UI_ETIKET = {
+            "tarih":"İşlem Tarih","guncelleme_tarihi":"Güncelleme Tarihi",
             "firma":"Firma","rakip_firma":"Rakip Firma","yetkili":"Yetkili","gsm":"GSM","sabit":"S.Tel",
             "email":"Email","adres":"Adres","il":"İl","ilce":"İlçe",
             "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"Aşama",
