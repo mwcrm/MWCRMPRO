@@ -5287,6 +5287,27 @@ function kartSec(id){
         df_edit["beklenen_ciro"] = pd.to_numeric(df_edit["beklenen_ciro"], errors="coerce").fillna(0)
     if "gerceklesen_ciro" in df_edit.columns:
         df_edit["gerceklesen_ciro"] = pd.to_numeric(df_edit["gerceklesen_ciro"], errors="coerce").fillna(0)
+    # ── Manuel Analiz / Çıkış İli / Koli-Palet override'ları — DB'den yükle ──
+    # (Analiz hesabından ÖNCE yüklenmeli — aşağıda kullanılıyor)
+    for _ov_key in ["_analiz_manuel_override", "_cikis_ili_manuel", "_koli_palet_manuel"]:
+        if _ov_key not in st.session_state:
+            st.session_state[_ov_key] = {}
+    if not st.session_state.get("_ekstra_override_yuklendi"):
+        st.session_state["_ekstra_override_yuklendi"] = True
+        try:
+            _sb_ex0 = get_sb_client()
+            if _sb_ex0:
+                import json as _exj0
+                _r_ex0 = _sb_ex0.table("kullanici_tercih").select("anahtar,deger").eq("kullanici","__liste_ui__").in_(
+                    "anahtar", ["_analiz_manuel_override", "_cikis_ili_manuel", "_koli_palet_manuel"]).execute()
+                for _row_ex in (_r_ex0.data or []):
+                    st.session_state[_row_ex["anahtar"]] = _exj0.loads(_row_ex["deger"])
+        except:
+            pass
+    _analiz_override = st.session_state.get("_analiz_manuel_override", {})
+    _cikis_ili_map   = st.session_state.get("_cikis_ili_manuel", {})
+    _koli_palet_map  = st.session_state.get("_koli_palet_manuel", {})
+
     try:
         # Analiz yapılmış firmaları işaretle
         try:
@@ -5428,26 +5449,6 @@ function kartSec(id){
         except:
             pass
     _cari_son_guncelleme = st.session_state.get("_cari_son_guncelleme", {})
-
-    # ── Manuel Analiz / Çıkış İli / Koli-Palet override'ları — DB'den yükle ──
-    for _ov_key in ["_analiz_manuel_override", "_cikis_ili_manuel", "_koli_palet_manuel"]:
-        if _ov_key not in st.session_state:
-            st.session_state[_ov_key] = {}
-    if not st.session_state.get("_ekstra_override_yuklendi"):
-        st.session_state["_ekstra_override_yuklendi"] = True
-        try:
-            _sb_ex0 = get_sb_client()
-            if _sb_ex0:
-                import json as _exj0
-                _r_ex0 = _sb_ex0.table("kullanici_tercih").select("anahtar,deger").eq("kullanici","__liste_ui__").in_(
-                    "anahtar", ["_analiz_manuel_override", "_cikis_ili_manuel", "_koli_palet_manuel"]).execute()
-                for _row_ex in (_r_ex0.data or []):
-                    st.session_state[_row_ex["anahtar"]] = _exj0.loads(_row_ex["deger"])
-        except:
-            pass
-    _analiz_override = st.session_state.get("_analiz_manuel_override", {})
-    _cikis_ili_map   = st.session_state.get("_cikis_ili_manuel", {})
-    _koli_palet_map  = st.session_state.get("_koli_palet_manuel", {})
 
     # ── Teklif sayısı (yeni sütun, Notlar ile aynı mantık) ──
 
