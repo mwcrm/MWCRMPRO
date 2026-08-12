@@ -4381,8 +4381,13 @@ section[data-testid="stSidebar"] { display: none !important; }
     # 4 teklifi varsa 4 olarak, 2 teklifi varsa 2 olarak sayılır, hepsi
     # toplanır. Kaynak: gerçek teklifler tablosu + manuel override (hangisi
     # varsa o kullanılır — Cari Liste'de gösterilenle birebir aynı mantık).
+    # ÖNEMLİ: sadece AKTİF (silinmemiş, Cari Liste'de görünen) müşterilerle
+    # sınırlanır — aksi halde silinmiş/eski müşterilere ait yetim teklif
+    # kayıtları da toplama karışıp sayıyı şişiriyordu (232 gibi yanlış sayı).
+    _aktif_id_seti = set(str(int(x)) for x in df["id"].dropna().tolist()) if not df.empty and "id" in df.columns else set()
+
     @st.cache_data(ttl=60, show_spinner=False)
-    def _rbar_teklif_toplam_yukle():
+    def _rbar_teklif_toplam_yukle(_aktif_idler):
         _toplam = 0
         try:
             _sb_rbf = get_sb_client()
@@ -4400,7 +4405,7 @@ section[data-testid="stSidebar"] { display: none !important; }
                     _override_map_f = _rbfovj.loads(_r_rbfov.data[0]["deger"])
             except Exception:
                 pass
-            _tum_idler_f = set(_gercek_sayac_f.keys()) | set(_override_map_f.keys())
+            _tum_idler_f = (set(_gercek_sayac_f.keys()) | set(_override_map_f.keys())) & set(_aktif_idler)
             for _mid in _tum_idler_f:
                 if _mid in _override_map_f:
                     try: _toplam += int("".join(ch for ch in str(_override_map_f[_mid]) if ch.isdigit()) or 0)
@@ -4410,7 +4415,7 @@ section[data-testid="stSidebar"] { display: none !important; }
         except Exception:
             return 0
         return _toplam
-    _teklif_firma_sayisi = _rbar_teklif_toplam_yukle()
+    _teklif_firma_sayisi = _rbar_teklif_toplam_yukle(frozenset(_aktif_id_seti))
 
     _grp_data = {
         "genel":    ("📊","GENEL",    None, _genel_items),
