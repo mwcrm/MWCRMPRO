@@ -4613,7 +4613,7 @@ function kartSec(id){
             st.session_state.pop("kart_sec_reset", None)
             st.session_state.pop("kart_sec", None)
 
-        _fc = st.columns([2, 1.5, 1.2, 1.2, 1.6, 0.8, 2])
+        _fc = st.columns([2, 1.5, 1.2, 1.2, 1.0, 0.8, 2, 1.2])
 
         secili_kart_inline = _fc[0].selectbox("m", kart_opts_inline, key="kart_sec_inline", label_visibility="collapsed")
         ara_txt = _fc[1].text_input("a", placeholder="🔍 Firma, yetkili, il...", key="ara_liste", label_visibility="collapsed")
@@ -4648,9 +4648,16 @@ function kartSec(id){
         _tem_sec = []
         siralama_kol = "Tarih↓"
 
-        # Manuel filtre kutularından biri (Aşama, Durum, Arama, İl, İlçe) kullanıldıysa
+        # ── İşlem Tarihi filtresi — tek tarih seç, sadece o gün kayıt/işlem
+        # yapılmış müşteriler görünsün. Filtre satırının en sonunda. ──────────
+        _tarih_filtre_sec = _fc[7].date_input(
+            "t", value=None, key="_cl_fil_tarih_sec",
+            label_visibility="collapsed", help="İşlem Tarihi filtresi — tek gün seçin"
+        )
+
+        # Manuel filtre kutularından biri (Aşama, Durum, Arama, İl, İlçe, Tarih) kullanıldıysa
         # 'Toplam' modu otomatik kapanır — aksi halde seçim görünür ama uygulanmaz
-        if ara_txt or _asama_sec or _durum_sec or _il_sec or _ilce_sec:
+        if ara_txt or _asama_sec or _durum_sec or _il_sec or _ilce_sec or _tarih_filtre_sec:
             st.session_state["_toplam_aktif"] = False
 
         # Çoklu firma seçimi — filtre satırında son sütun
@@ -4771,14 +4778,15 @@ function kartSec(id){
        not st.session_state.get("_cl_fil_asama3") and \
        not st.session_state.get("_cl_fil_sonuc") and \
        not st.session_state.get("_cl_fil_il_multi") and \
-       not st.session_state.get("_cl_fil_ilce_multi"):
+       not st.session_state.get("_cl_fil_ilce_multi") and \
+       not st.session_state.get("_cl_fil_tarih_sec"):
         st.session_state["_toplam_aktif"] = True
 
     # Filtre uygula
     df_f = df.copy()
     # Toplam aktifse tüm filtreleri zorla sıfırla
     if st.session_state.get("_toplam_aktif", False):
-        ara_txt = ""; _asama_sec = []; _durum_sec = []; _il_sec = []; _ilce_sec = []; _tem_sec = []; filtre_seg = "Tümü"
+        ara_txt = ""; _asama_sec = []; _durum_sec = []; _il_sec = []; _ilce_sec = []; _tem_sec = []; filtre_seg = "Tümü"; _tarih_filtre_sec = None
         for _fk in ["_cl_fil_asama1","_cl_fil_asama2","_cl_fil_asama3","_cl_fil_sonuc"]:
             st.session_state.pop(_fk, None)
     # Aşamasız filtresi
@@ -4842,6 +4850,9 @@ function kartSec(id){
             df_f = df_f[df_f["ilce"].astype(str).isin(_ilce_sec)]
         if _tem_sec:
             df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
+        if _tarih_filtre_sec and "tarih" in df_f.columns:
+            _sec_tarih_str = _tarih_filtre_sec.strftime("%Y-%m-%d")
+            df_f = df_f[df_f["tarih"].astype(str).str[:10] == _sec_tarih_str]
 
     # Bölgeler ekranından gelen gizli bölge filtresi (ilçe pill'leri taşmasın diye görünmez uygulanır)
     if st.session_state.get("_bl_ilce_filtre") and "ilce" in df_f.columns:
@@ -4961,7 +4972,7 @@ function kartSec(id){
         df_f = df_f[df_f["id"].isin(_cok_secili_idler)].reset_index(drop=True)
         st.info(f"🔍 {len(df_f)} firma karşılaştırma için seçili — temizlemek için yukarıdaki kutudan kaldırın.")
 
-    _aktif_fil_sayisi = sum([bool(ara_txt),bool(_asama_sec),bool(_durum_sec),filtre_seg!="Tümü",bool(_il_sec),bool(_ilce_sec),bool(_tem_sec)])
+    _aktif_fil_sayisi = sum([bool(ara_txt),bool(_asama_sec),bool(_durum_sec),filtre_seg!="Tümü",bool(_il_sec),bool(_ilce_sec),bool(_tem_sec),bool(_tarih_filtre_sec)])
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
         try:
             kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
