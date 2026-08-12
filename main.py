@@ -4335,10 +4335,26 @@ section[data-testid="stSidebar"] { display: none !important; }
         if str(_dn).upper() in ["NONE","NAN",""] or _dn in ["Portföy","Özel Müşteri"]: continue
         _genel_items.append((_durum_ikon(_dn), _dn, _durum_sayi(_dn), f"durum_{_dn}", _dn in _aktif_fil_durum))
 
+    # ── Gerçek Mesaj sayısı — islem_kaydi tablosundan (WhatsApp/Email gönderim
+    # kayıtları). "AŞAMA" satırındaki Arama/Tekrar Ara/E-Mail kutularının
+    # YANINA, aynı boyutta eklenir — mevcut 3 kutuya dokunulmadan. ───────────
+    @st.cache_data(ttl=60, show_spinner=False)
+    def _rbar_mesaj_toplam_yukle():
+        try:
+            _sb_rbm = get_sb_client()
+            if _sb_rbm:
+                _r_rbm = _sb_rbm.table("islem_kaydi").select("id,islem_turu").in_(
+                    "islem_turu", ["WhatsApp Teklif", "Email Teklif"]).execute()
+                return len(_r_rbm.data or [])
+        except Exception:
+            pass
+        return 0
+    _mesaj_gercek_toplam = _rbar_mesaj_toplam_yukle()
+
     _grp_data = {
         "genel":    ("📊","GENEL",    None, _genel_items),
         "genel":    ("📊","GENEL",    None, _genel_items),
-        "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama]),
+        "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama] + [("💬","Mesaj",_mesaj_gercek_toplam,"mesaj_gercek",False)]),
         "asama1":   ("📅","1. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama1",a),f"asama1_{a}",False)) for a in _grp2_asama]),
         "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama2",a),f"asama2_{a}",False)) for a in _grp3_asama]),
         "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama3",a),f"asama3_{a}",False)) for a in _grp4_asama]),
