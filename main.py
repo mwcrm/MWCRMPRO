@@ -4697,6 +4697,51 @@ function kartSec(id){
         st.caption(f"📋 Kanban — {len(_kb_df)} müşteri · {len(_kanban_filtreli)} sütun")
         st.stop()
 
+    # ── HIZLI SATIR EKLE — Cari Liste'den çıkmadan anında yeni müşteri ekle ──
+    _hz1, _hz2 = st.columns([6, 1])
+    with _hz2:
+        if st.button("➕ Satır Ekle", key="cl_hizli_ekle_btn", use_container_width=True, type="primary"):
+            st.session_state["_cl_hizli_ekle_acik"] = not st.session_state.get("_cl_hizli_ekle_acik", False)
+    if st.session_state.get("_cl_hizli_ekle_acik"):
+        with st.container(border=True):
+            st.caption("➕ Hızlı Müşteri Ekle — sadece Firma adı zorunlu, diğer bilgileri sonra listeden düzenleyebilirsin.")
+            _hzc1, _hzc2, _hzc3, _hzc4, _hzc5 = st.columns([2, 1.5, 1.3, 1.3, 1])
+            _hz_firma = _hzc1.text_input("Firma", key="cl_hizli_firma", placeholder="Firma adı *", label_visibility="collapsed")
+            _hz_yetkili = _hzc2.text_input("Yetkili", key="cl_hizli_yetkili", placeholder="Yetkili (ops.)", label_visibility="collapsed")
+            _hz_gsm = _hzc3.text_input("GSM", key="cl_hizli_gsm", placeholder="GSM (ops.)", label_visibility="collapsed")
+            _hz_il_opts = sorted(list(ILLER_ILCELER.keys()))
+            _hz_il = _hzc4.selectbox("İl", ["İstanbul"] + [i for i in _hz_il_opts if i != "İstanbul"], key="cl_hizli_il", label_visibility="collapsed")
+            if _hzc5.button("💾 Kaydet", key="cl_hizli_kaydet_btn", use_container_width=True, type="primary"):
+                _hz_firma_temiz = (_hz_firma or "").strip()
+                if not _hz_firma_temiz:
+                    st.warning("Firma adı boş bırakılamaz!")
+                else:
+                    _hz_gsm_temiz = "".join(ch for ch in str(_hz_gsm or "") if ch.isdigit())
+                    ok_hz = db_insert("cari_kartlar", {
+                        "tarih": datetime.now().isoformat(),
+                        "firma": _hz_firma_temiz, "rakip_firma": "", "yetkili": (_hz_yetkili or "").strip(),
+                        "gsm": _hz_gsm_temiz, "sabit": "", "email": "", "adres": "",
+                        "ilce": "", "il": _hz_il, "durum": "Portföy",
+                        "temsilci": st.session_state.get("kullanici",""), "islem_asamasi": "",
+                        "segment": "--", "aciklama": "",
+                        "silindi": 0, "olusturan": st.session_state.get("kullanici",""),
+                        "beklenen_ciro": 0, "gerceklesen_ciro": 0,
+                        "atanan_kullanici": st.session_state.get("kullanici","")
+                    })
+                    try:
+                        get_cari_listesi.clear()
+                    except:
+                        pass
+                    try:
+                        db_read.clear()
+                    except:
+                        pass
+                    for _hzk in ["cl_hizli_firma", "cl_hizli_yetkili", "cl_hizli_gsm"]:
+                        st.session_state.pop(_hzk, None)
+                    st.session_state["_cl_hizli_ekle_acik"] = False
+                    st.session_state["kayit_mesaj"] = f"✅ '{_hz_firma_temiz}' eklendi!"
+                    st.rerun()
+
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
     _cok_secili_idler = set()
     with st.expander("🔍 Filtreler & Arama", expanded=st.session_state.get("_cl_fil_acik", True)):
