@@ -5804,6 +5804,16 @@ function kartSec(id){
                     except: pass
                     try: db_read.clear()
                     except: pass
+                    # Aktif bir filtre (İl/İlçe/Tarih/Arama vb.) yeni satırı gizli
+                    # bırakmasın diye ekleme sonrası TÜMÜ moduna zorlanır.
+                    st.session_state["_toplam_aktif"] = True
+                    for _fk_temiz in ["ara_liste","_cl_fil_asama_multi","_cl_fil_durum_multi",
+                                      "_cl_fil_il_multi","_cl_fil_ilce_multi","_cl_fil_guncelleme_tarih_multi",
+                                      "_cl_cok_secim","_asamasiz_aktif","_cl_fil_asama1","_cl_fil_asama2",
+                                      "_cl_fil_asama3","_cl_fil_sonuc"]:
+                        st.session_state.pop(_fk_temiz, None)
+                    st.session_state.pop("cari_editor", None)
+                    st.session_state.pop("_ls_tablo", None)
                     st.session_state["kayit_mesaj"] = "✅ Boş satır eklendi — en üstte '(Yeni Müşteri)' olarak görünüyor, hücrelere tıklayıp doldurabilirsin."
                     st.rerun()
                 else:
