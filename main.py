@@ -5778,46 +5778,8 @@ function kartSec(id){
                 st.session_state["_kaydet_flag"] = True
         with _sb2:
             if st.button("➕ Satır Ekle", key="cl_hizli_ekle_btn_ust"):
-                _sb_hz_ust = get_sb_client()
-                _hz_basarili = False
-                _hz_hata_ust = ""
-                if _sb_hz_ust:
-                    try:
-                        _res_hz_ust = _sb_hz_ust.table("cari_kartlar").insert({
-                            "tarih": datetime.now().isoformat(),
-                            "firma": "(Yeni Müşteri)", "rakip_firma": "", "yetkili": "",
-                            "gsm": "", "sabit": "", "email": "", "adres": "",
-                            "ilce": "", "il": "İstanbul", "durum": "Portföy",
-                            "temsilci": st.session_state.get("kullanici",""), "islem_asamasi": "",
-                            "segment": "--", "aciklama": "",
-                            "silindi": 0, "olusturan": st.session_state.get("kullanici",""),
-                            "beklenen_ciro": 0, "gerceklesen_ciro": 0,
-                            "atanan_kullanici": st.session_state.get("kullanici","")
-                        }).execute()
-                        _hz_basarili = bool(_res_hz_ust.data)
-                    except Exception as _hz_e_ust:
-                        _hz_hata_ust = str(_hz_e_ust)
-                else:
-                    _hz_hata_ust = "Supabase bağlantısı yok."
-                if _hz_basarili:
-                    try: get_cari_listesi.clear()
-                    except: pass
-                    try: db_read.clear()
-                    except: pass
-                    # Aktif bir filtre (İl/İlçe/Tarih/Arama vb.) yeni satırı gizli
-                    # bırakmasın diye ekleme sonrası TÜMÜ moduna zorlanır.
-                    st.session_state["_toplam_aktif"] = True
-                    for _fk_temiz in ["ara_liste","_cl_fil_asama_multi","_cl_fil_durum_multi",
-                                      "_cl_fil_il_multi","_cl_fil_ilce_multi","_cl_fil_guncelleme_tarih_multi",
-                                      "_cl_cok_secim","_asamasiz_aktif","_cl_fil_asama1","_cl_fil_asama2",
-                                      "_cl_fil_asama3","_cl_fil_sonuc"]:
-                        st.session_state.pop(_fk_temiz, None)
-                    st.session_state.pop("cari_editor", None)
-                    st.session_state.pop("_ls_tablo", None)
-                    st.session_state["kayit_mesaj"] = "✅ Boş satır eklendi — en üstte '(Yeni Müşteri)' olarak görünüyor, hücrelere tıklayıp doldurabilirsin."
-                    st.rerun()
-                else:
-                    st.error(f"❌ Satır eklenemedi: {_hz_hata_ust}")
+                st.session_state["_cl_taslak_aktif"] = True
+                st.rerun()
         with _sb3:
             if st.button("🔄 Kolon Sıfırla", key="cl_kolon_sifirla_ust"):
                 st.session_state.pop("_cl_kolon_sira", None)
@@ -5826,6 +5788,20 @@ function kartSec(id){
 
     _tbl_col = st.container()
     _not_col = None
+
+    # ── TASLAK SATIR — "➕ Satır Ekle" ile açılan, henüz DB'ye YAZILMAMIŞ boş
+    # satır. id=0 ile işaretlenir. Firma alanı doldurulup "Kaydet" edilirse
+    # gerçek bir müşteri kaydı oluşturulur (kaydetmezsen hiçbir şey yazılmaz).
+    if st.session_state.get("_cl_taslak_aktif"):
+        _tas_bos = {c: "" for c in df_edit.columns}
+        _tas_bos["id"] = 0
+        if "Seç" in df_edit.columns:
+            _tas_bos["Seç"] = False
+        if "beklenen_ciro" in df_edit.columns:
+            _tas_bos["beklenen_ciro"] = 0
+        if "gerceklesen_ciro" in df_edit.columns:
+            _tas_bos["gerceklesen_ciro"] = 0
+        df_edit = pd.concat([pd.DataFrame([_tas_bos]), df_edit], ignore_index=True)
 
     # Tablo yüksekliğini görünen satır sayısına göre hesapla — sabit 800px'lik
     # yükseklik, sayfa başına 12 satır varken altında boş satırlar bırakıyordu.
@@ -5973,6 +5949,81 @@ function kartSec(id){
                     _rows = _json_ls.loads(_tablo_json) if _tablo_json else []
                 except:
                     _rows = []
+
+                # ── TASLAK SATIR (id=0) işleme — "Satır Ekle" ile açılan boş
+                # satır burada gerçek kayda dönüşür. Firma alanı hâlâ boşsa
+                # hiçbir şey yapılmaz, taslak ekranda kalmaya devam eder
+                # (yani kaydetmezsen/firma yazmazsan cariye eklenmez).
+                _taslak_idx = None
+                for _ti, _trow in enumerate(_rows):
+                    try:
+                        if int(float(str(_trow.get("id", -1)))) == 0:
+                            _taslak_idx = _ti
+                            break
+                    except Exception:
+                        continue
+                if _taslak_idx is not None:
+                    _taslak_idx_str = str(_taslak_idx)
+                    _taslak_firma = ""
+                    _ed_tas = None
+                    if "edited_df" in dir():
+                        try:
+                            _ed_tas = edited_df.reset_index(drop=True)
+                            if _taslak_idx < len(_ed_tas) and "firma" in _ed_tas.columns:
+                                _taslak_firma = str(_ed_tas.at[_taslak_idx, "firma"] or "").strip()
+                        except Exception:
+                            _ed_tas = None
+                    if not _taslak_firma:
+                        # Firma boş — DB'ye hiçbir şey yazma, taslağı olduğu gibi bırak
+                        _edited_rows.pop(_taslak_idx_str, None)
+                    else:
+                        def _tas_al(_kol, _varsayilan=""):
+                            try:
+                                if _ed_tas is not None and _kol in _ed_tas.columns:
+                                    _v = _ed_tas.at[_taslak_idx, _kol]
+                                    return str(_v) if _v not in [None, "nan", "None"] else _varsayilan
+                            except Exception:
+                                pass
+                            return _varsayilan
+                        _yeni_kayit = {
+                            "tarih": datetime.now().isoformat(),
+                            "firma": _taslak_firma,
+                            "rakip_firma": _tas_al("rakip_firma"),
+                            "yetkili": _tas_al("yetkili"),
+                            "gsm": "".join(ch for ch in _tas_al("gsm") if ch.isdigit()),
+                            "sabit": "".join(ch for ch in _tas_al("sabit") if ch.isdigit()),
+                            "email": _tas_al("email"),
+                            "adres": _tas_al("adres"),
+                            "ilce": _tas_al("ilce"),
+                            "il": _tas_al("il", "İstanbul"),
+                            "durum": _tas_al("durum", "Portföy"),
+                            "temsilci": _tas_al("temsilci", st.session_state.get("kullanici","")),
+                            "islem_asamasi": _tas_al("islem_asamasi"),
+                            "segment": "--",
+                            "aciklama": _tas_al("aciklama"),
+                            "silindi": 0, "olusturan": st.session_state.get("kullanici",""),
+                            "beklenen_ciro": 0, "gerceklesen_ciro": 0,
+                            "atanan_kullanici": st.session_state.get("kullanici","")
+                        }
+                        _taslak_basarili = False
+                        _taslak_hata = ""
+                        try:
+                            _sb_tas = get_sb_client()
+                            if _sb_tas:
+                                _res_tas = _sb_tas.table("cari_kartlar").insert(_yeni_kayit).execute()
+                                _taslak_basarili = bool(_res_tas.data)
+                            else:
+                                _taslak_hata = "Supabase bağlantısı yok."
+                        except Exception as _tas_e:
+                            _taslak_hata = str(_tas_e)
+                        if _taslak_basarili:
+                            kayit_sayi += 1
+                            st.session_state["_cl_taslak_aktif"] = False
+                            try: get_cari_listesi.clear()
+                            except: pass
+                        else:
+                            hata_list.append(f"Yeni satır ({_taslak_firma}): {_taslak_hata}")
+                        _edited_rows.pop(_taslak_idx_str, None)
 
                 # ── Teklif/Mesaj manuel override'ları — cari_kartlar'da bu isimde
                 # kolon yok, bu yüzden ayrı kullanici_tercih JSON'unda saklanır.
