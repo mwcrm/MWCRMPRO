@@ -4376,41 +4376,41 @@ section[data-testid="stSidebar"] { display: none !important; }
     _mesaj_gercek_toplam = _rbar_mesaj_toplam_yukle()
 
 
-    # ── "2. AŞAMA — Teklif" sayısı — teklif VERİLEN TEKİL FİRMA sayısı.
-    # Eskiden sadece asama2="Teklif" işaretli müşteriler sayılıyordu (sabit
-    # kalıyordu). Artık: gerçek teklifler tablosundaki firmalar + Cari
-    # Liste'de manuel Teklif değeri girilmiş firmalar birlikte, TEKİL olarak
-    # sayılıyor (bir firma birden fazla teklif almış olsa da 1 kez sayılır).
+    # ── "2. AŞAMA — Teklif" sayısı — Cari Liste'deki "🧾 Teklif" kolonunda
+    # görünen TÜM sayıların TOPLAMI (tekil firma sayısı DEĞİL). Bir firmanın
+    # 4 teklifi varsa 4 olarak, 2 teklifi varsa 2 olarak sayılır, hepsi
+    # toplanır. Kaynak: gerçek teklifler tablosu + manuel override (hangisi
+    # varsa o kullanılır — Cari Liste'de gösterilenle birebir aynı mantık).
     @st.cache_data(ttl=60, show_spinner=False)
-    def _rbar_teklif_firma_sayisi_yukle():
-        _firma_set = set()
+    def _rbar_teklif_toplam_yukle():
+        _toplam = 0
         try:
             _sb_rbf = get_sb_client()
             if not _sb_rbf:
                 return 0
             _r_rbf = _sb_rbf.table("teklifler").select("musteri_id").execute()
-            for _row in (_r_rbf.data or []):
-                _mid = _row.get("musteri_id")
-                if _mid not in [None, "", 0, "0"]:
-                    _firma_set.add(str(_mid))
+            import collections as _rbfcol
+            _gercek_sayac_f = _rbfcol.Counter([str(r.get("musteri_id","")) for r in (_r_rbf.data or [])])
+            _override_map_f = {}
             try:
                 _r_rbfov = _sb_rbf.table("kullanici_tercih").select("deger").eq(
                     "kullanici","__liste_ui__").eq("anahtar","_teklif_manuel_override").execute()
                 if _r_rbfov.data:
                     import json as _rbfovj
                     _override_map_f = _rbfovj.loads(_r_rbfov.data[0]["deger"])
-                    for _mid, _val in _override_map_f.items():
-                        try:
-                            if int("".join(ch for ch in str(_val) if ch.isdigit()) or 0) > 0:
-                                _firma_set.add(str(_mid))
-                        except Exception:
-                            pass
             except Exception:
                 pass
+            _tum_idler_f = set(_gercek_sayac_f.keys()) | set(_override_map_f.keys())
+            for _mid in _tum_idler_f:
+                if _mid in _override_map_f:
+                    try: _toplam += int("".join(ch for ch in str(_override_map_f[_mid]) if ch.isdigit()) or 0)
+                    except Exception: pass
+                else:
+                    _toplam += _gercek_sayac_f.get(_mid, 0)
         except Exception:
             return 0
-        return len(_firma_set)
-    _teklif_firma_sayisi = _rbar_teklif_firma_sayisi_yukle()
+        return _toplam
+    _teklif_firma_sayisi = _rbar_teklif_toplam_yukle()
 
     _grp_data = {
         "genel":    ("📊","GENEL",    None, _genel_items),
@@ -6151,7 +6151,7 @@ function kartSec(id){
                     # sonra güncel görünsün diye önbellek burada da temizlenir.
                     try: _rbar_mesaj_toplam_yukle.clear()
                     except: pass
-                    try: _rbar_teklif_firma_sayisi_yukle.clear()
+                    try: _rbar_teklif_toplam_yukle.clear()
                     except: pass
 
                 # ── Analiz / Çıkış İli / Koli-Palet manuel override'ları ────────────────
