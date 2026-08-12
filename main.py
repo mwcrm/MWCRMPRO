@@ -5778,23 +5778,36 @@ function kartSec(id){
                 st.session_state["_kaydet_flag"] = True
         with _sb2:
             if st.button("➕ Satır Ekle", key="cl_hizli_ekle_btn_ust"):
-                ok_hz_ust = db_insert("cari_kartlar", {
-                    "tarih": datetime.now().isoformat(),
-                    "firma": "(Yeni Müşteri)", "rakip_firma": "", "yetkili": "",
-                    "gsm": "", "sabit": "", "email": "", "adres": "",
-                    "ilce": "", "il": "İstanbul", "durum": "Portföy",
-                    "temsilci": st.session_state.get("kullanici",""), "islem_asamasi": "",
-                    "segment": "--", "aciklama": "",
-                    "silindi": 0, "olusturan": st.session_state.get("kullanici",""),
-                    "beklenen_ciro": 0, "gerceklesen_ciro": 0,
-                    "atanan_kullanici": st.session_state.get("kullanici","")
-                })
-                try: get_cari_listesi.clear()
-                except: pass
-                try: db_read.clear()
-                except: pass
-                st.session_state["kayit_mesaj"] = "✅ Boş satır eklendi — en üstte '(Yeni Müşteri)' olarak görünüyor, hücrelere tıklayıp doldurabilirsin."
-                st.rerun()
+                _sb_hz_ust = get_sb_client()
+                _hz_basarili = False
+                _hz_hata_ust = ""
+                if _sb_hz_ust:
+                    try:
+                        _res_hz_ust = _sb_hz_ust.table("cari_kartlar").insert({
+                            "tarih": datetime.now().isoformat(),
+                            "firma": "(Yeni Müşteri)", "rakip_firma": "", "yetkili": "",
+                            "gsm": "", "sabit": "", "email": "", "adres": "",
+                            "ilce": "", "il": "İstanbul", "durum": "Portföy",
+                            "temsilci": st.session_state.get("kullanici",""), "islem_asamasi": "",
+                            "segment": "--", "aciklama": "",
+                            "silindi": 0, "olusturan": st.session_state.get("kullanici",""),
+                            "beklenen_ciro": 0, "gerceklesen_ciro": 0,
+                            "atanan_kullanici": st.session_state.get("kullanici","")
+                        }).execute()
+                        _hz_basarili = bool(_res_hz_ust.data)
+                    except Exception as _hz_e_ust:
+                        _hz_hata_ust = str(_hz_e_ust)
+                else:
+                    _hz_hata_ust = "Supabase bağlantısı yok."
+                if _hz_basarili:
+                    try: get_cari_listesi.clear()
+                    except: pass
+                    try: db_read.clear()
+                    except: pass
+                    st.session_state["kayit_mesaj"] = "✅ Boş satır eklendi — en üstte '(Yeni Müşteri)' olarak görünüyor, hücrelere tıklayıp doldurabilirsin."
+                    st.rerun()
+                else:
+                    st.error(f"❌ Satır eklenemedi: {_hz_hata_ust}")
         with _sb3:
             if st.button("🔄 Kolon Sıfırla", key="cl_kolon_sifirla_ust"):
                 st.session_state.pop("_cl_kolon_sira", None)
@@ -6083,20 +6096,42 @@ function kartSec(id){
                                 _rn_dt = None
                     if not _rn_dt:
                         continue  # anlaşılamayan tarih — sessizce atla, veri bozma
+                    _rn_basarili = False
+                    _rn_hata = ""
                     try:
-                        db_insert("randevular", {
-                            "randevu_tarihi": _rn_dt.strftime("%Y-%m-%d"),
-                            "randevu_saati": _rn_saat,
-                            "musteri_id": _rid_rn, "musteri_adi": _firma_rn,
-                            "bolge": "", "gorev": "", "takip": "",
-                            "adet": 1, "aciklama": "Cari Liste'den hızlı eklendi",
-                            "sonuc": "", "temsilci": st.session_state.get("kullanici",""),
-                            "olusturan": st.session_state.get("kullanici","")
-                        })
+                        _sb_rn = get_sb_client()
+                        if _sb_rn:
+                            _res_rn = _sb_rn.table("randevular").insert({
+                                "randevu_tarihi": _rn_dt.strftime("%Y-%m-%d"),
+                                "randevu_saati": _rn_saat,
+                                "musteri_id": _rid_rn, "musteri_adi": _firma_rn,
+                                "bolge": "", "gorev": "", "takip": "",
+                                "adet": 1, "aciklama": "Cari Liste'den hızlı eklendi",
+                                "sonuc": "", "temsilci": st.session_state.get("kullanici",""),
+                                "olusturan": st.session_state.get("kullanici","")
+                            }).execute()
+                            _rn_basarili = bool(_res_rn.data)
+                        else:
+                            _rn_hata = "Supabase bağlantısı yok."
+                    except Exception as _rn_e:
+                        _rn_hata = str(_rn_e)
+                    if _rn_basarili:
                         try: db_read.clear()
                         except: pass
-                    except Exception:
-                        pass
+                        # Randevu tarihi eklenince, müşterinin "1. Aşama"sı henüz
+                        # boşsa otomatik "Randevu" yapılır — Kanban'daki "1. AŞAMA"
+                        # sayacına yansısın diye (aksi halde sayaç hiç değişmiyordu).
+                        _mevcut_asama1 = str(_rows[_idxn_rn].get("asama1","") or "").strip()
+                        if not _mevcut_asama1:
+                            try:
+                                if _sb_rn:
+                                    _sb_rn.table("cari_kartlar").update({"asama1":"Randevu"}).eq("id", _rid_rn).execute()
+                                    try: get_cari_listesi.clear()
+                                    except: pass
+                            except Exception:
+                                pass
+                    else:
+                        st.error(f"❌ Randevu kaydedilemedi ({_firma_rn}): {_rn_hata}")
 
                 # ── Güncelleme Tarihi izi — gerçekten bir alan (aşama, durum, açıklama,
                 # ciro vb.) değişen HER satır için "şu an" damgası basılır. "Seç"
