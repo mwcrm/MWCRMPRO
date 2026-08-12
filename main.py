@@ -3831,6 +3831,90 @@ section[data-testid="stSidebar"] { display: none !important; }
     # kayıt/silme/arşivleme işleminden SONRA (ilgili yerlerde zaten çağrılıyor)
     # temizleniyor; salt düzenleme sırasında 60 saniyelik önbellek kullanılıyor.
     df = get_cari_listesi()
+
+    # ── Güncelleme Tarihi ön-hesabı — ÇOKLU TARİH filtre kutusu için burada
+    # (filtrelemeden önce) hesaplanmalı. Kaynaklar: not/açıklama, teklif,
+    # mesaj/arama kaydı + cari kartında yapılan gerçek düzenleme izi +
+    # hiçbiri yoksa ilk kayıt tarihi. SAATSİZ — sadece gün baz alınır.
+    if "_cari_son_guncelleme" not in st.session_state:
+        st.session_state["_cari_son_guncelleme"] = {}
+        try:
+            _sb_sg_erken = get_sb_client()
+            if _sb_sg_erken:
+                import json as _sgj_erken
+                _r_sg_erken = _sb_sg_erken.table("kullanici_tercih").select("deger").eq(
+                    "kullanici","__liste_ui__").eq("anahtar","_cari_son_guncelleme").execute()
+                if _r_sg_erken.data:
+                    st.session_state["_cari_son_guncelleme"] = _sgj_erken.loads(_r_sg_erken.data[0]["deger"])
+        except:
+            pass
+    _cari_son_guncelleme_erken = st.session_state.get("_cari_son_guncelleme", {})
+
+    @st.cache_data(ttl=60, show_spinner=False)
+    def _son_aktivite_tarihleri_yukle_erken():
+        _sonuc = {}
+        _sb_ae = get_sb_client()
+        if not _sb_ae:
+            return _sonuc
+
+        def _guncelle_ae(_mid_ham, _tarih_ham):
+            if not _mid_ham or not _tarih_ham:
+                return
+            _mid = str(_mid_ham)
+            _yeni_dt = _guncelleme_tarih_parse(_tarih_ham)
+            if _yeni_dt is None:
+                return
+            _mevcut_dt = _guncelleme_tarih_parse(_sonuc.get(_mid)) if _mid in _sonuc else None
+            if _mevcut_dt is None or _yeni_dt > _mevcut_dt:
+                _sonuc[_mid] = str(_tarih_ham)
+
+        try:
+            _rae1 = _sb_ae.table("cari_aciklamalar").select("cari_id,created_at").execute()
+            for _rw in (_rae1.data or []):
+                _guncelle_ae(_rw.get("cari_id"), _rw.get("created_at"))
+        except Exception:
+            pass
+        try:
+            _rae2 = _sb_ae.table("teklifler").select("musteri_id,created_at").execute()
+            for _rw in (_rae2.data or []):
+                _guncelle_ae(_rw.get("musteri_id"), _rw.get("created_at"))
+        except Exception:
+            pass
+        try:
+            _rae3 = _sb_ae.table("islem_kaydi").select("musteri_id,tarih").execute()
+            for _rw in (_rae3.data or []):
+                _guncelle_ae(_rw.get("musteri_id"), _rw.get("tarih"))
+        except Exception:
+            pass
+        return _sonuc
+
+    _son_aktivite_erken = {}
+    try:
+        _son_aktivite_erken = _son_aktivite_tarihleri_yukle_erken()
+    except Exception:
+        _son_aktivite_erken = {}
+
+    # id_str -> en son güncelleme GÜNÜ (datetime.date, saatsiz)
+    _id_guncelleme_gun = {}
+    if not df.empty and "id" in df.columns:
+        for _gidx, _grow in df.iterrows():
+            try:
+                _grid = str(int(_grow["id"]))
+            except Exception:
+                continue
+            _gr_ilk = _grow.get("tarih") or _grow.get("created_at")
+            _adaylar_ae = [t for t in [_son_aktivite_erken.get(_grid, ""), _cari_son_guncelleme_erken.get(_grid, ""), str(_gr_ilk or "")] if t]
+            if not _adaylar_ae:
+                continue
+            _dts_ae = [d for d in (_guncelleme_tarih_parse(t) for t in _adaylar_ae) if d]
+            if _dts_ae:
+                _id_guncelleme_gun[_grid] = max(_dts_ae).date()
+
+    # Filtre kutusu seçenekleri — en yeni tarih en üstte
+    _guncelleme_tarih_opts = sorted(set(_id_guncelleme_gun.values()), reverse=True)
+    _guncelleme_tarih_opts_str = [d.strftime("%d.%m.%Y") for d in _guncelleme_tarih_opts]
+    _id_guncelleme_gun_str = {k: v.strftime("%d.%m.%Y") for k, v in _id_guncelleme_gun.items()}
+
     # NOT: "tarih" (İşlem Tarih) sütunu tablonun içinde DÜZENLENEBİLİR bir alan.
     # Eskiden her rerun'da canlı "tarih" değerine göre yeniden sıralanıyordu —
     # yani bir müşterinin İşlem Tarihini değiştirip kaydetmek o müşterinin
@@ -4648,16 +4732,17 @@ function kartSec(id){
         _tem_sec = []
         siralama_kol = "Tarih↓"
 
-        # ── İşlem Tarihi filtresi — tek tarih seç, sadece o gün kayıt/işlem
-        # yapılmış müşteriler görünsün. Filtre satırının en sonunda. ──────────
-        _tarih_filtre_sec = _fc[7].date_input(
-            "t", value=None, key="_cl_fil_tarih_sec",
-            label_visibility="collapsed", help="İşlem Tarihi filtresi — tek gün seçin"
+        # ── Güncelleme Tarihi filtresi — ÇOKLU seçim, saatsiz (sadece gün).
+        # "Çoklu firma" ile aynı mantık: seçenekler alt alta açılır, birden
+        # fazla tarih seçilebilir. Filtre satırının en sonunda. ──────────────
+        _guncelleme_tarih_sec = _fc[7].multiselect(
+            "gt", _guncelleme_tarih_opts_str, key="_cl_fil_guncelleme_tarih_multi",
+            placeholder="🔍 Güncelleme Tarihi...", label_visibility="collapsed"
         )
 
         # Manuel filtre kutularından biri (Aşama, Durum, Arama, İl, İlçe, Tarih) kullanıldıysa
         # 'Toplam' modu otomatik kapanır — aksi halde seçim görünür ama uygulanmaz
-        if ara_txt or _asama_sec or _durum_sec or _il_sec or _ilce_sec or _tarih_filtre_sec:
+        if ara_txt or _asama_sec or _durum_sec or _il_sec or _ilce_sec or _guncelleme_tarih_sec:
             st.session_state["_toplam_aktif"] = False
 
         # Çoklu firma seçimi — filtre satırında son sütun
@@ -4779,14 +4864,14 @@ function kartSec(id){
        not st.session_state.get("_cl_fil_sonuc") and \
        not st.session_state.get("_cl_fil_il_multi") and \
        not st.session_state.get("_cl_fil_ilce_multi") and \
-       not st.session_state.get("_cl_fil_tarih_sec"):
+       not st.session_state.get("_cl_fil_guncelleme_tarih_multi"):
         st.session_state["_toplam_aktif"] = True
 
     # Filtre uygula
     df_f = df.copy()
     # Toplam aktifse tüm filtreleri zorla sıfırla
     if st.session_state.get("_toplam_aktif", False):
-        ara_txt = ""; _asama_sec = []; _durum_sec = []; _il_sec = []; _ilce_sec = []; _tem_sec = []; filtre_seg = "Tümü"; _tarih_filtre_sec = None
+        ara_txt = ""; _asama_sec = []; _durum_sec = []; _il_sec = []; _ilce_sec = []; _tem_sec = []; filtre_seg = "Tümü"; _guncelleme_tarih_sec = []
         for _fk in ["_cl_fil_asama1","_cl_fil_asama2","_cl_fil_asama3","_cl_fil_sonuc"]:
             st.session_state.pop(_fk, None)
     # Aşamasız filtresi
@@ -4850,9 +4935,13 @@ function kartSec(id){
             df_f = df_f[df_f["ilce"].astype(str).isin(_ilce_sec)]
         if _tem_sec:
             df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
-        if _tarih_filtre_sec and "tarih" in df_f.columns:
-            _sec_tarih_str = _tarih_filtre_sec.strftime("%Y-%m-%d")
-            df_f = df_f[df_f["tarih"].astype(str).str[:10] == _sec_tarih_str]
+        if _guncelleme_tarih_sec:
+            # Güncelleme Tarihi — ÇOKLU seçim, saatsiz. Sayfa başında (satır
+            # filtrelemeden önce) hesaplanan _id_guncelleme_gun_str haritasını
+            # kullanır (not/teklif/mesaj kaydı + gerçek düzenleme izi + ilk kayıt
+            # tarihinin en yenisi, sadece gün olarak).
+            _sec_tarih_set = set(_guncelleme_tarih_sec)
+            df_f = df_f[df_f["id"].apply(lambda x: _id_guncelleme_gun_str.get(str(int(x)), "") in _sec_tarih_set)]
 
     # Bölgeler ekranından gelen gizli bölge filtresi (ilçe pill'leri taşmasın diye görünmez uygulanır)
     if st.session_state.get("_bl_ilce_filtre") and "ilce" in df_f.columns:
@@ -4972,7 +5061,7 @@ function kartSec(id){
         df_f = df_f[df_f["id"].isin(_cok_secili_idler)].reset_index(drop=True)
         st.info(f"🔍 {len(df_f)} firma karşılaştırma için seçili — temizlemek için yukarıdaki kutudan kaldırın.")
 
-    _aktif_fil_sayisi = sum([bool(ara_txt),bool(_asama_sec),bool(_durum_sec),filtre_seg!="Tümü",bool(_il_sec),bool(_ilce_sec),bool(_tem_sec),bool(_tarih_filtre_sec)])
+    _aktif_fil_sayisi = sum([bool(ara_txt),bool(_asama_sec),bool(_durum_sec),filtre_seg!="Tümü",bool(_il_sec),bool(_ilce_sec),bool(_tem_sec),bool(_guncelleme_tarih_sec)])
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
         try:
             kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
