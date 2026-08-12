@@ -6143,6 +6143,13 @@ function kartSec(id){
                             ], on_conflict="kullanici,anahtar").execute()
                     except:
                         pass
+                    # Üst AŞAMA raporundaki Teklif/Mesaj toplam kutuları 60 sn
+                    # önbellekli — kaydettikten hemen sonra güncel görünsün diye
+                    # önbellek burada da temizlenir.
+                    try: _rbar_teklif_toplam_yukle.clear()
+                    except: pass
+                    try: _rbar_mesaj_toplam_yukle.clear()
+                    except: pass
 
                 # ── Analiz / Çıkış İli / Koli-Palet manuel override'ları ────────────────
                 _analiz_ov_guncel = dict(st.session_state.get("_analiz_manuel_override", {}))
