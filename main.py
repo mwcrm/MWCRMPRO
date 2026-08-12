@@ -4336,19 +4336,43 @@ section[data-testid="stSidebar"] { display: none !important; }
         _genel_items.append((_durum_ikon(_dn), _dn, _durum_sayi(_dn), f"durum_{_dn}", _dn in _aktif_fil_durum))
 
     # ── Gerçek Mesaj sayısı — islem_kaydi tablosundan (WhatsApp/Email gönderim
-    # kayıtları). "AŞAMA" satırındaki Arama/Tekrar Ara/E-Mail kutularının
-    # YANINA, aynı boyutta eklenir — mevcut 3 kutuya dokunulmadan. ───────────
+    # kayıtları) + Cari Liste'de MANUEL yazılan override değerleri. Cari
+    # Liste'de görünen "💬 N" değerleriyle BİREBİR aynı toplamı versin diye
+    # override'lar da dahil ediliyor (sadece gerçek kayıt sayısı değil).
     @st.cache_data(ttl=60, show_spinner=False)
     def _rbar_mesaj_toplam_yukle():
+        _toplam = 0
         try:
             _sb_rbm = get_sb_client()
-            if _sb_rbm:
-                _r_rbm = _sb_rbm.table("islem_kaydi").select("id,islem_turu").in_(
-                    "islem_turu", ["WhatsApp Teklif", "Email Teklif"]).execute()
-                return len(_r_rbm.data or [])
+            if not _sb_rbm:
+                return 0
+            # 1) Her müşterinin GERÇEK mesaj sayısı (islem_kaydi'den)
+            _r_rbm = _sb_rbm.table("islem_kaydi").select("musteri_id,islem_turu").in_(
+                "islem_turu", ["WhatsApp Teklif", "Email Teklif"]).execute()
+            import collections as _rbmcol
+            _gercek_sayac = _rbmcol.Counter([str(r.get("musteri_id","")) for r in (_r_rbm.data or [])])
+            # 2) Manuel override'lar (Cari Liste'de elle yazılmış değerler)
+            _override_map = {}
+            try:
+                _r_rbov = _sb_rbm.table("kullanici_tercih").select("deger").eq(
+                    "kullanici","__liste_ui__").eq("anahtar","_mesaj_manuel_override").execute()
+                if _r_rbov.data:
+                    import json as _rbovj
+                    _override_map = _rbovj.loads(_r_rbov.data[0]["deger"])
+            except Exception:
+                pass
+            # 3) Sistemdeki TÜM müşteri id'leri üzerinden — override varsa onu,
+            # yoksa gerçek sayıyı topla (Cari Liste'de gösterilenle aynı mantık)
+            _tum_idler = set(_gercek_sayac.keys()) | set(_override_map.keys())
+            for _mid in _tum_idler:
+                if _mid in _override_map:
+                    try: _toplam += int("".join(ch for ch in str(_override_map[_mid]) if ch.isdigit()) or 0)
+                    except Exception: pass
+                else:
+                    _toplam += _gercek_sayac.get(_mid, 0)
         except Exception:
-            pass
-        return 0
+            return 0
+        return _toplam
     _mesaj_gercek_toplam = _rbar_mesaj_toplam_yukle()
 
     _grp_data = {
