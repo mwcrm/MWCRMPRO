@@ -3833,9 +3833,12 @@ section[data-testid="stSidebar"] { display: none !important; }
     df = get_cari_listesi()
 
     # ── Güncelleme Tarihi ön-hesabı — ÇOKLU TARİH filtre kutusu için burada
-    # (filtrelemeden önce) hesaplanmalı. Kaynaklar: not/açıklama, teklif,
-    # mesaj/arama kaydı + cari kartında yapılan gerçek düzenleme izi +
-    # hiçbiri yoksa ilk kayıt tarihi. SAATSİZ — sadece gün baz alınır.
+    # (filtrelemeden önce) hesaplanmalı. ÖNEMLİ: bir müşterinin sadece "EN SON"
+    # tarihine bakılmıyor — o müşteriye ait HER işlemin (her not, her teklif,
+    # her mesaj/arama, her kart düzenlemesi, ilk kayıt) kendi tarihi ayrı ayrı
+    # toplanıyor. Böylece "8 Temmuz" seçilince, en son işlemi daha sonraki bir
+    # tarihte olsa bile 8 Temmuz'da GERÇEKTEN işlem görmüş her müşteri gelir —
+    # sadece "en son işlemi tam o gün olan" tek bir müşteri değil. SAATSİZ.
     if "_cari_son_guncelleme" not in st.session_state:
         st.session_state["_cari_son_guncelleme"] = {}
         try:
@@ -3851,69 +3854,82 @@ section[data-testid="stSidebar"] { display: none !important; }
     _cari_son_guncelleme_erken = st.session_state.get("_cari_son_guncelleme", {})
 
     @st.cache_data(ttl=60, show_spinner=False)
-    def _son_aktivite_tarihleri_yukle_erken():
-        _sonuc = {}
+    def _tum_aktivite_tarihleri_yukle_erken():
+        """id_str -> o müşteriye ait TÜM işlem günlerinin kümesi (set of date)."""
+        import collections as _colae
+        _kume = _colae.defaultdict(set)
         _sb_ae = get_sb_client()
         if not _sb_ae:
-            return _sonuc
+            return dict(_kume)
 
-        def _guncelle_ae(_mid_ham, _tarih_ham):
+        def _ekle_ae(_mid_ham, _tarih_ham):
             if not _mid_ham or not _tarih_ham:
                 return
-            _mid = str(_mid_ham)
-            _yeni_dt = _guncelleme_tarih_parse(_tarih_ham)
-            if _yeni_dt is None:
+            _dt = _guncelleme_tarih_parse(_tarih_ham)
+            if _dt is None:
                 return
-            _mevcut_dt = _guncelleme_tarih_parse(_sonuc.get(_mid)) if _mid in _sonuc else None
-            if _mevcut_dt is None or _yeni_dt > _mevcut_dt:
-                _sonuc[_mid] = str(_tarih_ham)
+            _kume[str(_mid_ham)].add(_dt.date())
 
+        # 1) Notlar/açıklamalar
         try:
             _rae1 = _sb_ae.table("cari_aciklamalar").select("cari_id,created_at").execute()
             for _rw in (_rae1.data or []):
-                _guncelle_ae(_rw.get("cari_id"), _rw.get("created_at"))
+                _ekle_ae(_rw.get("cari_id"), _rw.get("created_at"))
         except Exception:
             pass
+        # 2) Teklifler
         try:
             _rae2 = _sb_ae.table("teklifler").select("musteri_id,created_at").execute()
             for _rw in (_rae2.data or []):
-                _guncelle_ae(_rw.get("musteri_id"), _rw.get("created_at"))
+                _ekle_ae(_rw.get("musteri_id"), _rw.get("created_at"))
         except Exception:
             pass
+        # 3) Mesaj/arama/whatsapp kayıtları
         try:
             _rae3 = _sb_ae.table("islem_kaydi").select("musteri_id,tarih").execute()
             for _rw in (_rae3.data or []):
-                _guncelle_ae(_rw.get("musteri_id"), _rw.get("tarih"))
+                _ekle_ae(_rw.get("musteri_id"), _rw.get("tarih"))
         except Exception:
             pass
-        return _sonuc
+        return {k: v for k, v in _kume.items()}
 
-    _son_aktivite_erken = {}
+    _tum_aktivite_erken = {}
     try:
-        _son_aktivite_erken = _son_aktivite_tarihleri_yukle_erken()
+        _tum_aktivite_erken = _tum_aktivite_tarihleri_yukle_erken()
     except Exception:
-        _son_aktivite_erken = {}
+        _tum_aktivite_erken = {}
 
-    # id_str -> en son güncelleme GÜNÜ (datetime.date, saatsiz)
-    _id_guncelleme_gun = {}
+    # id_str -> {date, date, ...} — aktivite günleri + cari kartı düzenleme
+    # günleri + ilk kayıt günü, HEPSİ BİRDEN (tek bir "en son" değil)
+    _id_tum_gunler = {}
     if not df.empty and "id" in df.columns:
         for _gidx, _grow in df.iterrows():
             try:
                 _grid = str(int(_grow["id"]))
             except Exception:
                 continue
+            _gunler = set(_tum_aktivite_erken.get(_grid, set()))
+            _sg_ham = _cari_son_guncelleme_erken.get(_grid)
+            if _sg_ham:
+                _sg_dt = _guncelleme_tarih_parse(_sg_ham)
+                if _sg_dt:
+                    _gunler.add(_sg_dt.date())
             _gr_ilk = _grow.get("tarih") or _grow.get("created_at")
-            _adaylar_ae = [t for t in [_son_aktivite_erken.get(_grid, ""), _cari_son_guncelleme_erken.get(_grid, ""), str(_gr_ilk or "")] if t]
-            if not _adaylar_ae:
-                continue
-            _dts_ae = [d for d in (_guncelleme_tarih_parse(t) for t in _adaylar_ae) if d]
-            if _dts_ae:
-                _id_guncelleme_gun[_grid] = max(_dts_ae).date()
+            if _gr_ilk:
+                _ilk_dt = _guncelleme_tarih_parse(str(_gr_ilk))
+                if _ilk_dt:
+                    _gunler.add(_ilk_dt.date())
+            if _gunler:
+                _id_tum_gunler[_grid] = _gunler
 
-    # Filtre kutusu seçenekleri — en yeni tarih en üstte
-    _guncelleme_tarih_opts = sorted(set(_id_guncelleme_gun.values()), reverse=True)
+    # Filtre kutusu seçenekleri — sistemde görülen TÜM tarihler, en yeni en üstte
+    _guncelleme_tarih_opts_set = set()
+    for _gset in _id_tum_gunler.values():
+        _guncelleme_tarih_opts_set.update(_gset)
+    _guncelleme_tarih_opts = sorted(_guncelleme_tarih_opts_set, reverse=True)
     _guncelleme_tarih_opts_str = [d.strftime("%d.%m.%Y") for d in _guncelleme_tarih_opts]
-    _id_guncelleme_gun_str = {k: v.strftime("%d.%m.%Y") for k, v in _id_guncelleme_gun.items()}
+    # id_str -> {"08.07.2026","12.08.2026",...} — string haline çevrilmiş tam küme
+    _id_tum_gunler_str = {k: {d.strftime("%d.%m.%Y") for d in v} for k, v in _id_tum_gunler.items()}
 
     # NOT: "tarih" (İşlem Tarih) sütunu tablonun içinde DÜZENLENEBİLİR bir alan.
     # Eskiden her rerun'da canlı "tarih" değerine göre yeniden sıralanıyordu —
@@ -4936,12 +4952,12 @@ function kartSec(id){
         if _tem_sec:
             df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
         if _guncelleme_tarih_sec:
-            # Güncelleme Tarihi — ÇOKLU seçim, saatsiz. Sayfa başında (satır
-            # filtrelemeden önce) hesaplanan _id_guncelleme_gun_str haritasını
-            # kullanır (not/teklif/mesaj kaydı + gerçek düzenleme izi + ilk kayıt
-            # tarihinin en yenisi, sadece gün olarak).
+            # Güncelleme Tarihi — ÇOKLU seçim, saatsiz. Bir müşteri, seçilen
+            # tarihlerden HERHANGİ BİRİNDE gerçekten işlem görmüşse gelir
+            # (sadece "en son işlemi" o tarihte olan değil — _id_tum_gunler_str
+            # o müşterinin TÜM işlem günlerini tutar, kesişim kontrolü yapılır).
             _sec_tarih_set = set(_guncelleme_tarih_sec)
-            df_f = df_f[df_f["id"].apply(lambda x: _id_guncelleme_gun_str.get(str(int(x)), "") in _sec_tarih_set)]
+            df_f = df_f[df_f["id"].apply(lambda x: bool(_id_tum_gunler_str.get(str(int(x)), set()) & _sec_tarih_set))]
 
     # Bölgeler ekranından gelen gizli bölge filtresi (ilçe pill'leri taşmasın diye görünmez uygulanır)
     if st.session_state.get("_bl_ilce_filtre") and "ilce" in df_f.columns:
