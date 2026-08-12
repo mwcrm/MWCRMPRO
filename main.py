@@ -4697,11 +4697,8 @@ function kartSec(id){
         st.caption(f"📋 Kanban — {len(_kb_df)} müşteri · {len(_kanban_filtreli)} sütun")
         st.stop()
 
-    # ── HIZLI SATIR EKLE — Cari Liste'den çıkmadan anında yeni müşteri ekle ──
-    _hz1, _hz2 = st.columns([6, 1])
-    with _hz2:
-        if st.button("➕ Satır Ekle", key="cl_hizli_ekle_btn", use_container_width=True, type="primary"):
-            st.session_state["_cl_hizli_ekle_acik"] = not st.session_state.get("_cl_hizli_ekle_acik", False)
+    # ── HIZLI SATIR EKLE PANELİ — buton üst toolbar'da ("➕ Satır Ekle"),
+    # panel açık/kapalı durumu oradan kontrol edilir. ────────────────────────
     if st.session_state.get("_cl_hizli_ekle_acik"):
         with st.container(border=True):
             st.caption("➕ Hızlı Müşteri Ekle — sadece Firma adı zorunlu, diğer bilgileri sonra listeden düzenleyebilirsin.")
@@ -5817,12 +5814,16 @@ function kartSec(id){
 
     with st.container():
         st.markdown('<div class="cl-sticky-bar">', unsafe_allow_html=True)
-        _sb1, _sb2, _sb3 = st.columns([2, 1, 1])
+        _sb1, _sb2, _sb3, _sb4 = st.columns([2, 1, 1, 1])
         with _sb1:
             if st.button("💾 Değişiklikleri Kaydet", use_container_width=True, type="primary", key="liste_kaydet_ust"):
                 st.session_state["_kaydet_flag"] = True
         with _sb3:
-            if st.button("🔄 Kolon Sıfırla", use_container_width=True, key="cl_kolon_sifirla_ust"):
+            if st.button("➕ Satır Ekle", key="cl_hizli_ekle_btn_ust"):
+                st.session_state["_cl_hizli_ekle_acik"] = not st.session_state.get("_cl_hizli_ekle_acik", False)
+                st.rerun()
+        with _sb4:
+            if st.button("🔄 Kolon Sıfırla", key="cl_kolon_sifirla_ust"):
                 st.session_state.pop("_cl_kolon_sira", None)
                 st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
@@ -5938,15 +5939,12 @@ function kartSec(id){
 
 
     # ── BUTONLAR ──────────────────────────────────────────────────────────────
+    # NOT: "Değişiklikleri Kaydet" ve "Kolon Sıfırla" butonları artık SADECE
+    # üst toolbar'da (sticky bar) gösteriliyor — burada tekrar render edilmiyor,
+    # ama kaydetme mantığı (_kaydet_flag üzerinden) aynen çalışmaya devam ediyor.
     btn_k, btn_a, btn_s, btn_kolon = st.columns(4)
-    with btn_kolon:
-        if st.button("🔄 Kolon Sırasını Sıfırla", use_container_width=True, key="cl_kolon_sifirla"):
-            st.session_state.pop("_cl_kolon_sira", None)
-            st.rerun()
     _do_kaydet = st.session_state.pop("_kaydet_flag", False)
     with btn_k:
-        if st.button("💾 Değişiklikleri Kaydet", use_container_width=True, type="primary", key="liste_kaydet"):
-            _do_kaydet = True
         if _do_kaydet:
             _editor_state = st.session_state.get("cari_editor", {})
             _edited_rows  = dict(_editor_state.get("edited_rows", {}))
