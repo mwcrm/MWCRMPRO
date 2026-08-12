@@ -4376,12 +4376,48 @@ section[data-testid="stSidebar"] { display: none !important; }
     _mesaj_gercek_toplam = _rbar_mesaj_toplam_yukle()
 
 
+    # ── "2. AŞAMA — Teklif" sayısı — teklif VERİLEN TEKİL FİRMA sayısı.
+    # Eskiden sadece asama2="Teklif" işaretli müşteriler sayılıyordu (sabit
+    # kalıyordu). Artık: gerçek teklifler tablosundaki firmalar + Cari
+    # Liste'de manuel Teklif değeri girilmiş firmalar birlikte, TEKİL olarak
+    # sayılıyor (bir firma birden fazla teklif almış olsa da 1 kez sayılır).
+    @st.cache_data(ttl=60, show_spinner=False)
+    def _rbar_teklif_firma_sayisi_yukle():
+        _firma_set = set()
+        try:
+            _sb_rbf = get_sb_client()
+            if not _sb_rbf:
+                return 0
+            _r_rbf = _sb_rbf.table("teklifler").select("musteri_id").execute()
+            for _row in (_r_rbf.data or []):
+                _mid = _row.get("musteri_id")
+                if _mid not in [None, "", 0, "0"]:
+                    _firma_set.add(str(_mid))
+            try:
+                _r_rbfov = _sb_rbf.table("kullanici_tercih").select("deger").eq(
+                    "kullanici","__liste_ui__").eq("anahtar","_teklif_manuel_override").execute()
+                if _r_rbfov.data:
+                    import json as _rbfovj
+                    _override_map_f = _rbfovj.loads(_r_rbfov.data[0]["deger"])
+                    for _mid, _val in _override_map_f.items():
+                        try:
+                            if int("".join(ch for ch in str(_val) if ch.isdigit()) or 0) > 0:
+                                _firma_set.add(str(_mid))
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+        except Exception:
+            return 0
+        return len(_firma_set)
+    _teklif_firma_sayisi = _rbar_teklif_firma_sayisi_yukle()
+
     _grp_data = {
         "genel":    ("📊","GENEL",    None, _genel_items),
         "genel":    ("📊","GENEL",    None, _genel_items),
         "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama] + [("💬","Mesaj",_mesaj_gercek_toplam,"mesaj_gercek",False)]),
         "asama1":   ("📅","1. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama1",a),f"asama1_{a}",False)) for a in _grp2_asama]),
-        "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama2",a),f"asama2_{a}",False)) for a in _grp3_asama]),
+        "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,(_teklif_firma_sayisi if a=="Teklif" else _kolon_sayi("asama2",a)),f"asama2_{a}",False)) for a in _grp3_asama]),
         "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama3",a),f"asama3_{a}",False)) for a in _grp4_asama]),
         "sonuc":    ("🏆","SONUÇ",    None, [((_asama_ikon(a),a,_kolon_sayi("sonuc",a),f"sonuc_{a}",False)) for a in _grp5_asama]),
     }
@@ -6110,10 +6146,12 @@ function kartSec(id){
                             ], on_conflict="kullanici,anahtar").execute()
                     except:
                         pass
-                    # Üst AŞAMA raporundaki Mesaj toplam kutusu 60 sn önbellekli
-                    # — kaydettikten hemen sonra güncel görünsün diye önbellek
-                    # burada da temizlenir.
+                    # Üst AŞAMA raporundaki Mesaj toplam kutusu ve 2.AŞAMA'daki
+                    # Teklif firma sayısı 60 sn önbellekli — kaydettikten hemen
+                    # sonra güncel görünsün diye önbellek burada da temizlenir.
                     try: _rbar_mesaj_toplam_yukle.clear()
+                    except: pass
+                    try: _rbar_teklif_firma_sayisi_yukle.clear()
                     except: pass
 
                 # ── Analiz / Çıkış İli / Koli-Palet manuel override'ları ────────────────
