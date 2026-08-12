@@ -4697,48 +4697,6 @@ function kartSec(id){
         st.caption(f"📋 Kanban — {len(_kb_df)} müşteri · {len(_kanban_filtreli)} sütun")
         st.stop()
 
-    # ── HIZLI SATIR EKLE PANELİ — buton üst toolbar'da ("➕ Satır Ekle"),
-    # panel açık/kapalı durumu oradan kontrol edilir. ────────────────────────
-    if st.session_state.get("_cl_hizli_ekle_acik"):
-        with st.container(border=True):
-            st.caption("➕ Hızlı Müşteri Ekle — sadece Firma adı zorunlu, diğer bilgileri sonra listeden düzenleyebilirsin.")
-            _hzc1, _hzc2, _hzc3, _hzc4, _hzc5 = st.columns([2, 1.5, 1.3, 1.3, 1])
-            _hz_firma = _hzc1.text_input("Firma", key="cl_hizli_firma", placeholder="Firma adı *", label_visibility="collapsed")
-            _hz_yetkili = _hzc2.text_input("Yetkili", key="cl_hizli_yetkili", placeholder="Yetkili (ops.)", label_visibility="collapsed")
-            _hz_gsm = _hzc3.text_input("GSM", key="cl_hizli_gsm", placeholder="GSM (ops.)", label_visibility="collapsed")
-            _hz_il_opts = sorted(list(ILLER_ILCELER.keys()))
-            _hz_il = _hzc4.selectbox("İl", ["İstanbul"] + [i for i in _hz_il_opts if i != "İstanbul"], key="cl_hizli_il", label_visibility="collapsed")
-            if _hzc5.button("💾 Kaydet", key="cl_hizli_kaydet_btn", use_container_width=True, type="primary"):
-                _hz_firma_temiz = (_hz_firma or "").strip()
-                if not _hz_firma_temiz:
-                    st.warning("Firma adı boş bırakılamaz!")
-                else:
-                    _hz_gsm_temiz = "".join(ch for ch in str(_hz_gsm or "") if ch.isdigit())
-                    ok_hz = db_insert("cari_kartlar", {
-                        "tarih": datetime.now().isoformat(),
-                        "firma": _hz_firma_temiz, "rakip_firma": "", "yetkili": (_hz_yetkili or "").strip(),
-                        "gsm": _hz_gsm_temiz, "sabit": "", "email": "", "adres": "",
-                        "ilce": "", "il": _hz_il, "durum": "Portföy",
-                        "temsilci": st.session_state.get("kullanici",""), "islem_asamasi": "",
-                        "segment": "--", "aciklama": "",
-                        "silindi": 0, "olusturan": st.session_state.get("kullanici",""),
-                        "beklenen_ciro": 0, "gerceklesen_ciro": 0,
-                        "atanan_kullanici": st.session_state.get("kullanici","")
-                    })
-                    try:
-                        get_cari_listesi.clear()
-                    except:
-                        pass
-                    try:
-                        db_read.clear()
-                    except:
-                        pass
-                    for _hzk in ["cl_hizli_firma", "cl_hizli_yetkili", "cl_hizli_gsm"]:
-                        st.session_state.pop(_hzk, None)
-                    st.session_state["_cl_hizli_ekle_acik"] = False
-                    st.session_state["kayit_mesaj"] = f"✅ '{_hz_firma_temiz}' eklendi!"
-                    st.rerun()
-
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
     _cok_secili_idler = set()
     with st.expander("🔍 Filtreler & Arama", expanded=st.session_state.get("_cl_fil_acik", True)):
@@ -5365,7 +5323,7 @@ function kartSec(id){
         "temsilci":      st.column_config.TextColumn("Temsilci",  width=_w("temsilci")),
         "islem_asamasi": st.column_config.SelectboxColumn("Aşama", options=["Tümü", "Arama", "Tekrar Ara", "Mesaj", "E-Mail"], width=_w("islem_asamasi")),
         "aciklama":      st.column_config.TextColumn("Açıklama",  width=_w("aciklama")),
-        "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=True, width=_w("📅 Son Randevu")),
+        "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=False, width=_w("📅 Son Randevu"), help="Manuel tarih yazıp kaydedebilirsin (örn. 15.08.2026 veya 15.08.2026 14:00) — gerçek bir randevu kaydı oluşturulur."),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
         "✅ Analiz":     st.column_config.TextColumn("✅ Analiz", disabled=False, width=_w("✅ Analiz"), help="Herhangi bir şey yazıp kaydedin (örn. bir nokta) — ✅ ikonu manuel olarak gösterilir. Boş bırakırsan otomatik eşleşme geri döner."),
         "🧾 Teklif":     st.column_config.TextColumn("🧾 Teklif", disabled=False, width=_w("🧾 Teklif"), help="Sadece rakam girin (örn. 5). İkon otomatik eklenir. Boş bırakırsan otomatik hesaplanan sayı geri döner."),
@@ -5814,15 +5772,30 @@ function kartSec(id){
 
     with st.container():
         st.markdown('<div class="cl-sticky-bar">', unsafe_allow_html=True)
-        _sb1, _sb2, _sb3, _sb4 = st.columns([2, 1, 1, 1])
+        _sb1, _sb2, _sb3, _sb_bos = st.columns([1.4, 1.1, 1.1, 5])
         with _sb1:
-            if st.button("💾 Değişiklikleri Kaydet", use_container_width=True, type="primary", key="liste_kaydet_ust"):
+            if st.button("💾 Değişiklikleri Kaydet", type="primary", key="liste_kaydet_ust"):
                 st.session_state["_kaydet_flag"] = True
-        with _sb3:
+        with _sb2:
             if st.button("➕ Satır Ekle", key="cl_hizli_ekle_btn_ust"):
-                st.session_state["_cl_hizli_ekle_acik"] = not st.session_state.get("_cl_hizli_ekle_acik", False)
+                ok_hz_ust = db_insert("cari_kartlar", {
+                    "tarih": datetime.now().isoformat(),
+                    "firma": "(Yeni Müşteri)", "rakip_firma": "", "yetkili": "",
+                    "gsm": "", "sabit": "", "email": "", "adres": "",
+                    "ilce": "", "il": "İstanbul", "durum": "Portföy",
+                    "temsilci": st.session_state.get("kullanici",""), "islem_asamasi": "",
+                    "segment": "--", "aciklama": "",
+                    "silindi": 0, "olusturan": st.session_state.get("kullanici",""),
+                    "beklenen_ciro": 0, "gerceklesen_ciro": 0,
+                    "atanan_kullanici": st.session_state.get("kullanici","")
+                })
+                try: get_cari_listesi.clear()
+                except: pass
+                try: db_read.clear()
+                except: pass
+                st.session_state["kayit_mesaj"] = "✅ Boş satır eklendi — en üstte '(Yeni Müşteri)' olarak görünüyor, hücrelere tıklayıp doldurabilirsin."
                 st.rerun()
-        with _sb4:
+        with _sb3:
             if st.button("🔄 Kolon Sıfırla", key="cl_kolon_sifirla_ust"):
                 st.session_state.pop("_cl_kolon_sira", None)
                 st.rerun()
@@ -6075,6 +6048,56 @@ function kartSec(id){
                     except:
                         pass
 
+                # ── "📅 Son Randevu" hücresine manuel tarih yazılırsa GERÇEK bir
+                # randevu kaydı (randevular tablosu) oluşturulur — override değil,
+                # gerçek veri. Format: "15.08.2026" veya "15.08.2026 14:00".
+                import re as _rndre
+                for _idx_str_rn, _deg_rn in _edited_rows.items():
+                    if "📅 Son Randevu" not in _deg_rn:
+                        continue
+                    _rn_ham = str(_deg_rn["📅 Son Randevu"] or "").strip()
+                    if not _rn_ham:
+                        continue  # boşaltma = randevu silme değil, sadece görmezden gel
+                    _idxn_rn = int(_idx_str_rn)
+                    if _idxn_rn >= len(_rows):
+                        continue
+                    _rid_rn = int(float(str(_rows[_idxn_rn].get("id", 0))))
+                    _firma_rn = str(_rows[_idxn_rn].get("firma", "") or "")
+                    if not _rid_rn:
+                        continue
+                    # Emoji/etiket kalıntılarını temizle (örn. "📅 15.08.2026 14:00")
+                    _rn_temiz = _rndre.sub(r"[^\d.:/ ]", "", _rn_ham).strip()
+                    _rn_saat_m = _rndre.search(r"(\d{1,2}):(\d{2})", _rn_temiz)
+                    _rn_saat = f"{_rn_saat_m.group(1).zfill(2)}:{_rn_saat_m.group(2)}" if _rn_saat_m else "10:00"
+                    _rn_tarih_str = _rndre.sub(r"\d{1,2}:\d{2}", "", _rn_temiz).strip()
+                    _rn_dt = _guncelleme_tarih_parse(_rn_tarih_str) or _guncelleme_tarih_parse(_rn_temiz)
+                    if not _rn_dt:
+                        # Doğrudan DD.MM.YYYY formatını dene (parse edemediyse)
+                        _rn_m = _rndre.match(r"(\d{1,2})[.\/](\d{1,2})[.\/](\d{2,4})", _rn_tarih_str)
+                        if _rn_m:
+                            try:
+                                _gg, _aa, _yy = int(_rn_m.group(1)), int(_rn_m.group(2)), int(_rn_m.group(3))
+                                if _yy < 100: _yy += 2000
+                                _rn_dt = datetime(_yy, _aa, _gg)
+                            except Exception:
+                                _rn_dt = None
+                    if not _rn_dt:
+                        continue  # anlaşılamayan tarih — sessizce atla, veri bozma
+                    try:
+                        db_insert("randevular", {
+                            "randevu_tarihi": _rn_dt.strftime("%Y-%m-%d"),
+                            "randevu_saati": _rn_saat,
+                            "musteri_id": _rid_rn, "musteri_adi": _firma_rn,
+                            "bolge": "", "gorev": "", "takip": "",
+                            "adet": 1, "aciklama": "Cari Liste'den hızlı eklendi",
+                            "sonuc": "", "temsilci": st.session_state.get("kullanici",""),
+                            "olusturan": st.session_state.get("kullanici","")
+                        })
+                        try: db_read.clear()
+                        except: pass
+                    except Exception:
+                        pass
+
                 # ── Güncelleme Tarihi izi — gerçekten bir alan (aşama, durum, açıklama,
                 # ciro vb.) değişen HER satır için "şu an" damgası basılır. "Seç"
                 # (checkbox işaretleme) tek başına değişiklik sayılmaz. ISO format
@@ -6118,7 +6141,7 @@ function kartSec(id){
                         return None
                     guncelle = {}
                     for k, v in degisiklikler.items():
-                        if k in ("Seç", "🗑️ Sil", "🧾 Teklif", "💬 Mesaj", "✅ Analiz", "Varış İli", "Koli/Palet"): continue
+                        if k in ("Seç", "🗑️ Sil", "🧾 Teklif", "💬 Mesaj", "✅ Analiz", "Varış İli", "Koli/Palet", "📅 Son Randevu"): continue
                         if k in ("beklenen_ciro", "gerceklesen_ciro"):
                             try: guncelle[k] = float(v or 0)
                             except: guncelle[k] = 0
