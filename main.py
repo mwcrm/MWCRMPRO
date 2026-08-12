@@ -4375,10 +4375,44 @@ section[data-testid="stSidebar"] { display: none !important; }
         return _toplam
     _mesaj_gercek_toplam = _rbar_mesaj_toplam_yukle()
 
+    # ── Gerçek Teklif sayısı — teklifler tablosundan + Cari Liste'de MANUEL
+    # yazılan override değerleri. Cari Liste'de görünen "🧾 N" değerleriyle
+    # birebir aynı toplamı versin diye override'lar da dahil edilir. ────────
+    @st.cache_data(ttl=60, show_spinner=False)
+    def _rbar_teklif_toplam_yukle():
+        _toplam = 0
+        try:
+            _sb_rbt = get_sb_client()
+            if not _sb_rbt:
+                return 0
+            _r_rbt = _sb_rbt.table("teklifler").select("musteri_id").execute()
+            import collections as _rbtcol
+            _gercek_sayac_t = _rbtcol.Counter([str(r.get("musteri_id","")) for r in (_r_rbt.data or [])])
+            _override_map_t = {}
+            try:
+                _r_rbtov = _sb_rbt.table("kullanici_tercih").select("deger").eq(
+                    "kullanici","__liste_ui__").eq("anahtar","_teklif_manuel_override").execute()
+                if _r_rbtov.data:
+                    import json as _rbtovj
+                    _override_map_t = _rbtovj.loads(_r_rbtov.data[0]["deger"])
+            except Exception:
+                pass
+            _tum_idler_t = set(_gercek_sayac_t.keys()) | set(_override_map_t.keys())
+            for _mid in _tum_idler_t:
+                if _mid in _override_map_t:
+                    try: _toplam += int("".join(ch for ch in str(_override_map_t[_mid]) if ch.isdigit()) or 0)
+                    except Exception: pass
+                else:
+                    _toplam += _gercek_sayac_t.get(_mid, 0)
+        except Exception:
+            return 0
+        return _toplam
+    _teklif_gercek_toplam = _rbar_teklif_toplam_yukle()
+
     _grp_data = {
         "genel":    ("📊","GENEL",    None, _genel_items),
         "genel":    ("📊","GENEL",    None, _genel_items),
-        "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama] + [("💬","Mesaj",_mesaj_gercek_toplam,"mesaj_gercek",False)]),
+        "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama] + [("🧾","Teklif",_teklif_gercek_toplam,"teklif_gercek",False), ("💬","Mesaj",_mesaj_gercek_toplam,"mesaj_gercek",False)]),
         "asama1":   ("📅","1. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama1",a),f"asama1_{a}",False)) for a in _grp2_asama]),
         "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama2",a),f"asama2_{a}",False)) for a in _grp3_asama]),
         "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama3",a),f"asama3_{a}",False)) for a in _grp4_asama]),
