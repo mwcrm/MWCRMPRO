@@ -1667,6 +1667,22 @@ section[data-testid="stMain"], section[data-testid="stSidebar"] {
 section[data-testid="stSidebar"] {
     background-color: #f8fafc !important;
 }
+
+/* ── KOMPAKT MOD — tüm sistem genelinde yazı/boşluk küçültme ────────────── */
+html { font-size: 14px !important; }
+.block-container { padding-top: 1.2rem !important; padding-bottom: 1.5rem !important; }
+section[data-testid="stSidebar"] .block-container { padding-top: 1rem !important; }
+h1 { font-size: 1.6rem !important; }
+h2 { font-size: 1.35rem !important; }
+h3 { font-size: 1.15rem !important; }
+h4, h5, h6 { font-size: 1rem !important; }
+.stButton button, .stDownloadButton button { padding: 0.35rem 0.75rem !important; font-size: 0.85rem !important; }
+section[data-testid="stSidebar"] .stButton button { padding: 0.4rem 0.6rem !important; font-size: 0.85rem !important; }
+[data-testid="stMetricValue"] { font-size: 1.3rem !important; }
+[data-testid="stMetricLabel"] { font-size: 0.8rem !important; }
+.stTextInput input, .stSelectbox div[data-baseweb="select"], .stNumberInput input { font-size: 0.85rem !important; }
+[data-testid="stExpander"] summary { font-size: 0.9rem !important; padding: 0.5rem 0.75rem !important; }
+p, .stMarkdown, label { font-size: 0.9rem !important; }
 </style>
 """, unsafe_allow_html=True)
 
