@@ -1677,6 +1677,13 @@ section[data-testid="stSidebar"] { zoom: 0.80 !important; }
 html { font-size: 14px !important; }
 .block-container { padding-top: 1.2rem !important; padding-bottom: 1.5rem !important; }
 section[data-testid="stSidebar"] .block-container { padding-top: 1rem !important; }
+/* Streamlit 1.40+ konteyner sınıfını değiştirdi — eski .block-container artık
+   gerçek genişlik konteynerine denk gelmiyor, sayfa "wide" modda bile dar
+   kalıyordu. Yeni gerçek konteyner buradaki data-testid — tüm sayfalarda
+   tam genişlik için bunu da hedefliyoruz. */
+[data-testid="stMainBlockContainer"] { max-width: 100% !important; padding-left: 1rem !important; padding-right: 1rem !important; }
+[data-testid="stAppViewContainer"] { max-width: 100% !important; }
+[data-testid="stAppViewContainer"] > .main { max-width: 100% !important; }
 h1 { font-size: 1.6rem !important; }
 h2 { font-size: 1.35rem !important; }
 h3 { font-size: 1.15rem !important; }
@@ -3634,6 +3641,7 @@ elif aktif == "liste":
     st.markdown("""<style>
 .block-container { padding-left: 0.6rem !important; padding-right: 0.6rem !important; max-width: 100% !important; }
 [data-testid="stAppViewContainer"] { max-width: 100% !important; }
+[data-testid="stMainBlockContainer"] { max-width: 100% !important; padding-left: 0.6rem !important; padding-right: 0.6rem !important; }
 </style>""", unsafe_allow_html=True)
 
     # ── KAYDETME SONRASI ONAY BANNER'I — toast kaçırılırsa diye burada da göster ──
@@ -4810,8 +4818,7 @@ function kartSec(id){
 
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
     _cok_secili_idler = set()
-    with st.expander("🔍 Filtreler & Arama", expanded=st.session_state.get("_cl_fil_acik", True)):
-        st.session_state["_cl_fil_acik"] = True  # expander açık kalsın
+    with st.expander("🔍 Filtreler & Arama", expanded=False):
         # ── TEK SATIR FİLTRE ───────────────────────────────────────────────────
         if st.session_state.get("kart_sec_reset"):
             st.session_state.pop("kart_sec_reset", None)
