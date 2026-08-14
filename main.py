@@ -6535,8 +6535,7 @@ function kartSec(id){
 
 elif aktif == "dis_nakliye":
     sayfa_log("dis_nakliye")
-    st.markdown("## 🚚 Dış Nakliye")
-    st.caption("Satır eklemek için tablonun en altındaki ➕ işaretine tıklayın. Silmek için satırın en solundaki kutuyu işaretleyip klavyeden Delete'e basın (veya satıra sağ tıklayıp 'Delete row' seçin). Değişiklikleri kalıcı yapmak için altta '💾 Kaydet'e basmayı unutmayın — kaydetmezseniz sayfayı yenilediğinizde kaybolur.")
+    st.caption("🚚 Dış Nakliye — satır eklemek için tablonun en altındaki ➕ işaretine tıklayın. Silmek için satırın en solundaki kutuyu işaretleyip klavyeden Delete'e basın (veya satıra sağ tıklayıp 'Delete row' seçin). Değişiklikleri kalıcı yapmak için altta '💾 Kaydet'e basmayı unutmayın — kaydetmezseniz sayfayı yenilediğinizde kaybolur.")
 
     _dn_kolonlar = [
         "tarih", "gonderen_firma", "gonderici_tel", "gonderen_adres", "gonderen_il", "gonderen_ilce",
@@ -6557,8 +6556,15 @@ elif aktif == "dis_nakliye":
         "tasiyici_fatura": "TAŞIYICI FATURA", "tasiyici_odendi": "ÖDENDİ",
         "stf_faturasi": "STF FATURASI", "stf_odendi": "ÖDENDİ", "kar": "KAR"
     }
-    _dn_dar_kolonlar = {"tarih","gonderici_tel","alici_tel","gonderen_il","gonderen_ilce","alici_il","alici_ilce",
-                         "vergi_no","yetkili_tel","odeme_turu","adet","tur","tasiyici_odendi","stf_odendi","kar"}
+    # Cari Liste ile AYNI ölçekte kompakt piksel genişlikleri (Streamlit'in
+    # "small"/"medium" genel boyutları çok büyük çıkıyordu)
+    _dn_pixel_genislik = {
+        "tarih":80,"gonderen_firma":100,"gonderici_tel":90,"gonderen_adres":110,"gonderen_il":70,"gonderen_ilce":70,
+        "alici_firma":100,"alici_tel":90,"alici_adres":110,"alici_il":70,"alici_ilce":70,
+        "odeme_yapacak_musteri":120,"fatura_adresi":110,"vergi_dairesi":90,"vergi_no":80,"yetkili_tel":90,
+        "odeme_turu":80,"adet":50,"tur":70,"tasiyici":90,"tasiyici_fatura":100,"tasiyici_odendi":60,
+        "stf_faturasi":100,"stf_odendi":60,"kar":80
+    }
 
     # ── Yükle — kullanici_tercih tablosunda TEK bir JSON kayıt olarak
     # saklanır (yeni tablo açmadan). Sayfa açılışında bir kere çekilir. ──────
@@ -6603,23 +6609,24 @@ elif aktif == "dis_nakliye":
 
     _dn_col_config = {}
     for _k in _dn_kolonlar:
-        _dn_w = "small" if _k in _dn_dar_kolonlar else "medium"
+        _dn_w = _dn_pixel_genislik.get(_k, 90)
         if _k == "adet":
-            _dn_col_config[_k] = st.column_config.NumberColumn(_dn_basliklar[_k], min_value=0, step=1, width="small")
+            _dn_col_config[_k] = st.column_config.NumberColumn(_dn_basliklar[_k], min_value=0, step=1, width=_dn_w)
         elif _k == "kar":
-            _dn_col_config[_k] = st.column_config.NumberColumn(_dn_basliklar[_k], format="%.2f ₺", width="small")
+            _dn_col_config[_k] = st.column_config.NumberColumn(_dn_basliklar[_k], format="%.2f ₺", width=_dn_w)
         elif _k in ("tasiyici_odendi", "stf_odendi"):
-            _dn_col_config[_k] = st.column_config.CheckboxColumn(_dn_basliklar[_k], width="small")
+            _dn_col_config[_k] = st.column_config.CheckboxColumn(_dn_basliklar[_k], width=_dn_w)
         else:
             _dn_col_config[_k] = st.column_config.TextColumn(_dn_basliklar[_k], width=_dn_w)
 
+    _dn_yukseklik = min(500, 38 + (max(len(_dn_df), 3) * 35) + 3)
     _dn_edited = st.data_editor(
         _dn_df,
         use_container_width=True,
         num_rows="dynamic",
         column_config=_dn_col_config,
         key="dn_editor",
-        height=650
+        height=_dn_yukseklik
     )
 
     _dn_k1, _dn_k2 = st.columns([1, 5])
