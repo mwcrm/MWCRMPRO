@@ -5397,13 +5397,93 @@ function kartSec(id){
     _KG = st.session_state.get("_kol_genislik", _KOL_VARSAYILAN.copy())
     _GIZLI_KOLONLAR = set(st.session_state.get("_kol_gizli", []))
 
+    # ── 📐 KOLON GENİŞLİKLERİ — doğrudan Cari Liste ekranında, başka sekmeye
+    # gitmeden ayarlanıp KALICI kaydedilir. Kullanıcı Yönetimi → Kolon Ayarları
+    # sekmesiyle AYNI session_state / AYNI Supabase satırını kullanır — ikisi
+    # de tek doğruluk kaynağına yazar, birbirini ezmez.
+    _KG_ETIKET_CL = {
+        "tarih":"İşlem Tarih","guncelleme_tarihi":"Güncelleme Tarihi",
+        "firma":"Firma","rakip_firma":"Rakip Firma","yetkili":"Yetkili","gsm":"GSM","sabit":"S.Tel",
+        "email":"Email","adres":"Adres","il":"İl","ilce":"İlçe",
+        "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"Aşama",
+        "aciklama":"Açıklama","📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID",
+        "asama1":"1. Aşama","asama2":"2. Aşama","asama3":"3. Aşama","sonuc":"Sonuç","ara_islem":"Ara İşlem",
+        "beklenen_ciro":"Hedef ₺","gerceklesen_ciro":"Gerçek ₺","✅ Analiz":"Analiz",
+        "Varış İli":"Varış İli","Koli/Palet":"Koli/Palet","🧾 Teklif":"Teklif","💬 Mesaj":"Mesaj",
+    }
+    with st.expander("📐 Kolon Genişlikleri — sürüklemek yerine buradan ayarla, kalıcı kaydeder"):
+        st.caption("Kaydırıcıyı hareket ettir, sonra en alttaki '💾 Kaydet'e bas — herkeste, her cihazda kalıcı kalır.")
+        _cl_kg_kolonlar = list(_KOL_VARSAYILAN.keys())
+        _cl_kg_yeni = {}
+        _cl_kg_yeni_gizli = []
+        _cl_kg_sutun_sayisi = 6
+        for _cl_i in range(0, len(_cl_kg_kolonlar), _cl_kg_sutun_sayisi):
+            _cl_kg_satir = _cl_kg_kolonlar[_cl_i:_cl_i + _cl_kg_sutun_sayisi]
+            _cl_kg_cols = st.columns(len(_cl_kg_satir))
+            for _cl_j, _cl_k in enumerate(_cl_kg_satir):
+                _cl_etiket = _KG_ETIKET_CL.get(_cl_k, _cl_k)
+                _cl_gizli_mi = _cl_k in _GIZLI_KOLONLAR
+                with _cl_kg_cols[_cl_j]:
+                    _cl_goz = "🙈" if _cl_gizli_mi else "👁"
+                    if st.button(_cl_goz, key=f"cl_kg_giz_{_cl_i}_{_cl_j}", use_container_width=True, help="Gizle/Göster"):
+                        _cl_gizli_liste = list(_GIZLI_KOLONLAR)
+                        if _cl_gizli_mi:
+                            _cl_gizli_liste = [x for x in _cl_gizli_liste if x != _cl_k]
+                        else:
+                            _cl_gizli_liste.append(_cl_k)
+                        st.session_state["_kol_gizli"] = _cl_gizli_liste
+                        try:
+                            _sb_cl_kg = get_sb_client()
+                            if _sb_cl_kg:
+                                import json as _cl_kgj
+                                _sb_cl_kg.table("kullanici_tercih").upsert({
+                                    "kullanici": "__liste_ui__", "anahtar": "_kol_gizli",
+                                    "deger": _cl_kgj.dumps(_cl_gizli_liste, ensure_ascii=False)
+                                }, on_conflict="kullanici,anahtar").execute()
+                        except Exception:
+                            pass
+                        st.session_state.pop("_kol_genislik_init", None)
+                        st.rerun()
+                    _cl_kg_yeni[_cl_k] = st.slider(
+                        f"{'~~' if _cl_gizli_mi else ''}{_cl_etiket}",
+                        min_value=10, max_value=400,
+                        value=int(_KG.get(_cl_k, _KOL_VARSAYILAN.get(_cl_k, 100))),
+                        step=10, key=f"cl_kg_slider_{_cl_k}",
+                        disabled=_cl_gizli_mi
+                    )
+                    if _cl_gizli_mi:
+                        _cl_kg_yeni_gizli.append(_cl_k)
+        # Canlı önizleme — Kaydet'e basmadan tablo hemen bu genişlikleri kullanır
+        st.session_state["_kol_genislik"] = {**st.session_state.get("_kol_genislik", {}), **_cl_kg_yeni}
+        _KG = st.session_state["_kol_genislik"]
+        if st.button("💾 Kaydet (kalıcı)", type="primary", key="cl_kg_kaydet_btn", use_container_width=True):
+            try:
+                _sb_cl_kgs = get_sb_client()
+                if _sb_cl_kgs:
+                    import json as _cl_kgsj
+                    _sb_cl_kgs.table("kullanici_tercih").upsert({
+                        "kullanici": "__liste_ui__", "anahtar": "_kol_genislik",
+                        "deger": _cl_kgsj.dumps(_cl_kg_yeni, ensure_ascii=False)
+                    }, on_conflict="kullanici,anahtar").execute()
+                st.session_state["_kol_genislik"] = _cl_kg_yeni
+                st.session_state.pop("_kol_genislik_init", None)
+                st.toast("✅ Kolon genişlikleri kalıcı kaydedildi!", icon="✅")
+                st.rerun()
+            except Exception as _cl_kge:
+                st.error(f"Hata: {_cl_kge}")
+
+    # Firma'ya kadarki (GSM/S.Tel dahil) kolonlar küçük/okunur kalsın diye ayrı
+    # bir grup — bunlar büyütülürse Firma ilk görünümden kayboluyordu.
+    # Bu grubun SONRASINDAKİ kolonlar otomatik daha fazla büyütülüyor ki tablo
+    # kendiliğinden üst rapor barının uzunluğuna ulaşsın — kullanıcı hiçbir
+    # kolonu tek tek ayarlamak zorunda kalmasın.
+    _KOL_ERKEN = {"tarih","guncelleme_tarihi","id","rakip_firma","firma","yetkili","gsm","sabit"}
+
     def _w(k):
         # Gerçek piksel genişliği kullan — small/medium/large'a yuvarlarsak
         # 10 ile 79 arası tüm değerler görsel olarak aynı görünüyordu.
-        # NOT: Tüm genişlikler büyütülüyor (oran korunuyor, kullanıcının kendi
-        # kolon ayarları bozulmuyor) — tablo üst rapor kutularının genişliğine
-        # ulaşsın diye.
-        return int(int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100))) * 4.5)
+        _carpan = 4.5 if k in _KOL_ERKEN else 8.5
+        return int(int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100))) * _carpan)
 
     # Asama1/2/3 sabit seçenek listeleri — mevcut veride bu listede olmayan bir
     # değer varsa açılır kutu bozulmasın diye otomatik listeye eklenir.
