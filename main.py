@@ -6556,6 +6556,10 @@ function kartSec(id){
 
 elif aktif == "dis_nakliye":
     sayfa_log("dis_nakliye")
+    st.markdown("""<style>
+.block-container { padding-left: 0.6rem !important; padding-right: 0.6rem !important; max-width: 100% !important; }
+[data-testid="stAppViewContainer"] { max-width: 100% !important; }
+</style>""", unsafe_allow_html=True)
 
     _dn_kolonlar = [
         "tarih", "gonderen_firma", "gonderici_tel", "gonderen_adres", "gonderen_il", "gonderen_ilce",
@@ -6579,11 +6583,11 @@ elif aktif == "dis_nakliye":
     # Cari Liste ile AYNI ölçekte kompakt piksel genişlikleri — tüm kolonlar
     # tek ekrana sığsın diye iyice daraltıldı
     _dn_pixel_genislik = {
-        "tarih":65,"gonderen_firma":85,"gonderici_tel":75,"gonderen_adres":85,"gonderen_il":60,"gonderen_ilce":60,
-        "alici_firma":85,"alici_tel":75,"alici_adres":85,"alici_il":60,"alici_ilce":60,
-        "odeme_yapacak_musteri":95,"fatura_adresi":85,"vergi_dairesi":75,"vergi_no":65,"yetkili_tel":75,
-        "odeme_turu":65,"adet":45,"tur":60,"tasiyici":75,"tasiyici_fatura":80,"tasiyici_odendi":55,
-        "stf_faturasi":80,"stf_odendi":55,"kar":65
+        "tarih":60,"gonderen_firma":75,"gonderici_tel":68,"gonderen_adres":75,"gonderen_il":55,"gonderen_ilce":55,
+        "alici_firma":75,"alici_tel":68,"alici_adres":75,"alici_il":55,"alici_ilce":55,
+        "odeme_yapacak_musteri":85,"fatura_adresi":75,"vergi_dairesi":68,"vergi_no":60,"yetkili_tel":68,
+        "odeme_turu":60,"adet":42,"tur":55,"tasiyici":68,"tasiyici_fatura":72,"tasiyici_odendi":50,
+        "stf_faturasi":72,"stf_odendi":50,"kar":60
     }
 
     # ── Yükle — kullanici_tercih tablosunda TEK bir JSON kayıt olarak
