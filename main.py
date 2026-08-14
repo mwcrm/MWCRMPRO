@@ -6559,8 +6559,11 @@ elif aktif == "dis_nakliye":
     st.markdown("""<style>
 .block-container { padding-left: 0.6rem !important; padding-right: 0.6rem !important; max-width: 100% !important; }
 [data-testid="stAppViewContainer"] { max-width: 100% !important; }
-div[data-testid="stHorizontalBlock"] { gap: 0.3rem !important; }
+div[data-testid="stHorizontalBlock"] { gap: 0.3rem !important; justify-content: flex-start !important; }
 div[data-testid="stHorizontalBlock"] > div[data-testid="column"] { padding: 0 !important; }
+div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(1) {
+    flex: 0 1 auto !important; max-width: none !important; width: auto !important;
+}
 div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) {
     max-width: 260px !important; flex: 0 0 260px !important; width: 260px !important;
 }
