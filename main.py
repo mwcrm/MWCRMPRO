@@ -2482,7 +2482,7 @@ _TAB_ETIKETLER = {
     "kayitli_teklifler": "📋 Kayıtlı Teklifler",
     "sozlesme": "📜 Sözleşmeler",
     "excel": "📥 Excel Aktar",
-    "dis_nakliye": "🚢 Dış Nakliye",
+    "dis_nakliye": "🚚 Dış Nakliye",
     
     "randevu": "📅 Randevular",
     "kullanici": "👥 Kullanıcı Yönetimi",
@@ -6535,7 +6535,7 @@ function kartSec(id){
 
 elif aktif == "dis_nakliye":
     sayfa_log("dis_nakliye")
-    st.markdown("### 🚢 Dış Nakliye")
+    st.markdown("## 🚚 Dış Nakliye")
     st.caption("Satır eklemek için tablonun en altındaki ➕ işaretine tıklayın. Silmek için satırın en solundaki kutuyu işaretleyip klavyeden Delete'e basın (veya satıra sağ tıklayıp 'Delete row' seçin). Değişiklikleri kalıcı yapmak için altta '💾 Kaydet'e basmayı unutmayın — kaydetmezseniz sayfayı yenilediğinizde kaybolur.")
 
     _dn_kolonlar = [
