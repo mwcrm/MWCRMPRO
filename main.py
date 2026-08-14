@@ -6556,7 +6556,6 @@ function kartSec(id){
 
 elif aktif == "dis_nakliye":
     sayfa_log("dis_nakliye")
-    st.caption("🚚 Dış Nakliye — satır eklemek için tablonun en altındaki ➕ işaretine tıklayın. Silmek için satırın en solundaki kutuyu işaretleyip klavyeden Delete'e basın (veya satıra sağ tıklayıp 'Delete row' seçin). Değişiklikleri kalıcı yapmak için altta '💾 Kaydet'e basmayı unutmayın — kaydetmezseniz sayfayı yenilediğinizde kaybolur.")
 
     _dn_kolonlar = [
         "tarih", "gonderen_firma", "gonderici_tel", "gonderen_adres", "gonderen_il", "gonderen_ilce",
@@ -6577,14 +6576,14 @@ elif aktif == "dis_nakliye":
         "tasiyici_fatura": "TAŞIYICI FATURA", "tasiyici_odendi": "ÖDENDİ",
         "stf_faturasi": "STF FATURASI", "stf_odendi": "ÖDENDİ", "kar": "KAR"
     }
-    # Cari Liste ile AYNI ölçekte kompakt piksel genişlikleri (Streamlit'in
-    # "small"/"medium" genel boyutları çok büyük çıkıyordu)
+    # Cari Liste ile AYNI ölçekte kompakt piksel genişlikleri — tüm kolonlar
+    # tek ekrana sığsın diye iyice daraltıldı
     _dn_pixel_genislik = {
-        "tarih":80,"gonderen_firma":100,"gonderici_tel":90,"gonderen_adres":110,"gonderen_il":70,"gonderen_ilce":70,
-        "alici_firma":100,"alici_tel":90,"alici_adres":110,"alici_il":70,"alici_ilce":70,
-        "odeme_yapacak_musteri":120,"fatura_adresi":110,"vergi_dairesi":90,"vergi_no":80,"yetkili_tel":90,
-        "odeme_turu":80,"adet":50,"tur":70,"tasiyici":90,"tasiyici_fatura":100,"tasiyici_odendi":60,
-        "stf_faturasi":100,"stf_odendi":60,"kar":80
+        "tarih":65,"gonderen_firma":85,"gonderici_tel":75,"gonderen_adres":85,"gonderen_il":60,"gonderen_ilce":60,
+        "alici_firma":85,"alici_tel":75,"alici_adres":85,"alici_il":60,"alici_ilce":60,
+        "odeme_yapacak_musteri":95,"fatura_adresi":85,"vergi_dairesi":75,"vergi_no":65,"yetkili_tel":75,
+        "odeme_turu":65,"adet":45,"tur":60,"tasiyici":75,"tasiyici_fatura":80,"tasiyici_odendi":55,
+        "stf_faturasi":80,"stf_odendi":55,"kar":65
     }
 
     # ── Yükle — kullanici_tercih tablosunda TEK bir JSON kayıt olarak
@@ -6650,7 +6649,7 @@ elif aktif == "dis_nakliye":
         height=_dn_yukseklik
     )
 
-    _dn_k1, _dn_k2 = st.columns([1, 5])
+    _dn_k1, _dn_k2, _dn_k3 = st.columns([1, 1, 4])
     with _dn_k1:
         if st.button("💾 Kaydet", type="primary", key="dn_kaydet_btn"):
             _dn_kayit_listesi = _dn_edited.reset_index(drop=True).to_dict(orient="records")
@@ -6669,6 +6668,13 @@ elif aktif == "dis_nakliye":
                     st.error("Supabase bağlantısı yok, kaydedilemedi.")
             except Exception as _dn_e:
                 st.error(f"❌ Kaydedilemedi: {_dn_e}")
+    with _dn_k2:
+        if st.button("➕ Satır Ekle", key="dn_satir_ekle_btn"):
+            _dn_bos_satir = {c: (0 if c in ("adet","kar") else (False if c in ("tasiyici_odendi","stf_odendi") else "")) for c in _dn_kolonlar}
+            _dn_guncel_liste = _dn_edited.reset_index(drop=True).to_dict(orient="records")
+            _dn_guncel_liste.append(_dn_bos_satir)
+            st.session_state["_dn_kayitlar"] = _dn_guncel_liste
+            st.rerun()
 
 elif aktif == "kullanici":
     sayfa_log("kullanici")
