@@ -1672,7 +1672,7 @@ section[data-testid="stSidebar"] {
    NOT: Tablo (data_editor) canvas ile çizildiği için normal font-size CSS'i
    onu küçültemiyor. "zoom" özelliği tarayıcının PİKSEL bazında her şeyi
    (canvas dahil) küçültmesini sağlar — gerçek/kalıcı çözüm budur. */
-[data-testid="stAppViewContainer"] { zoom: 0.80 !important; width: 125% !important; margin-left: -12.5% !important; }
+[data-testid="stAppViewContainer"] { zoom: 0.80 !important; }
 section[data-testid="stSidebar"] { zoom: 0.80 !important; }
 html { font-size: 14px !important; }
 .block-container { padding-top: 1.2rem !important; padding-bottom: 1.5rem !important; }
@@ -1682,7 +1682,7 @@ section[data-testid="stSidebar"] .block-container { padding-top: 1rem !important
    kalıyordu. Yeni gerçek konteyner buradaki data-testid — tüm sayfalarda
    tam genişlik için bunu da hedefliyoruz. */
 [data-testid="stMainBlockContainer"] { max-width: 100% !important; padding-left: 1rem !important; padding-right: 1rem !important; }
-[data-testid="stAppViewContainer"] { max-width: 125% !important; }
+[data-testid="stAppViewContainer"] { max-width: 100% !important; }
 [data-testid="stAppViewContainer"] > .main { max-width: 100% !important; }
 h1 { font-size: 1.6rem !important; }
 h2 { font-size: 1.35rem !important; }
@@ -3640,7 +3640,7 @@ elif aktif == "liste":
     sayfa_log("liste")
     st.markdown("""<style>
 .block-container { padding-left: 0.6rem !important; padding-right: 0.6rem !important; max-width: 100% !important; }
-[data-testid="stAppViewContainer"] { max-width: 125% !important; }
+[data-testid="stAppViewContainer"] { max-width: 100% !important; }
 [data-testid="stMainBlockContainer"] { max-width: 100% !important; padding-left: 0.6rem !important; padding-right: 0.6rem !important; }
 </style>""", unsafe_allow_html=True)
 
@@ -6572,7 +6572,7 @@ elif aktif == "dis_nakliye":
     sayfa_log("dis_nakliye")
     st.markdown("""<style>
 .block-container { padding-left: 0.6rem !important; padding-right: 0.6rem !important; max-width: 100% !important; }
-[data-testid="stAppViewContainer"] { max-width: 125% !important; }
+[data-testid="stAppViewContainer"] { max-width: 100% !important; }
 div[data-testid="stHorizontalBlock"] { gap: 0.3rem !important; justify-content: flex-start !important; }
 div[data-testid="stHorizontalBlock"] > div[data-testid="column"] { padding: 0 !important; }
 div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(1) {
