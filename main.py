@@ -6583,11 +6583,11 @@ elif aktif == "dis_nakliye":
     # Cari Liste ile AYNI ölçekte kompakt piksel genişlikleri — tüm kolonlar
     # tek ekrana sığsın diye iyice daraltıldı
     _dn_pixel_genislik = {
-        "tarih":60,"gonderen_firma":75,"gonderici_tel":68,"gonderen_adres":75,"gonderen_il":55,"gonderen_ilce":55,
-        "alici_firma":75,"alici_tel":68,"alici_adres":75,"alici_il":55,"alici_ilce":55,
-        "odeme_yapacak_musteri":85,"fatura_adresi":75,"vergi_dairesi":68,"vergi_no":60,"yetkili_tel":68,
-        "odeme_turu":60,"adet":42,"tur":55,"tasiyici":68,"tasiyici_fatura":72,"tasiyici_odendi":50,
-        "stf_faturasi":72,"stf_odendi":50,"kar":60
+        "tarih":95,"gonderen_firma":130,"gonderici_tel":105,"gonderen_adres":130,"gonderen_il":90,"gonderen_ilce":90,
+        "alici_firma":130,"alici_tel":105,"alici_adres":130,"alici_il":90,"alici_ilce":90,
+        "odeme_yapacak_musteri":150,"fatura_adresi":130,"vergi_dairesi":105,"vergi_no":95,"yetkili_tel":105,
+        "odeme_turu":95,"adet":70,"tur":90,"tasiyici":105,"tasiyici_fatura":110,"tasiyici_odendi":75,
+        "stf_faturasi":110,"stf_odendi":75,"kar":95
     }
 
     # ── Yükle — kullanici_tercih tablosunda TEK bir JSON kayıt olarak
@@ -6648,7 +6648,7 @@ elif aktif == "dis_nakliye":
         else:
             _dn_col_config[_k] = st.column_config.TextColumn(_dn_basliklar[_k], width=_dn_w)
 
-    _dn_yukseklik = min(500, 38 + (max(len(_dn_df), 3) * 35) + 3)
+    _dn_yukseklik = max(450, min(650, 38 + (max(len(_dn_df), 3) * 35) + 3))
     _dn_edited = st.data_editor(
         _dn_df,
         use_container_width=True,
