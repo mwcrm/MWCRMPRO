@@ -1800,6 +1800,36 @@ st.markdown("""<script>
 # komple kaldırıldı — sistem artık HER bilgisayarda, her zaman BEYAZ arka
 # planla açılır. Eskiden kaydedilmiş bir renk/takım tercihi olsa bile
 # hiçbir zaman uygulanmaz.
+#
+# ── KAYDEDİLMİŞ BOŞLUK AYARINI HER SAYFADA (sadece Ekran Ayarları sekmesinde
+# DEĞİL) baştan yükle. Eskiden bu değerler SADECE Kullanıcı Yönetimi →
+# Ekran Ayarları sekmesine girilince Supabase'den çekiliyordu — kullanıcı
+# direkt Cari Liste'ye girince (varsayılan giriş sayfası) kaydettiği ayar
+# hiç okunmuyor, varsayılana dönüyordu. Artık girişten hemen sonra, her
+# sayfada bir kez yükleniyor.
+if st.session_state.get("giris") and "_ekran_ayar_global_init" not in st.session_state:
+    st.session_state["_ekran_ayar_global_init"] = True
+    try:
+        _sb_eag = get_sb_client()
+        _eag_kul = st.session_state.get("kullanici", "")
+        if _sb_eag and _eag_kul:
+            import json as _eagj
+            _r_eag = _sb_eag.table("kullanici_tercih").select("deger").eq("kullanici", _eag_kul).eq("anahtar", "ekran_ayar").execute()
+            if _r_eag.data:
+                _eag_ayar = _eagj.loads(_r_eag.data[0]["deger"])
+                if "ust_px" in _eag_ayar: st.session_state["_ust_px"] = int(_eag_ayar["ust_px"])
+                if "alt_px" in _eag_ayar: st.session_state["_alt_px"] = int(_eag_ayar["alt_px"])
+                if "sol_px" in _eag_ayar:
+                    st.session_state["_sol_px"] = int(_eag_ayar["sol_px"])
+                elif "yan_px" in _eag_ayar:
+                    st.session_state["_sol_px"] = int(_eag_ayar["yan_px"])
+                if "sag_px" in _eag_ayar:
+                    st.session_state["_sag_px"] = int(_eag_ayar["sag_px"])
+                elif "yan_px" in _eag_ayar:
+                    st.session_state["_sag_px"] = int(_eag_ayar["yan_px"])
+    except Exception:
+        pass
+
 _e_ust     = st.session_state.get("_ust_px", 32)
 _e_alt     = st.session_state.get("_alt_px", 32)
 _e_sol     = st.session_state.get("_sol_px", st.session_state.get("_yan_px", 16))
@@ -3620,9 +3650,15 @@ elif aktif == "mukerrer":
 
 elif aktif == "liste":
     sayfa_log("liste")
-    st.markdown("""<style>
-.block-container { padding-left: 0.6rem !important; padding-right: 0.6rem !important; max-width: 100% !important; }
-[data-testid="stAppViewContainer"] { max-width: 100% !important; }
+    # NOT: Burada eskiden padding-left/right SABİT 0.6rem'e zorlanıyordu — bu
+    # Ekran Ayarları → Sol/Sağ Boşluk ayarını komple eziyordu, kullanıcı ne
+    # ayarlarsa ayarlasın Cari Liste'de hiç görünmüyordu. Artık kullanıcının
+    # kendi kaydettiği sol/sağ px değerleri kullanılıyor.
+    _liste_sol_px = st.session_state.get("_sol_px", st.session_state.get("_yan_px", 16))
+    _liste_sag_px = st.session_state.get("_sag_px", st.session_state.get("_yan_px", 16))
+    st.markdown(f"""<style>
+.block-container {{ padding-left: {_liste_sol_px}px !important; padding-right: {_liste_sag_px}px !important; max-width: 100% !important; }}
+[data-testid="stAppViewContainer"] {{ max-width: 100% !important; }}
 </style>""", unsafe_allow_html=True)
 
     # ── KAYDETME SONRASI ONAY BANNER'I — toast kaçırılırsa diye burada da göster ──
@@ -7220,16 +7256,25 @@ document.getElementById('sh_val').textContent = window.screen.height;
         <div style="flex:1;background:white;border-radius:3px;padding:3px;text-align:center;font-size:7px;color:#374151;">AŞAMA</div>
         <div style="flex:1;background:white;border-radius:3px;padding:3px;text-align:center;font-size:7px;color:#374151;">SONUÇ</div>
       </div>
-      <div style="flex:1;background:white;border:0.5px solid #e2e8f0;border-radius:4px;padding:4px;display:flex;flex-direction:column;gap:3px;">
-        <div style="height:8px;background:#f1f5f9;border-radius:2px;"></div>
-        <div style="height:8px;background:#f8fafc;border-radius:2px;"></div>
-        <div style="height:8px;background:#f1f5f9;border-radius:2px;"></div>
-        <div style="height:8px;background:#f8fafc;border-radius:2px;"></div>
-        <div style="height:8px;background:#f1f5f9;border-radius:2px;"></div>
+      <div style="flex:1;background:white;border:0.5px solid #e2e8f0;border-radius:4px;padding:0;overflow:hidden;display:flex;flex-direction:column;">
+        <div style="display:flex;background:#f8fafc;border-bottom:0.5px solid #cbd5e1;flex-shrink:0;">
+          <div style="flex:1.2;padding:3px 2px;font-size:6px;color:#64748b;border-right:0.5px solid #e2e8f0;">Firma</div>
+          <div style="flex:0.9;padding:3px 2px;font-size:6px;color:#64748b;border-right:0.5px solid #e2e8f0;">Yetkili</div>
+          <div style="flex:0.9;padding:3px 2px;font-size:6px;color:#64748b;border-right:0.5px solid #e2e8f0;">GSM</div>
+          <div style="flex:0.7;padding:3px 2px;font-size:6px;color:#64748b;border-right:0.5px solid #e2e8f0;">İl</div>
+          <div style="flex:0.9;padding:3px 2px;font-size:6px;color:#64748b;border-right:0.5px solid #e2e8f0;">Durum</div>
+          <div style="flex:0.9;padding:3px 2px;font-size:6px;color:#64748b;">Sonuç</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px;padding:3px;">
+          <div style="height:7px;background:#f1f5f9;border-radius:2px;"></div>
+          <div style="height:7px;background:#f8fafc;border-radius:2px;"></div>
+          <div style="height:7px;background:#f1f5f9;border-radius:2px;"></div>
+          <div style="height:7px;background:#f8fafc;border-radius:2px;"></div>
+        </div>
       </div>
     </div>
   </div>
-  <div style="text-align:center;font-size:10px;color:#94a3b8;margin-top:4px;">solda menü · sağda üst rapor + Cari Liste (gerçek oranın küçültülmüş hali)</div>
+  <div style="text-align:center;font-size:10px;color:#94a3b8;margin-top:4px;">solda menü · sağda üst rapor + Cari Liste başlıkları (gerçek oranın küçültülmüş hali)</div>
 </div>
 """, unsafe_allow_html=True)
 
