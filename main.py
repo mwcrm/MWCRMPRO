@@ -1677,6 +1677,13 @@ section[data-testid="stSidebar"] { zoom: 0.80 !important; }
 html { font-size: 14px !important; }
 .block-container { padding-top: 1.2rem !important; padding-bottom: 1.5rem !important; }
 section[data-testid="stSidebar"] .block-container { padding-top: 1rem !important; }
+/* Streamlit 1.40+ konteyner sınıfını değiştirdi — eski .block-container artık
+   gerçek genişlik konteynerine denk gelmiyor, sayfa "wide" modda bile dar
+   kalıyordu. Yeni gerçek konteyner buradaki data-testid — tüm sayfalarda
+   tam genişlik için bunu da hedefliyoruz. */
+[data-testid="stMainBlockContainer"] { max-width: 100% !important; padding-left: 1rem !important; padding-right: 1rem !important; }
+[data-testid="stAppViewContainer"] { max-width: 100% !important; }
+[data-testid="stAppViewContainer"] > .main { max-width: 100% !important; }
 h1 { font-size: 1.6rem !important; }
 h2 { font-size: 1.35rem !important; }
 h3 { font-size: 1.15rem !important; }
@@ -1796,44 +1803,24 @@ st.markdown("""<script>
 
 
 # ── EKRAN AYARLARI UYGULA ────────────────────────────────────────────────────
-# NOT: Arka plan rengi / takım teması özelleştirmesi kullanıcı isteğiyle
-# komple kaldırıldı — sistem artık HER bilgisayarda, her zaman BEYAZ arka
-# planla açılır. Eskiden kaydedilmiş bir renk/takım tercihi olsa bile
-# hiçbir zaman uygulanmaz.
-#
-# ── KAYDEDİLMİŞ BOŞLUK AYARINI HER SAYFADA (sadece Ekran Ayarları sekmesinde
-# DEĞİL) baştan yükle. Eskiden bu değerler SADECE Kullanıcı Yönetimi →
-# Ekran Ayarları sekmesine girilince Supabase'den çekiliyordu — kullanıcı
-# direkt Cari Liste'ye girince (varsayılan giriş sayfası) kaydettiği ayar
-# hiç okunmuyor, varsayılana dönüyordu. Artık girişten hemen sonra, her
-# sayfada bir kez yükleniyor.
-if st.session_state.get("giris") and "_ekran_ayar_global_init" not in st.session_state:
-    st.session_state["_ekran_ayar_global_init"] = True
-    try:
-        _sb_eag = get_sb_client()
-        _eag_kul = st.session_state.get("kullanici", "")
-        if _sb_eag and _eag_kul:
-            import json as _eagj
-            _r_eag = _sb_eag.table("kullanici_tercih").select("deger").eq("kullanici", _eag_kul).eq("anahtar", "ekran_ayar").execute()
-            if _r_eag.data:
-                _eag_ayar = _eagj.loads(_r_eag.data[0]["deger"])
-                if "ust_px" in _eag_ayar: st.session_state["_ust_px"] = int(_eag_ayar["ust_px"])
-                if "alt_px" in _eag_ayar: st.session_state["_alt_px"] = int(_eag_ayar["alt_px"])
-                if "sol_px" in _eag_ayar:
-                    st.session_state["_sol_px"] = int(_eag_ayar["sol_px"])
-                elif "yan_px" in _eag_ayar:
-                    st.session_state["_sol_px"] = int(_eag_ayar["yan_px"])
-                if "sag_px" in _eag_ayar:
-                    st.session_state["_sag_px"] = int(_eag_ayar["sag_px"])
-                elif "yan_px" in _eag_ayar:
-                    st.session_state["_sag_px"] = int(_eag_ayar["yan_px"])
-    except Exception:
-        pass
-
+_e_r1      = st.session_state.get("_ekran_r1","")
+_e_r2      = st.session_state.get("_ekran_r2","")
+_e_tema_bg = st.session_state.get("_ekran_tema","")
 _e_ust     = st.session_state.get("_ust_px", 32)
 _e_alt     = st.session_state.get("_alt_px", 32)
-_e_sol     = st.session_state.get("_sol_px", st.session_state.get("_yan_px", 16))
-_e_sag     = st.session_state.get("_sag_px", st.session_state.get("_yan_px", 16))
+_e_yan     = st.session_state.get("_yan_px", 16)
+
+_takim_css = ""
+if _e_r1 and _e_r2:
+    _takim_css = f"""
+section[data-testid="stSidebar"] {{ background: {_e_r2} !important; }}
+section[data-testid="stSidebar"] .stButton>button {{ border-color: {_e_r1} !important; color: {_e_r2} !important; background: {_e_r2} !important; }}
+section[data-testid="stSidebar"] .stButton>button p {{ color: {_e_r1} !important; }}
+section[data-testid="stSidebar"] .stButton>button[kind="primary"] {{ background: {_e_r1} !important; }}
+section[data-testid="stSidebar"] .stButton>button[kind="primary"] p {{ color: {_e_r2} !important; }}
+section[data-testid="stSidebar"] div[style*="font-size:15px"], section[data-testid="stSidebar"] div[style*="font-size:14px"] {{ color: {_e_r1} !important; }}
+"""
+_bg_css = f"body, .main {{ background-color: {_e_tema_bg} !important; }}" if _e_tema_bg and not _e_r1 else ""
 
 st.markdown(f"""
 <style>
@@ -1845,10 +1832,11 @@ section.main > div.block-container,
 .block-container {{
     padding-top: {_e_ust}px !important;
     padding-bottom: {_e_alt}px !important;
-    padding-left: {_e_sol}px !important;
-    padding-right: {_e_sag}px !important;
+    padding-left: {_e_yan}px !important;
+    padding-right: {_e_yan}px !important;
 }}
-body, .main, [data-testid="stAppViewContainer"], [data-testid="stApp"] {{ background-color: #ffffff !important; }}
+{_bg_css}
+{_takim_css}
 </style>
 <script>
 (function applyPadding() {{
@@ -1859,8 +1847,8 @@ body, .main, [data-testid="stAppViewContainer"], [data-testid="stApp"] {{ backgr
         if (bc) {{
             bc.style.setProperty('padding-top', '{_e_ust}px', 'important');
             bc.style.setProperty('padding-bottom', '{_e_alt}px', 'important');
-            bc.style.setProperty('padding-left', '{_e_sol}px', 'important');
-            bc.style.setProperty('padding-right', '{_e_sag}px', 'important');
+            bc.style.setProperty('padding-left', '{_e_yan}px', 'important');
+            bc.style.setProperty('padding-right', '{_e_yan}px', 'important');
         }}
     }}
     apply();
@@ -3650,15 +3638,10 @@ elif aktif == "mukerrer":
 
 elif aktif == "liste":
     sayfa_log("liste")
-    # NOT: Burada eskiden padding-left/right SABİT 0.6rem'e zorlanıyordu — bu
-    # Ekran Ayarları → Sol/Sağ Boşluk ayarını komple eziyordu, kullanıcı ne
-    # ayarlarsa ayarlasın Cari Liste'de hiç görünmüyordu. Artık kullanıcının
-    # kendi kaydettiği sol/sağ px değerleri kullanılıyor.
-    _liste_sol_px = st.session_state.get("_sol_px", st.session_state.get("_yan_px", 16))
-    _liste_sag_px = st.session_state.get("_sag_px", st.session_state.get("_yan_px", 16))
-    st.markdown(f"""<style>
-.block-container {{ padding-left: {_liste_sol_px}px !important; padding-right: {_liste_sag_px}px !important; max-width: 100% !important; }}
-[data-testid="stAppViewContainer"] {{ max-width: 100% !important; }}
+    st.markdown("""<style>
+.block-container { padding-left: 0.6rem !important; padding-right: 0.6rem !important; max-width: 100% !important; }
+[data-testid="stAppViewContainer"] { max-width: 100% !important; }
+[data-testid="stMainBlockContainer"] { max-width: 100% !important; padding-left: 0.6rem !important; padding-right: 0.6rem !important; }
 </style>""", unsafe_allow_html=True)
 
     # ── KAYDETME SONRASI ONAY BANNER'I — toast kaçırılırsa diye burada da göster ──
@@ -4481,8 +4464,11 @@ section[data-testid="stSidebar"] { display: none !important; }
         "sonuc":    ("🏆","SONUÇ",    None, [((_asama_ikon(a),a,_kolon_sayi("sonuc",a),f"sonuc_{a}",False)) for a in _grp5_asama]),
     }
     # HTML oluştur - 2 satırlı tablo
+    # ── Rapor barı SABİT %100 genişlikte kalır, kendi başına kaymaz/kaydırılmaz.
+    # Cari Liste tablosu, kendi ayrı kolon-genişliği formülüyle (aşağıda _w())
+    # buna uymaya çalışır; rapor barı bunun için değişken hale getirilmez.
     _html = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">'
-    _html += '<div style="overflow-x:auto;margin-bottom:4px;"><table style="border-collapse:separate;border-spacing:0;font-family:inherit;font-size:12px;width:100%;">'
+    _html += '<div style="overflow-x:hidden;margin-bottom:4px;"><table style="border-collapse:separate;border-spacing:0;font-family:inherit;font-size:12px;width:100%;">'
 
     # 1. SATIR — grup başlıkları
     _html += '<thead><tr>'
@@ -4835,8 +4821,7 @@ function kartSec(id){
 
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
     _cok_secili_idler = set()
-    with st.expander("🔍 Filtreler & Arama", expanded=st.session_state.get("_cl_fil_acik", True)):
-        st.session_state["_cl_fil_acik"] = True  # expander açık kalsın
+    with st.expander("🔍 Filtreler & Arama", expanded=False):
         # ── TEK SATIR FİLTRE ───────────────────────────────────────────────────
         if st.session_state.get("kart_sec_reset"):
             st.session_state.pop("kart_sec_reset", None)
@@ -5422,24 +5407,17 @@ function kartSec(id){
     _KG = st.session_state.get("_kol_genislik", _KOL_VARSAYILAN.copy())
     _GIZLI_KOLONLAR = set(st.session_state.get("_kol_gizli", []))
 
-    # Firma'ya kadarki (GSM/S.Tel dahil) kolonlar küçük/okunur kalsın diye ayrı
-    # bir grup — bunlar büyütülürse Firma ilk görünümden kayboluyordu.
-    # Bu grubun SONRASINDAKİ kolonlar otomatik daha fazla büyütülüyor ki tablo
-    # kendiliğinden üst rapor barının uzunluğuna ulaşsın — kullanıcı hiçbir
-    # kolonu tek tek ayarlamak zorunda kalmasın.
+    # Firma'ya kadarki (ve GSM/S.Tel'e kadar) kolonlar küçük/okunur kalsın diye
+    # ayrı bir grup — bunlar büyütülürse Firma ilk görünümden çıkıyordu.
+    # Bu grubun SONRASINDAKİ kolonlar daha fazla büyütülüyor ki toplam genişlik
+    # üst rapor barına ulaşsın (aradaki fark bu "geç" kolonlara dağıtılıyor).
     _KOL_ERKEN = {"tarih","guncelleme_tarihi","id","rakip_firma","firma","yetkili","gsm","sabit"}
 
     def _w(k):
         # Gerçek piksel genişliği kullan — small/medium/large'a yuvarlarsak
         # 10 ile 79 arası tüm değerler görsel olarak aynı görünüyordu.
-        _kayitli = int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100)))
-        _varsayilan = int(_KOL_VARSAYILAN.get(k, 100))
-        if _kayitli != _varsayilan:
-            # "Kolon Ayarları"ndan elle değiştirilip kaydedilmiş bir değer —
-            # üstüne otomatik çarpan uygulanmaz, girilen sayı AYNEN kullanılır.
-            return _kayitli
         _carpan = 4.5 if k in _KOL_ERKEN else 8.5
-        return int(_kayitli * _carpan)
+        return int(int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100))) * _carpan)
 
     # Asama1/2/3 sabit seçenek listeleri — mevcut veride bu listede olmayan bir
     # değer varsa açılır kutu bozulmasın diye otomatik listeye eklenir.
@@ -7178,25 +7156,18 @@ elif aktif == "kullanici":
         # ── SAYFA BOŞLUĞU ───────────────────────────────────────────────────
         # ── EKRAN ANALİZİ + BOŞLUK AYARI ────────────────────────────────────
         st.markdown("#### 🖥️ Ekran Analizi & Boşluk Ayarı")
-        st.caption("Sol ve sağ boşluğu ayrı ayrı ayarla, altta canlı küçük önizlemede an be an gör — hiçbir yere gitmene gerek yok.")
 
         # Mevcut px değerlerini session veya Supabase'den al
-        # NOT: Eskiden tek bir "Yan Boşluk" (sol=sağ) vardı — artık sol/sağ
-        # ayrı ayrı ayarlanabiliyor. Eski kayıtlı "yan_px" varsa ikisine de
-        # başlangıç değeri olarak uygulanır (geriye dönük uyumluluk).
         if "_ust_px" not in st.session_state:
             _kayitli_b = _mevcut.get("ust_px", 32)
-            _kayitli_yan_eski = int(_mevcut.get("yan_px", 16))
             st.session_state["_ust_px"] = int(_kayitli_b)
             st.session_state["_alt_px"] = int(_mevcut.get("alt_px", 32))
-            st.session_state["_sol_px"] = int(_mevcut.get("sol_px", _kayitli_yan_eski))
-            st.session_state["_sag_px"] = int(_mevcut.get("sag_px", _kayitli_yan_eski))
+            st.session_state["_yan_px"] = int(_mevcut.get("yan_px", 16))
         _ust_px  = st.session_state.get("_ust_px", 32)
         _alt_px  = st.session_state.get("_alt_px", 32)
-        _sol_px  = st.session_state.get("_sol_px", 16)
-        _sag_px  = st.session_state.get("_sag_px", 16)
+        _yan_px  = st.session_state.get("_yan_px", 16)
 
-        # Ekran bilgi kartları
+        # Ekran bilgi kartları — JS ile dolduruluyor
         st.markdown(f"""
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
   <div style="background:var(--color-background-secondary);border-radius:8px;padding:10px;border:0.5px solid var(--color-border-tertiary);text-align:center;">
@@ -7210,96 +7181,173 @@ elif aktif == "kullanici":
     <div style="font-size:10px;color:gray;">px</div>
   </div>
   <div style="background:var(--color-background-secondary);border-radius:8px;padding:10px;border:0.5px solid var(--color-border-tertiary);text-align:center;">
-    <div style="font-size:10px;color:gray;margin-bottom:4px;">Sol Boşluk</div>
-    <div style="font-size:16px;font-weight:500;">{_sol_px}</div>
+    <div style="font-size:10px;color:gray;margin-bottom:4px;">Üst Boşluk</div>
+    <div style="font-size:16px;font-weight:500;" id="pt_val">{_ust_px}</div>
     <div style="font-size:10px;color:gray;">px</div>
   </div>
   <div style="background:var(--color-background-secondary);border-radius:8px;padding:10px;border:0.5px solid var(--color-border-tertiary);text-align:center;">
-    <div style="font-size:10px;color:gray;margin-bottom:4px;">Sağ Boşluk</div>
-    <div style="font-size:16px;font-weight:500;">{_sag_px}</div>
+    <div style="font-size:10px;color:gray;margin-bottom:4px;">Alt Boşluk</div>
+    <div style="font-size:16px;font-weight:500;" id="pb_val">{_alt_px}</div>
     <div style="font-size:10px;color:gray;">px</div>
   </div>
+</div>
+
+<!-- Görsel temsil -->
+<div style="border:0.5px solid var(--color-border-tertiary);border-radius:8px;overflow:hidden;margin-bottom:12px;">
+  <div style="background:#1f6feb;height:4px;"></div>
+  <div id="top_vis" style="background:#e8f4ff;display:flex;align-items:center;justify-content:center;font-size:11px;color:#1f6feb;height:{_ust_px}px;min-height:16px;transition:height 0.2s;">
+    ↕ üst: <b id="top_lbl" style="margin-left:4px;">{_ust_px}px</b>
+  </div>
+  <div style="background:white;padding:8px 14px;font-size:12px;border-top:0.5px solid #eee;border-bottom:0.5px solid #eee;">📊 İçerik alanı</div>
+  <div id="bot_vis" style="background:#e8f4ff;display:flex;align-items:center;justify-content:center;font-size:11px;color:#1f6feb;height:{_alt_px}px;min-height:16px;transition:height 0.2s;">
+    ↕ alt: <b id="bot_lbl" style="margin-left:4px;">{_alt_px}px</b>
+  </div>
+  <div style="background:#f0f2f6;height:4px;"></div>
 </div>
 <script>
 document.getElementById('sw_val').textContent = window.screen.width;
 document.getElementById('sh_val').textContent = window.screen.height;
+function updateTop(v){{
+  document.getElementById('top_lbl').textContent=v+'px';
+  document.getElementById('top_vis').style.height=Math.max(16,parseInt(v))+'px';
+  document.getElementById('pt_val').textContent=v;
+}}
+function updateBot(v){{
+  document.getElementById('bot_lbl').textContent=v+'px';
+  document.getElementById('bot_vis').style.height=Math.max(16,parseInt(v))+'px';
+  document.getElementById('pb_val').textContent=v;
+}}
 </script>
 """, unsafe_allow_html=True)
 
-        # Sliderlar — hareket ettirdiğin an aşağıdaki önizleme de anında güncellenir
+        # Sliderlar
         _yeni_ust = st.slider("⬆️ Üst Boşluk (px)", 0, 100, _ust_px, key="slider_ust")
         _yeni_alt = st.slider("⬇️ Alt Boşluk (px)", 0, 100, _alt_px, key="slider_alt")
-        _yeni_sol = st.slider("⬅️ Sol Boşluk (px)", 0, 150, _sol_px, key="slider_sol")
-        _yeni_sag = st.slider("➡️ Sağ Boşluk (px)", 0, 150, _sag_px, key="slider_sag")
-
-        # ── CANLI KÜÇÜK ÖNİZLEME — menü, üst rapor, alt Cari Liste tablosu ──
-        # Gerçek ekranın küçültülmüş (ölçekli) temsili. Slider'ları hareket
-        # ettirdiğinde (kaydetmeden ÖNCE bile) burada anında değişir.
-        st.markdown("**🖼️ Canlı Önizleme** (gerçek ekranın küçültülmüş hali)")
-        _pv_olcek = 0.4  # gerçek px -> önizleme px oranı
-        _pv_sol = int(_yeni_sol * _pv_olcek)
-        _pv_sag = int(_yeni_sag * _pv_olcek)
-        _pv_ust = int(_yeni_ust * _pv_olcek)
-        _pv_alt = int(_yeni_alt * _pv_olcek)
-        st.markdown(f"""
-<div style="border:0.5px solid var(--color-border-tertiary);border-radius:8px;overflow:hidden;background:#f8fafc;padding:6px;">
-  <div style="display:flex;gap:0;height:210px;background:white;border:0.5px solid #e2e8f0;border-radius:6px;overflow:hidden;">
-    <div style="width:52px;flex-shrink:0;background:#eef4fc;border-right:0.5px solid #cbd5e1;padding:6px 4px;font-size:8px;color:#1a4f9e;">
-      <div style="font-weight:700;margin-bottom:6px;">MWCRM</div>
-      <div style="background:#dbeafe;border-radius:3px;padding:2px 3px;margin-bottom:3px;">Liste</div>
-      <div style="padding:2px 3px;color:#94a3b8;">Randevu</div>
-      <div style="padding:2px 3px;color:#94a3b8;">Yönetim</div>
-    </div>
-    <div style="flex:1;min-width:0;padding-top:{_pv_ust}px;padding-bottom:{_pv_alt}px;padding-left:{_pv_sol}px;padding-right:{_pv_sag}px;background:#fdfdfd;display:flex;flex-direction:column;">
-      <div style="background:#f1f5f9;border:0.5px solid #cbd5e1;border-radius:4px;padding:5px;display:flex;gap:3px;margin-bottom:4px;flex-shrink:0;">
-        <div style="flex:1;background:white;border-radius:3px;padding:3px;text-align:center;font-size:7px;color:#374151;">GENEL</div>
-        <div style="flex:1;background:white;border-radius:3px;padding:3px;text-align:center;font-size:7px;color:#374151;">AŞAMA</div>
-        <div style="flex:1;background:white;border-radius:3px;padding:3px;text-align:center;font-size:7px;color:#374151;">SONUÇ</div>
-      </div>
-      <div style="flex:1;background:white;border:0.5px solid #e2e8f0;border-radius:4px;padding:0;overflow:hidden;display:flex;flex-direction:column;">
-        <div style="display:flex;background:#f8fafc;border-bottom:0.5px solid #cbd5e1;flex-shrink:0;">
-          <div style="flex:1.2;padding:3px 2px;font-size:6px;color:#64748b;border-right:0.5px solid #e2e8f0;">Firma</div>
-          <div style="flex:0.9;padding:3px 2px;font-size:6px;color:#64748b;border-right:0.5px solid #e2e8f0;">Yetkili</div>
-          <div style="flex:0.9;padding:3px 2px;font-size:6px;color:#64748b;border-right:0.5px solid #e2e8f0;">GSM</div>
-          <div style="flex:0.7;padding:3px 2px;font-size:6px;color:#64748b;border-right:0.5px solid #e2e8f0;">İl</div>
-          <div style="flex:0.9;padding:3px 2px;font-size:6px;color:#64748b;border-right:0.5px solid #e2e8f0;">Durum</div>
-          <div style="flex:0.9;padding:3px 2px;font-size:6px;color:#64748b;">Sonuç</div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:2px;padding:3px;">
-          <div style="height:7px;background:#f1f5f9;border-radius:2px;"></div>
-          <div style="height:7px;background:#f8fafc;border-radius:2px;"></div>
-          <div style="height:7px;background:#f1f5f9;border-radius:2px;"></div>
-          <div style="height:7px;background:#f8fafc;border-radius:2px;"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div style="text-align:center;font-size:10px;color:#94a3b8;margin-top:4px;">solda menü · sağda üst rapor + Cari Liste başlıkları (gerçek oranın küçültülmüş hali)</div>
-</div>
-""", unsafe_allow_html=True)
+        _yeni_yan = st.slider("↔️ Yan Boşluk (px)", 0, 100, _yan_px, key="slider_yan")
 
         _bs1, _bs2 = st.columns(2)
         if _bs1.button("💾 Boşlukları Kaydet", use_container_width=True, type="primary", key="bosluk_kaydet"):
             st.session_state["_ust_px"] = _yeni_ust
             st.session_state["_alt_px"] = _yeni_alt
-            st.session_state["_sol_px"] = _yeni_sol
-            st.session_state["_sag_px"] = _yeni_sag
+            st.session_state["_yan_px"] = _yeni_yan
+            st.session_state["_ekran_bosluk"] = f"{_yeni_ust}px"
+            st.session_state["_ekran_altbosluk"] = f"{_yeni_alt}px"
+            st.session_state["_ekran_yanbosluk"] = f"{_yeni_yan}px"
             _mevcut["ust_px"] = _yeni_ust
             _mevcut["alt_px"] = _yeni_alt
-            _mevcut["sol_px"] = _yeni_sol
-            _mevcut["sag_px"] = _yeni_sag
+            _mevcut["yan_px"] = _yeni_yan
             _ekran_kaydet(_mevcut)
             st.success("✅ Kaydedildi!")
             st.rerun()
         if _bs2.button("↺ Sıfırla", use_container_width=True, key="bosluk_sifirla"):
             st.session_state["_ust_px"] = 32
             st.session_state["_alt_px"] = 32
-            st.session_state["_sol_px"] = 16
-            st.session_state["_sag_px"] = 16
+            st.session_state["_yan_px"] = 16
+            st.session_state["_ekran_bosluk"] = "32px"
+            st.session_state["_ekran_altbosluk"] = "32px"
+            st.session_state["_ekran_yanbosluk"] = "16px"
             st.rerun()
 
+        st.divider()
+
+        # ── ARKA PLAN ────────────────────────────────────────────────────────
+        st.markdown("#### 🎨 Arka Plan Rengi")
+        _temalar = {
+            "beyaz":    ("#ffffff","Beyaz"),
+            "acik_mavi":("#e8f4ff","Açık Mavi"),
+            "gri":      ("#f1f5f9","Gri"),
+            "yesil":    ("#f0fdf4","Açık Yeşil"),
+            "krem":     ("#fff7ed","Krem"),
+            "koyu":     ("#1e293b","Koyu"),
+        }
+        _t_cols = st.columns(6)
+        for _ti, (_tk, (_tren, _tad)) in enumerate(_temalar.items()):
+            _aktif_t = _mevcut.get("tema","beyaz") == _tk
+            _t_cols[_ti].markdown(
+                f"<div onclick='' style='cursor:pointer;text-align:center;'>"
+                f"<div style='width:36px;height:36px;border-radius:6px;background:{_tren};"
+                f"border:{'2px solid #3b82f6' if _aktif_t else '0.5px solid #cbd5e1'};"
+                f"margin:0 auto 4px;'></div>"
+                f"<span style='font-size:10px;'>{_tad}</span></div>",
+                unsafe_allow_html=True
+            )
+            if _t_cols[_ti].button("●", key=f"tema_{_tk}", use_container_width=True, help=_tad):
+                _mevcut["tema"] = _tk
+                _ekran_kaydet(_mevcut)
+                st.session_state["_ekran_tema"] = _tren
+                st.rerun()
+
+        st.divider()
+
+        # ── TAKIM TEMALARI ───────────────────────────────────────────────────
+        st.markdown("#### ⚽ Takım Teması")
+
+        _TUM_TAKIMLAR = {
+            "fenerbahce":    ("#ffef03","#004684","Fenerbahçe"),
+            "galatasaray":   ("#e30613","#fcb514","Galatasaray"),
+            "besiktas":      ("#000000","#ffffff","Beşiktaş"),
+            "trabzonspor":   ("#ffffff","#722f37","Trabzonspor"),
+            "giresunspor":   ("#2d8c2d","#ffffff","Giresunspor"),
+            "samsunspor":    ("#cc0000","#000000","Samsunspor"),
+            "rizespor":      ("#0055a5","#008000","Rizespor"),
+            "kayserispor":   ("#cc9900","#cc0000","Kayserispor"),
+            "sivasspor":     ("#cc0000","#ffffff","Sivasspor"),
+            "antalyaspor":   ("#cc0000","#ffffff","Antalyaspor"),
+            "konyaspor":     ("#006600","#ffffff","Konyaspor"),
+            "bursaspor":     ("#006600","#ffffff","Bursaspor"),
+            "alanyaspor":    ("#ff6600","#006600","Alanyaspor"),
+            "kasimpasa":     ("#003399","#ffffff","Kasımpaşa"),
+            "ankaragucu":    ("#ffef03","#003399","Ankaragücü"),
+            "basaksehir":    ("#ff6600","#003399","Başakşehir"),
+            "gaziantep":     ("#cc0000","#000000","Gaziantep FK"),
+            "hatayspor":     ("#cc0000","#ffffff","Hatayspor"),
+            "adanaspor":     ("#ff6600","#ffffff","Adanaspor"),
+            "denizlispor":   ("#003399","#ffffff","Denizlispor"),
+            "boluspor":      ("#cc0000","#ffffff","Boluspor"),
+            "eyupspor":      ("#006600","#cc0000","Eyüpspor"),
+            "goztepe":       ("#cc9900","#cc0000","Göztepe"),
+            "kocaelispor":   ("#cc0000","#000000","Kocaelispor"),
+            "sakaryaspor":   ("#cc0000","#000000","Sakaryaspor"),
+            "orduspor":      ("#6600cc","#ffffff","Orduspor"),
+            "genclerbirligi":("#cc0000","#000000","Gençlerbirliği"),
+            "erzurumspor":   ("#003399","#cc0000","Erzurumspor"),
+            "malatyaspor":   ("#cc9900","#000000","Malatyaspor"),
+            "bandirmaspor":  ("#003399","#ffffff","Bandırmaspor"),
+            "izmirspor":     ("#cc0000","#ffffff","İzmirspor"),
+        }
+
+        # 4 büyük — önizlemeli
+        _4buyuk = ["fenerbahce","galatasaray","besiktas","trabzonspor","giresunspor"]
+        _tk4 = st.columns(5)
+        for _tki, _tkk in enumerate(_4buyuk):
+            _r1, _r2, _tad = _TUM_TAKIMLAR[_tkk]
+            _aktif_tk = _mevcut.get("takim","") == _tkk
+            _border = "3px solid #3b82f6" if _aktif_tk else f"2px solid {_r1}"
+            _tk4[_tki].markdown(
+                f"<div style='border-radius:8px;overflow:hidden;border:{_border};margin-bottom:4px;'>"
+                f"<div style='background:{_r2};padding:5px 7px;color:{_r1};font-size:11px;font-weight:700;'>🏢 MWCRMPRO</div>"
+                f"<div style='background:white;padding:3px 5px;display:flex;flex-direction:column;gap:2px;'>"
+                f"<div style='background:{_r2};color:{_r1};font-size:10px;padding:3px 5px;border-radius:3px;font-weight:600;'>📋 Cari Liste</div>"
+                f"<div style='background:white;color:{_r2};font-size:10px;padding:3px 5px;border-radius:3px;border:1px solid {_r2};'>📅 Randevular</div>"
+                f"</div>"
+                f"<div style='background:{_r1};padding:3px;text-align:center;font-size:10px;font-weight:700;color:{_r2};'>{_tad}</div>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+            if _tk4[_tki].button("✓ Seçili" if _aktif_tk else "Seç", key=f"takim_{_tkk}",
+                                  use_container_width=True, type="primary" if _aktif_tk else "secondary"):
+                _mevcut["takim"] = _tkk
+                _ekran_kaydet(_mevcut)
+                st.session_state["_ekran_r1"] = _r1
+                st.session_state["_ekran_r2"] = _r2
+                st.rerun()
+
+
+
         if st.button("↺ Varsayılana Sıfırla", use_container_width=True, key="ekran_sifirla"):
-            _ekran_kaydet({"bosluk":"normal"})
+            _ekran_kaydet({"bosluk":"normal","tema":"beyaz"})
+            st.session_state.pop("_ekran_tema", None)
+            st.session_state.pop("_ekran_tema2", None)
             st.session_state.pop("_ekran_bosluk", None)
             st.rerun()
 
