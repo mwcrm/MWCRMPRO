@@ -5901,26 +5901,6 @@ function kartSec(id){
             pass
     _aktif_col_order = _kayitli_sira if _kayitli_sira else col_order
 
-    # ── GARANTİLİ DOLDURMA — Kolon Ayarları'ndan kaydedilmiş özel değerler
-    # olsa bile, tablo toplamı hedef genişliğin altında kalırsa aradaki fark
-    # uygun bir kolona eklenir. Böylece rapor barının sağındaki boşluk HER
-    # durumda (kaydedilmiş özel genişlikler olsa da olmasa da) kapanır.
-    _cl_hedef_genislik = 2400
-    _cl_simdiki_toplam = sum(_w(c) for c in _aktif_col_order if c not in ("Seç",))
-    if _cl_simdiki_toplam < _cl_hedef_genislik:
-        _cl_fark = _cl_hedef_genislik - _cl_simdiki_toplam
-        for _cl_doldur_hedef in ["aciklama", "ara_islem", "adres", "sonuc"]:
-            if _cl_doldur_hedef in _aktif_col_order:
-                _cl_baslik = {"aciklama": "Açıklama", "ara_islem": "Ara İşlem",
-                               "adres": "Adres", "sonuc": "Sonuç"}[_cl_doldur_hedef]
-                if _cl_doldur_hedef == "sonuc":
-                    col_config[_cl_doldur_hedef] = st.column_config.SelectboxColumn(
-                        _cl_baslik, options=_asama_secenek_guvenli("sonuc", ["Tümü", "Kazanıldı", "Kaybedildi", "Devam Ediyor"]),
-                        width=_w(_cl_doldur_hedef) + _cl_fark)
-                else:
-                    col_config[_cl_doldur_hedef] = st.column_config.TextColumn(_cl_baslik, width=_w(_cl_doldur_hedef) + _cl_fark)
-                break
-
     # NOT: Eskiden burada notlu satırları sarı yapan bir CSS triki vardı
     # (ilk N satır notluydu, çünkü tablo not sayısına göre sıralanıyordu).
     # Sıralama kaldırıldığı için bu trik artık rastgele satırları sarı
