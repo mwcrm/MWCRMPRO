@@ -5402,9 +5402,8 @@ function kartSec(id){
         # 10 ile 79 arası tüm değerler görsel olarak aynı görünüyordu.
         # NOT: Tüm genişlikler büyütülüyor (oran korunuyor, kullanıcının kendi
         # kolon ayarları bozulmuyor) — tablo üst rapor kutularının genişliğine
-        # ulaşsın diye. Ayrıca MİNİMUM 100px garantisi var — aksi halde çok dar
-        # ayarlı kolonlar (örn. 20px) büyütülünce bile tek harfe sıkışıyordu.
-        return max(100, int(int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100))) * 2.2))
+        # ulaşsın diye.
+        return int(int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100))) * 3.0)
 
     # Asama1/2/3 sabit seçenek listeleri — mevcut veride bu listede olmayan bir
     # değer varsa açılır kutu bozulmasın diye otomatik listeye eklenir.
