@@ -6539,22 +6539,26 @@ elif aktif == "dis_nakliye":
     st.caption("Satır eklemek için tablonun en altındaki ➕ işaretine tıklayın. Silmek için satırın en solundaki kutuyu işaretleyip klavyeden Delete'e basın (veya satıra sağ tıklayıp 'Delete row' seçin). Değişiklikleri kalıcı yapmak için altta '💾 Kaydet'e basmayı unutmayın — kaydetmezseniz sayfayı yenilediğinizde kaybolur.")
 
     _dn_kolonlar = [
-        "gonderen_firma", "gonderici_tel", "gonderen_adres", "gonderen_il", "gonderen_ilce",
+        "tarih", "gonderen_firma", "gonderici_tel", "gonderen_adres", "gonderen_il", "gonderen_ilce",
         "alici_firma", "alici_tel", "alici_adres", "alici_il", "alici_ilce",
-        "odeme_yapacak_musteri", "yetkili", "yetkili_tel", "odeme_turu",
+        "odeme_yapacak_musteri", "fatura_adresi", "vergi_dairesi", "vergi_no", "yetkili_tel", "odeme_turu",
         "adet", "tur", "tasiyici", "tasiyici_fatura", "tasiyici_odendi",
         "stf_faturasi", "stf_odendi", "kar"
     ]
     _dn_basliklar = {
+        "tarih": "TARİH",
         "gonderen_firma": "GÖNDEREN FİRMA", "gonderici_tel": "GÖNDERİCİ TEL", "gonderen_adres": "GÖNDEREN ADRESİ",
         "gonderen_il": "GÖNDEREN İL", "gonderen_ilce": "GÖNDEREN İLÇE",
         "alici_firma": "ALICI FİRMA", "alici_tel": "ALICI TEL", "alici_adres": "ALICI ADRES",
         "alici_il": "ALICI İL", "alici_ilce": "ALICI İLÇE",
-        "odeme_yapacak_musteri": "ÖDEME YAPACAK MÜŞTERİ", "yetkili": "YETKİLİ", "yetkili_tel": "YETKİLİ TEL",
+        "odeme_yapacak_musteri": "ÖDEME YAPACAK MÜŞTERİ", "fatura_adresi": "FATURA ADRESİ",
+        "vergi_dairesi": "VERGİ DAİRESİ", "vergi_no": "VERGİ NO", "yetkili_tel": "YETKİLİ TEL",
         "odeme_turu": "ÖDEME TÜRÜ", "adet": "ADET", "tur": "TÜR", "tasiyici": "TAŞIYICI",
         "tasiyici_fatura": "TAŞIYICI FATURA", "tasiyici_odendi": "ÖDENDİ",
         "stf_faturasi": "STF FATURASI", "stf_odendi": "ÖDENDİ", "kar": "KAR"
     }
+    _dn_dar_kolonlar = {"tarih","gonderici_tel","alici_tel","gonderen_il","gonderen_ilce","alici_il","alici_ilce",
+                         "vergi_no","yetkili_tel","odeme_turu","adet","tur","tasiyici_odendi","stf_odendi","kar"}
 
     # ── Yükle — kullanici_tercih tablosunda TEK bir JSON kayıt olarak
     # saklanır (yeni tablo açmadan). Sayfa açılışında bir kere çekilir. ──────
@@ -6587,9 +6591,9 @@ elif aktif == "dis_nakliye":
     _dn_df["kar"] = pd.to_numeric(_dn_df["kar"], errors="coerce").fillna(0.0)
     _dn_df["tasiyici_odendi"] = _dn_df["tasiyici_odendi"].apply(lambda x: bool(x) if str(x).strip() not in ["", "nan", "None"] else False)
     _dn_df["stf_odendi"] = _dn_df["stf_odendi"].apply(lambda x: bool(x) if str(x).strip() not in ["", "nan", "None"] else False)
-    for _tk in ["gonderen_firma","gonderici_tel","gonderen_adres","gonderen_il","gonderen_ilce",
+    for _tk in ["tarih","gonderen_firma","gonderici_tel","gonderen_adres","gonderen_il","gonderen_ilce",
                 "alici_firma","alici_tel","alici_adres","alici_il","alici_ilce",
-                "odeme_yapacak_musteri","yetkili","yetkili_tel","odeme_turu","tur","tasiyici",
+                "odeme_yapacak_musteri","fatura_adresi","vergi_dairesi","vergi_no","yetkili_tel","odeme_turu","tur","tasiyici",
                 "tasiyici_fatura","stf_faturasi"]:
         _dn_df[_tk] = _dn_df[_tk].astype(str).replace(["nan","None"], "")
 
@@ -6599,14 +6603,15 @@ elif aktif == "dis_nakliye":
 
     _dn_col_config = {}
     for _k in _dn_kolonlar:
+        _dn_w = "small" if _k in _dn_dar_kolonlar else "medium"
         if _k == "adet":
-            _dn_col_config[_k] = st.column_config.NumberColumn(_dn_basliklar[_k], min_value=0, step=1)
+            _dn_col_config[_k] = st.column_config.NumberColumn(_dn_basliklar[_k], min_value=0, step=1, width="small")
         elif _k == "kar":
-            _dn_col_config[_k] = st.column_config.NumberColumn(_dn_basliklar[_k], format="%.2f ₺")
+            _dn_col_config[_k] = st.column_config.NumberColumn(_dn_basliklar[_k], format="%.2f ₺", width="small")
         elif _k in ("tasiyici_odendi", "stf_odendi"):
-            _dn_col_config[_k] = st.column_config.CheckboxColumn(_dn_basliklar[_k])
+            _dn_col_config[_k] = st.column_config.CheckboxColumn(_dn_basliklar[_k], width="small")
         else:
-            _dn_col_config[_k] = st.column_config.TextColumn(_dn_basliklar[_k])
+            _dn_col_config[_k] = st.column_config.TextColumn(_dn_basliklar[_k], width=_dn_w)
 
     _dn_edited = st.data_editor(
         _dn_df,
