@@ -1805,7 +1805,6 @@ st.markdown("""<script>
 # ── EKRAN AYARLARI UYGULA ────────────────────────────────────────────────────
 _e_r1      = st.session_state.get("_ekran_r1","")
 _e_r2      = st.session_state.get("_ekran_r2","")
-_e_tema_bg = st.session_state.get("_ekran_tema","")
 _e_ust     = st.session_state.get("_ust_px", 32)
 _e_alt     = st.session_state.get("_alt_px", 32)
 _e_yan     = st.session_state.get("_yan_px", 16)
@@ -1820,7 +1819,9 @@ section[data-testid="stSidebar"] .stButton>button[kind="primary"] {{ background:
 section[data-testid="stSidebar"] .stButton>button[kind="primary"] p {{ color: {_e_r2} !important; }}
 section[data-testid="stSidebar"] div[style*="font-size:15px"], section[data-testid="stSidebar"] div[style*="font-size:14px"] {{ color: {_e_r1} !important; }}
 """
-_bg_css = f"body, .main {{ background-color: {_e_tema_bg} !important; }}" if _e_tema_bg and not _e_r1 else ""
+# Arka plan artık kullanıcı tarafından değiştirilemez — her cihazda/ekranda
+# HER ZAMAN beyaz. (Eskiden burada kullanıcının seçtiği tema rengi uygulanıyordu.)
+_bg_css = "body, .main { background-color: #ffffff !important; }"
 
 st.markdown(f"""
 <style>
@@ -5879,6 +5880,19 @@ function kartSec(id){
             pass
     _aktif_col_order = _kayitli_sira if _kayitli_sira else col_order
 
+    # ── SAĞ TARAFTAKİ BOŞLUĞU KAPAT ─────────────────────────────────────────
+    # Tüm kolonlara sabit piksel genişliği verildiğinde, toplam genişlik ekran
+    # genişliğinden az kalırsa tablonun sağında boş bir alan kalıyordu (ekran
+    # boyutuna göre değişiyordu). Çözüm: en sondaki GÖRÜNÜR kolonun piksel
+    # genişliğini sabitlemiyoruz — Streamlit o kolonu kalan boş alanı
+    # dolduracak şekilde otomatik büyütüyor, böylece hangi ekran/monitör
+    # olursa olsun sağda boşluk kalmıyor.
+    for _son_kol in reversed(_aktif_col_order):
+        if _son_kol != "Seç" and _son_kol in col_config and isinstance(col_config[_son_kol], dict):
+            col_config[_son_kol] = dict(col_config[_son_kol])
+            col_config[_son_kol].pop("width", None)
+            break
+
     # NOT: Eskiden burada notlu satırları sarı yapan bir CSS triki vardı
     # (ilk N satır notluydu, çünkü tablo not sayısına göre sıralanıyordu).
     # Sıralama kaldırıldığı için bu trik artık rastgele satırları sarı
@@ -7251,31 +7265,12 @@ function updateBot(v){{
         st.divider()
 
         # ── ARKA PLAN ────────────────────────────────────────────────────────
+        # NOT: Arka plan rengi seçimi kaldırıldı — arka plan artık her
+        # bilgisayarda/ekranda HER ZAMAN sabit beyaz. Kullanıcı tarafından
+        # değiştirilemez (bkz. yukarıdaki "EKRAN AYARLARI UYGULA" bölümü,
+        # _bg_css sabit olarak beyaza ayarlandı).
         st.markdown("#### 🎨 Arka Plan Rengi")
-        _temalar = {
-            "beyaz":    ("#ffffff","Beyaz"),
-            "acik_mavi":("#e8f4ff","Açık Mavi"),
-            "gri":      ("#f1f5f9","Gri"),
-            "yesil":    ("#f0fdf4","Açık Yeşil"),
-            "krem":     ("#fff7ed","Krem"),
-            "koyu":     ("#1e293b","Koyu"),
-        }
-        _t_cols = st.columns(6)
-        for _ti, (_tk, (_tren, _tad)) in enumerate(_temalar.items()):
-            _aktif_t = _mevcut.get("tema","beyaz") == _tk
-            _t_cols[_ti].markdown(
-                f"<div onclick='' style='cursor:pointer;text-align:center;'>"
-                f"<div style='width:36px;height:36px;border-radius:6px;background:{_tren};"
-                f"border:{'2px solid #3b82f6' if _aktif_t else '0.5px solid #cbd5e1'};"
-                f"margin:0 auto 4px;'></div>"
-                f"<span style='font-size:10px;'>{_tad}</span></div>",
-                unsafe_allow_html=True
-            )
-            if _t_cols[_ti].button("●", key=f"tema_{_tk}", use_container_width=True, help=_tad):
-                _mevcut["tema"] = _tk
-                _ekran_kaydet(_mevcut)
-                st.session_state["_ekran_tema"] = _tren
-                st.rerun()
+        st.caption("Arka plan tüm cihazlarda sabit **beyaz**. Bu ayar artık değiştirilemiyor.")
 
         st.divider()
 
