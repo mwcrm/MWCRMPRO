@@ -6561,6 +6561,9 @@ elif aktif == "dis_nakliye":
 [data-testid="stAppViewContainer"] { max-width: 100% !important; }
 div[data-testid="stHorizontalBlock"] { gap: 0.3rem !important; }
 div[data-testid="stHorizontalBlock"] > div[data-testid="column"] { padding: 0 !important; }
+div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) {
+    max-width: 260px !important; flex: 0 0 260px !important; width: 260px !important;
+}
 </style>""", unsafe_allow_html=True)
 
     _dn_kolonlar = [
