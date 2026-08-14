@@ -1385,6 +1385,7 @@ def sayfa_log(sayfa):
         "randevu": "Randevular", "ozel_teklif": "Özel Teklif", "sozlesme": "Sözleşmeler",
         "rapor": "Raporlar", "excel": "Excel", "kullanici": "Kullanıcılar",
         "admin_rapor": "Admin Rapor", "harita": "Müşteri Haritası", "patron": "Patron",
+        "dis_nakliye": "Dış Nakliye",
     }
     _ad = _menu_adlari.get(sayfa, sayfa)
 
@@ -1636,6 +1637,7 @@ _sayfa_adlari_cfg = {
     "randevu":"Randevular","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler",
     "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
     "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
+    "dis_nakliye":"Dış Nakliye",
 }
 _aktif_cfg = st.session_state.get("aktif_tab","liste")
 _baslik_cfg = "MWCRMPRO | " + _sayfa_adlari_cfg.get(_aktif_cfg,"MWCRMPRO")
@@ -1674,6 +1676,7 @@ _sayfa_adlari = {
     "randevu":"Randevular","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler",
     "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
     "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
+    "dis_nakliye":"Dış Nakliye",
 }
 _aktif_sayfa = st.session_state.get("aktif_tab","liste")
 _sayfa_adi = _sayfa_adlari.get(_aktif_sayfa, _aktif_sayfa)
@@ -2470,7 +2473,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "mukerrer"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "mukerrer", "dis_nakliye"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -2479,6 +2482,7 @@ _TAB_ETIKETLER = {
     "kayitli_teklifler": "📋 Kayıtlı Teklifler",
     "sozlesme": "📜 Sözleşmeler",
     "excel": "📥 Excel Aktar",
+    "dis_nakliye": "🚢 Dış Nakliye",
     
     "randevu": "📅 Randevular",
     "kullanici": "👥 Kullanıcı Yönetimi",
@@ -2931,7 +2935,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
     _MENU_GRUPLARI = [
         ("🧾 Cari işlemleri",    ["yeni", "liste", "excel", "mukerrer"]),
         ("📅 Randevu ve teklif", ["randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler"]),
-        ("🚚 Saha",              ["harita"]),
+        ("🚚 Saha",              ["harita", "dis_nakliye"]),
         ("⚙️ Yönetim",          ["kullanici", "patron"]),
         ("📊 Raporlar",          ["admin_rapor", "rapor"]),
     ]
@@ -6528,6 +6532,111 @@ function kartSec(id){
         st.caption(f"**Tümü** gösteriliyor — {_cl_toplam_kayit} kayıt")
 
     st.divider()
+
+elif aktif == "dis_nakliye":
+    sayfa_log("dis_nakliye")
+    st.markdown("### 🚢 Dış Nakliye")
+    st.caption("Satır eklemek için tablonun en altındaki ➕ işaretine tıklayın. Silmek için satırın en solundaki kutuyu işaretleyip klavyeden Delete'e basın (veya satıra sağ tıklayıp 'Delete row' seçin). Değişiklikleri kalıcı yapmak için altta '💾 Kaydet'e basmayı unutmayın — kaydetmezseniz sayfayı yenilediğinizde kaybolur.")
+
+    _dn_kolonlar = [
+        "gonderen_firma", "gonderici_tel", "gonderen_adres", "gonderen_il", "gonderen_ilce",
+        "alici_firma", "alici_tel", "alici_adres", "alici_il", "alici_ilce",
+        "odeme_yapacak_musteri", "yetkili", "yetkili_tel", "odeme_turu",
+        "adet", "tur", "tasiyici", "tasiyici_fatura", "tasiyici_odendi",
+        "stf_faturasi", "stf_odendi", "kar"
+    ]
+    _dn_basliklar = {
+        "gonderen_firma": "GÖNDEREN FİRMA", "gonderici_tel": "GÖNDERİCİ TEL", "gonderen_adres": "GÖNDEREN ADRESİ",
+        "gonderen_il": "GÖNDEREN İL", "gonderen_ilce": "GÖNDEREN İLÇE",
+        "alici_firma": "ALICI FİRMA", "alici_tel": "ALICI TEL", "alici_adres": "ALICI ADRES",
+        "alici_il": "ALICI İL", "alici_ilce": "ALICI İLÇE",
+        "odeme_yapacak_musteri": "ÖDEME YAPACAK MÜŞTERİ", "yetkili": "YETKİLİ", "yetkili_tel": "YETKİLİ TEL",
+        "odeme_turu": "ÖDEME TÜRÜ", "adet": "ADET", "tur": "TÜR", "tasiyici": "TAŞIYICI",
+        "tasiyici_fatura": "TAŞIYICI FATURA", "tasiyici_odendi": "ÖDENDİ",
+        "stf_faturasi": "STF FATURASI", "stf_odendi": "ÖDENDİ", "kar": "KAR"
+    }
+
+    # ── Yükle — kullanici_tercih tablosunda TEK bir JSON kayıt olarak
+    # saklanır (yeni tablo açmadan). Sayfa açılışında bir kere çekilir. ──────
+    if "_dn_kayitlar" not in st.session_state:
+        st.session_state["_dn_kayitlar"] = []
+        try:
+            _sb_dn0 = get_sb_client()
+            if _sb_dn0:
+                import json as _dnj0
+                _r_dn0 = _sb_dn0.table("kullanici_tercih").select("deger").eq(
+                    "kullanici", "__liste_ui__").eq("anahtar", "dis_nakliye_kayitlari").execute()
+                if _r_dn0.data:
+                    st.session_state["_dn_kayitlar"] = _dnj0.loads(_r_dn0.data[0]["deger"])
+        except Exception:
+            pass
+
+    _dn_liste = st.session_state["_dn_kayitlar"]
+    if _dn_liste:
+        _dn_df = pd.DataFrame(_dn_liste)
+        for _k in _dn_kolonlar:
+            if _k not in _dn_df.columns:
+                _dn_df[_k] = 0 if _k in ("adet", "kar") else ("" if _k not in ("tasiyici_odendi","stf_odendi") else False)
+        _dn_df = _dn_df[_dn_kolonlar]
+    else:
+        _dn_df = pd.DataFrame(columns=_dn_kolonlar)
+
+    if _dn_df.empty:
+        _dn_df = pd.DataFrame([{c: (0 if c in ("adet","kar") else (False if c in ("tasiyici_odendi","stf_odendi") else "")) for c in _dn_kolonlar}]).iloc[0:0]
+    _dn_df["adet"] = pd.to_numeric(_dn_df["adet"], errors="coerce").fillna(0).astype(int)
+    _dn_df["kar"] = pd.to_numeric(_dn_df["kar"], errors="coerce").fillna(0.0)
+    _dn_df["tasiyici_odendi"] = _dn_df["tasiyici_odendi"].apply(lambda x: bool(x) if str(x).strip() not in ["", "nan", "None"] else False)
+    _dn_df["stf_odendi"] = _dn_df["stf_odendi"].apply(lambda x: bool(x) if str(x).strip() not in ["", "nan", "None"] else False)
+    for _tk in ["gonderen_firma","gonderici_tel","gonderen_adres","gonderen_il","gonderen_ilce",
+                "alici_firma","alici_tel","alici_adres","alici_il","alici_ilce",
+                "odeme_yapacak_musteri","yetkili","yetkili_tel","odeme_turu","tur","tasiyici",
+                "tasiyici_fatura","stf_faturasi"]:
+        _dn_df[_tk] = _dn_df[_tk].astype(str).replace(["nan","None"], "")
+
+    _dn_df = _dn_df.reset_index(drop=True)
+    _dn_df.index = _dn_df.index + 1
+    _dn_df.index.name = "S.No"
+
+    _dn_col_config = {}
+    for _k in _dn_kolonlar:
+        if _k == "adet":
+            _dn_col_config[_k] = st.column_config.NumberColumn(_dn_basliklar[_k], min_value=0, step=1)
+        elif _k == "kar":
+            _dn_col_config[_k] = st.column_config.NumberColumn(_dn_basliklar[_k], format="%.2f ₺")
+        elif _k in ("tasiyici_odendi", "stf_odendi"):
+            _dn_col_config[_k] = st.column_config.CheckboxColumn(_dn_basliklar[_k])
+        else:
+            _dn_col_config[_k] = st.column_config.TextColumn(_dn_basliklar[_k])
+
+    _dn_edited = st.data_editor(
+        _dn_df,
+        use_container_width=True,
+        num_rows="dynamic",
+        column_config=_dn_col_config,
+        key="dn_editor",
+        height=650
+    )
+
+    _dn_k1, _dn_k2 = st.columns([1, 5])
+    with _dn_k1:
+        if st.button("💾 Kaydet", type="primary", key="dn_kaydet_btn"):
+            _dn_kayit_listesi = _dn_edited.reset_index(drop=True).to_dict(orient="records")
+            st.session_state["_dn_kayitlar"] = _dn_kayit_listesi
+            try:
+                _sb_dn1 = get_sb_client()
+                if _sb_dn1:
+                    import json as _dnj1
+                    _sb_dn1.table("kullanici_tercih").upsert({
+                        "kullanici": "__liste_ui__", "anahtar": "dis_nakliye_kayitlari",
+                        "deger": _dnj1.dumps(_dn_kayit_listesi, ensure_ascii=False)
+                    }, on_conflict="kullanici,anahtar").execute()
+                    st.success(f"✅ {len(_dn_kayit_listesi)} kayıt kaydedildi!")
+                    st.rerun()
+                else:
+                    st.error("Supabase bağlantısı yok, kaydedilemedi.")
+            except Exception as _dn_e:
+                st.error(f"❌ Kaydedilemedi: {_dn_e}")
+
 elif aktif == "kullanici":
     sayfa_log("kullanici")
     st.markdown("## 👥 Kullanıcı & Firma Yönetimi")
