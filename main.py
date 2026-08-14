@@ -4464,8 +4464,32 @@ section[data-testid="stSidebar"] { display: none !important; }
         "sonuc":    ("🏆","SONUÇ",    None, [((_asama_ikon(a),a,_kolon_sayi("sonuc",a),f"sonuc_{a}",False)) for a in _grp5_asama]),
     }
     # HTML oluştur - 2 satırlı tablo
+    # ── Genişliği Cari Liste tablosuyla BİREBİR eşitle ────────────────────────
+    # Piksel tahmini/çarpan denemeleri hep bir miktar sapıyordu. Bunun yerine
+    # tablonun kendi genişlik formülünü (aynı erken/geç kolon ayrımı, aynı
+    # çarpanlar) burada da uygulayıp matematiksel olarak AYNI piksel sayısını
+    # üretiyoruz — böylece iki taraf da kesin eşleşir, tahmine gerek kalmaz.
+    _RB_KOL_VARSAYILAN = {
+        "tarih":90,"guncelleme_tarihi":100,
+        "firma":90,"rakip_firma":90,"yetkili":90,"gsm":100,"sabit":90,"email":90,
+        "adres":110,"il":70,"ilce":60,"durum":80,"temsilci":80,
+        "islem_asamasi":80,"aciklama":110,"📅 Son Randevu":170,"📨 Notlar":50,"id":40,
+        "beklenen_ciro":70,"gerceklesen_ciro":70,"✅ Analiz":70,"Varış İli":90,"Koli/Palet":110,
+        "🧾 Teklif":70,"💬 Mesaj":70,
+        "asama1":90,"asama2":90,"asama3":90,"sonuc":90,"ara_islem":90
+    }
+    _RB_KOL_ERKEN = {"tarih","guncelleme_tarihi","id","rakip_firma","firma","yetkili","gsm","sabit"}
+    _RB_KG = st.session_state.get("_kol_genislik", _RB_KOL_VARSAYILAN)
+    _RB_GIZLI = set(st.session_state.get("_kol_gizli", []))
+    _RB_GENISLIK_TOPLAM = 0
+    for _rb_k, _rb_v in _RB_KOL_VARSAYILAN.items():
+        if _rb_k in _RB_GIZLI:
+            continue
+        _rb_carpan = 4.5 if _rb_k in _RB_KOL_ERKEN else 8.5
+        _RB_GENISLIK_TOPLAM += int(int(_RB_KG.get(_rb_k, _rb_v)) * _rb_carpan)
+    _RB_GENISLIK_TOPLAM += 120  # Seç + S.No + index kolonları için sabit pay
     _html = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">'
-    _html += '<div style="overflow-x:auto;margin-bottom:4px;"><table style="border-collapse:separate;border-spacing:0;font-family:inherit;font-size:12px;width:100%;">'
+    _html += f'<div style="overflow-x:auto;margin-bottom:4px;"><table style="border-collapse:separate;border-spacing:0;font-family:inherit;font-size:12px;width:{_RB_GENISLIK_TOPLAM}px;min-width:100%;">'
 
     # 1. SATIR — grup başlıkları
     _html += '<thead><tr>'
