@@ -1802,7 +1802,8 @@ st.markdown("""<script>
 # hiçbir zaman uygulanmaz.
 _e_ust     = st.session_state.get("_ust_px", 32)
 _e_alt     = st.session_state.get("_alt_px", 32)
-_e_yan     = st.session_state.get("_yan_px", 16)
+_e_sol     = st.session_state.get("_sol_px", st.session_state.get("_yan_px", 16))
+_e_sag     = st.session_state.get("_sag_px", st.session_state.get("_yan_px", 16))
 
 st.markdown(f"""
 <style>
@@ -1814,8 +1815,8 @@ section.main > div.block-container,
 .block-container {{
     padding-top: {_e_ust}px !important;
     padding-bottom: {_e_alt}px !important;
-    padding-left: {_e_yan}px !important;
-    padding-right: {_e_yan}px !important;
+    padding-left: {_e_sol}px !important;
+    padding-right: {_e_sag}px !important;
 }}
 body, .main, [data-testid="stAppViewContainer"], [data-testid="stApp"] {{ background-color: #ffffff !important; }}
 </style>
@@ -1828,8 +1829,8 @@ body, .main, [data-testid="stAppViewContainer"], [data-testid="stApp"] {{ backgr
         if (bc) {{
             bc.style.setProperty('padding-top', '{_e_ust}px', 'important');
             bc.style.setProperty('padding-bottom', '{_e_alt}px', 'important');
-            bc.style.setProperty('padding-left', '{_e_yan}px', 'important');
-            bc.style.setProperty('padding-right', '{_e_yan}px', 'important');
+            bc.style.setProperty('padding-left', '{_e_sol}px', 'important');
+            bc.style.setProperty('padding-right', '{_e_sag}px', 'important');
         }}
     }}
     apply();
@@ -7141,18 +7142,25 @@ elif aktif == "kullanici":
         # ── SAYFA BOŞLUĞU ───────────────────────────────────────────────────
         # ── EKRAN ANALİZİ + BOŞLUK AYARI ────────────────────────────────────
         st.markdown("#### 🖥️ Ekran Analizi & Boşluk Ayarı")
+        st.caption("Sol ve sağ boşluğu ayrı ayrı ayarla, altta canlı küçük önizlemede an be an gör — hiçbir yere gitmene gerek yok.")
 
         # Mevcut px değerlerini session veya Supabase'den al
+        # NOT: Eskiden tek bir "Yan Boşluk" (sol=sağ) vardı — artık sol/sağ
+        # ayrı ayrı ayarlanabiliyor. Eski kayıtlı "yan_px" varsa ikisine de
+        # başlangıç değeri olarak uygulanır (geriye dönük uyumluluk).
         if "_ust_px" not in st.session_state:
             _kayitli_b = _mevcut.get("ust_px", 32)
+            _kayitli_yan_eski = int(_mevcut.get("yan_px", 16))
             st.session_state["_ust_px"] = int(_kayitli_b)
             st.session_state["_alt_px"] = int(_mevcut.get("alt_px", 32))
-            st.session_state["_yan_px"] = int(_mevcut.get("yan_px", 16))
+            st.session_state["_sol_px"] = int(_mevcut.get("sol_px", _kayitli_yan_eski))
+            st.session_state["_sag_px"] = int(_mevcut.get("sag_px", _kayitli_yan_eski))
         _ust_px  = st.session_state.get("_ust_px", 32)
         _alt_px  = st.session_state.get("_alt_px", 32)
-        _yan_px  = st.session_state.get("_yan_px", 16)
+        _sol_px  = st.session_state.get("_sol_px", 16)
+        _sag_px  = st.session_state.get("_sag_px", 16)
 
-        # Ekran bilgi kartları — JS ile dolduruluyor
+        # Ekran bilgi kartları
         st.markdown(f"""
 <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
   <div style="background:var(--color-background-secondary);border-radius:8px;padding:10px;border:0.5px solid var(--color-border-tertiary);text-align:center;">
@@ -7166,71 +7174,83 @@ elif aktif == "kullanici":
     <div style="font-size:10px;color:gray;">px</div>
   </div>
   <div style="background:var(--color-background-secondary);border-radius:8px;padding:10px;border:0.5px solid var(--color-border-tertiary);text-align:center;">
-    <div style="font-size:10px;color:gray;margin-bottom:4px;">Üst Boşluk</div>
-    <div style="font-size:16px;font-weight:500;" id="pt_val">{_ust_px}</div>
+    <div style="font-size:10px;color:gray;margin-bottom:4px;">Sol Boşluk</div>
+    <div style="font-size:16px;font-weight:500;">{_sol_px}</div>
     <div style="font-size:10px;color:gray;">px</div>
   </div>
   <div style="background:var(--color-background-secondary);border-radius:8px;padding:10px;border:0.5px solid var(--color-border-tertiary);text-align:center;">
-    <div style="font-size:10px;color:gray;margin-bottom:4px;">Alt Boşluk</div>
-    <div style="font-size:16px;font-weight:500;" id="pb_val">{_alt_px}</div>
+    <div style="font-size:10px;color:gray;margin-bottom:4px;">Sağ Boşluk</div>
+    <div style="font-size:16px;font-weight:500;">{_sag_px}</div>
     <div style="font-size:10px;color:gray;">px</div>
   </div>
-</div>
-
-<!-- Görsel temsil -->
-<div style="border:0.5px solid var(--color-border-tertiary);border-radius:8px;overflow:hidden;margin-bottom:12px;">
-  <div style="background:#1f6feb;height:4px;"></div>
-  <div id="top_vis" style="background:#e8f4ff;display:flex;align-items:center;justify-content:center;font-size:11px;color:#1f6feb;height:{_ust_px}px;min-height:16px;transition:height 0.2s;">
-    ↕ üst: <b id="top_lbl" style="margin-left:4px;">{_ust_px}px</b>
-  </div>
-  <div style="background:white;padding:8px 14px;font-size:12px;border-top:0.5px solid #eee;border-bottom:0.5px solid #eee;">📊 İçerik alanı</div>
-  <div id="bot_vis" style="background:#e8f4ff;display:flex;align-items:center;justify-content:center;font-size:11px;color:#1f6feb;height:{_alt_px}px;min-height:16px;transition:height 0.2s;">
-    ↕ alt: <b id="bot_lbl" style="margin-left:4px;">{_alt_px}px</b>
-  </div>
-  <div style="background:#f0f2f6;height:4px;"></div>
 </div>
 <script>
 document.getElementById('sw_val').textContent = window.screen.width;
 document.getElementById('sh_val').textContent = window.screen.height;
-function updateTop(v){{
-  document.getElementById('top_lbl').textContent=v+'px';
-  document.getElementById('top_vis').style.height=Math.max(16,parseInt(v))+'px';
-  document.getElementById('pt_val').textContent=v;
-}}
-function updateBot(v){{
-  document.getElementById('bot_lbl').textContent=v+'px';
-  document.getElementById('bot_vis').style.height=Math.max(16,parseInt(v))+'px';
-  document.getElementById('pb_val').textContent=v;
-}}
 </script>
 """, unsafe_allow_html=True)
 
-        # Sliderlar
+        # Sliderlar — hareket ettirdiğin an aşağıdaki önizleme de anında güncellenir
         _yeni_ust = st.slider("⬆️ Üst Boşluk (px)", 0, 100, _ust_px, key="slider_ust")
         _yeni_alt = st.slider("⬇️ Alt Boşluk (px)", 0, 100, _alt_px, key="slider_alt")
-        _yeni_yan = st.slider("↔️ Yan Boşluk (px)", 0, 100, _yan_px, key="slider_yan")
+        _yeni_sol = st.slider("⬅️ Sol Boşluk (px)", 0, 150, _sol_px, key="slider_sol")
+        _yeni_sag = st.slider("➡️ Sağ Boşluk (px)", 0, 150, _sag_px, key="slider_sag")
+
+        # ── CANLI KÜÇÜK ÖNİZLEME — menü, üst rapor, alt Cari Liste tablosu ──
+        # Gerçek ekranın küçültülmüş (ölçekli) temsili. Slider'ları hareket
+        # ettirdiğinde (kaydetmeden ÖNCE bile) burada anında değişir.
+        st.markdown("**🖼️ Canlı Önizleme** (gerçek ekranın küçültülmüş hali)")
+        _pv_olcek = 0.4  # gerçek px -> önizleme px oranı
+        _pv_sol = int(_yeni_sol * _pv_olcek)
+        _pv_sag = int(_yeni_sag * _pv_olcek)
+        _pv_ust = int(_yeni_ust * _pv_olcek)
+        _pv_alt = int(_yeni_alt * _pv_olcek)
+        st.markdown(f"""
+<div style="border:0.5px solid var(--color-border-tertiary);border-radius:8px;overflow:hidden;background:#f8fafc;padding:6px;">
+  <div style="display:flex;gap:0;height:210px;background:white;border:0.5px solid #e2e8f0;border-radius:6px;overflow:hidden;">
+    <div style="width:52px;flex-shrink:0;background:#eef4fc;border-right:0.5px solid #cbd5e1;padding:6px 4px;font-size:8px;color:#1a4f9e;">
+      <div style="font-weight:700;margin-bottom:6px;">MWCRM</div>
+      <div style="background:#dbeafe;border-radius:3px;padding:2px 3px;margin-bottom:3px;">Liste</div>
+      <div style="padding:2px 3px;color:#94a3b8;">Randevu</div>
+      <div style="padding:2px 3px;color:#94a3b8;">Yönetim</div>
+    </div>
+    <div style="flex:1;min-width:0;padding-top:{_pv_ust}px;padding-bottom:{_pv_alt}px;padding-left:{_pv_sol}px;padding-right:{_pv_sag}px;background:#fdfdfd;display:flex;flex-direction:column;">
+      <div style="background:#f1f5f9;border:0.5px solid #cbd5e1;border-radius:4px;padding:5px;display:flex;gap:3px;margin-bottom:4px;flex-shrink:0;">
+        <div style="flex:1;background:white;border-radius:3px;padding:3px;text-align:center;font-size:7px;color:#374151;">GENEL</div>
+        <div style="flex:1;background:white;border-radius:3px;padding:3px;text-align:center;font-size:7px;color:#374151;">AŞAMA</div>
+        <div style="flex:1;background:white;border-radius:3px;padding:3px;text-align:center;font-size:7px;color:#374151;">SONUÇ</div>
+      </div>
+      <div style="flex:1;background:white;border:0.5px solid #e2e8f0;border-radius:4px;padding:4px;display:flex;flex-direction:column;gap:3px;">
+        <div style="height:8px;background:#f1f5f9;border-radius:2px;"></div>
+        <div style="height:8px;background:#f8fafc;border-radius:2px;"></div>
+        <div style="height:8px;background:#f1f5f9;border-radius:2px;"></div>
+        <div style="height:8px;background:#f8fafc;border-radius:2px;"></div>
+        <div style="height:8px;background:#f1f5f9;border-radius:2px;"></div>
+      </div>
+    </div>
+  </div>
+  <div style="text-align:center;font-size:10px;color:#94a3b8;margin-top:4px;">solda menü · sağda üst rapor + Cari Liste (gerçek oranın küçültülmüş hali)</div>
+</div>
+""", unsafe_allow_html=True)
 
         _bs1, _bs2 = st.columns(2)
         if _bs1.button("💾 Boşlukları Kaydet", use_container_width=True, type="primary", key="bosluk_kaydet"):
             st.session_state["_ust_px"] = _yeni_ust
             st.session_state["_alt_px"] = _yeni_alt
-            st.session_state["_yan_px"] = _yeni_yan
-            st.session_state["_ekran_bosluk"] = f"{_yeni_ust}px"
-            st.session_state["_ekran_altbosluk"] = f"{_yeni_alt}px"
-            st.session_state["_ekran_yanbosluk"] = f"{_yeni_yan}px"
+            st.session_state["_sol_px"] = _yeni_sol
+            st.session_state["_sag_px"] = _yeni_sag
             _mevcut["ust_px"] = _yeni_ust
             _mevcut["alt_px"] = _yeni_alt
-            _mevcut["yan_px"] = _yeni_yan
+            _mevcut["sol_px"] = _yeni_sol
+            _mevcut["sag_px"] = _yeni_sag
             _ekran_kaydet(_mevcut)
             st.success("✅ Kaydedildi!")
             st.rerun()
         if _bs2.button("↺ Sıfırla", use_container_width=True, key="bosluk_sifirla"):
             st.session_state["_ust_px"] = 32
             st.session_state["_alt_px"] = 32
-            st.session_state["_yan_px"] = 16
-            st.session_state["_ekran_bosluk"] = "32px"
-            st.session_state["_ekran_altbosluk"] = "32px"
-            st.session_state["_ekran_yanbosluk"] = "16px"
+            st.session_state["_sol_px"] = 16
+            st.session_state["_sag_px"] = 16
             st.rerun()
 
         if st.button("↺ Varsayılana Sıfırla", use_container_width=True, key="ekran_sifirla"):
