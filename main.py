@@ -5399,8 +5399,11 @@ function kartSec(id){
 
     def _w(k):
         # Gerçek piksel genişliği kullan — small/medium/large'a yuvarlarsak
-        # 10 ile 79 arası tüm değerler görsel olarak aynı görünüyordu
-        return int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100)))
+        # 10 ile 79 arası tüm değerler görsel olarak aynı görünüyordu.
+        # NOT: Tüm genişlikler %28 büyütülüyor (oran korunuyor, kullanıcının
+        # kendi kolon ayarları bozulmuyor) — tablo üst rapor kutularının
+        # genişliğine ulaşsın diye (aksi halde sağda büyük boşluk kalıyordu).
+        return int(int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100))) * 1.28)
 
     # Asama1/2/3 sabit seçenek listeleri — mevcut veride bu listede olmayan bir
     # değer varsa açılır kutu bozulmasın diye otomatik listeye eklenir.
