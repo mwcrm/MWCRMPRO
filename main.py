@@ -5404,14 +5404,17 @@ function kartSec(id){
     _KG = st.session_state.get("_kol_genislik", _KOL_VARSAYILAN.copy())
     _GIZLI_KOLONLAR = set(st.session_state.get("_kol_gizli", []))
 
+    # Firma'ya kadarki (ve GSM/S.Tel'e kadar) kolonlar küçük/okunur kalsın diye
+    # ayrı bir grup — bunlar büyütülürse Firma ilk görünümden çıkıyordu.
+    # Bu grubun SONRASINDAKİ kolonlar daha fazla büyütülüyor ki toplam genişlik
+    # üst rapor barına ulaşsın (aradaki fark bu "geç" kolonlara dağıtılıyor).
+    _KOL_ERKEN = {"tarih","guncelleme_tarihi","id","rakip_firma","firma","yetkili","gsm","sabit"}
+
     def _w(k):
         # Gerçek piksel genişliği kullan — small/medium/large'a yuvarlarsak
         # 10 ile 79 arası tüm değerler görsel olarak aynı görünüyordu.
-        # NOT: 5.625 çarpanı denendi ama kolonları o kadar büyüttü ki Firma
-        # ve diğer erken kolonlar ilk görünümden çıktı (kaydırma gerekiyordu).
-        # 4.5'e geri dönüldü — rapor barıyla piksel piksel aynı uzunluk yerine
-        # Firma'nın görünür kalması önceliklidir.
-        return int(int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100))) * 4.5)
+        _carpan = 4.5 if k in _KOL_ERKEN else 6.03
+        return int(int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100))) * _carpan)
 
     # Asama1/2/3 sabit seçenek listeleri — mevcut veride bu listede olmayan bir
     # değer varsa açılır kutu bozulmasın diye otomatik listeye eklenir.
