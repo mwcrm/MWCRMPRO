@@ -6559,6 +6559,8 @@ elif aktif == "dis_nakliye":
     st.markdown("""<style>
 .block-container { padding-left: 0.6rem !important; padding-right: 0.6rem !important; max-width: 100% !important; }
 [data-testid="stAppViewContainer"] { max-width: 100% !important; }
+div[data-testid="stHorizontalBlock"] { gap: 0.3rem !important; }
+div[data-testid="stHorizontalBlock"] > div[data-testid="column"] { padding: 0 !important; }
 </style>""", unsafe_allow_html=True)
 
     _dn_kolonlar = [
@@ -6648,7 +6650,7 @@ elif aktif == "dis_nakliye":
         else:
             _dn_col_config[_k] = st.column_config.TextColumn(_dn_basliklar[_k], width=_dn_w)
 
-    _dn_ana_col, _dn_yan_col = st.columns([3.4, 1], gap="small")
+    _dn_ana_col, _dn_yan_col = st.columns([2.6, 1], gap="small")
     with _dn_ana_col:
         _dn_yukseklik = max(650, min(800, 38 + (max(len(_dn_df), 3) * 35) + 3))
         _dn_edited = st.data_editor(
