@@ -5407,8 +5407,14 @@ function kartSec(id){
     def _w(k):
         # Gerçek piksel genişliği kullan — small/medium/large'a yuvarlarsak
         # 10 ile 79 arası tüm değerler görsel olarak aynı görünüyordu.
+        _kayitli = int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100)))
+        _varsayilan = int(_KOL_VARSAYILAN.get(k, 100))
+        if _kayitli != _varsayilan:
+            # "Kolon Ayarları"ndan elle değiştirilip kaydedilmiş bir değer —
+            # üstüne otomatik çarpan uygulanmaz, girilen sayı AYNEN kullanılır.
+            return _kayitli
         _carpan = 4.5 if k in _KOL_ERKEN else 8.5
-        return int(int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100))) * _carpan)
+        return int(_kayitli * _carpan)
 
     # Asama1/2/3 sabit seçenek listeleri — mevcut veride bu listede olmayan bir
     # değer varsa açılır kutu bozulmasın diye otomatik listeye eklenir.
