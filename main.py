@@ -3631,6 +3631,10 @@ elif aktif == "mukerrer":
 
 elif aktif == "liste":
     sayfa_log("liste")
+    st.markdown("""<style>
+.block-container { padding-left: 0.6rem !important; padding-right: 0.6rem !important; max-width: 100% !important; }
+[data-testid="stAppViewContainer"] { max-width: 100% !important; }
+</style>""", unsafe_allow_html=True)
 
     # ── KAYDETME SONRASI ONAY BANNER'I — toast kaçırılırsa diye burada da göster ──
     _son_kaydet_msg = st.session_state.pop("_son_kaydet_ozeti", None)
