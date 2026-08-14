@@ -6648,64 +6648,77 @@ elif aktif == "dis_nakliye":
         else:
             _dn_col_config[_k] = st.column_config.TextColumn(_dn_basliklar[_k], width=_dn_w)
 
-    _dn_yukseklik = max(650, min(800, 38 + (max(len(_dn_df), 3) * 35) + 3))
-    _dn_edited = st.data_editor(
-        _dn_df,
-        use_container_width=True,
-        num_rows="dynamic",
-        column_config=_dn_col_config,
-        key="dn_editor",
-        height=_dn_yukseklik
-    )
+    _dn_ana_col, _dn_yan_col = st.columns([5, 1.3])
+    with _dn_ana_col:
+        _dn_yukseklik = max(650, min(800, 38 + (max(len(_dn_df), 3) * 35) + 3))
+        _dn_edited = st.data_editor(
+            _dn_df,
+            use_container_width=True,
+            num_rows="dynamic",
+            column_config=_dn_col_config,
+            key="dn_editor",
+            height=_dn_yukseklik
+        )
 
-    _dn_k1, _dn_k2, _dn_k3 = st.columns([1, 1, 4])
-    with _dn_k1:
-        if st.button("💾 Kaydet", type="primary", key="dn_kaydet_btn"):
-            _dn_final_df = _dn_edited.reset_index(drop=True).copy()
-            # KAR'ı en güncel Taşıyıcı Fatura / STF Faturası değerlerinden
-            # yeniden hesapla — disabled kolon canlı güncellenmediği için
-            # kaydetme anında kesin doğru değeri burada üretiyoruz.
-            _dn_final_df["tasiyici_fatura"] = pd.to_numeric(_dn_final_df["tasiyici_fatura"], errors="coerce").fillna(0.0)
-            _dn_final_df["stf_faturasi"] = pd.to_numeric(_dn_final_df["stf_faturasi"], errors="coerce").fillna(0.0)
-            _dn_final_df["kar"] = _dn_final_df["stf_faturasi"] - _dn_final_df["tasiyici_fatura"]
-            _dn_kayit_listesi = _dn_final_df.to_dict(orient="records")
-            _dn_kaydedildi = False
-            _dn_hata_msg = ""
-            try:
-                _sb_dn1 = get_sb_client()
-                if _sb_dn1:
-                    import json as _dnj1
-                    _dn_json_str = _dnj1.dumps(_dn_kayit_listesi, ensure_ascii=False)
-                    _sb_dn1.table("kullanici_tercih").upsert({
-                        "kullanici": "__liste_ui__", "anahtar": "dis_nakliye_kayitlari",
-                        "deger": _dn_json_str
-                    }, on_conflict="kullanici,anahtar").execute()
-                    # Doğrulama — gerçekten yazıldı mı diye geri okuyoruz
-                    _dn_dogrula = _sb_dn1.table("kullanici_tercih").select("deger").eq(
-                        "kullanici", "__liste_ui__").eq("anahtar", "dis_nakliye_kayitlari").execute()
-                    if _dn_dogrula.data and _dn_dogrula.data[0]["deger"] == _dn_json_str:
-                        _dn_kaydedildi = True
+        _dn_k1, _dn_k2, _dn_k3 = st.columns([1, 1, 4])
+        with _dn_k1:
+            if st.button("💾 Kaydet", type="primary", key="dn_kaydet_btn"):
+                _dn_final_df = _dn_edited.reset_index(drop=True).copy()
+                # KAR'ı en güncel Taşıyıcı Fatura / STF Faturası değerlerinden
+                # yeniden hesapla — disabled kolon canlı güncellenmediği için
+                # kaydetme anında kesin doğru değeri burada üretiyoruz.
+                _dn_final_df["tasiyici_fatura"] = pd.to_numeric(_dn_final_df["tasiyici_fatura"], errors="coerce").fillna(0.0)
+                _dn_final_df["stf_faturasi"] = pd.to_numeric(_dn_final_df["stf_faturasi"], errors="coerce").fillna(0.0)
+                _dn_final_df["kar"] = _dn_final_df["stf_faturasi"] - _dn_final_df["tasiyici_fatura"]
+                _dn_kayit_listesi = _dn_final_df.to_dict(orient="records")
+                _dn_kaydedildi = False
+                _dn_hata_msg = ""
+                try:
+                    _sb_dn1 = get_sb_client()
+                    if _sb_dn1:
+                        import json as _dnj1
+                        _dn_json_str = _dnj1.dumps(_dn_kayit_listesi, ensure_ascii=False)
+                        _sb_dn1.table("kullanici_tercih").upsert({
+                            "kullanici": "__liste_ui__", "anahtar": "dis_nakliye_kayitlari",
+                            "deger": _dn_json_str
+                        }, on_conflict="kullanici,anahtar").execute()
+                        # Doğrulama — gerçekten yazıldı mı diye geri okuyoruz
+                        _dn_dogrula = _sb_dn1.table("kullanici_tercih").select("deger").eq(
+                            "kullanici", "__liste_ui__").eq("anahtar", "dis_nakliye_kayitlari").execute()
+                        if _dn_dogrula.data and _dn_dogrula.data[0]["deger"] == _dn_json_str:
+                            _dn_kaydedildi = True
+                        else:
+                            _dn_hata_msg = "Yazma işlemi doğrulanamadı — veritabanına ulaşmamış olabilir."
                     else:
-                        _dn_hata_msg = "Yazma işlemi doğrulanamadı — veritabanına ulaşmamış olabilir."
-                else:
-                    _dn_hata_msg = "Supabase bağlantısı yok."
-            except Exception as _dn_e:
-                _dn_hata_msg = str(_dn_e)
+                        _dn_hata_msg = "Supabase bağlantısı yok."
+                except Exception as _dn_e:
+                    _dn_hata_msg = str(_dn_e)
 
-            if _dn_kaydedildi:
-                st.session_state["_dn_kayitlar"] = _dn_kayit_listesi
-                st.toast(f"✅ {len(_dn_kayit_listesi)} kayıt kaydedildi!", icon="✅")
-                st.success(f"✅ {len(_dn_kayit_listesi)} kayıt kaydedildi ve doğrulandı!")
+                if _dn_kaydedildi:
+                    st.session_state["_dn_kayitlar"] = _dn_kayit_listesi
+                    st.toast(f"✅ {len(_dn_kayit_listesi)} kayıt kaydedildi!", icon="✅")
+                    st.success(f"✅ {len(_dn_kayit_listesi)} kayıt kaydedildi ve doğrulandı!")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Kaydedilemedi: {_dn_hata_msg}")
+        with _dn_k2:
+            if st.button("➕ Satır Ekle", key="dn_satir_ekle_btn"):
+                _dn_bos_satir = {c: (0 if c in ("adet","kar","tasiyici_fatura","stf_faturasi") else (False if c in ("tasiyici_odendi","stf_odendi") else "")) for c in _dn_kolonlar}
+                _dn_guncel_liste = _dn_edited.reset_index(drop=True).to_dict(orient="records")
+                _dn_guncel_liste.append(_dn_bos_satir)
+                st.session_state["_dn_kayitlar"] = _dn_guncel_liste
                 st.rerun()
-            else:
-                st.error(f"❌ Kaydedilemedi: {_dn_hata_msg}")
-    with _dn_k2:
-        if st.button("➕ Satır Ekle", key="dn_satir_ekle_btn"):
-            _dn_bos_satir = {c: (0 if c in ("adet","kar","tasiyici_fatura","stf_faturasi") else (False if c in ("tasiyici_odendi","stf_odendi") else "")) for c in _dn_kolonlar}
-            _dn_guncel_liste = _dn_edited.reset_index(drop=True).to_dict(orient="records")
-            _dn_guncel_liste.append(_dn_bos_satir)
-            st.session_state["_dn_kayitlar"] = _dn_guncel_liste
-            st.rerun()
+    with _dn_yan_col:
+        st.markdown("**🧮 KDV Hesaplayıcı**")
+        _dn_h_adet = st.number_input("Adet", min_value=0, value=0, step=1, key="dn_hesap_adet")
+        _dn_h_birim = st.number_input("Birim Fiyat", min_value=0.0, value=0.0, step=1.0, format="%.2f", key="dn_hesap_birim")
+        _dn_h_kdv = st.number_input("KDV (%)", min_value=0.0, value=20.0, step=1.0, key="dn_hesap_kdv")
+        _dn_h_toplam = _dn_h_adet * _dn_h_birim
+        _dn_h_kdvli = _dn_h_toplam * (1 + _dn_h_kdv / 100)
+        st.divider()
+        st.metric("Toplam Tutar", f"{_dn_h_toplam:,.2f} ₺")
+        st.metric("KDV'li Tutar", f"{_dn_h_kdvli:,.2f} ₺")
+
 
 elif aktif == "kullanici":
     sayfa_log("kullanici")
