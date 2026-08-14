@@ -1677,13 +1677,6 @@ section[data-testid="stSidebar"] { zoom: 0.80 !important; }
 html { font-size: 14px !important; }
 .block-container { padding-top: 1.2rem !important; padding-bottom: 1.5rem !important; }
 section[data-testid="stSidebar"] .block-container { padding-top: 1rem !important; }
-/* Streamlit 1.40+ konteyner sınıfını değiştirdi — eski .block-container artık
-   gerçek genişlik konteynerine denk gelmiyor, sayfa "wide" modda bile dar
-   kalıyordu. Yeni gerçek konteyner buradaki data-testid — tüm sayfalarda
-   tam genişlik için bunu da hedefliyoruz. */
-[data-testid="stMainBlockContainer"] { max-width: 100% !important; padding-left: 1rem !important; padding-right: 1rem !important; }
-[data-testid="stAppViewContainer"] { max-width: 100% !important; }
-[data-testid="stAppViewContainer"] > .main { max-width: 100% !important; }
 h1 { font-size: 1.6rem !important; }
 h2 { font-size: 1.35rem !important; }
 h3 { font-size: 1.15rem !important; }
@@ -3641,7 +3634,6 @@ elif aktif == "liste":
     st.markdown("""<style>
 .block-container { padding-left: 0.6rem !important; padding-right: 0.6rem !important; max-width: 100% !important; }
 [data-testid="stAppViewContainer"] { max-width: 100% !important; }
-[data-testid="stMainBlockContainer"] { max-width: 100% !important; padding-left: 0.6rem !important; padding-right: 0.6rem !important; }
 </style>""", unsafe_allow_html=True)
 
     # ── KAYDETME SONRASI ONAY BANNER'I — toast kaçırılırsa diye burada da göster ──
@@ -4464,11 +4456,8 @@ section[data-testid="stSidebar"] { display: none !important; }
         "sonuc":    ("🏆","SONUÇ",    None, [((_asama_ikon(a),a,_kolon_sayi("sonuc",a),f"sonuc_{a}",False)) for a in _grp5_asama]),
     }
     # HTML oluştur - 2 satırlı tablo
-    # ── Rapor barı SABİT %100 genişlikte kalır, kendi başına kaymaz/kaydırılmaz.
-    # Cari Liste tablosu, kendi ayrı kolon-genişliği formülüyle (aşağıda _w())
-    # buna uymaya çalışır; rapor barı bunun için değişken hale getirilmez.
     _html = '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css">'
-    _html += '<div style="overflow-x:hidden;margin-bottom:4px;"><table style="border-collapse:separate;border-spacing:0;font-family:inherit;font-size:12px;width:100%;">'
+    _html += '<div style="overflow-x:auto;margin-bottom:4px;"><table style="border-collapse:separate;border-spacing:0;font-family:inherit;font-size:12px;width:100%;">'
 
     # 1. SATIR — grup başlıkları
     _html += '<thead><tr>'
@@ -4821,7 +4810,8 @@ function kartSec(id){
 
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
     _cok_secili_idler = set()
-    with st.expander("🔍 Filtreler & Arama", expanded=False):
+    with st.expander("🔍 Filtreler & Arama", expanded=st.session_state.get("_cl_fil_acik", True)):
+        st.session_state["_cl_fil_acik"] = True  # expander açık kalsın
         # ── TEK SATIR FİLTRE ───────────────────────────────────────────────────
         if st.session_state.get("kart_sec_reset"):
             st.session_state.pop("kart_sec_reset", None)
@@ -5407,17 +5397,13 @@ function kartSec(id){
     _KG = st.session_state.get("_kol_genislik", _KOL_VARSAYILAN.copy())
     _GIZLI_KOLONLAR = set(st.session_state.get("_kol_gizli", []))
 
-    # Firma'ya kadarki (ve GSM/S.Tel'e kadar) kolonlar küçük/okunur kalsın diye
-    # ayrı bir grup — bunlar büyütülürse Firma ilk görünümden çıkıyordu.
-    # Bu grubun SONRASINDAKİ kolonlar daha fazla büyütülüyor ki toplam genişlik
-    # üst rapor barına ulaşsın (aradaki fark bu "geç" kolonlara dağıtılıyor).
-    _KOL_ERKEN = {"tarih","guncelleme_tarihi","id","rakip_firma","firma","yetkili","gsm","sabit"}
-
     def _w(k):
         # Gerçek piksel genişliği kullan — small/medium/large'a yuvarlarsak
         # 10 ile 79 arası tüm değerler görsel olarak aynı görünüyordu.
-        _carpan = 4.5 if k in _KOL_ERKEN else 8.5
-        return int(int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100))) * _carpan)
+        # NOT: Tüm genişlikler büyütülüyor (oran korunuyor, kullanıcının kendi
+        # kolon ayarları bozulmuyor) — tablo üst rapor kutularının genişliğine
+        # ulaşsın diye.
+        return int(int(_KG.get(k, _KOL_VARSAYILAN.get(k, 100))) * 4.5)
 
     # Asama1/2/3 sabit seçenek listeleri — mevcut veride bu listede olmayan bir
     # değer varsa açılır kutu bozulmasın diye otomatik listeye eklenir.
