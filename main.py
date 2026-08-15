@@ -1695,6 +1695,15 @@ section[data-testid="stSidebar"] .block-container { padding-top: 1rem !important
     width: 100% !important;
     max-width: 100% !important;
 }
+/* ── TABLO ARAÇ ÇUBUĞU (göz/indir/ara/tam ekran) ÜST ÜSTE BİNMESİN ────────
+   Streamlit, fare tablonun üzerine gelince sağ üst köşede yüzen bir araç
+   çubuğu gösteriyor; bu çubuk tablonun kendi kutusunun biraz dışına taşarak
+   hemen üstündeki butonun/metnin üzerine biniyordu. Tabloya üstten boşluk
+   ve araç çubuğuna daha yüksek katman (z-index) vererek düzeltiyoruz. */
+div[data-testid="stElementToolbar"] { z-index: 999 !important; }
+[data-testid="stDataFrame"], [data-testid="stDataFrameResizable"] {
+    margin-top: 2.2rem !important;
+}
 h1 { font-size: 1.6rem !important; }
 h2 { font-size: 1.35rem !important; }
 h3 { font-size: 1.15rem !important; }
