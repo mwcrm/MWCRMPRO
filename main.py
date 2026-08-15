@@ -6412,8 +6412,8 @@ function kartSec(id){
                             "firma": _taslak_firma,
                             "rakip_firma": _tas_al("rakip_firma"),
                             "yetkili": _tas_al("yetkili"),
-                            "gsm": "".join(ch for ch in _tas_al("gsm") if ch.isdigit()),
-                            "sabit": "".join(ch for ch in _tas_al("sabit") if ch.isdigit()),
+                            "gsm": _tas_al("gsm").strip(),
+                            "sabit": _tas_al("sabit").strip(),
                             "email": _tas_al("email"),
                             "adres": _tas_al("adres"),
                             "ilce": _tas_al("ilce"),
@@ -6681,10 +6681,12 @@ function kartSec(id){
                             try: guncelle["gerceklesen_ciro"] = float(str(v or "").replace(".","").replace("₺","").replace(",",".").strip() or 0)
                             except: guncelle["gerceklesen_ciro"] = 0
                         elif k in ("gsm", "sabit"):
-                            # Ekranda "541 357 80 20" gruplu görünüyor ama veritabanına
-                            # her zaman sade rakamlarla yazılır (WhatsApp vb. entegrasyonlar
-                            # boşluksuz rakam bekliyor).
-                            guncelle[k] = "".join(ch for ch in str(v or "") if ch.isdigit())
+                            # KULLANICI İSTEĞİ: Artık otomatik "sadece rakam" temizliği
+                            # YAPILMIYOR — birden fazla numarayı "533 405 55 18 - 539 266
+                            # 42 86" gibi kendi ayracıyla tek hücrede tutabilmek için,
+                            # kullanıcı ne yazarsa AYNEN kaydediliyor. (Eskiden boşluk/tire
+                            # gibi her şey silinip iki numara birbirine yapışıyordu.)
+                            guncelle[k] = str(v).strip() if v is not None else ""
                         else:
                             guncelle[k] = str(v) if v is not None else ""
                     if not guncelle:
