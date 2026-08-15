@@ -2289,6 +2289,10 @@ def _dis_nakliye_hesapla(df):
     df["yekun2"] = df["adet2"] * df["fiyat2"]
     df["kdvli2"] = df["yekun2"] * 1.20
     df["kar"] = df["kdvli1"] - df["kdvli2"]
+    # Metin kolonlarında None/nan yerine boş göster
+    for _tk in _DIS_NAKLIYE_KOLONLAR:
+        if _tk not in _DIS_NAKLIYE_SAYI_KOLON and _tk not in _DIS_NAKLIYE_HESAP_KOLON and _tk not in _DIS_NAKLIYE_CHECK_KOLON:
+            df[_tk] = df[_tk].astype(str).replace(["None", "nan", "NaN", "none"], "")
     return df
 
 def _dis_nakliye_yukle():
@@ -2611,38 +2615,75 @@ def not_dialog(cari_id, firma_adi=""):
             _dn_df = _dis_nakliye_hesapla(_dn_df)
             _dn_df = _dn_df[["id", "cari_id"] + _DIS_NAKLIYE_KOLONLAR]
             _dn_df = _dn_df.reset_index(drop=True)
+            _dn_df.insert(0, "Seç", False)
             _dn_df.index = _dn_df.index + 1
             _dn_df.index.name = "S.No"
 
             _dn_edited = st.data_editor(
-                _dn_df, use_container_width=True, num_rows="dynamic",
-                column_config={**_dis_nakliye_col_config(), "id": None, "cari_id": None},
+                _dn_df, use_container_width=True, num_rows="fixed",
+                column_config={
+                    **_dis_nakliye_col_config(), "id": None, "cari_id": None,
+                    "Seç": st.column_config.CheckboxColumn("Seç", default=False),
+                },
                 key=f"dlg_dn_editor_{cari_id}",
                 height=min(400, 45 + (len(_dn_df) * 35) + 5),
             )
-            if st.button("💾 Dış Nakliye Kayıtlarını Kaydet", key=f"dlg_dn_kaydet_{cari_id}", type="primary", use_container_width=True):
-                _dn_final = _dn_edited.reset_index(drop=True).copy()
-                _dn_final = _dis_nakliye_hesapla(_dn_final)
-                for _c in ["id", "cari_id"]:
-                    if _c not in _dn_final.columns:
-                        _dn_final[_c] = 0
-                _dn_final["id"] = _dn_final["id"].apply(lambda x: int(x) if str(x).strip() not in ("", "nan", "None") and float(x) > 0 else 0)
-                _dn_final["cari_id"] = int(cari_id)
-                _yeni_id_sayac = int(max([int(r.get("id", 0) or 0) for r in _dn_tum], default=0)) + 1
-                _bu_musteri_yeni = []
-                for _, _row in _dn_final.iterrows():
-                    _rd = _row.to_dict()
-                    if not _rd.get("id"):
-                        _rd["id"] = _yeni_id_sayac
-                        _yeni_id_sayac += 1
-                    _bu_musteri_yeni.append(_rd)
-                _diger_musteriler = [r for r in _dn_tum if int(r.get("cari_id", 0) or 0) != int(cari_id)]
-                _tam_liste = _diger_musteriler + _bu_musteri_yeni
-                if _dis_nakliye_kaydet(_tam_liste):
-                    st.toast("✅ Dış nakliye kayıtları güncellendi!", icon="✅")
-                    st.rerun()
+
+            _dn_secili = _dn_edited[_dn_edited["Seç"] == True]
+            _dn_secili_sayi = len(_dn_secili)
+            _dn_secili_idler = _dn_secili["id"].tolist() if not _dn_secili.empty else []
+
+            _dnk1, _dnk2 = st.columns([1, 1])
+            with _dnk1:
+                if st.button("💾 Değişiklikleri Kaydet", key=f"dlg_dn_kaydet_{cari_id}", type="primary", use_container_width=True):
+                    _dn_final = _dn_edited.drop(columns=["Seç"]).reset_index(drop=True).copy()
+                    _dn_final = _dis_nakliye_hesapla(_dn_final)
+                    for _c in ["id", "cari_id"]:
+                        if _c not in _dn_final.columns:
+                            _dn_final[_c] = 0
+                    _dn_final["id"] = _dn_final["id"].apply(lambda x: int(x) if str(x).strip() not in ("", "nan", "None") and float(x) > 0 else 0)
+                    _dn_final["cari_id"] = int(cari_id)
+                    _yeni_id_sayac = int(max([int(r.get("id", 0) or 0) for r in _dn_tum], default=0)) + 1
+                    _bu_musteri_yeni = []
+                    for _, _row in _dn_final.iterrows():
+                        _rd = _row.to_dict()
+                        if not _rd.get("id"):
+                            _rd["id"] = _yeni_id_sayac
+                            _yeni_id_sayac += 1
+                        _bu_musteri_yeni.append(_rd)
+                    _diger_musteriler = [r for r in _dn_tum if int(r.get("cari_id", 0) or 0) != int(cari_id)]
+                    _tam_liste = _diger_musteriler + _bu_musteri_yeni
+                    if _dis_nakliye_kaydet(_tam_liste):
+                        st.toast("✅ Dış nakliye kayıtları güncellendi!", icon="✅")
+                        st.rerun()
+                    else:
+                        st.error("❌ Kaydedilemedi, bağlantıyı kontrol et.")
+            with _dnk2:
+                if _dn_secili_sayi > 0:
+                    if not st.session_state.get(f"_dn_sil_onay_bekliyor_{cari_id}"):
+                        if st.button(f"🗑️ Seçili {_dn_secili_sayi} Kaydı Sil", key=f"dlg_dn_sil_{cari_id}", use_container_width=True):
+                            st.session_state[f"_dn_sil_onay_bekliyor_{cari_id}"] = True
+                            st.rerun()
                 else:
-                    st.error("❌ Kaydedilemedi, bağlantıyı kontrol et.")
+                    st.caption("Silmek için satırları soldaki Seç kutusuyla işaretle.")
+
+            if _dn_secili_sayi > 0 and st.session_state.get(f"_dn_sil_onay_bekliyor_{cari_id}"):
+                st.warning(f"⚠️ Seçili {_dn_secili_sayi} kayıt kalıcı olarak silinecek, geri alınamaz! Silmek istediğine emin misin?")
+                _dnsa1, _dnsa2 = st.columns(2)
+                with _dnsa1:
+                    if st.button(f"✅ Evet, {_dn_secili_sayi} kaydı sil", type="primary", key=f"dlg_dn_sil_onay_{cari_id}", use_container_width=True):
+                        _dn_silinecek_idler = set(int(x) for x in _dn_secili_idler)
+                        _dn_kalan = [r for r in _dn_tum if int(r.get("id", 0) or 0) not in _dn_silinecek_idler]
+                        if _dis_nakliye_kaydet(_dn_kalan):
+                            st.session_state.pop(f"_dn_sil_onay_bekliyor_{cari_id}", None)
+                            st.success(f"✅ {_dn_secili_sayi} kayıt silindi!")
+                            st.rerun()
+                        else:
+                            st.error("❌ Silinemedi, bağlantıyı kontrol et.")
+                with _dnsa2:
+                    if st.button("❌ Vazgeç", key=f"dlg_dn_sil_vazgec_{cari_id}", use_container_width=True):
+                        st.session_state.pop(f"_dn_sil_onay_bekliyor_{cari_id}", None)
+                        st.rerun()
         else:
             st.caption("Bu müşteri için henüz dış nakliye kaydı yok.")
     with _tab_teklif:
@@ -6812,37 +6853,74 @@ elif aktif == "dis_nakliye_toplu":
             _dnb_df = _dis_nakliye_hesapla(_dnb_df)
             _dnb_df = _dnb_df[["id", "cari_id"] + _DIS_NAKLIYE_KOLONLAR]
             _dnb_df = _dnb_df.reset_index(drop=True)
+            _dnb_df.insert(0, "Seç", False)
             _dnb_df.index = _dnb_df.index + 1
             _dnb_df.index.name = "S.No"
 
             st.caption(f"📌 {len(_dnb_df)} kayıt — toplam kar: {_dnb_df['kar'].sum():,.2f} ₺".replace(",", "."))
             _dnb_edited = st.data_editor(
-                _dnb_df, use_container_width=True, num_rows="dynamic",
-                column_config={**_dis_nakliye_col_config(), "id": None, "cari_id": None},
+                _dnb_df, use_container_width=True, num_rows="fixed",
+                column_config={
+                    **_dis_nakliye_col_config(), "id": None, "cari_id": None,
+                    "Seç": st.column_config.CheckboxColumn("Seç", default=False),
+                },
                 key="dnb_editor",
                 height=min(650, 45 + (len(_dnb_df) * 35) + 5),
             )
-            if st.button("💾 Dış Nakliye — Tüm Kayıtları Kaydet", key="dnb_kaydet_btn", type="primary"):
-                _dnb_final = _dnb_edited.reset_index(drop=True).copy()
-                _dnb_final = _dis_nakliye_hesapla(_dnb_final)
-                for _c in ["id", "cari_id"]:
-                    if _c not in _dnb_final.columns:
-                        _dnb_final[_c] = 0
-                _dnb_final["id"] = _dnb_final["id"].apply(lambda x: int(x) if str(x).strip() not in ("", "nan", "None") and float(x) > 0 else 0)
-                _dnb_final["cari_id"] = _dnb_final["cari_id"].apply(lambda x: int(x) if str(x).strip() not in ("", "nan", "None") else 0)
-                _yeni_id_sayac_b = int(max([int(r.get("id", 0) or 0) for r in _dnb_tum], default=0)) + 1
-                _tum_yeni = []
-                for _, _row in _dnb_final.iterrows():
-                    _rd = _row.to_dict()
-                    if not _rd.get("id"):
-                        _rd["id"] = _yeni_id_sayac_b
-                        _yeni_id_sayac_b += 1
-                    _tum_yeni.append(_rd)
-                if _dis_nakliye_kaydet(_tum_yeni):
-                    st.toast("✅ Dış nakliye kayıtları güncellendi!", icon="✅")
-                    st.rerun()
+
+            _dnb_secili = _dnb_edited[_dnb_edited["Seç"] == True]
+            _dnb_secili_sayi = len(_dnb_secili)
+            _dnb_secili_idler = _dnb_secili["id"].tolist() if not _dnb_secili.empty else []
+
+            _dnb_bk1, _dnb_bk2 = st.columns([1, 1])
+            with _dnb_bk1:
+                if st.button("💾 Değişiklikleri Kaydet", key="dnb_kaydet_btn", type="primary", use_container_width=True):
+                    _dnb_final = _dnb_edited.drop(columns=["Seç"]).reset_index(drop=True).copy()
+                    _dnb_final = _dis_nakliye_hesapla(_dnb_final)
+                    for _c in ["id", "cari_id"]:
+                        if _c not in _dnb_final.columns:
+                            _dnb_final[_c] = 0
+                    _dnb_final["id"] = _dnb_final["id"].apply(lambda x: int(x) if str(x).strip() not in ("", "nan", "None") and float(x) > 0 else 0)
+                    _dnb_final["cari_id"] = _dnb_final["cari_id"].apply(lambda x: int(x) if str(x).strip() not in ("", "nan", "None") else 0)
+                    _yeni_id_sayac_b = int(max([int(r.get("id", 0) or 0) for r in _dnb_tum], default=0)) + 1
+                    _tum_yeni = []
+                    for _, _row in _dnb_final.iterrows():
+                        _rd = _row.to_dict()
+                        if not _rd.get("id"):
+                            _rd["id"] = _yeni_id_sayac_b
+                            _yeni_id_sayac_b += 1
+                        _tum_yeni.append(_rd)
+                    if _dis_nakliye_kaydet(_tum_yeni):
+                        st.toast("✅ Dış nakliye kayıtları güncellendi!", icon="✅")
+                        st.rerun()
+                    else:
+                        st.error("❌ Kaydedilemedi, bağlantıyı kontrol et.")
+            with _dnb_bk2:
+                if _dnb_secili_sayi > 0:
+                    if not st.session_state.get("_dnb_sil_onay_bekliyor"):
+                        if st.button(f"🗑️ Seçili {_dnb_secili_sayi} Kaydı Sil", key="dnb_sil_btn", use_container_width=True):
+                            st.session_state["_dnb_sil_onay_bekliyor"] = True
+                            st.rerun()
                 else:
-                    st.error("❌ Kaydedilemedi, bağlantıyı kontrol et.")
+                    st.caption("Silmek için satırları soldaki Seç kutusuyla işaretle.")
+
+            if _dnb_secili_sayi > 0 and st.session_state.get("_dnb_sil_onay_bekliyor"):
+                st.warning(f"⚠️ Seçili {_dnb_secili_sayi} kayıt kalıcı olarak silinecek, geri alınamaz! Silmek istediğine emin misin?")
+                _dnb_sa1, _dnb_sa2 = st.columns(2)
+                with _dnb_sa1:
+                    if st.button(f"✅ Evet, {_dnb_secili_sayi} kaydı sil", type="primary", key="dnb_sil_onay", use_container_width=True):
+                        _dnb_silinecek_idler = set(int(x) for x in _dnb_secili_idler)
+                        _dnb_kalan = [r for r in _dnb_tum if int(r.get("id", 0) or 0) not in _dnb_silinecek_idler]
+                        if _dis_nakliye_kaydet(_dnb_kalan):
+                            st.session_state.pop("_dnb_sil_onay_bekliyor", None)
+                            st.success(f"✅ {_dnb_secili_sayi} kayıt silindi!")
+                            st.rerun()
+                        else:
+                            st.error("❌ Silinemedi, bağlantıyı kontrol et.")
+                with _dnb_sa2:
+                    if st.button("❌ Vazgeç", key="dnb_sil_vazgec", use_container_width=True):
+                        st.session_state.pop("_dnb_sil_onay_bekliyor", None)
+                        st.rerun()
         else:
             st.caption("Henüz hiç dış nakliye kaydı yok. Bir müşterinin 'Notlar & Randevu' penceresindeki 🚚 Dış Nakliye sekmesinden veya aşağıdaki taşıyıcı yönetiminden başlayabilirsin.")
 
