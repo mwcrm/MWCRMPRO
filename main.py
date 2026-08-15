@@ -1697,12 +1697,16 @@ section[data-testid="stSidebar"] .block-container { padding-top: 1rem !important
 }
 /* ── TABLO ARAÇ ÇUBUĞU (göz/indir/ara/tam ekran) ÜST ÜSTE BİNMESİN ────────
    Streamlit, fare tablonun üzerine gelince sağ üst köşede yüzen bir araç
-   çubuğu gösteriyor; bu çubuk tablonun kendi kutusunun biraz dışına taşarak
-   hemen üstündeki butonun/metnin üzerine biniyordu. Tabloya üstten boşluk
-   ve araç çubuğuna daha yüksek katman (z-index) vererek düzeltiyoruz. */
-div[data-testid="stElementToolbar"] { z-index: 999 !important; }
-[data-testid="stDataFrame"], [data-testid="stDataFrameResizable"] {
-    margin-top: 2.2rem !important;
+   çubuğu gösteriyor; bu çubuk tablonun kendi kutusunun biraz dışına taşıp
+   hemen üstündeki elemanın üzerine biniyordu. NOT: Önceki çözümde tüm
+   tablolara margin-top eklemiştik ama bu, Cari Liste'deki sticky üst bar ve
+   buton satırlarının konumunu kaydırıp YENİ bir üst üste binmeye yol açtı —
+   o yüzden tablonun kendi kutusuna DOKUNMUYORUZ, sadece araç çubuğunun
+   kendi float konumunu nazikçe aşağı itiyoruz.
+*/
+div[data-testid="stElementToolbar"] {
+    z-index: 999 !important;
+    transform: translateY(8px);
 }
 h1 { font-size: 1.6rem !important; }
 h2 { font-size: 1.35rem !important; }
