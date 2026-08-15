@@ -5880,6 +5880,45 @@ function kartSec(id){
             pass
     _aktif_col_order = _kayitli_sira if _kayitli_sira else col_order
 
+    # ── KAYITLI SIRAYI GEÇERLİ/GÖRÜNÜR KOLONLARLA TEMİZLE ────────────────────
+    # _kayitli_sira (kullanıcının sürükleyip kaydettiği kolon sırası) eski
+    # olabilir: sonradan gizlenmiş bir kolonu hâlâ içerebilir, ya da sonradan
+    # eklenmiş yeni bir kolonu (örn. Varış İli) hiç içermeyebilir. Bu durumda
+    # "son kolon" araması aşağıda GERÇEKTE görünmeyen bir kolonu bulup onun
+    # genişliğini kaldırıyordu — asıl görünen son kolon sabit genişlikte
+    # kalıp sağda boşluk bırakıyordu. Burada kayıtlı sırayı güncel "col_order"
+    # (görünür kolonlar) ile kesiştirip, yeni/eksik kolonları sona ekliyoruz.
+    if _kayitli_sira:
+        _kayitli_temiz = [c for c in _kayitli_sira if c in col_order]
+        _eksik_yeni = [c for c in col_order if c not in _kayitli_temiz]
+        _aktif_col_order = _kayitli_temiz + _eksik_yeni
+
+    # ── TABLONUN GENEL GENİŞLİĞİNİ BÜYÜT — sağda boşluk kalmasın ─────────────
+    # Kolonlar arasındaki ORANI (kimin daha geniş/dar olduğunu) DEĞİŞTİRMİYORUZ
+    # — kullanıcının "Kolon Ayarları" panelinde kaydettiği kişisel genişlik
+    # tercihlerine dokunmuyoruz. Sadece HEPSİNİ aynı oranda büyütüyoruz ki
+    # toplam tablo genişliği geniş ekranlarda sağda boş alan bırakmasın.
+    # Hedef, geniş bir masaüstü ekranını kapsayacak şekilde seçildi; daha dar
+    # ekranlarda tablo yatay kaydırma ile görüntülenir — bu, sağda çirkin
+    # boş alan bırakmaktan çok daha iyi bir görünüm.
+    _TABLO_HEDEF_GENISLIK = 2800
+    _genislik_toplam = 0
+    for _gk in _aktif_col_order:
+        if _gk == "Seç":
+            continue
+        _gcfg = col_config.get(_gk)
+        if isinstance(_gcfg, dict) and isinstance(_gcfg.get("width"), (int, float)):
+            _genislik_toplam += _gcfg["width"]
+    if _genislik_toplam and _genislik_toplam < _TABLO_HEDEF_GENISLIK:
+        _buyutme_orani = _TABLO_HEDEF_GENISLIK / _genislik_toplam
+        for _gk in _aktif_col_order:
+            if _gk == "Seç":
+                continue
+            _gcfg = col_config.get(_gk)
+            if isinstance(_gcfg, dict) and isinstance(_gcfg.get("width"), (int, float)):
+                col_config[_gk] = dict(_gcfg)
+                col_config[_gk]["width"] = int(_gcfg["width"] * _buyutme_orani)
+
     # ── SAĞ TARAFTAKİ BOŞLUĞU KAPAT ─────────────────────────────────────────
     # Tüm kolonlara sabit piksel genişliği verildiğinde, toplam genişlik ekran
     # genişliğinden az kalırsa tablonun sağında boş bir alan kalıyordu (ekran
