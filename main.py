@@ -1684,6 +1684,17 @@ section[data-testid="stSidebar"] .block-container { padding-top: 1rem !important
 [data-testid="stMainBlockContainer"] { max-width: 100% !important; padding-left: 1rem !important; padding-right: 1rem !important; }
 [data-testid="stAppViewContainer"] { max-width: 100% !important; }
 [data-testid="stAppViewContainer"] > .main { max-width: 100% !important; }
+/* ── VERİ TABLOSU (data_editor/dataframe) TAM GENİŞLİK ────────────────────
+   Glide tabanlı tablo bileşeni kendi dış kutusunun genişliğine göre kolon
+   alanını hesaplıyor. use_container_width=True tek başına her zaman tam
+   genişliğe ulaşmadığı için dış kapsayıcıyı burada CSS ile zorluyoruz —
+   böylece rapor barındaki (GENEL/AŞAMA/...) tam genişlikli HTML tabloyla
+   Cari Liste tablosunun sağ kenarı denk gelir, sağda boşluk kalmaz. */
+[data-testid="stDataFrame"], [data-testid="stDataFrameResizable"],
+[data-testid="stDataFrame"] > div, [data-testid="stDataFrameResizable"] > div {
+    width: 100% !important;
+    max-width: 100% !important;
+}
 h1 { font-size: 1.6rem !important; }
 h2 { font-size: 1.35rem !important; }
 h3 { font-size: 1.15rem !important; }
@@ -4697,21 +4708,7 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
                 "kartlar": _kartlar[:50]
             })
 
-        _kb_gizli = st.session_state.get("_kb_gizli_asama", [])
-        # DB'den yükle
-        if "_kb_gizli_init" not in st.session_state:
-            try:
-                _sb_kbi = get_sb_client()
-                if _sb_kbi:
-                    import json as _kbij
-                    _r_kbi = _sb_kbi.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kb_gizli_asama").execute()
-                    if _r_kbi.data:
-                        st.session_state["_kb_gizli_asama"] = _kbij.loads(_r_kbi.data[0]["deger"])
-            except: pass
-            st.session_state["_kb_gizli_init"] = True
-            _kb_gizli = st.session_state.get("_kb_gizli_asama", [])
-
-        _kanban_filtreli = [k for k in _kanban_kolonlar if k["asama"] not in _kb_gizli]
+        _kanban_filtreli = _kanban_kolonlar
         _kanban_json = _kbj.dumps(_kanban_filtreli, ensure_ascii=False)
 
         _kanban_html = ("""<!DOCTYPE html>
@@ -7622,36 +7619,6 @@ function updateBot(v){{
                 st.rerun()
             except Exception as _kgue:
                 st.error(f"Hata: {_kgue}")
-
-        st.divider()
-        st.markdown("### 📋 Kanban Sütun Görünürlüğü")
-        st.caption("Kanban'da görünmesini istemediğiniz aşamaları kapatın")
-        _kb_gizli_ui = list(st.session_state.get("_kb_gizli_asama", []))
-        _all_asama = _tanimlar_yukle("asama")
-        if _all_asama:
-            _kb_cols = st.columns(4)
-            for _kbi, _kba in enumerate(_all_asama):
-                _kb_gorunsun = _kba not in _kb_gizli_ui
-                _kb_tog = _kb_cols[_kbi % 4].toggle(
-                    _kba, value=_kb_gorunsun, key=f"kb_giz_{_kbi}"
-                )
-                if not _kb_tog and _kba not in _kb_gizli_ui:
-                    _kb_gizli_ui.append(_kba)
-                elif _kb_tog and _kba in _kb_gizli_ui:
-                    _kb_gizli_ui.remove(_kba)
-            if st.button("💾 Kanban Ayarlarını Kaydet", key="kb_giz_kaydet", type="primary"):
-                st.session_state["_kb_gizli_asama"] = _kb_gizli_ui
-                try:
-                    _sb_kbg = get_sb_client()
-                    if _sb_kbg:
-                        import json as _kbgj
-                        _sb_kbg.table("kullanici_tercih").upsert({
-                            "kullanici":"__liste_ui__","anahtar":"_kb_gizli_asama",
-                            "deger":_kbgj.dumps(_kb_gizli_ui, ensure_ascii=False)
-                        }, on_conflict="kullanici,anahtar").execute()
-                    st.success("✅ Kaydedildi!")
-                except Exception as _kbge:
-                    st.error(f"Hata: {_kbge}")
 
     # ── 🔄 TOPLU DEĞİŞTİR ────────────────────────────────────────────────────
     with kul_tab_toplu:
