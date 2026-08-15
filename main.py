@@ -6786,7 +6786,7 @@ function kartSec(id){
     # kayıtlarını gösteren toplu liste + taşıyıcı (tedarikçi) yönetimi.
     # Müşteri bazlı ekleme/düzenleme "Notlar & Randevu" penceresindeki
     # "🚚 Dış Nakliye" sekmesinden yapılır; burası hepsinin toplu görünümüdür.
-    with st.expander("🚚 Dış Nakliye", expanded=False):
+    with st.expander("🚚 Dış Nakliyeler Listesi", expanded=False):
         _dnb_tab_liste, _dnb_tab_tasiyici = st.tabs(["📦 Tüm Kayıtlar", "🚛 Taşıyıcı Yönetimi"])
 
         with _dnb_tab_liste:
