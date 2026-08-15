@@ -2376,6 +2376,15 @@ def _dis_nakliye_tasiyici_secici(key_prefix):
 @st.dialog("📋 Notlar & Randevu", width="large")
 def not_dialog(cari_id, firma_adi=""):
     """Ekran ortasında açılan not + randevu + silme + düzenleme penceresi"""
+    # ── PENCEREYİ GENİŞLET — Streamlit'in "large" seçeneği en fazla 1280px
+    # veriyor, Dış Nakliye tablosundaki çok sayıda kolon için yetersiz
+    # kalıyordu. CSS ile ekranın büyük kısmını kaplayacak şekilde zorluyoruz.
+    st.markdown("""<style>
+[data-testid="stDialog"] div[role="dialog"] {
+    width: 96vw !important;
+    max-width: 1900px !important;
+}
+</style>""", unsafe_allow_html=True)
     _tab_not, _tab_rdv, _tab_yetkili, _tab_dn, _tab_teklif, _tab_sozlesme, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "🚚 Dış Nakliye", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
     with _tab_not:
         not_paneli(cari_id, firma_adi, key_prefix="dlg")
