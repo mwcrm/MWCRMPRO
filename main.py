@@ -5436,6 +5436,16 @@ function kartSec(id){
         df_f = df.copy()  # tüm listeden (mevcut il/durum filtrelerinden bağımsız) seçilenleri bul
         df_f = df_f[df_f["id"].isin(_cok_secili_idler)].reset_index(drop=True)
         st.info(f"🔍 {len(df_f)} firma karşılaştırma için seçili — temizlemek için yukarıdaki kutudan kaldırın.")
+        # ── ŞEFFAFLIK: Seçilen ID sayısı ile bulunan satır sayısı farklıysa
+        # (örn. arşivlenmiş/silinmiş bir firma seçiliyse) bunu SESSİZCE
+        # gizlemiyoruz — hangi ID'lerin bulunamadığını açıkça gösteriyoruz.
+        # Burada uygulanan HİÇBİR sayısal sınır/limit yok; "isin()" filtresi
+        # seçilen TÜM ID'leri arıyor.
+        _bulunmayan_idler = _cok_secili_idler - set(df_f["id"].astype(int).tolist())
+        if _bulunmayan_idler:
+            st.warning(f"⚠️ Seçtiğin {len(_bulunmayan_idler)} firma listede bulunamadı (ID: {sorted(_bulunmayan_idler)}) — "
+                       "muhtemelen arşivlenmiş/silinmiş ya da başka bir kullanıcı tarafından kaldırılmış. "
+                       "Bu bir gösterim sınırı değil, o kayıtlar artık mevcut değil.")
 
     _aktif_fil_sayisi = sum([bool(ara_txt),bool(_asama_sec),bool(_durum_sec),filtre_seg!="Tümü",bool(_il_sec),bool(_ilce_sec),bool(_tem_sec),bool(_guncelleme_tarih_sec)])
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
@@ -6814,7 +6824,7 @@ function kartSec(id){
                     st.session_state.pop("cari_editor", None)
                     st.success(f"✅ {secili_sayi} arşive gönderildi!"); st.rerun()
         else:
-            st.caption("Seçmek için Seç kolonunu işaretleyin")
+            pass
 
     with btn_s:
         if secili_sayi > 0:
@@ -6869,7 +6879,7 @@ function kartSec(id){
     # ── SAYFALAMA KONTROLLERİ KALDIRILDI — kullanıcı isteği üzerine ──────────
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
     if _cl_toplam_kayit > 0:
-        st.caption(f"**Tümü** gösteriliyor — {_cl_toplam_kayit} kayıt")
+        st.caption(f"Seçmek için Seç kolonunu işaretleyin · **Tümü** gösteriliyor — {_cl_toplam_kayit} kayıt")
 
     st.divider()
 
