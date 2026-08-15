@@ -1695,6 +1695,13 @@ section[data-testid="stSidebar"] .block-container { padding-top: 1rem !important
     width: 100% !important;
     max-width: 100% !important;
 }
+/* Dış kapsayıcı, içindeki tablo canvas'ından daha dar kalınca KENDİ yatay
+   kaydırma çubuğunu da gösteriyordu — tablonun asıl (alttaki) scrollbar'ıyla
+   birlikte İKİ tane üst üste görünüyordu. Dış kapsayıcının kendi scrollbar'ını
+   kapatıyoruz, asıl/doğru scrollbar (tablonun kendi iç scrollbar'ı) kalıyor. */
+[data-testid="stDataFrame"], [data-testid="stDataFrameResizable"] {
+    overflow-x: hidden !important;
+}
 /* ── TABLO ARAÇ ÇUBUĞU (göz/indir/ara/tam ekran) ÜST ÜSTE BİNMESİN ────────
    Streamlit, fare tablonun üzerine gelince sağ üst köşede yüzen bir araç
    çubuğu gösteriyor; bu çubuk tablonun kendi kutusunun biraz dışına taşıp
