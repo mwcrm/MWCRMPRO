@@ -6684,15 +6684,23 @@ function kartSec(id){
 
                 # ── SATIRLARI PARALEL KAYDET — sıra sıra beklemek yerine aynı anda
                 # gönderilir, N satır için toplam süre ~1 satırlık süreye yakın olur.
+                _kaydedilen_firmalar = []
                 with concurrent.futures.ThreadPoolExecutor(max_workers=8) as _havuz:
                     _gelecekler = {
                         _havuz.submit(_tek_satir_guncelle, idx_str, degisiklikler): idx_str
                         for idx_str, degisiklikler in _edited_rows.items()
                     }
                     for _gelecek in concurrent.futures.as_completed(_gelecekler):
+                        _idx_str_g = _gelecekler[_gelecek]
                         try:
                             if _gelecek.result():
                                 kayit_sayi += 1
+                                try:
+                                    _idxn_g = int(_idx_str_g)
+                                    if _idxn_g < len(_rows):
+                                        _kaydedilen_firmalar.append(str(_rows[_idxn_g].get("firma","") or "(isimsiz)"))
+                                except Exception:
+                                    pass
                         except Exception as e_row:
                             hata_list.append(str(e_row))
 
@@ -6744,6 +6752,8 @@ function kartSec(id){
                 st.session_state.pop("cari_editor", None)
                 if kayit_sayi > 0:
                     _ozet_msg = f"{kayit_sayi} satır kaydedildi!" + (f" · {_arsiv_sayi} not arşivlendi!" if _arsiv_sayi > 0 else "")
+                    if _kaydedilen_firmalar:
+                        _ozet_msg += " → " + ", ".join(_kaydedilen_firmalar[:8]) + (" ..." if len(_kaydedilen_firmalar) > 8 else "")
                 elif _arsiv_sayi > 0:
                     _ozet_msg = f"{_arsiv_sayi} not arşivlendi!"
                 else:
