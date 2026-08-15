@@ -6164,7 +6164,7 @@ function kartSec(id){
                 st.session_state["_kaydet_flag"] = True
         with _sb2:
             if st.button("➕ Satır Ekle", key="cl_hizli_ekle_btn_ust"):
-                st.session_state["_cl_taslak_aktif"] = True
+                st.session_state["_cl_taslak_sayisi"] = st.session_state.get("_cl_taslak_sayisi", 0) + 1
                 st.rerun()
         with _sb3:
             if st.button("🔄 Kolon Sıfırla", key="cl_kolon_sifirla_ust"):
@@ -6176,19 +6176,34 @@ function kartSec(id){
     _tbl_col = st.container()
     _not_col = None
 
-    # ── TASLAK SATIR — "➕ Satır Ekle" ile açılan, henüz DB'ye YAZILMAMIŞ boş
-    # satır. id=0 ile işaretlenir. Firma alanı doldurulup "Kaydet" edilirse
-    # gerçek bir müşteri kaydı oluşturulur (kaydetmezsen hiçbir şey yazılmaz).
-    if st.session_state.get("_cl_taslak_aktif"):
-        _tas_bos = {c: "" for c in df_edit.columns}
-        _tas_bos["id"] = 0
-        if "Seç" in df_edit.columns:
-            _tas_bos["Seç"] = False
-        if "beklenen_ciro" in df_edit.columns:
-            _tas_bos["beklenen_ciro"] = 0
-        if "gerceklesen_ciro" in df_edit.columns:
-            _tas_bos["gerceklesen_ciro"] = 0
-        df_edit = pd.concat([pd.DataFrame([_tas_bos]), df_edit], ignore_index=True)
+    # ── TASLAK SATIR(LAR) — "➕ Satır Ekle" ile açılan, henüz DB'ye YAZILMAMIŞ
+    # boş satır(lar). id=0 ile işaretlenir. Firma alanı doldurulup "Kaydet"
+    # edilirse gerçek bir müşteri kaydı oluşturulur (kaydetmezsen hiçbir şey
+    # yazılmaz).
+    # ÖNEMLİ (kritik veri kaybı hatası düzeltmesi): Eskiden bu blok bir BOOLEAN
+    # bayrağa (_cl_taslak_aktif) bakıyordu ve bayrak True olduğu SÜRECE HER
+    # rerun'da (yani kullanıcı bir hücreye yazıp Tab/Enter'a bastığında bile)
+    # YENİDEN bir boş satır ekliyordu. Bu da her hücre düzenlemesinde tabloya
+    # yeni bir boş satır girip önceki satırları kaydırıyordu — kullanıcının o
+    # ana kadar yazdığı bilgiler artık YANLIŞ satıra karışıyor, bazı hücreler
+    # kaybolmuş gibi görünüyordu. Şimdi kaç taslak satır isteneceği SABİT bir
+    # sayaçta (_cl_taslak_sayisi) tutuluyor — bu sayaç SADECE "Satır Ekle"
+    # butonuna basınca 1 artıyor, başka hiçbir rerun'da değişmiyor. Böylece
+    # satır sayısı ve sırası, kullanıcı yazarken stabil kalıyor.
+    _cl_taslak_sayisi = int(st.session_state.get("_cl_taslak_sayisi", 0) or 0)
+    if _cl_taslak_sayisi > 0:
+        _tas_bos_liste = []
+        for _ in range(_cl_taslak_sayisi):
+            _tas_bos = {c: "" for c in df_edit.columns}
+            _tas_bos["id"] = 0
+            if "Seç" in df_edit.columns:
+                _tas_bos["Seç"] = False
+            if "beklenen_ciro" in df_edit.columns:
+                _tas_bos["beklenen_ciro"] = 0
+            if "gerceklesen_ciro" in df_edit.columns:
+                _tas_bos["gerceklesen_ciro"] = 0
+            _tas_bos_liste.append(_tas_bos)
+        df_edit = pd.concat([pd.DataFrame(_tas_bos_liste), df_edit], ignore_index=True)
 
     # Tablo yüksekliğini görünen satır sayısına göre hesapla — sabit 800px'lik
     # yükseklik, sayfa başına 12 satır varken altında boş satırlar bırakıyordu.
@@ -6337,19 +6352,22 @@ function kartSec(id){
                 except:
                     _rows = []
 
-                # ── TASLAK SATIR (id=0) işleme — "Satır Ekle" ile açılan boş
-                # satır burada gerçek kayda dönüşür. Firma alanı hâlâ boşsa
-                # hiçbir şey yapılmaz, taslak ekranda kalmaya devam eder
-                # (yani kaydetmezsen/firma yazmazsan cariye eklenmez).
-                _taslak_idx = None
+                # ── TASLAK SATIRLAR (id=0) işleme — "Satır Ekle" ile açılan boş
+                # satır(lar) burada gerçek kayda dönüşür. Firma alanı hâlâ boşsa
+                # o taslak için hiçbir şey yapılmaz, ekranda kalmaya devam eder.
+                # ÖNEMLİ (hata düzeltmesi): Eskiden kod sadece İLK id=0 satırını
+                # işleyip duruyordu (break ile) — birden fazla yeni satır eklenip
+                # doldurulduğunda ikinciden itibaren TÜMÜ sessizce kayboluyordu.
+                # Şimdi TÜM id=0 satırları tek tek işleniyor, hiçbiri atlanmıyor.
+                _taslak_idxler = []
                 for _ti, _trow in enumerate(_rows):
                     try:
                         if int(float(str(_trow.get("id", -1)))) == 0:
-                            _taslak_idx = _ti
-                            break
+                            _taslak_idxler.append(_ti)
                     except Exception:
                         continue
-                if _taslak_idx is not None:
+                _taslak_basarili_sayisi = 0
+                for _taslak_idx in _taslak_idxler:
                     _taslak_idx_str = str(_taslak_idx)
                     _taslak_firma = ""
                     _ed_tas = None
@@ -6364,10 +6382,10 @@ function kartSec(id){
                         # Firma boş — DB'ye hiçbir şey yazma, taslağı olduğu gibi bırak
                         _edited_rows.pop(_taslak_idx_str, None)
                     else:
-                        def _tas_al(_kol, _varsayilan=""):
+                        def _tas_al(_kol, _varsayilan="", _idx=_taslak_idx, _df=_ed_tas):
                             try:
-                                if _ed_tas is not None and _kol in _ed_tas.columns:
-                                    _v = _ed_tas.at[_taslak_idx, _kol]
+                                if _df is not None and _kol in _df.columns:
+                                    _v = _df.at[_idx, _kol]
                                     return str(_v) if _v not in [None, "nan", "None"] else _varsayilan
                             except Exception:
                                 pass
@@ -6405,12 +6423,16 @@ function kartSec(id){
                             _taslak_hata = str(_tas_e)
                         if _taslak_basarili:
                             kayit_sayi += 1
-                            st.session_state["_cl_taslak_aktif"] = False
+                            _taslak_basarili_sayisi += 1
                             try: get_cari_listesi.clear()
                             except: pass
                         else:
                             hata_list.append(f"Yeni satır ({_taslak_firma}): {_taslak_hata}")
                         _edited_rows.pop(_taslak_idx_str, None)
+                if _taslak_basarili_sayisi:
+                    # Sadece BAŞARIYLA kaydedilen taslak sayısı kadar azalt —
+                    # firma alanı boş bırakılan taslak(lar) ekranda kalmaya devam etsin.
+                    st.session_state["_cl_taslak_sayisi"] = max(0, _cl_taslak_sayisi - _taslak_basarili_sayisi)
 
                 # ── Teklif/Mesaj manuel override'ları — cari_kartlar'da bu isimde
                 # kolon yok, bu yüzden ayrı kullanici_tercih JSON'unda saklanır.
