@@ -5334,8 +5334,6 @@ function kartSec(id){
         df_f = df_f[df_f.apply(
             lambda r: il_ilce_bolge_bul(r.get("il",""), r.get(_hv_ilce_kol,"") if _hv_ilce_kol else "") is None,
             axis=1)]
-        st.error(f"📦 ⚠️ Havuz (Bölgesiz) — hiçbir tanımlı bölgeye uymayan **{len(df_f)} kayıt**. "
-                 "Aşağıdaki tabloya İl/İlçe yazın, Kaydet'e basınca otomatik doğru bölgeye taşınır.")
         if not df_f.empty and "id" in df_f.columns:
             _hv_kolonlar = [c for c in ["id","firma","il","ilce"] if c in df_f.columns]
             _hv_edit_df = df_f[_hv_kolonlar].copy().reset_index(drop=True)
