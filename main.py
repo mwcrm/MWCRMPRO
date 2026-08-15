@@ -3047,61 +3047,6 @@ button[data-testid="manage-app-button"] { display: none !important; }
                         st.session_state["aktif_tab"] = _tab_key
                         st.rerun()
 
-    # ── MUHASEBE MENÜSÜ ───────────────────────────────────────────────────────
-    # Tüm alt sayfalar artık CRM içinde native render ediliyor (harici link/yeni
-    # sekme YOK) — her sayfa açıldığında muhasebe sisteminden anlık veri çeker,
-    # CRM'de yapılan her ekleme/silme de anında muhasebe sistemine yazılır.
-    st.markdown("""
-<style>
-.mw-muh-baslik{font-size:11px;font-weight:700;color:#0f172a;text-transform:uppercase;
-    letter-spacing:.4px;line-height:1.6;margin:10px 0 4px;padding:0;}
-</style>
-""", unsafe_allow_html=True)
-    _MUH_SB_GRUPLAR = [
-        ("Satışlar", [
-            ("muhasebe_teklifler",        "📝 Teklifler"),
-            ("muhasebe_fatura",           "📄 Faturalar"),
-            ("muhasebe_musteriler",       "👥 Müşteriler"),
-            ("muhasebe_satis_raporu",     "📊 Satışlar Raporu"),
-            ("muhasebe_tahsilat_raporu",  "💵 Tahsilatlar Raporu"),
-            ("muhasebe_gelirgider_raporu","📈 Gelir Gider Raporu"),
-        ]),
-        ("Giderler", [
-            ("muhasebe_gider_listesi",  "🧾 Gider Listesi"),
-            ("muhasebe_tedarikciler",   "🚚 Tedarikçiler"),
-            ("muhasebe_calisanlar",     "👔 Çalışanlar"),
-            ("muhasebe_gider_raporu",   "📉 Giderler Raporu"),
-            ("muhasebe_odeme_raporu",   "💳 Ödemeler Raporu"),
-            ("muhasebe_kdv_raporu",     "🧮 KDV Raporu"),
-        ]),
-        ("Nakit", [
-            ("muhasebe_kasa_banka",        "🏦 Kasa ve Bankalar"),
-            ("muhasebe_cekler",            "📑 Çekler"),
-            ("muhasebe_kasabanka_raporu",  "🏦 Kasa / Banka Raporu"),
-            ("muhasebe_nakit_raporu",      "💧 Nakit Akışı Raporu"),
-        ]),
-    ]
-    _muh_tum_keyler = [k for _, _items in _MUH_SB_GRUPLAR for k, _ in _items]
-    if "_acik_muhasebe" not in st.session_state:
-        st.session_state["_acik_muhasebe"] = st.session_state.get("aktif_tab") in _muh_tum_keyler
-    _muh_acik = st.session_state["_acik_muhasebe"]
-    _muh_ok = "▾" if _muh_acik else "▸"
-    if st.button(f"💰 Muhasebe   {_muh_ok}", use_container_width=True,
-                 type="primary" if _muh_acik else "secondary",
-                 key="grphdr_muhasebe"):
-        st.session_state["_acik_muhasebe"] = not _muh_acik
-        st.rerun()
-    if _muh_acik:
-        for _mg_baslik, _mg_items in _MUH_SB_GRUPLAR:
-            st.markdown(f'<div class="mw-muh-baslik">{_mg_baslik}</div>', unsafe_allow_html=True)
-            for _mg_key, _mg_etiket in _mg_items:
-                _mg_aktif = st.session_state.get("aktif_tab") == _mg_key
-                if st.button(_mg_etiket, use_container_width=True,
-                             type="primary" if _mg_aktif else "secondary",
-                             key=f"sb_{_mg_key}"):
-                    st.session_state["aktif_tab"] = _mg_key
-                    st.rerun()
-
     # ── ALT BÖLÜM ─────────────────────────────────────────────────────────────
     st.divider()
 
