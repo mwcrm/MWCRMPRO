@@ -7508,13 +7508,19 @@ function updateBot(v){{
         # ÖNEMLİ: Ana listenin de kullandığı session_state["_kol_genislik"] tek doğruluk kaynağıdır.
         # Burada AYRI bir DB sorgusu yapmıyoruz — aksi halde iki farklı kaynak birbirini
         # ezip "ayarladığım gibi kalmıyor" sorununa yol açıyordu.
+        # NOT (hata düzeltmesi): _sb_kg_ui ve _kguj burada, session_state zaten
+        # doluysa (yani aşağıdaki "else" dalı çalışıyorsa) TANIMLANMIYORDU.
+        # Bu yüzden "Gizle/Göster" butonuna basınca (sayfa ilk açılıştan sonra,
+        # yani hep) sessizce NameError alıp hiçbir şey kaydetmiyordu — "çalışmıyor"
+        # sorununun kök nedeni buydu. Şimdi her ikisi de KOŞULDAN BAĞIMSIZ,
+        # her zaman tanımlanıyor.
+        import json as _kguj
+        _sb_kg_ui = get_sb_client()
         if "_kol_genislik" not in st.session_state or "_kol_gizli" not in st.session_state:
             try:
-                _sb_kg_ui = get_sb_client()
                 _kg_ui_mevcut = _KOL_VARS_UI.copy()
                 _gizli_ui = []
                 if _sb_kg_ui:
-                    import json as _kguj
                     _r_kgu = _sb_kg_ui.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kol_genislik").execute()
                     if _r_kgu.data:
                         _kg_ui_mevcut = _kguj.loads(_r_kgu.data[0]["deger"])
@@ -7545,15 +7551,18 @@ function updateBot(v){{
                         _gizli_ui = [x for x in _gizli_ui if x != _k]
                     else:
                         _gizli_ui.append(_k)
-                    # Anında kaydet
+                    # Oturum içinde HEMEN uygula — DB yazımı başarısız olsa bile
+                    # buton görsel olarak tepkisiz kalmasın.
+                    st.session_state["_kol_gizli"] = _gizli_ui
+                    st.session_state.pop("_kol_genislik_init", None)
+                    # Kalıcı olması için DB'ye de yaz
                     try:
                         _sb_kg_ui.table("kullanici_tercih").upsert({
                             "kullanici":"__liste_ui__","anahtar":"_kol_gizli",
                             "deger":_kguj.dumps(_gizli_ui, ensure_ascii=False)
                         }, on_conflict="kullanici,anahtar").execute()
-                        st.session_state["_kol_gizli"] = _gizli_ui
-                        st.session_state.pop("_kol_genislik_init", None)
-                    except: pass
+                    except Exception as _kgize:
+                        st.toast(f"⚠️ Gizle/Göster kaydedilemedi: {_kgize}", icon="⚠️")
                     st.rerun()
                 # Slider — gizliyse devre dışı
                 _yeni_kg_ui[_k] = st.slider(
