@@ -6121,6 +6121,149 @@ function kartSec(id){
                 st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
+    # ── 🚚 DIŞ NAKLİYE — Cari Liste'nin altında, tüm müşterilerin dış nakliye
+    # kayıtlarını gösteren toplu liste + taşıyıcı (tedarikçi) yönetimi.
+    # Müşteri bazlı ekleme/düzenleme "Notlar & Randevu" penceresindeki
+    # "🚚 Dış Nakliye" sekmesinden yapılır; burası hepsinin toplu görünümüdür.
+    with st.expander("🚚 Dış Nakliyeler Listesi", expanded=False):
+        _dnb_tab_liste, _dnb_tab_ekstre, _dnb_tab_tasiyici = st.tabs(["📦 Tüm Kayıtlar", "🧾 Cari Ekstre", "🚛 Taşıyıcı Yönetimi"])
+
+        with _dnb_tab_liste:
+            _dnb_tum = _dis_nakliye_yukle()
+            if _dnb_tum:
+                _dnb_df = pd.DataFrame(_dnb_tum)
+                for _c in _DIS_NAKLIYE_KOLONLAR:
+                    if _c not in _dnb_df.columns:
+                        _dnb_df[_c] = 0 if _c in _DIS_NAKLIYE_SAYI_KOLON or _c in _DIS_NAKLIYE_HESAP_KOLON else (False if _c in _DIS_NAKLIYE_CHECK_KOLON else "")
+                _dnb_df = _dis_nakliye_hesapla(_dnb_df)
+                _dnb_df = _dnb_df[["id", "cari_id"] + _DIS_NAKLIYE_KOLONLAR]
+                _dnb_df = _dnb_df.reset_index(drop=True)
+                _dnb_df.index = _dnb_df.index + 1
+                _dnb_df.index.name = "S.No"
+
+                st.caption(f"📌 {len(_dnb_df)} kayıt — toplam kar: {_dnb_df['kar'].sum():,.2f} ₺".replace(",", "."))
+                _dnb_edited = st.data_editor(
+                    _dnb_df, use_container_width=True, num_rows="dynamic",
+                    column_config={**_dis_nakliye_col_config(), "id": None, "cari_id": None},
+                    key="dnb_editor",
+                    height=min(650, 45 + (len(_dnb_df) * 35) + 5),
+                )
+                if st.button("💾 Dış Nakliye — Tüm Kayıtları Kaydet", key="dnb_kaydet_btn", type="primary"):
+                    _dnb_final = _dnb_edited.reset_index(drop=True).copy()
+                    _dnb_final = _dis_nakliye_hesapla(_dnb_final)
+                    for _c in ["id", "cari_id"]:
+                        if _c not in _dnb_final.columns:
+                            _dnb_final[_c] = 0
+                    _dnb_final["id"] = _dnb_final["id"].apply(lambda x: int(x) if str(x).strip() not in ("", "nan", "None") and float(x) > 0 else 0)
+                    _dnb_final["cari_id"] = _dnb_final["cari_id"].apply(lambda x: int(x) if str(x).strip() not in ("", "nan", "None") else 0)
+                    _yeni_id_sayac_b = int(max([int(r.get("id", 0) or 0) for r in _dnb_tum], default=0)) + 1
+                    _tum_yeni = []
+                    for _, _row in _dnb_final.iterrows():
+                        _rd = _row.to_dict()
+                        if not _rd.get("id"):
+                            _rd["id"] = _yeni_id_sayac_b
+                            _yeni_id_sayac_b += 1
+                        _tum_yeni.append(_rd)
+                    if _dis_nakliye_kaydet(_tum_yeni):
+                        st.toast("✅ Dış nakliye kayıtları güncellendi!", icon="✅")
+                        st.rerun()
+                    else:
+                        st.error("❌ Kaydedilemedi, bağlantıyı kontrol et.")
+            else:
+                st.caption("Henüz hiç dış nakliye kaydı yok. Bir müşterinin 'Notlar & Randevu' penceresindeki 🚚 Dış Nakliye sekmesinden veya aşağıdaki taşıyıcı yönetiminden başlayabilirsin.")
+
+        with _dnb_tab_ekstre:
+            st.caption("Bir müşteri seç, o müşterinin dış nakliye üzerinden tüm cari hareketini (tarih, tutar, KDV'li, ödendi durumu, kar) tek ekranda gör.")
+            _dnb_ekstre_kaynak = _dis_nakliye_yukle()
+            if _dnb_ekstre_kaynak:
+                _dnb_ekstre_df_tum = pd.DataFrame(_dnb_ekstre_kaynak)
+                for _c in _DIS_NAKLIYE_KOLONLAR:
+                    if _c not in _dnb_ekstre_df_tum.columns:
+                        _dnb_ekstre_df_tum[_c] = 0 if _c in _DIS_NAKLIYE_SAYI_KOLON or _c in _DIS_NAKLIYE_HESAP_KOLON else (False if _c in _DIS_NAKLIYE_CHECK_KOLON else "")
+                _dnb_ekstre_df_tum = _dis_nakliye_hesapla(_dnb_ekstre_df_tum)
+                _dnb_ekstre_df_tum["cari_id"] = pd.to_numeric(_dnb_ekstre_df_tum.get("cari_id", 0), errors="coerce").fillna(0).astype(int)
+                _dnb_musteri_map = {}
+                for _, _r in _dnb_ekstre_df_tum[_dnb_ekstre_df_tum["cari_id"] > 0].iterrows():
+                    _dnb_musteri_map[int(_r["cari_id"])] = str(_r.get("gonderen_firma", "")).strip() or f"Müşteri #{int(_r['cari_id'])}"
+                if _dnb_musteri_map:
+                    _dnb_secenek_idler = sorted(_dnb_musteri_map.keys(), key=lambda cid: _dnb_musteri_map[cid])
+                    _dnb_secili_cid = st.selectbox(
+                        "Müşteri", _dnb_secenek_idler, key="dnb_ekstre_musteri_sec",
+                        format_func=lambda cid: _dnb_musteri_map.get(cid, str(cid)),
+                    )
+                    _dnb_ekstre_df = _dnb_ekstre_df_tum[_dnb_ekstre_df_tum["cari_id"] == _dnb_secili_cid].copy()
+                    _dnb_ekstre_df = _dnb_ekstre_df.sort_values("tarih")
+                    _dnb_ekstre_df["bakiye"] = (_dnb_ekstre_df["kdvli1"] * (~_dnb_ekstre_df["odendi1"].astype(bool))).cumsum()
+
+                    _ek1, _ek2, _ek3, _ek4 = st.columns(4)
+                    _ek1.metric("Toplam İşlem", len(_dnb_ekstre_df))
+                    _ek2.metric("Toplam Tutar (KDV'li)", f"{_dnb_ekstre_df['kdvli1'].sum():,.2f} ₺".replace(",", "."))
+                    _ek3.metric("Ödenmemiş Tutar", f"{_dnb_ekstre_df.loc[~_dnb_ekstre_df['odendi1'].astype(bool), 'kdvli1'].sum():,.2f} ₺".replace(",", "."))
+                    _ek4.metric("Toplam Kar", f"{_dnb_ekstre_df['kar'].sum():,.2f} ₺".replace(",", "."))
+
+                    _dnb_ekstre_goster = _dnb_ekstre_df[[
+                        "tarih", "alici_firma", "adet1", "fiyat1", "yekun1", "kdvli1", "odendi1", "bakiye", "kar"
+                    ]].rename(columns={
+                        "tarih": "Tarih", "alici_firma": "Alıcı Firma", "adet1": "Adet", "fiyat1": "Birim Fiyat",
+                        "yekun1": "Yekün", "kdvli1": "KDV'li Tutar", "odendi1": "Ödendi",
+                        "bakiye": "Ödenmemiş Bakiye (Kümülatif)", "kar": "Kar",
+                    })
+                    _dnb_ekstre_goster = _dnb_ekstre_goster.reset_index(drop=True)
+                    _dnb_ekstre_goster.index = _dnb_ekstre_goster.index + 1
+                    _dnb_ekstre_goster.index.name = "S.No"
+                    st.dataframe(
+                        _dnb_ekstre_goster, use_container_width=True,
+                        column_config={
+                            "Birim Fiyat": st.column_config.NumberColumn(format="%.2f ₺"),
+                            "Yekün": st.column_config.NumberColumn(format="%.2f ₺"),
+                            "KDV'li Tutar": st.column_config.NumberColumn(format="%.2f ₺"),
+                            "Ödenmemiş Bakiye (Kümülatif)": st.column_config.NumberColumn(format="%.2f ₺"),
+                            "Kar": st.column_config.NumberColumn(format="%.2f ₺"),
+                        },
+                    )
+                else:
+                    st.caption("Kayıtlarda müşteri bilgisi bulunamadı.")
+            else:
+                st.caption("Henüz hiç dış nakliye kaydı yok.")
+
+        with _dnb_tab_tasiyici:
+            st.caption("Sık kullanılan taşıyıcıları (tedarikçileri) burada kaydet — dış nakliye kaydı eklerken listeden seçip otomatik doldurabilirsin.")
+            _dnb_tas = _dis_nakliye_tasiyici_yukle()
+            if _dnb_tas:
+                _dnb_tas_df = pd.DataFrame(_dnb_tas)
+                for _c in ["tasiyici", "yetkili", "yetkili_tel"]:
+                    if _c not in _dnb_tas_df.columns:
+                        _dnb_tas_df[_c] = ""
+                _dnb_tas_df = _dnb_tas_df[["tasiyici", "yetkili", "yetkili_tel"]]
+                _dnb_tas_df = _dnb_tas_df.reset_index(drop=True)
+                _dnb_tas_df.index = _dnb_tas_df.index + 1
+                _dnb_tas_df.index.name = "S.No"
+                _dnb_tas_edited = st.data_editor(
+                    _dnb_tas_df, use_container_width=True, num_rows="dynamic",
+                    column_config={
+                        "tasiyici": st.column_config.TextColumn("Taşıyıcı", width=150),
+                        "yetkili": st.column_config.TextColumn("Yetkili", width=130),
+                        "yetkili_tel": st.column_config.TextColumn("Yetkili Tel", width=110),
+                    },
+                    key="dnb_tasiyici_editor",
+                )
+                if st.button("💾 Taşıyıcıları Kaydet", key="dnb_tas_kaydet_btn", type="primary"):
+                    _dnb_tas_final = _dnb_tas_edited.reset_index(drop=True).to_dict(orient="records")
+                    if _dis_nakliye_tasiyici_kaydet(_dnb_tas_final):
+                        st.toast("✅ Taşıyıcılar güncellendi!", icon="✅")
+                        st.rerun()
+                    else:
+                        st.error("❌ Kaydedilemedi, bağlantıyı kontrol et.")
+            else:
+                st.caption("Henüz kayıtlı taşıyıcı yok.")
+                _dnbt1, _dnbt2, _dnbt3 = st.columns(3)
+                _dnb_yeni_tas = _dnbt1.text_input("Taşıyıcı", key="dnb_yeni_tas")
+                _dnb_yeni_yet = _dnbt2.text_input("Yetkili", key="dnb_yeni_yet")
+                _dnb_yeni_tel = _dnbt3.text_input("Yetkili Tel", key="dnb_yeni_tel")
+                if st.button("➕ Taşıyıcı Ekle", key="dnb_yeni_tas_ekle") and _dnb_yeni_tas.strip():
+                    _dis_nakliye_tasiyici_kaydet([{"tasiyici": _dnb_yeni_tas, "yetkili": _dnb_yeni_yet, "yetkili_tel": _dnb_yeni_tel}])
+                    st.rerun()
+
     _tbl_col = st.container()
     _not_col = None
 
@@ -6782,148 +6925,6 @@ function kartSec(id){
 
     st.divider()
 
-    # ── 🚚 DIŞ NAKLİYE — Cari Liste'nin altında, tüm müşterilerin dış nakliye
-    # kayıtlarını gösteren toplu liste + taşıyıcı (tedarikçi) yönetimi.
-    # Müşteri bazlı ekleme/düzenleme "Notlar & Randevu" penceresindeki
-    # "🚚 Dış Nakliye" sekmesinden yapılır; burası hepsinin toplu görünümüdür.
-    with st.expander("🚚 Dış Nakliyeler Listesi", expanded=False):
-        _dnb_tab_liste, _dnb_tab_ekstre, _dnb_tab_tasiyici = st.tabs(["📦 Tüm Kayıtlar", "🧾 Cari Ekstre", "🚛 Taşıyıcı Yönetimi"])
-
-        with _dnb_tab_liste:
-            _dnb_tum = _dis_nakliye_yukle()
-            if _dnb_tum:
-                _dnb_df = pd.DataFrame(_dnb_tum)
-                for _c in _DIS_NAKLIYE_KOLONLAR:
-                    if _c not in _dnb_df.columns:
-                        _dnb_df[_c] = 0 if _c in _DIS_NAKLIYE_SAYI_KOLON or _c in _DIS_NAKLIYE_HESAP_KOLON else (False if _c in _DIS_NAKLIYE_CHECK_KOLON else "")
-                _dnb_df = _dis_nakliye_hesapla(_dnb_df)
-                _dnb_df = _dnb_df[["id", "cari_id"] + _DIS_NAKLIYE_KOLONLAR]
-                _dnb_df = _dnb_df.reset_index(drop=True)
-                _dnb_df.index = _dnb_df.index + 1
-                _dnb_df.index.name = "S.No"
-
-                st.caption(f"📌 {len(_dnb_df)} kayıt — toplam kar: {_dnb_df['kar'].sum():,.2f} ₺".replace(",", "."))
-                _dnb_edited = st.data_editor(
-                    _dnb_df, use_container_width=True, num_rows="dynamic",
-                    column_config={**_dis_nakliye_col_config(), "id": None, "cari_id": None},
-                    key="dnb_editor",
-                    height=min(650, 45 + (len(_dnb_df) * 35) + 5),
-                )
-                if st.button("💾 Dış Nakliye — Tüm Kayıtları Kaydet", key="dnb_kaydet_btn", type="primary"):
-                    _dnb_final = _dnb_edited.reset_index(drop=True).copy()
-                    _dnb_final = _dis_nakliye_hesapla(_dnb_final)
-                    for _c in ["id", "cari_id"]:
-                        if _c not in _dnb_final.columns:
-                            _dnb_final[_c] = 0
-                    _dnb_final["id"] = _dnb_final["id"].apply(lambda x: int(x) if str(x).strip() not in ("", "nan", "None") and float(x) > 0 else 0)
-                    _dnb_final["cari_id"] = _dnb_final["cari_id"].apply(lambda x: int(x) if str(x).strip() not in ("", "nan", "None") else 0)
-                    _yeni_id_sayac_b = int(max([int(r.get("id", 0) or 0) for r in _dnb_tum], default=0)) + 1
-                    _tum_yeni = []
-                    for _, _row in _dnb_final.iterrows():
-                        _rd = _row.to_dict()
-                        if not _rd.get("id"):
-                            _rd["id"] = _yeni_id_sayac_b
-                            _yeni_id_sayac_b += 1
-                        _tum_yeni.append(_rd)
-                    if _dis_nakliye_kaydet(_tum_yeni):
-                        st.toast("✅ Dış nakliye kayıtları güncellendi!", icon="✅")
-                        st.rerun()
-                    else:
-                        st.error("❌ Kaydedilemedi, bağlantıyı kontrol et.")
-            else:
-                st.caption("Henüz hiç dış nakliye kaydı yok. Bir müşterinin 'Notlar & Randevu' penceresindeki 🚚 Dış Nakliye sekmesinden veya aşağıdaki taşıyıcı yönetiminden başlayabilirsin.")
-
-        with _dnb_tab_ekstre:
-            st.caption("Bir müşteri seç, o müşterinin dış nakliye üzerinden tüm cari hareketini (tarih, tutar, KDV'li, ödendi durumu, kar) tek ekranda gör.")
-            _dnb_ekstre_kaynak = _dis_nakliye_yukle()
-            if _dnb_ekstre_kaynak:
-                _dnb_ekstre_df_tum = pd.DataFrame(_dnb_ekstre_kaynak)
-                for _c in _DIS_NAKLIYE_KOLONLAR:
-                    if _c not in _dnb_ekstre_df_tum.columns:
-                        _dnb_ekstre_df_tum[_c] = 0 if _c in _DIS_NAKLIYE_SAYI_KOLON or _c in _DIS_NAKLIYE_HESAP_KOLON else (False if _c in _DIS_NAKLIYE_CHECK_KOLON else "")
-                _dnb_ekstre_df_tum = _dis_nakliye_hesapla(_dnb_ekstre_df_tum)
-                _dnb_ekstre_df_tum["cari_id"] = pd.to_numeric(_dnb_ekstre_df_tum.get("cari_id", 0), errors="coerce").fillna(0).astype(int)
-                _dnb_musteri_map = {}
-                for _, _r in _dnb_ekstre_df_tum[_dnb_ekstre_df_tum["cari_id"] > 0].iterrows():
-                    _dnb_musteri_map[int(_r["cari_id"])] = str(_r.get("gonderen_firma", "")).strip() or f"Müşteri #{int(_r['cari_id'])}"
-                if _dnb_musteri_map:
-                    _dnb_secenek_idler = sorted(_dnb_musteri_map.keys(), key=lambda cid: _dnb_musteri_map[cid])
-                    _dnb_secili_cid = st.selectbox(
-                        "Müşteri", _dnb_secenek_idler, key="dnb_ekstre_musteri_sec",
-                        format_func=lambda cid: _dnb_musteri_map.get(cid, str(cid)),
-                    )
-                    _dnb_ekstre_df = _dnb_ekstre_df_tum[_dnb_ekstre_df_tum["cari_id"] == _dnb_secili_cid].copy()
-                    _dnb_ekstre_df = _dnb_ekstre_df.sort_values("tarih")
-                    _dnb_ekstre_df["bakiye"] = (_dnb_ekstre_df["kdvli1"] * (~_dnb_ekstre_df["odendi1"].astype(bool))).cumsum()
-
-                    _ek1, _ek2, _ek3, _ek4 = st.columns(4)
-                    _ek1.metric("Toplam İşlem", len(_dnb_ekstre_df))
-                    _ek2.metric("Toplam Tutar (KDV'li)", f"{_dnb_ekstre_df['kdvli1'].sum():,.2f} ₺".replace(",", "."))
-                    _ek3.metric("Ödenmemiş Tutar", f"{_dnb_ekstre_df.loc[~_dnb_ekstre_df['odendi1'].astype(bool), 'kdvli1'].sum():,.2f} ₺".replace(",", "."))
-                    _ek4.metric("Toplam Kar", f"{_dnb_ekstre_df['kar'].sum():,.2f} ₺".replace(",", "."))
-
-                    _dnb_ekstre_goster = _dnb_ekstre_df[[
-                        "tarih", "alici_firma", "adet1", "fiyat1", "yekun1", "kdvli1", "odendi1", "bakiye", "kar"
-                    ]].rename(columns={
-                        "tarih": "Tarih", "alici_firma": "Alıcı Firma", "adet1": "Adet", "fiyat1": "Birim Fiyat",
-                        "yekun1": "Yekün", "kdvli1": "KDV'li Tutar", "odendi1": "Ödendi",
-                        "bakiye": "Ödenmemiş Bakiye (Kümülatif)", "kar": "Kar",
-                    })
-                    _dnb_ekstre_goster = _dnb_ekstre_goster.reset_index(drop=True)
-                    _dnb_ekstre_goster.index = _dnb_ekstre_goster.index + 1
-                    _dnb_ekstre_goster.index.name = "S.No"
-                    st.dataframe(
-                        _dnb_ekstre_goster, use_container_width=True,
-                        column_config={
-                            "Birim Fiyat": st.column_config.NumberColumn(format="%.2f ₺"),
-                            "Yekün": st.column_config.NumberColumn(format="%.2f ₺"),
-                            "KDV'li Tutar": st.column_config.NumberColumn(format="%.2f ₺"),
-                            "Ödenmemiş Bakiye (Kümülatif)": st.column_config.NumberColumn(format="%.2f ₺"),
-                            "Kar": st.column_config.NumberColumn(format="%.2f ₺"),
-                        },
-                    )
-                else:
-                    st.caption("Kayıtlarda müşteri bilgisi bulunamadı.")
-            else:
-                st.caption("Henüz hiç dış nakliye kaydı yok.")
-
-        with _dnb_tab_tasiyici:
-            st.caption("Sık kullanılan taşıyıcıları (tedarikçileri) burada kaydet — dış nakliye kaydı eklerken listeden seçip otomatik doldurabilirsin.")
-            _dnb_tas = _dis_nakliye_tasiyici_yukle()
-            if _dnb_tas:
-                _dnb_tas_df = pd.DataFrame(_dnb_tas)
-                for _c in ["tasiyici", "yetkili", "yetkili_tel"]:
-                    if _c not in _dnb_tas_df.columns:
-                        _dnb_tas_df[_c] = ""
-                _dnb_tas_df = _dnb_tas_df[["tasiyici", "yetkili", "yetkili_tel"]]
-                _dnb_tas_df = _dnb_tas_df.reset_index(drop=True)
-                _dnb_tas_df.index = _dnb_tas_df.index + 1
-                _dnb_tas_df.index.name = "S.No"
-                _dnb_tas_edited = st.data_editor(
-                    _dnb_tas_df, use_container_width=True, num_rows="dynamic",
-                    column_config={
-                        "tasiyici": st.column_config.TextColumn("Taşıyıcı", width=150),
-                        "yetkili": st.column_config.TextColumn("Yetkili", width=130),
-                        "yetkili_tel": st.column_config.TextColumn("Yetkili Tel", width=110),
-                    },
-                    key="dnb_tasiyici_editor",
-                )
-                if st.button("💾 Taşıyıcıları Kaydet", key="dnb_tas_kaydet_btn", type="primary"):
-                    _dnb_tas_final = _dnb_tas_edited.reset_index(drop=True).to_dict(orient="records")
-                    if _dis_nakliye_tasiyici_kaydet(_dnb_tas_final):
-                        st.toast("✅ Taşıyıcılar güncellendi!", icon="✅")
-                        st.rerun()
-                    else:
-                        st.error("❌ Kaydedilemedi, bağlantıyı kontrol et.")
-            else:
-                st.caption("Henüz kayıtlı taşıyıcı yok.")
-                _dnbt1, _dnbt2, _dnbt3 = st.columns(3)
-                _dnb_yeni_tas = _dnbt1.text_input("Taşıyıcı", key="dnb_yeni_tas")
-                _dnb_yeni_yet = _dnbt2.text_input("Yetkili", key="dnb_yeni_yet")
-                _dnb_yeni_tel = _dnbt3.text_input("Yetkili Tel", key="dnb_yeni_tel")
-                if st.button("➕ Taşıyıcı Ekle", key="dnb_yeni_tas_ekle") and _dnb_yeni_tas.strip():
-                    _dis_nakliye_tasiyici_kaydet([{"tasiyici": _dnb_yeni_tas, "yetkili": _dnb_yeni_yet, "yetkili_tel": _dnb_yeni_tel}])
-                    st.rerun()
 
 elif aktif == "dis_nakliye":
     sayfa_log("dis_nakliye")
