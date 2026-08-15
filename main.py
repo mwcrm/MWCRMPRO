@@ -1684,24 +1684,13 @@ section[data-testid="stSidebar"] .block-container { padding-top: 1rem !important
 [data-testid="stMainBlockContainer"] { max-width: 100% !important; padding-left: 1rem !important; padding-right: 1rem !important; }
 [data-testid="stAppViewContainer"] { max-width: 100% !important; }
 [data-testid="stAppViewContainer"] > .main { max-width: 100% !important; }
-/* ── VERİ TABLOSU (data_editor/dataframe) TAM GENİŞLİK ────────────────────
-   Glide tabanlı tablo bileşeni kendi dış kutusunun genişliğine göre kolon
-   alanını hesaplıyor. use_container_width=True tek başına her zaman tam
-   genişliğe ulaşmadığı için dış kapsayıcıyı burada CSS ile zorluyoruz —
-   böylece rapor barındaki (GENEL/AŞAMA/...) tam genişlikli HTML tabloyla
-   Cari Liste tablosunun sağ kenarı denk gelir, sağda boşluk kalmaz. */
-[data-testid="stDataFrame"], [data-testid="stDataFrameResizable"],
-[data-testid="stDataFrame"] > div, [data-testid="stDataFrameResizable"] > div {
-    width: 100% !important;
-    max-width: 100% !important;
-}
-/* Dış kapsayıcı, içindeki tablo canvas'ından daha dar kalınca KENDİ yatay
-   kaydırma çubuğunu da gösteriyordu — tablonun asıl (alttaki) scrollbar'ıyla
-   birlikte İKİ tane üst üste görünüyordu. Dış kapsayıcının kendi scrollbar'ını
-   kapatıyoruz, asıl/doğru scrollbar (tablonun kendi iç scrollbar'ı) kalıyor. */
-[data-testid="stDataFrame"], [data-testid="stDataFrameResizable"] {
-    overflow-x: hidden !important;
-}
+/* ── VERİ TABLOSU (data_editor/dataframe) ─────────────────────────────────
+   NOT: Daha önce burada dış kapsayıcıyı CSS ile zorla %100 genişliğe
+   çeken ve overflow-x'i kapatan bir blok vardı. Bu, Streamlit'in kendi iç
+   kaydırma mekanizmasıyla çakışıp sağ tarafta ÜST ÜSTE birden fazla
+   kaydırma çubuğu görünmesine sebep oldu — kaldırıldı. Kolonların sağ
+   boşluğu kapatması zaten kod tarafında (Cari Liste'de son görünür
+   kolonun genişliğinin kaldırılmasıyla) sağlanıyor, bu CSS'e gerek yok. */
 /* ── TABLO ARAÇ ÇUBUĞU (göz/indir/ara/tam ekran) ÜST ÜSTE BİNMESİN ────────
    Streamlit, fare tablonun üzerine gelince sağ üst köşede yüzen bir araç
    çubuğu gösteriyor; bu çubuk tablonun kendi kutusunun biraz dışına taşıp
