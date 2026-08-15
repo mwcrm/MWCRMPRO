@@ -2513,7 +2513,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "mukerrer", "dis_nakliye"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -2975,7 +2975,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
     _MENU_GRUPLARI = [
         ("🧾 Cari işlemleri",    ["yeni", "liste", "excel", "mukerrer"]),
         ("📅 Randevu ve teklif", ["randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler"]),
-        ("🚚 Saha",              ["harita", "dis_nakliye"]),
+        ("🚚 Saha",              ["harita"]),
         ("⚙️ Yönetim",          ["kullanici", "patron"]),
         ("📊 Raporlar",          ["admin_rapor", "rapor"]),
     ]
