@@ -5173,18 +5173,24 @@ function kartSec(id){
 
         with st.expander(f"📂 Çoklu Firma Taslakları ({len(st.session_state['_cok_firma_taslaklar'])})", expanded=False):
             _tsk_dict = st.session_state["_cok_firma_taslaklar"]
-            _tsk_opts = ["-- Taslak Seç --"] + sorted(_tsk_dict.keys())
+            _tsk_opts = sorted(_tsk_dict.keys())
             _tc1, _tc2, _tc3 = st.columns([2, 1, 1])
-            _tsk_sec = _tc1.selectbox("Kayıtlı taslaklar", _tsk_opts, key="_cok_tsk_sec", label_visibility="collapsed")
-            if _tc2.button("📂 Yükle", key="_cok_tsk_yukle", use_container_width=True, disabled=(_tsk_sec == "-- Taslak Seç --")):
-                _tsk_ids = set(_tsk_dict.get(_tsk_sec, []))
+            _tsk_sec_ms = _tc1.multiselect("Kayıtlı taslaklar", _tsk_opts, key="_cok_tsk_sec_ms", label_visibility="collapsed", placeholder="📂 Taslak seç (birden fazlası birleştirilir)")
+            if _tc2.button("📂 Yükle", key="_cok_tsk_yukle", use_container_width=True, disabled=(len(_tsk_sec_ms) == 0)):
+                _tsk_ids = set()
+                for _ts in _tsk_sec_ms:
+                    _tsk_ids |= set(_tsk_dict.get(_ts, []))
                 st.session_state["_cok_tsk_bekleyen"] = list(_tsk_ids)
-                st.toast(f"✅ '{_tsk_sec}' taslağı yükleniyor — {len(_tsk_ids)} firma", icon="📂")
+                if len(_tsk_sec_ms) > 1:
+                    st.toast(f"✅ {len(_tsk_sec_ms)} taslak birleştirilerek yüklendi — {len(_tsk_ids)} firma", icon="📂")
+                else:
+                    st.toast(f"✅ '{_tsk_sec_ms[0]}' taslağı yüklendi — {len(_tsk_ids)} firma", icon="📂")
                 st.rerun()
-            if _tc3.button("🗑️ Sil", key="_cok_tsk_sil", use_container_width=True, disabled=(_tsk_sec == "-- Taslak Seç --")):
-                _tsk_dict.pop(_tsk_sec, None)
+            if _tc3.button("🗑️ Sil", key="_cok_tsk_sil", use_container_width=True, disabled=(len(_tsk_sec_ms) == 0)):
+                for _ts in _tsk_sec_ms:
+                    _tsk_dict.pop(_ts, None)
                 _cok_firma_taslak_kaydet_db()
-                st.toast(f"🗑️ '{_tsk_sec}' silindi", icon="🗑️")
+                st.toast(f"🗑️ {len(_tsk_sec_ms)} taslak silindi", icon="🗑️")
                 st.rerun()
             st.divider()
             _tsk_kaynak_idler = _cok_secili_idler if _cok_secili_ham else _il_ilce_secili_idler
@@ -5192,9 +5198,17 @@ function kartSec(id){
             if not _cok_secili_ham and (_il_sec or _ilce_sec):
                 _il_ilce_etiket = " / ".join([x for x in [", ".join(_il_sec), ", ".join(_ilce_sec)] if x])
                 st.caption(f"📍 İl/İlçe seçimine göre kaydedilecek: **{_il_ilce_etiket}** ({len(_tsk_kaynak_idler)} firma)")
+            # Taslağı yükledikten sonra yukarıdaki "🔍 Çoklu firma..." kutusunda firma ekleyip çıkarabilirsiniz —
+            # tek bir taslak seçiliyse, o değişikliği doğrudan aynı taslağın üzerine kaydetme imkanı:
+            if len(_tsk_sec_ms) == 1 and _cok_secili_ham:
+                if st.button(f"🔁 '{_tsk_sec_ms[0]}' taslağını güncelle (eklenen/çıkarılan firmalarla)", key="_cok_tsk_guncelle_btn", use_container_width=True):
+                    _tsk_dict[_tsk_sec_ms[0]] = sorted(_tsk_kaynak_idler)
+                    _cok_firma_taslak_kaydet_db()
+                    st.toast(f"🔁 '{_tsk_sec_ms[0]}' güncellendi — {len(_tsk_kaynak_idler)} firma", icon="🔁")
+                    st.rerun()
             _tk1, _tk2 = st.columns([3, 1])
             _tsk_yeni_ad = _tk1.text_input("Yeni taslak adı", key="_cok_tsk_yeni_ad", placeholder="Örn: Ataşehir Kampanya", label_visibility="collapsed")
-            if _tk2.button("💾 Kaydet", key="_cok_tsk_kaydet_btn", use_container_width=True, type="primary", disabled=not _tsk_kaynak_var):
+            if _tk2.button("💾 Farklı Kaydet", key="_cok_tsk_kaydet_btn", use_container_width=True, type="primary", disabled=not _tsk_kaynak_var):
                 _ad_temiz = (_tsk_yeni_ad or "").strip()
                 if _ad_temiz:
                     _tsk_dict[_ad_temiz] = sorted(_tsk_kaynak_idler)
@@ -5204,7 +5218,7 @@ function kartSec(id){
                 else:
                     st.warning("Bir taslak adı yazın.")
             if not _tsk_kaynak_var:
-                st.caption("💡 Yukarıdaki '🔍 Çoklu firma...' kutusundan firma seçin YA DA İl/İlçe filtresi uygulayın, sonra isim verip kaydedin.")
+                st.caption("💡 Yukarıdaki '🔍 Çoklu firma...' kutusundan firma seçin YA DA İl/İlçe filtresi uygulayın. Sonra: yeni isimle kaydedin, ya da (tek taslak seçiliyse) mevcut taslağı güncelleyin.")
 
         if st.session_state.get("_filtre_sifirla_flag"):
             del st.session_state["_filtre_sifirla_flag"]
