@@ -5154,12 +5154,18 @@ function kartSec(id){
                 _sb_tsk1 = get_sb_client()
                 if _sb_tsk1:
                     import json as _tskj1
-                    _sb_tsk1.table("kullanici_tercih").upsert({
+                    _deger_tsk1 = _tskj1.dumps(st.session_state["_cok_firma_taslaklar"], ensure_ascii=False)
+                    # NOT: upsert(on_conflict=...) kullanılmıyor — "kullanici_tercih" tablosunda
+                    # (kullanici, anahtar) için unique constraint olmadığından upsert sessizce
+                    # başarısız olabiliyor. Bunun yerine önce sil, sonra ekle (diğer modüllerdeki
+                    # _muh_token deseniyle aynı, kanıtlanmış yöntem).
+                    _sb_tsk1.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_cok_firma_taslaklar").execute()
+                    _sb_tsk1.table("kullanici_tercih").insert({
                         "kullanici": "__liste_ui__", "anahtar": "_cok_firma_taslaklar",
-                        "deger": _tskj1.dumps(st.session_state["_cok_firma_taslaklar"], ensure_ascii=False)
-                    }, on_conflict="kullanici,anahtar").execute()
-            except:
-                pass
+                        "deger": _deger_tsk1
+                    }).execute()
+            except Exception as _tsk_db_hata:
+                st.error(f"⚠️ Taslak veritabanına kaydedilemedi: {_tsk_db_hata}")
 
         # İl/İlçe filtresiyle eşleşen firma ID'leri — çoklu firma kutusu boşken de taslağa kaydedebilmek için
         _il_ilce_secili_idler = set()
