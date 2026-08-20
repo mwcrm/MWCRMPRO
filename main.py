@@ -5192,12 +5192,13 @@ function kartSec(id){
                 else:
                     st.toast(f"✅ '{_tsk_sec_ms[0]}' taslağı yüklendi — {len(_tsk_ids)} firma", icon="📂")
                 st.rerun()
-            if _tc3.button("🗑️ Sil", key="_cok_tsk_sil", use_container_width=True, disabled=(len(_tsk_sec_ms) == 0)):
+            if _tc3.button("📤 Taslaktan Çıkar", key="_cok_tsk_sil", use_container_width=True, disabled=(len(_tsk_sec_ms) == 0)):
                 for _ts in _tsk_sec_ms:
                     _tsk_dict.pop(_ts, None)
                 _cok_firma_taslak_kaydet_db()
-                st.toast(f"🗑️ {len(_tsk_sec_ms)} taslak silindi", icon="🗑️")
+                st.toast(f"📤 {len(_tsk_sec_ms)} taslak listeden çıkarıldı — firmalar Cari Liste'de duruyor, hiçbir şey silinmedi", icon="📤")
                 st.rerun()
+            st.caption("ℹ️ 'Taslaktan Çıkar' sadece bu kayıtlı listeyi kaldırır — firmalar ve firmalara yapılan işlemler (not, teklif, arşiv vb.) Cari Liste'de olduğu gibi kalır.")
             st.divider()
             _tsk_kaynak_idler = _cok_secili_idler if _cok_secili_ham else _il_ilce_secili_idler
             _tsk_kaynak_var = bool(_cok_secili_ham) or bool(_il_sec) or bool(_ilce_sec)
