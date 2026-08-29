@@ -5192,13 +5192,12 @@ function kartSec(id){
                 else:
                     st.toast(f"✅ '{_tsk_sec_ms[0]}' taslağı yüklendi — {len(_tsk_ids)} firma", icon="📂")
                 st.rerun()
-            if _tc3.button("📤 Taslaktan Çıkar", key="_cok_tsk_sil", use_container_width=True, disabled=(len(_tsk_sec_ms) == 0)):
+            if _tc3.button("🗑️ Sil", key="_cok_tsk_sil", use_container_width=True, disabled=(len(_tsk_sec_ms) == 0)):
                 for _ts in _tsk_sec_ms:
                     _tsk_dict.pop(_ts, None)
                 _cok_firma_taslak_kaydet_db()
-                st.toast(f"📤 {len(_tsk_sec_ms)} taslak listeden çıkarıldı — firmalar Cari Liste'de duruyor, hiçbir şey silinmedi", icon="📤")
+                st.toast(f"🗑️ {len(_tsk_sec_ms)} taslak silindi", icon="🗑️")
                 st.rerun()
-            st.caption("ℹ️ 'Taslaktan Çıkar' sadece bu kayıtlı listeyi kaldırır — firmalar ve firmalara yapılan işlemler (not, teklif, arşiv vb.) Cari Liste'de olduğu gibi kalır.")
             st.divider()
             _tsk_kaynak_idler = _cok_secili_idler if _cok_secili_ham else _il_ilce_secili_idler
             _tsk_kaynak_var = bool(_cok_secili_ham) or bool(_il_sec) or bool(_ilce_sec)
@@ -6183,6 +6182,26 @@ function kartSec(id){
 
     # Sağda not paneli açık mı?
     _not_panel_id = st.session_state.get("_cl_not_panel_id")
+
+    # ── YENİ FİRMA KONTROLÜ — "Satır Ekle" ile elle firma adı yazmadan önce,
+    # aynı/benzer isimde zaten kayıtlı müşteri var mı diye anlık arama.
+    # Mükerrer kayıt açılmasını önlemek için — 3+ harf yazınca eşleşenler listelenir.
+    _yf_ara = st.text_input("🔍 Yeni firma eklemeden önce kontrol et (en az 3 harf yazın)",
+                             key="_cl_yeni_firma_ara", placeholder="Firma adının bir kısmını yazın...")
+    if _yf_ara and len(_yf_ara.strip()) >= 3 and "firma" in df.columns:
+        def _yf_norm(_s):
+            return (str(_s).upper().replace("İ", "I").replace("Ş", "S")
+                    .replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C"))
+        _yf_q = _yf_norm(_yf_ara.strip())
+        _yf_kaynak = df.copy()
+        _yf_kaynak["_yf_norm"] = _yf_kaynak["firma"].apply(_yf_norm)
+        _yf_eslesen = _yf_kaynak[_yf_kaynak["_yf_norm"].str.contains(_yf_q, na=False)]
+        if not _yf_eslesen.empty:
+            st.warning(f"⚠️ '{_yf_ara}' ile eşleşen {len(_yf_eslesen)} kayıtlı müşteri bulundu — mükerrer girmemek için kontrol edin:")
+            _yf_kol = [c for c in ["id", "firma", "yetkili", "gsm", "il", "ilce"] if c in _yf_eslesen.columns]
+            st.dataframe(_yf_eslesen[_yf_kol].head(15), use_container_width=True, hide_index=True)
+        else:
+            st.caption(f"✅ '{_yf_ara}' ile eşleşen kayıtlı müşteri yok — yeni firma olarak güvenle eklenebilir.")
 
     # ── KAYDET BUTONU — TABLONUN ÜSTÜNDE, STICKY ───────────────────────────────
     st.markdown("""<style>
