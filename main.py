@@ -6186,16 +6186,18 @@ function kartSec(id){
     # ── YENİ FİRMA KONTROLÜ — "Satır Ekle" ile elle firma adı yazmadan önce,
     # aynı/benzer isimde zaten kayıtlı müşteri var mı diye anlık arama.
     # Mükerrer kayıt açılmasını önlemek için — 3+ harf yazınca eşleşenler listelenir.
-    _yf_ara = st.text_input("🔍 Yeni firma eklemeden önce kontrol et (en az 3 harf yazın)",
+    _yf_ara = st.text_input("🔍 Yeni firma eklemeden önce kontrol et",
                              key="_cl_yeni_firma_ara", placeholder="Firma adının bir kısmını yazın...")
-    if _yf_ara and len(_yf_ara.strip()) >= 3 and "firma" in df.columns:
+    if _yf_ara and _yf_ara.strip() and "firma" in df.columns:
         def _yf_norm(_s):
             return (str(_s).upper().replace("İ", "I").replace("Ş", "S")
                     .replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C"))
-        _yf_q = _yf_norm(_yf_ara.strip())
+        _yf_q_kelimeler = [k for k in _yf_norm(_yf_ara.strip()).split() if k]
         _yf_kaynak = df.copy()
         _yf_kaynak["_yf_norm"] = _yf_kaynak["firma"].apply(_yf_norm)
-        _yf_eslesen = _yf_kaynak[_yf_kaynak["_yf_norm"].str.contains(_yf_q, na=False)]
+        _yf_eslesen = _yf_kaynak[_yf_kaynak["_yf_norm"].apply(
+            lambda _n: all(_k in _n for _k in _yf_q_kelimeler)
+        )]
         if not _yf_eslesen.empty:
             st.warning(f"⚠️ '{_yf_ara}' ile eşleşen {len(_yf_eslesen)} kayıtlı müşteri bulundu — mükerrer girmemek için kontrol edin:")
             _yf_kol = [c for c in ["id", "firma", "yetkili", "gsm", "il", "ilce"] if c in _yf_eslesen.columns]
