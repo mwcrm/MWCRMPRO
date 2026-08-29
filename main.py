@@ -6185,32 +6185,23 @@ function kartSec(id){
 
     # ── YENİ FİRMA KONTROLÜ — "Satır Ekle" ile elle firma adı yazmadan önce,
     # aynı/benzer isimde zaten kayıtlı müşteri var mı diye anlık arama.
-    # Mükerrer kayıt açılmasını önlemek için — bir şey yazılır yazılmaz eşleşenler listelenir.
-    # Hem KISA parça yazımı (örn. "DAL") hem de firmanın TAM adının yazılması
-    # (kısaltma/noktalama farkı olsa bile — "TİC.LTD.ŞTİ." / "TİCARET LİMİTED ŞİRKETİ" gibi)
-    # kapsanacak şekilde: boşluksuz tam ada yakın eşleşme + kelime bazlı kısmi eşleşme
-    # birlikte skorlanıp en iyi eşleşme üstte gösteriliyor.
+    # ÖNEMLİ: Kelime kelime ayrı ayrı arama YAPILMAZ — yazılan ifade (boşluk/nokta
+    # farkları yok sayılarak) ART ARDA/BÜTÜN olarak firma adında geçiyor mu diye
+    # bakılır. Örn. "KAPKA HEDİ" yazınca sadece "KAPKA HEDİYELİK..." gibi bu ifadeyi
+    # ard arda içeren firmalar gelir; sadece "HEDİ" geçen alakasız firmalar gelmez.
     _yf_ara = st.text_input("🔍 Yeni firma eklemeden önce kontrol et",
                              key="_cl_yeni_firma_ara", placeholder="Firma adının bir kısmını veya tamamını yazın...")
     if _yf_ara and _yf_ara.strip() and "firma" in df.columns:
         def _yf_norm(_s):
             return (str(_s).upper().replace("İ", "I").replace("Ş", "S")
                     .replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C"))
-        _yf_q_ham = _yf_norm(_yf_ara.strip())
-        _yf_q_bosluksuz = _yf_q_ham.replace(" ", "").replace(".", "")
-        _yf_q_kelimeler = [k for k in _yf_q_ham.split() if k]
+        _yf_q_bosluksuz = _yf_norm(_yf_ara.strip()).replace(" ", "").replace(".", "")
         _yf_kaynak = df.copy()
-        _yf_kaynak["_yf_norm"] = _yf_kaynak["firma"].apply(_yf_norm)
-        _yf_kaynak["_yf_norm_bs"] = _yf_kaynak["_yf_norm"].str.replace(" ", "", regex=False).str.replace(".", "", regex=False)
-
-        def _yf_skor(_row):
-            _tam = _row["_yf_norm_bs"]
-            if _yf_q_bosluksuz and _tam and (_yf_q_bosluksuz in _tam or _tam in _yf_q_bosluksuz):
-                return 1000 + min(len(_yf_q_bosluksuz), len(_tam))  # tam ada yakın eşleşme en üstte
-            return sum(1 for _k in _yf_q_kelimeler if _k in _row["_yf_norm"])
-
-        _yf_kaynak["_yf_skor"] = _yf_kaynak.apply(_yf_skor, axis=1)
-        _yf_eslesen = _yf_kaynak[_yf_kaynak["_yf_skor"] > 0].sort_values("_yf_skor", ascending=False)
+        _yf_kaynak["_yf_norm_bs"] = (_yf_kaynak["firma"].apply(_yf_norm)
+                                      .str.replace(" ", "", regex=False).str.replace(".", "", regex=False))
+        _yf_eslesen = _yf_kaynak[_yf_kaynak["_yf_norm_bs"].apply(
+            lambda _tam: bool(_yf_q_bosluksuz) and _yf_q_bosluksuz in _tam
+        )]
         if not _yf_eslesen.empty:
             st.warning(f"⚠️ '{_yf_ara}' ile eşleşen {len(_yf_eslesen)} kayıtlı müşteri bulundu — mükerrer girmemek için kontrol edin:")
             _yf_kol = [c for c in ["id", "firma", "yetkili", "gsm", "il", "ilce"] if c in _yf_eslesen.columns]
