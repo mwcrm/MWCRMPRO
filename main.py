@@ -6221,7 +6221,7 @@ function kartSec(id){
 
     with st.container():
         st.markdown('<div class="cl-sticky-bar">', unsafe_allow_html=True)
-        _sb1, _sb2, _sb3, _sb_bos = st.columns([1.4, 1.1, 1.1, 5])
+        _sb1, _sb2, _sb3, _sb4, _sb_bos = st.columns([1.4, 1.1, 1.1, 1.3, 3.7])
         with _sb1:
             if st.button("💾 Değişiklikleri Kaydet", type="primary", key="liste_kaydet_ust"):
                 st.session_state["_kaydet_flag"] = True
@@ -6233,6 +6233,17 @@ function kartSec(id){
             if st.button("🔄 Kolon Sıfırla", key="cl_kolon_sifirla_ust"):
                 st.session_state.pop("_cl_kolon_sira", None)
                 st.rerun()
+        with _sb4:
+            # Gerçek .xlsx (openpyxl) — virgülle ayrılmış CSV DEĞİL, Excel'de doğrudan
+            # sorunsuz açılan binary Excel formatı. Ekrandaki (filtrelenmiş) liste iner.
+            import io as _cl_xio
+            _cl_xl_buf = _cl_xio.BytesIO()
+            df_f.to_excel(_cl_xl_buf, index=False, engine="openpyxl")
+            _cl_xl_buf.seek(0)
+            st.download_button("📥 Excel İndir", data=_cl_xl_buf,
+                                file_name=f"cari_liste_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                key="cl_excel_indir_ust", use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
 
