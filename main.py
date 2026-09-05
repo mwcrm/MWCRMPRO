@@ -3374,12 +3374,17 @@ button[data-testid="manage-app-button"] { display: none !important; }
                         if _bl_diger:
                             st.caption("Diğer iller")
                             _bl_diger_opts = ["-- İl seç --"] + [f"{b}  ({_bl_sayim_nav[b]})" for b in _bl_diger]
-                            _bl_diger_sec = st.selectbox("Diğer iller", _bl_diger_opts, key="nav_bolge_diger_sec", label_visibility="collapsed")
+                            # ÖNEMLİ: selectbox butonun aksine değerini KALICI tutar — sıfırlamazsak
+                            # her rerun'da aynı seçim tekrar tekrar tetiklenir. Streamlit, widget'ın
+                            # KENDİ key'ine sonradan atama yapmaya izin vermiyor (hata verir) — bu yüzden
+                            # sabit bir key yerine SAYAÇLI (suffix'li) key kullanılıyor: seçim yapılınca
+                            # sayaç arttırılıp bir sonraki çizimde TAMAMEN YENİ (temiz/varsayılan) bir
+                            # widget oluşuyor — Aşama/Durum filtrelerindeki ile aynı, kanıtlanmış yöntem.
+                            _bl_sfx = st.session_state.get("_bl_diger_sfx", 0)
+                            _bl_diger_sec = st.selectbox("Diğer iller", _bl_diger_opts, key=f"nav_bolge_diger_sec_{_bl_sfx}", label_visibility="collapsed")
                             if _bl_diger_sec != "-- İl seç --":
                                 _bl_sec_ad = _bl_diger_sec.rsplit("  (", 1)[0]
-                                # ÖNEMLİ: selectbox butonun aksine değerini KALICI tutar — sıfırlamazsak
-                                # her rerun'da aynı seçim tekrar tekrar tetiklenir (sonsuz döngü riski).
-                                st.session_state["nav_bolge_diger_sec"] = "-- İl seç --"
+                                st.session_state["_bl_diger_sfx"] = _bl_sfx + 1
                                 _bl_uygula(_bl_sec_ad)
             continue
 
