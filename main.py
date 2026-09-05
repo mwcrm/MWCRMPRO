@@ -4666,6 +4666,32 @@ section[data-testid="stSidebar"] { display: none !important; }
         return _toplam
     _mesaj_gercek_toplam = _rbar_mesaj_toplam_yukle()
 
+    @st.cache_data(ttl=60, show_spinner=False)
+    def _rbar_mesaj_id_seti_yukle():
+        """'💬 Mesaj' kutusuna tıklanınca filtrelemek için — mesaj toplamıyla
+        AYNI mantık (gerçek islem_kaydi + manuel override), ama toplam yerine
+        hangi müşteri id'lerinin dahil olduğunu (id seti) döndürür."""
+        try:
+            _sb_rbm2 = get_sb_client()
+            if not _sb_rbm2:
+                return set()
+            _r_rbm2 = _sb_rbm2.table("islem_kaydi").select("musteri_id,islem_turu").in_(
+                "islem_turu", ["WhatsApp Teklif", "Email Teklif"]).execute()
+            _gercek_idler = {str(r.get("musteri_id","")) for r in (_r_rbm2.data or []) if r.get("musteri_id")}
+            _override_idler = set()
+            try:
+                _r_rbov2 = _sb_rbm2.table("kullanici_tercih").select("deger").eq(
+                    "kullanici","__liste_ui__").eq("anahtar","_mesaj_manuel_override").execute()
+                if _r_rbov2.data:
+                    import json as _rbovj2
+                    _override_map2 = _rbovj2.loads(_r_rbov2.data[0]["deger"])
+                    _override_idler = set(_override_map2.keys())
+            except Exception:
+                pass
+            return _gercek_idler | _override_idler
+        except Exception:
+            return set()
+
 
     # ── "2. AŞAMA — Teklif" sayısı — Cari Liste'deki "🧾 Teklif" kolonunda
     # görünen TÜM sayıların TOPLAMI (tekil firma sayısı DEĞİL). Bir firmanın
@@ -4708,10 +4734,17 @@ section[data-testid="stSidebar"] { display: none !important; }
         return _toplam
     _teklif_firma_sayisi = _rbar_teklif_toplam_yukle(frozenset(_aktif_id_seti))
 
+    # "Tekrar Ara" ve aşama-bazlı "Mesaj" kutuları kullanıcı isteğiyle KALDIRILDI —
+    # NOT: bu sadece görünümden kaldırma; _grp1_asama'nın kendisine dokunulmadı,
+    # çünkü o değişken "Aşamasız" hesabında da kullanılıyor (o kayıtlar hâlâ
+    # aşamalı sayılmaya devam etsin, "aşamasız"a düşmesinler diye).
+    _grp1_asama_goster = [a for a in _grp1_asama if a not in ["Tekrar Ara", "Mesaj"]]
+    _mesaj_gercek_aktif_flag = st.session_state.get("_mesaj_gercek_aktif", False)
+
     _grp_data = {
         "genel":    ("📊","GENEL",    None, _genel_items),
         "genel":    ("📊","GENEL",    None, _genel_items),
-        "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama] + [("💬","Mesaj",_mesaj_gercek_toplam,"mesaj_gercek",False)]),
+        "iletisim": ("📞","AŞAMA",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama_goster] + [("💬","Mesaj",_mesaj_gercek_toplam,"mesaj_gercek",_mesaj_gercek_aktif_flag)]),
         "asama1":   ("📅","1. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama1",a),f"asama1_{a}",False)) for a in _grp2_asama]),
         "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,(_teklif_firma_sayisi if a=="Teklif" else _kolon_sayi("asama2",a)),f"asama2_{a}",False)) for a in _grp3_asama]),
         "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama3",a),f"asama3_{a}",False)) for a in _grp4_asama]),
@@ -4838,6 +4871,7 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
         if _qp_rfil == "toplam":
             st.session_state["_toplam_aktif"] = True
             st.session_state["_asamasiz_aktif"] = False
+            st.session_state["_mesaj_gercek_aktif"] = False
             st.session_state["_filtre_reset_sayac"] = st.session_state.get("_filtre_reset_sayac",0)+1
             _tekli_asama_temizle()
             for _fk in ["_cl_fil_durum_multi","_cl_fil_asama_multi","_cl_fil_il_multi","_cl_fil_ilce_multi","_cl_fil_temsilci_multi"]:
@@ -4845,6 +4879,16 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
         elif _qp_rfil == "asamasiz":
             st.session_state["_asamasiz_aktif"] = True
             st.session_state["_toplam_aktif"] = False
+            st.session_state["_mesaj_gercek_aktif"] = False
+            _tekli_asama_temizle()
+            st.session_state.pop("_cl_fil_durum_multi", None)
+            st.session_state["_cl_fil_asama_multi"] = []
+        elif _qp_rfil == "mesaj_gercek":
+            # "💬 Mesaj" kutusuna tıklanınca — gerçekten mesaj/whatsapp/email
+            # kaydı olan (veya manuel override edilmiş) müşterileri filtrele.
+            st.session_state["_toplam_aktif"] = False
+            st.session_state["_asamasiz_aktif"] = False
+            st.session_state["_mesaj_gercek_aktif"] = True
             _tekli_asama_temizle()
             st.session_state.pop("_cl_fil_durum_multi", None)
             st.session_state["_cl_fil_asama_multi"] = []
@@ -4852,16 +4896,19 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
             _d = _qp_rfil[6:]
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
+            st.session_state["_mesaj_gercek_aktif"] = False
             _rapor_kutuya_ekle("_cl_fil_durum_multi", _d)
         elif _qp_rfil.startswith("asama_"):
             _a = _qp_rfil[6:]
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
+            st.session_state["_mesaj_gercek_aktif"] = False
             _rapor_kutuya_ekle("_cl_fil_asama_multi", _a)
         elif _qp_rfil.startswith("asama1_"):
             _a = _qp_rfil[7:]
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
+            st.session_state["_mesaj_gercek_aktif"] = False
             _tekli_asama_temizle()
             st.session_state["_cl_fil_asama1"] = _a
             _rapor_kutuya_ekle("_cl_fil_asama_multi", _a)
@@ -4869,6 +4916,7 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
             _a = _qp_rfil[7:]
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
+            st.session_state["_mesaj_gercek_aktif"] = False
             _tekli_asama_temizle()
             st.session_state["_cl_fil_asama2"] = _a
             _rapor_kutuya_ekle("_cl_fil_asama_multi", _a)
@@ -4876,6 +4924,7 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
             _a = _qp_rfil[7:]
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
+            st.session_state["_mesaj_gercek_aktif"] = False
             _tekli_asama_temizle()
             st.session_state["_cl_fil_asama3"] = _a
             _rapor_kutuya_ekle("_cl_fil_asama_multi", _a)
@@ -4883,6 +4932,7 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
             _a = _qp_rfil[6:]
             st.session_state["_toplam_aktif"] = False
             st.session_state["_asamasiz_aktif"] = False
+            st.session_state["_mesaj_gercek_aktif"] = False
             _tekli_asama_temizle()
             st.session_state["_cl_fil_sonuc"] = _a
             _rapor_kutuya_ekle("_cl_fil_asama_multi", _a)
@@ -5255,6 +5305,7 @@ function kartSec(id){
        not st.session_state.get("_cl_fil_durum_multi") and \
        not st.session_state.get("_cl_fil_asama_multi") and \
        not st.session_state.get("_asamasiz_aktif") and \
+       not st.session_state.get("_mesaj_gercek_aktif") and \
        not st.session_state.get("_cl_fil_asama1") and \
        not st.session_state.get("_cl_fil_asama2") and \
        not st.session_state.get("_cl_fil_asama3") and \
@@ -5276,6 +5327,12 @@ function kartSec(id){
         _tum_asama_set = set(_grp1_asama + _grp2_asama + _grp3_asama + _grp4_asama + _grp5_asama)
         if "islem_asamasi" in df_f.columns:
             df_f = df_f[df_f["islem_asamasi"].isna() | ~df_f["islem_asamasi"].isin(_tum_asama_set)]
+    # "💬 Mesaj" kutusuna tıklanınca — gerçek mesaj/whatsapp/email kaydı olan
+    # (veya manuel override edilmiş) müşterilerle filtrele.
+    elif st.session_state.get("_mesaj_gercek_aktif", False):
+        if "id" in df_f.columns:
+            _mg_idler = _rbar_mesaj_id_seti_yukle()
+            df_f = df_f[df_f["id"].astype(str).isin(_mg_idler)]
     # Toplam butonuna basıldıysa hiçbir filtre uygulanmaz
     elif not st.session_state.get("_toplam_aktif", False):
         if ara_txt:
