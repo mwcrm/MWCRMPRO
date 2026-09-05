@@ -1384,7 +1384,7 @@ def sayfa_log(sayfa):
         "yeni": "Yeni Kart", "liste": "Cari Liste",
         "randevu": "Randevular", "ozel_teklif": "Özel Teklif", "sozlesme": "Sözleşmeler",
         "rapor": "Raporlar", "excel": "Excel", "kullanici": "Kullanıcılar",
-        "admin_rapor": "Admin Rapor", "harita": "Müşteri Haritası", "patron": "Patron",
+        "admin_rapor": "Admin Rapor", "harita": "Müşteri Haritası",
         "dis_nakliye": "Dış Nakliye", "dis_nakliye_toplu": "Dış Nakliyeler Listesi",
     }
     _ad = _menu_adlari.get(sayfa, sayfa)
@@ -1636,7 +1636,7 @@ _sayfa_adlari_cfg = {
     "yeni":"Yeni Kart","liste":"Cari Liste",
     "randevu":"Randevular","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler",
     "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
-    "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
+    "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası",
     "dis_nakliye":"Dış Nakliye","dis_nakliye_toplu":"Dış Nakliyeler Listesi",
 }
 _aktif_cfg = st.session_state.get("aktif_tab","liste")
@@ -1734,7 +1734,7 @@ _sayfa_adlari = {
     "yeni":"Yeni Kart","liste":"Cari Liste",
     "randevu":"Randevular","ozel_teklif":"Özel Teklif","sozlesme":"Sözleşmeler",
     "rapor":"Raporlar","excel":"Excel","kullanici":"Kullanıcılar",
-    "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası","patron":"Patron",
+    "admin_rapor":"Admin Rapor","harita":"Müşteri Haritası",
     "dis_nakliye":"Dış Nakliye","dis_nakliye_toplu":"Dış Nakliyeler Listesi",
 }
 _aktif_sayfa = st.session_state.get("aktif_tab","liste")
@@ -2809,7 +2809,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "dis_nakliye_toplu", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "patron", "mukerrer"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "dis_nakliye_toplu", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -2826,7 +2826,6 @@ _TAB_ETIKETLER = {
     "mesajlar": "💬 Mesajlar",
     "admin_rapor": "📊 Rapor Tasarla",
     "harita": "🗺️ Müşteri Haritası",
-    "patron": "👑 Yönetim Paneli",
     "mukerrer": "🔍 Mükerrer Bul",
     
 }
@@ -2847,7 +2846,7 @@ def get_menu_tercihi(kullanici):
                 kayitli = json.loads(res.data[0]["deger"])
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
-                    tam_liste += ["kullanici","admin_rapor","patron"]
+                    tam_liste += ["kullanici","admin_rapor"]
                 tam_liste = _temizle(tam_liste)
                 # Eksik olanları tam_liste'deki sıraya göre doğru pozisyona ekle
                 for i, t in enumerate(tam_liste):
@@ -2871,7 +2870,7 @@ def get_menu_tercihi(kullanici):
                 kayitli = json.loads(row[0])
                 tam_liste = _TAB_LISTESI_DEFAULT.copy()
                 if st.session_state.get("rol") == "admin":
-                    tam_liste += ["kullanici","admin_rapor","patron"]
+                    tam_liste += ["kullanici","admin_rapor"]
                 tam_liste = _temizle(tam_liste)
                 for i, t in enumerate(tam_liste):
                     if t not in kayitli:
@@ -2886,7 +2885,7 @@ def get_menu_tercihi(kullanici):
     except: pass
     tam_liste = _TAB_LISTESI_DEFAULT.copy()
     if st.session_state.get("rol") == "admin":
-        tam_liste += ["kullanici","admin_rapor","patron"]
+        tam_liste += ["kullanici","admin_rapor"]
     return _temizle(tam_liste)
 
 def save_menu_tercihi(kullanici, sira):
@@ -3203,7 +3202,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
     _sb_liste = _sb_liste_temiz
 
     # ── ADMIN OLMAYAN KULLANICILARDAN GİZLENECEK SAYFALAR ─────────────────────
-    _SADECE_ADMIN = {"patron", "admin_rapor", "kullanici", "excel"}
+    _SADECE_ADMIN = {"admin_rapor", "kullanici", "excel"}
     if st.session_state.get("rol") != "admin":
         _sb_liste = [t for t in _sb_liste if t not in _SADECE_ADMIN]
 
@@ -3273,7 +3272,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
         ("🧾 Cari işlemleri",    ["yeni", "liste", "dis_nakliye_toplu", "excel", "mukerrer"]),
         ("📅 Randevu ve teklif", ["randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler"]),
         ("🚚 Saha",              ["harita"]),
-        ("⚙️ Yönetim",          ["kullanici", "patron"]),
+        ("⚙️ Yönetim",          ["kullanici"]),
         ("📊 Raporlar",          ["admin_rapor", "rapor"]),
     ]
 
@@ -12135,399 +12134,6 @@ elif aktif == "admin_rapor":
                             del _raporlar[_rn]
                             _ar_kaydet(_raporlar)
                             st.rerun()
-
-
-
-elif aktif == "patron":
-    sayfa_log("patron")
-    import json as _pj
-    from datetime import datetime as _pdt, timedelta as _ptd
-    import streamlit.components.v1 as _pc
-
-
-    _bugun = _pdt.now().date()
-
-    # Veri çek
-    _p_cari = db_read("cari_kartlar", extra_sql="WHERE (silindi=0 OR silindi='0' OR silindi IS NULL)")
-    _p_rand = db_read("randevular", extra_sql="ORDER BY randevu_tarihi DESC")
-    _p_tek  = _teklifler_tarih_normalize(_teklifler_oku())
-    _p_an   = db_read("musteri_analiz")
-    try:
-        _sb_pat = get_sb_client()
-        if _sb_pat:
-            _p_notlar_raw = _sb_pat.table("cari_aciklamalar").select("cari_id,created_at,tarih").execute().data or []
-        else:
-            _p_notlar_raw = []
-    except:
-        try:
-            _sb_pat = get_sb_client()
-            _p_notlar_raw = _sb_pat.table("cari_aciklamalar").select("*").execute().data or [] if _sb_pat else []
-        except: _p_notlar_raw = []
-
-    # Tarih normalize — created_at veya tarih kolonundan al
-    # NOT: Yetkililer sekmesi de aynı tabloya "##YETKILI##" etiketiyle kayıt
-    # atıyor — bunlar gerçek not değil, "not yazıldı" istatistiğine dahil edilmemeli.
-    _p_notlar = []
-    for _nn in _p_notlar_raw:
-        if str(_nn.get("aciklama","") or "").startswith("##YETKILI##"):
-            continue
-        _nt = str(_nn.get("created_at","") or _nn.get("tarih","") or "")[:10]
-        if _nt:
-            _p_notlar.append({"cari_id": _nn.get("cari_id",""), "tarih": _nt})
-
-    st.divider()
-
-    _periyot = st.session_state.get("patron_periyot", "ay")
-    _pc1,_pc2,_pc3 = st.columns(3)
-    if _pc1.button("Bugün", key="pp1", use_container_width=True, type="primary" if _periyot=="bugun" else "secondary"):
-        st.session_state["patron_periyot"]="bugun"; st.rerun()
-    if _pc2.button("Bu Hafta", key="pp2", use_container_width=True, type="primary" if _periyot=="hafta" else "secondary"):
-        st.session_state["patron_periyot"]="hafta"; st.rerun()
-    if _pc3.button("Bu Ay", key="pp3", use_container_width=True, type="primary" if _periyot=="ay" else "secondary"):
-        st.session_state["patron_periyot"]="ay"; st.rerun()
-
-    # Tarih aralığı
-    if _periyot == "bugun":
-        _bas = str(_bugun); _bit = str(_bugun)
-        _per_lbl = f"Bugün — {_bugun.strftime('%d %B %Y')}"
-    elif _periyot == "hafta":
-        _bas = str(_bugun - _ptd(days=_bugun.weekday())); _bit = str(_bugun)
-        _per_lbl = f"Bu Hafta — {(_bugun - _ptd(days=_bugun.weekday())).strftime('%d')}–{_bugun.strftime('%d %B %Y')}"
-    else:
-        _bas = str(_bugun.replace(day=1)); _bit = str(_bugun)
-        _per_lbl = f"Bu Ay — {_bugun.strftime('%B %Y')}"
-
-    # Tarih filtresi
-    # ÖNEMLİ DÜZELTME: bazı kayıtlarda tarih saat bilgisiyle birlikte gelebiliyor
-    # (örn. "2026-09-05T14:30:00"). Bunu düz "2026-09-05" ile metin olarak
-    # karşılaştırınca saat kısmı yüzünden "büyük" sayılıp filtreden düşüyordu —
-    # bugün/bu ay girilen kayıtlar gösterilmiyordu. Karşılaştırmadan önce
-    # sadece YYYY-MM-DD kısmını (ilk 10 karakter) alıyoruz.
-    def _tfil(df, kolon):
-        if df.empty or kolon not in df.columns: return pd.DataFrame()
-        _tarih_kismi = df[kolon].astype(str).str[:10]
-        return df[(_tarih_kismi >= _bas) & (_tarih_kismi <= _bit)]
-
-    _p_rand_p = _tfil(_p_rand, "randevu_tarihi")
-    _p_tek_p  = _tfil(_p_tek, "tarih")
-    _p_an_p   = _tfil(_p_an, "tarih") if not _p_an.empty and "tarih" in _p_an.columns else _p_an
-
-    # Not sayıları — dönem filtreli
-    _not_sayi = sum(1 for n in _p_notlar if n["tarih"] >= _bas and n["tarih"] <= _bit)
-
-    # KPI
-    _kpi_rnd = len(_p_rand_p)
-    _kpi_anl = len(_p_an_p) if not _p_an_p.empty else 0
-    _kpi_not = _not_sayi
-    _kpi_tkl = len(_p_tek_p) if not _p_tek_p.empty else 0
-    _kpi_arm = len(_p_rand_p[_p_rand_p["gorev"]=="Arama"]) if not _p_rand_p.empty and "gorev" in _p_rand_p.columns else 0
-
-    # Gün gün satırlar — cari kartlara join
-    _cari_map = {}
-    if not _p_cari.empty:
-        for _, _cr in _p_cari.iterrows():
-            _cari_map[str(_cr.get("firma",""))] = {
-                "yetkili": str(_cr.get("yetkili","") or "—"),
-                "gsm": str(_cr.get("gsm","") or "—"),
-                "il": str(_cr.get("il","") or ""),
-                "ilce": str(_cr.get("ilce","") or ""),
-            }
-
-    # Tarih bazlı gruplama
-    _gun_data = {}
-
-    # Randevular
-    if not _p_rand_p.empty:
-        for _, _rr in _p_rand_p.iterrows():
-            _rt = str(_rr.get("randevu_tarihi",""))[:10]
-            if not _rt or _rt < _bas: continue
-            _fm = str(_rr.get("musteri_adi","") or _rr.get("musteri","") or "")
-            _cr = _cari_map.get(_fm, {"yetkili":"—","gsm":"—","il":"","ilce":""})
-            _gorev = str(_rr.get("gorev","") or "")
-            _saat = str(_rr.get("randevu_saati","") or "")
-            _sonuc = str(_rr.get("sonuc","") or "")
-            if _rt not in _gun_data: _gun_data[_rt] = {}
-            _key = _fm + "_" + _rt
-            if _key not in _gun_data[_rt]:
-                _gun_data[_rt][_key] = {"f":_fm,"alt":_gorev,"y":_cr["yetkili"],"tel":_cr["gsm"],"adr":(_cr["il"]+("/"+_cr["ilce"] if _cr["ilce"] else "")),"r":0,"a":0,"n":0,"k":0,"m":0,"z":_saat}
-            if _gorev == "Ziyaret": _gun_data[_rt][_key]["r"] += 1
-            elif _gorev == "Arama": _gun_data[_rt][_key]["m"] += 1
-            else: _gun_data[_rt][_key]["r"] += 1
-
-    # Analizler
-    if not _p_an_p.empty:
-        for _, _ar in _p_an_p.iterrows():
-            _at = str(_ar.get("tarih",""))[:10]
-            if not _at or _at < _bas: continue
-            _fm = str(_ar.get("firma","") or "")
-            _cr = _cari_map.get(_fm, {"yetkili":"—","gsm":"—","il":"","ilce":""})
-            if _at not in _gun_data: _gun_data[_at] = {}
-            _key = _fm + "_" + _at
-            if _key not in _gun_data[_at]:
-                _gun_data[_at][_key] = {"f":_fm,"alt":"Analiz yapıldı","y":_cr["yetkili"],"tel":_cr["gsm"],"adr":(_cr["il"]+("/"+_cr["ilce"] if _cr["ilce"] else "")),"r":0,"a":0,"n":0,"k":0,"m":0,"z":""}
-            _gun_data[_at][_key]["a"] += 1
-
-    # Teklifler
-    if not _p_tek_p.empty:
-        for _, _tr in _p_tek_p.iterrows():
-            _tt = str(_tr.get("tarih",""))[:10]
-            if not _tt or _tt < _bas: continue
-            _fm = str(_tr.get("musteri","") or _tr.get("firma","") or "")
-            _cr = _cari_map.get(_fm, {"yetkili":"—","gsm":"—","il":"","ilce":""})
-            if _tt not in _gun_data: _gun_data[_tt] = {}
-            _key = _fm + "_" + _tt
-            if _key not in _gun_data[_tt]:
-                _gun_data[_tt][_key] = {"f":_fm,"alt":"Teklif hazırlandı","y":_cr["yetkili"],"tel":_cr["gsm"],"adr":(_cr["il"]+("/"+_cr["ilce"] if _cr["ilce"] else "")),"r":0,"a":0,"n":0,"k":0,"m":0,"z":""}
-            _gun_data[_tt][_key]["k"] += 1
-
-    # Notlar - cari_id → firma adı map
-    _cari_id_map = {}
-    if not _p_cari.empty and "id" in _p_cari.columns:
-        for _, _cr2 in _p_cari.iterrows():
-            _cari_id_map[str(int(_cr2["id"]))] = str(_cr2.get("firma","") or "")
-
-    for _nn in _p_notlar:
-        _nt = _nn["tarih"]
-        if not _nt or _nt < _bas or _nt > _bit: continue
-        _ncid = str(_nn.get("cari_id","") or "")
-        _nm = _cari_id_map.get(_ncid, "")
-        if not _nm: continue
-        _cr = _cari_map.get(_nm, {"yetkili":"—","gsm":"—","il":"","ilce":""})
-        if _nt not in _gun_data: _gun_data[_nt] = {}
-        _key = _nm + "_" + _nt
-        if _key not in _gun_data[_nt]:
-            _gun_data[_nt][_key] = {"f":_nm,"alt":"Not eklendi","y":_cr["yetkili"],"tel":_cr["gsm"],"adr":(_cr["il"]+("/"+_cr["ilce"] if _cr["ilce"] else "")),"r":0,"a":0,"n":0,"k":0,"m":0,"z":""}
-        _gun_data[_nt][_key]["n"] += 1
-
-    # JSON hazırla
-    _rows_json = []
-    for _tarih in sorted(_gun_data.keys(), reverse=True):
-        for _key, _val in _gun_data[_tarih].items():
-            _rows_json.append({
-                "t": _tarih,
-                "z": _val["z"],
-                "f": _val["f"][:40],
-                "alt": _val["alt"],
-                "y": _val["y"][:25],
-                "tel": _val["tel"],
-                "adr": _val["adr"],
-                "r": _val["r"],
-                "a": _val["a"],
-                "n": _val["n"],
-                "k": _val["k"],
-                "m": _val["m"],
-            })
-
-    _data_json = _pj.dumps({
-        "kpi": {"rnd":_kpi_rnd,"anl":_kpi_anl,"not":_kpi_not,"tkl":_kpi_tkl,"arm":_kpi_arm},
-        "rows": _rows_json,
-        "label": _per_lbl,
-        "periyot": _periyot,
-    }, ensure_ascii=False)
-
-    _patron_html = """<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
-<style>
-*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,sans-serif;}
-body{padding:8px;color:#1e293b;background:transparent;}
-.kpi-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px;}
-.kpi{background:#f8fafc;border:0.5px solid #e2e8f0;border-radius:10px;padding:12px;display:flex;align-items:center;gap:10px;}
-.kpi-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:18px;}
-.kpi-v{font-size:20px;font-weight:600;}
-.kpi-l{font-size:11px;color:#64748b;margin-top:1px;}
-.tbl{background:white;border:0.5px solid #e2e8f0;border-radius:10px;overflow:hidden;}
-.thdr{display:grid;grid-template-columns:100px 1fr 1fr 85px 55px 55px 55px 55px 55px;padding:8px 12px;background:#f8fafc;border-bottom:0.5px solid #e2e8f0;font-size:10px;font-weight:600;color:#94a3b8;text-transform:uppercase;letter-spacing:.5px;gap:4px;}
-.trow{display:grid;grid-template-columns:100px 1fr 1fr 85px 55px 55px 55px 55px 55px;padding:9px 12px;border-bottom:0.5px solid #f1f5f9;align-items:center;gap:4px;cursor:default;transition:background .1s;}
-.trow:last-child{border-bottom:none;}
-.trow:hover{background:#f8fafc;}
-.tarih-sep{padding:5px 12px;background:#f1f5f9;border-bottom:0.5px solid #e2e8f0;font-size:10px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:.5px;display:flex;align-items:center;justify-content:space-between;}
-.z{font-size:11px;color:#94a3b8;}
-.zb{font-weight:600;color:#374151;}
-.f .fn{font-size:13px;font-weight:600;color:#0f172a;}
-.f .fa{font-size:11px;color:#94a3b8;margin-top:1px;}
-.con .cy{font-size:12px;color:#374151;}
-.con .ct{font-size:11px;color:#3266ad;margin-top:1px;}
-.con .ca{font-size:10px;color:#94a3b8;margin-top:1px;}
-.cn{text-align:center;}
-.b{display:inline-flex;align-items:center;justify-content:center;border-radius:6px;font-size:12px;font-weight:600;min-width:28px;padding:3px 6px;}
-.d{color:#e2e8f0;}
-.chip{display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:500;}
-.foot{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#f8fafc;border-top:0.5px solid #e2e8f0;font-size:12px;color:#64748b;}
-</style></head><body>
-<div id="root"></div>
-<script>
-var DATA=""" + _data_json + """;
-var CFG=[
-  {k:'rnd',l:'Randevu',c:'#3266ad',bg:'#eff6ff',ic:'ti-calendar'},
-  {k:'anl',l:'Analiz',c:'#7c3aed',bg:'#fdf4ff',ic:'ti-chart-bar'},
-  {k:'not',l:'Not',c:'#0369a1',bg:'#f0f9ff',ic:'ti-notes'},
-  {k:'tkl',l:'Teklif',c:'#b45309',bg:'#fff7ed',ic:'ti-file-text'},
-  {k:'arm',l:'Arama',c:'#16a34a',bg:'#f0fdf4',ic:'ti-phone'},
-];
-var KM={rnd:'r',anl:'a',not:'n',tkl:'k',arm:'m'};
-function bc(v,c,bg){
-  if(!v) return '<div class="cn"><span class="d">—</span></div>';
-  return '<div class="cn"><span class="b" style="background:'+bg+';color:'+c+'">'+v+'</span></div>';
-}
-function render(){
-  var root=document.getElementById('root');
-  var d=DATA;
-  // KPI
-  var kh='<div class="kpi-row">';
-  CFG.forEach(function(c){
-    kh+='<div class="kpi"><div class="kpi-icon" style="background:'+c.bg+'"><i class="ti '+c.ic+'" style="color:'+c.c+'"></i></div><div><div class="kpi-v" style="color:'+c.c+'">'+d.kpi[c.k]+'</div><div class="kpi-l">'+c.l+'</div></div></div>';
-  });
-  kh+='</div>';
-  // Tablo
-  var th='<div class="tbl"><div class="thdr"><div>Tarih/Saat</div><div>Müşteri</div><div>Yetkili & İletişim</div><div>Toplam</div><div style="text-align:center;color:#3266ad">Rnd</div><div style="text-align:center;color:#7c3aed">Anl</div><div style="text-align:center;color:#0369a1">Not</div><div style="text-align:center;color:#b45309">Tkl</div><div style="text-align:center;color:#16a34a">Arm</div></div>';
-  // Tarih grupla
-  var tarihler=[],tm={};
-  d.rows.forEach(function(r){if(!tm[r.t]){tarihler.push(r.t);tm[r.t]=[];}tm[r.t].push(r);});
-  var showGrup=d.periyot==='ay';
-  tarihler.forEach(function(tarih){
-    var rows=tm[tarih];
-    var gt=0;rows.forEach(function(r){gt+=r.r+r.a+r.n+r.k+r.m;});
-    if(showGrup){
-      var d2=new Date(tarih);
-      var ay=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
-      th+='<div class="tarih-sep"><span>'+d2.getDate()+' '+ay[d2.getMonth()]+'</span><span style="background:white;border:0.5px solid #e2e8f0;padding:2px 8px;border-radius:6px;font-size:10px">'+rows.length+' müşteri · '+gt+' işlem</span></div>';
-    }
-    rows.forEach(function(row,ri){
-      var t=row.r+row.a+row.n+row.k+row.m;
-      var tc=t>=6?'#dc2626':t>=3?'#b45309':'#374151';
-      var tbg=t>=6?'#fee2e2':t>=3?'#fff7ed':'#f1f5f9';
-      var zc=showGrup?(ri===0&&row.z?'<div class="z">'+row.z+'</div>':'<div class="z"></div>')
-        :'<div class="z"><span class="zb">'+tarih.slice(5).replace('-',' ')+'</span>'+(row.z?'<br>'+row.z:'')+'</div>';
-      th+='<div class="trow">'+zc
-        +'<div class="f"><div class="fn">'+row.f+'</div><div class="fa">'+row.alt+'</div></div>'
-        +'<div class="con"><div class="cy">'+row.y+'</div><div class="ct"><i class="ti ti-phone" style="font-size:10px"></i> '+row.tel+'</div><div class="ca"><i class="ti ti-map-pin" style="font-size:10px"></i> '+row.adr+'</div></div>'
-        +'<div><span class="chip" style="background:'+tbg+';color:'+tc+'">'+t+' işlem</span></div>'
-        +bc(row.r,'#1d4ed8','#eff6ff')+bc(row.a,'#7c3aed','#fdf4ff')+bc(row.n,'#0369a1','#f0f9ff')+bc(row.k,'#c2410c','#fff7ed')+bc(row.m,'#15803d','#f0fdf4')
-        +'</div>';
-    });
-  });
-  var tot={r:0,a:0,n:0,k:0,m:0};
-  d.rows.forEach(function(r){tot.r+=r.r;tot.a+=r.a;tot.n+=r.n;tot.k+=r.k;tot.m+=r.m;});
-  var grand=tot.r+tot.a+tot.n+tot.k+tot.m;
-  th+='<div class="foot"><span style="font-weight:600;color:#0f172a">'+d.label+' · '+grand+' toplam işlem</span>'
-    +'<div style="display:flex;gap:12px">'
-    +'<span><span style="color:#3266ad;font-weight:600">'+tot.r+'</span> randevu</span>'
-    +'<span><span style="color:#7c3aed;font-weight:600">'+tot.a+'</span> analiz</span>'
-    +'<span><span style="color:#0369a1;font-weight:600">'+tot.n+'</span> not</span>'
-    +'<span><span style="color:#b45309;font-weight:600">'+tot.k+'</span> teklif</span>'
-    +'<span><span style="color:#16a34a;font-weight:600">'+tot.m+'</span> arama</span>'
-    +'</div></div></div>';
-  root.innerHTML=kh+th;
-}
-render();
-</script></body></html>"""
-
-    _pc.html(_patron_html, height=700, scrolling=True)
-
-    # ── ANA SAYFA (Cari Liste) İLE AYNI BÖLGELER + ÖZET KUTUCUKLARI ─────────
-    # Cari Liste'deki tıklanabilir orijinal rapor barına/Bölgeler'e DOKUNULMADI
-    # (stabilite kuralı) — burası, aynı kaynak verilerden (cari_kartlar +
-    # tanımlar) TAMAMEN AYRI ve bağımsız bir blok olarak, sayfa her
-    # açıldığında YENİDEN hesaplanıyor. Cari Liste'de bir kayıt/aşama
-    # değişirse burası da otomatik güncellenir (aynı canlı veriden okunduğu
-    # için) — ama iki bar birbirinden bağımsız kodlar.
-    st.divider()
-    _ob_df = _p_cari
-
-    # Bölgeler (il/ilçe bazlı, salt okunur chip'ler)
-    if not _ob_df.empty and "il" in _ob_df.columns:
-        _ob_ilce_kol = "ilce" if "ilce" in _ob_df.columns else None
-        _ob_bolge_ham = _ob_df.apply(
-            lambda r: il_ilce_bolge_bul(r.get("il", ""), r.get(_ob_ilce_kol, "") if _ob_ilce_kol else ""), axis=1)
-        _ob_bolge = _ob_bolge_ham.fillna("Havuz (Bölgesiz)")
-        _ob_bolge_sayim = _ob_bolge.value_counts()
-        if not _ob_bolge_sayim.empty:
-            with st.expander(f"📍 Bölgeler  ·  {len(_ob_bolge_sayim)} bölge", expanded=True):
-                _ob_bl_cols = st.columns(min(len(_ob_bolge_sayim), 8) or 1)
-                for _obi, (_ob_bad, _ob_badet) in enumerate(_ob_bolge_sayim.items()):
-                    if _ob_badet <= 0: continue
-                    with _ob_bl_cols[_obi % len(_ob_bl_cols)]:
-                        st.markdown(
-                            f"<div style='border:1px solid #e2e8f0;border-radius:8px;padding:6px 8px;"
-                            f"text-align:center;margin-bottom:6px;background:#f8fafc;font-size:12px;'>"
-                            f"📍 {_ob_bad} <b>{_ob_badet}</b></div>", unsafe_allow_html=True)
-
-    _ob_durum_opts = _tanimlar_yukle("durum") or ["Özel Müşteri", "Portföy"]
-    _ob_asama_opts = _tanimlar_yukle("asama") or []
-
-    def _ob_norm(s):
-        return (str(s or "").strip().upper().replace("İ", "I").replace("Ş", "S")
-                .replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C"))
-
-    def _ob_durum_sayi(ad):
-        if ad == "Toplam": return len(_ob_df)
-        if _ob_df.empty or "durum" not in _ob_df.columns: return 0
-        return len(_ob_df[_ob_df["durum"] == ad])
-
-    def _ob_kolon_sayi(kolon, ad):
-        if _ob_df.empty or kolon not in _ob_df.columns: return 0
-        _adn = _ob_norm(ad)
-        return len(_ob_df[_ob_df[kolon].apply(_ob_norm) == _adn])
-
-    _ob_grp1 = [a for a in _ob_asama_opts if a in ["Arama", "Tekrar Ara", "E-Mail", "Mail", "Mesaj", "Whatsapp Mesaj"]]
-    _ob_grp2 = [a for a in _ob_asama_opts if a in ["Randevu"]]
-    _ob_grp3 = [a for a in _ob_asama_opts if a in ["Teklif"]]
-    _ob_grp4 = [a for a in _ob_asama_opts if a in ["Deneme", "TAKİP", "Sözleşme", "Fiyat Hazırla"]]
-    _ob_grp5 = [a for a in _ob_asama_opts if a in ["Kazanıldı", "Kaybedildi", "Devam Ediyor"]]
-    if "Devam Ediyor" not in _ob_grp5: _ob_grp5.append("Devam Ediyor")
-
-    def _ob_asamasiz():
-        if _ob_df.empty or "islem_asamasi" not in _ob_df.columns: return 0
-        _tum = _ob_grp1 + _ob_grp2 + _ob_grp3 + _ob_grp4 + _ob_grp5
-        return len(_ob_df[~_ob_df["islem_asamasi"].isin(_tum) | _ob_df["islem_asamasi"].isna()])
-
-    def _ob_ikon(a):
-        _m = {"arama": "📞", "tekrar ara": "📲", "mesaj": "💬", "mail": "📧", "e-mail": "📧",
-              "whatsapp": "💬", "takip": "📌", "randevu": "📅", "teklif": "📄",
-              "fiyat hazırla": "💰", "deneme": "🧪", "sözleşme": "📝",
-              "devam ediyor": "⏳", "kazanıldı": "🏆", "kaybedildi": "❌"}
-        for k, v in _m.items():
-            if k in str(a).lower(): return v
-        return "🔹"
-
-    _ob_gruplar = [
-        ("GENEL", "#eff6ff", "#1d4ed8", [("📊", "Toplam", len(_ob_df))] +
-            [("📦" if d == "Portföy" else "⭐" if d == "Özel Müşteri" else "🔹", d, _ob_durum_sayi(d))
-             for d in _ob_durum_opts if str(d).strip() and str(d).upper() not in ["NONE", "NAN"]] +
-            [("📋", "Aşamasız", _ob_asamasiz())]),
-        ("AŞAMA", "#fff7ed", "#c2410c", [(_ob_ikon(a), a, _ob_kolon_sayi("islem_asamasi", a)) for a in _ob_grp1]),
-        ("1. AŞAMA", "#f0fdf4", "#15803d", [(_ob_ikon(a), a, _ob_kolon_sayi("asama1", a)) for a in _ob_grp2]),
-        ("2. AŞAMA", "#faf5ff", "#7e22ce", [(_ob_ikon(a), a, _ob_kolon_sayi("asama2", a)) for a in _ob_grp3]),
-        ("3. AŞAMA", "#fefce8", "#a16207", [(_ob_ikon(a), a, _ob_kolon_sayi("asama3", a)) for a in _ob_grp4]),
-        ("SONUÇ", "#fef2f2", "#b91c1c", [(_ob_ikon(a), a, _ob_kolon_sayi("sonuc", a)) for a in _ob_grp5]),
-    ]
-
-    _ob_html = """<style>
-.gdo{border:1px solid #e2e8f0;border-radius:12px;padding:10px;margin-bottom:0;background:white;}
-.gdo-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(84px, 1fr));gap:5px;}
-.gdo-box{aspect-ratio:1/1;border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:2px;position:relative;overflow:hidden;}
-.gdo-tag{position:absolute;top:0;left:0;right:0;font-size:8px;font-weight:700;text-align:center;
-    padding:1px 2px;text-transform:uppercase;letter-spacing:.3px;}
-.gdo-ikon{font-size:16px;line-height:1;}
-.gdo-sayi{font-size:18px;font-weight:800;color:#0f172a;line-height:1.15;}
-.gdo-ad{font-size:9px;color:#64748b;text-align:center;line-height:1.05;padding:0 2px;
-    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
-</style><div class="gdo"><div class="gdo-grid">"""
-    # Sadece 1./2./3. AŞAMA gruplarında her kutunun üstünde küçük renkli etiket
-    # gösteriliyor (GENEL/AŞAMA/SONUÇ etiketsiz) — görseldeki görünümle birebir.
-    _ob_tagli_gruplar = {"1. AŞAMA", "2. AŞAMA", "3. AŞAMA"}
-    for _gad, _bg, _fg, _kalemler in _ob_gruplar:
-        for _ik, _ad, _sayi in _kalemler:
-            _tag_html = f'<div class="gdo-tag" style="background:{_bg};color:{_fg};">{_gad}</div>' if _gad in _ob_tagli_gruplar else ''
-            _pad_top = "18px" if _gad in _ob_tagli_gruplar else "0"
-            _ob_html += (f'<div class="gdo-box">{_tag_html}'
-                         f'<div style="margin-top:{_pad_top};display:flex;flex-direction:column;align-items:center;">'
-                         f'<div class="gdo-ikon">{_ik}</div>'
-                         f'<div class="gdo-sayi">{_sayi}</div><div class="gdo-ad" title="{_ad}">{_ad}</div></div></div>')
-    _ob_html += '</div></div>'
-    st.markdown(_ob_html, unsafe_allow_html=True)
 
 
 
