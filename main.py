@@ -12175,6 +12175,76 @@ elif aktif == "patron":
         if _nt:
             _p_notlar.append({"cari_id": _nn.get("cari_id",""), "tarih": _nt})
 
+    # ── ANA SAYFA (Cari Liste) İLE AYNI ÖZET KUTUCUKLARI ────────────────────
+    # Cari Liste'deki tıklanabilir rapor barına DOKUNULMADI (stabilite kuralı) —
+    # burası, aynı kaynak verilerden (cari_kartlar + tanımlar) TAMAMEN AYRI ve
+    # bağımsız bir blok olarak, sayfa her açıldığında YENİDEN hesaplanıyor.
+    # Yani Cari Liste'de bir kayıt/aşama değişirse, burası da otomatik güncellenir
+    # (aynı canlı veriden okunduğu için) — ama iki bar birbirinden bağımsız kodlar.
+    with st.expander("📊 Genel Durum Özeti (Cari Liste ile aynı kategoriler)", expanded=True):
+        _ob_df = _p_cari
+        _ob_durum_opts = _tanimlar_yukle("durum") or ["Özel Müşteri", "Portföy"]
+        _ob_asama_opts = _tanimlar_yukle("asama") or []
+
+        def _ob_norm(s):
+            return (str(s or "").strip().upper().replace("İ", "I").replace("Ş", "S")
+                    .replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C"))
+
+        def _ob_durum_sayi(ad):
+            if ad == "Toplam": return len(_ob_df)
+            if _ob_df.empty or "durum" not in _ob_df.columns: return 0
+            return len(_ob_df[_ob_df["durum"] == ad])
+
+        def _ob_kolon_sayi(kolon, ad):
+            if _ob_df.empty or kolon not in _ob_df.columns: return 0
+            _adn = _ob_norm(ad)
+            return len(_ob_df[_ob_df[kolon].apply(_ob_norm) == _adn])
+
+        _ob_grp1 = [a for a in _ob_asama_opts if a in ["Arama", "Tekrar Ara", "E-Mail", "Mail", "Mesaj", "Whatsapp Mesaj"]]
+        _ob_grp2 = [a for a in _ob_asama_opts if a in ["Randevu"]]
+        _ob_grp3 = [a for a in _ob_asama_opts if a in ["Teklif"]]
+        _ob_grp4 = [a for a in _ob_asama_opts if a in ["Deneme", "TAKİP", "Sözleşme", "Fiyat Hazırla"]]
+        _ob_grp5 = [a for a in _ob_asama_opts if a in ["Kazanıldı", "Kaybedildi", "Devam Ediyor"]]
+        if "Devam Ediyor" not in _ob_grp5: _ob_grp5.append("Devam Ediyor")
+
+        def _ob_asamasiz():
+            if _ob_df.empty or "islem_asamasi" not in _ob_df.columns: return 0
+            _tum = _ob_grp1 + _ob_grp2 + _ob_grp3 + _ob_grp4 + _ob_grp5
+            return len(_ob_df[~_ob_df["islem_asamasi"].isin(_tum) | _ob_df["islem_asamasi"].isna()])
+
+        def _ob_ikon(a):
+            _m = {"arama": "📞", "tekrar ara": "📲", "mesaj": "💬", "mail": "📧", "e-mail": "📧",
+                  "whatsapp": "💬", "takip": "📌", "randevu": "📅", "teklif": "📄",
+                  "fiyat hazırla": "💰", "deneme": "🧪", "sözleşme": "📝",
+                  "devam ediyor": "⏳", "kazanıldı": "🏆", "kaybedildi": "❌"}
+            for k, v in _m.items():
+                if k in str(a).lower(): return v
+            return "🔹"
+
+        _ob_gruplar = [
+            ("📊 GENEL", [("📊", "Toplam", len(_ob_df))] +
+                [("📦" if d == "Portföy" else "⭐" if d == "Özel Müşteri" else "🔹", d, _ob_durum_sayi(d))
+                 for d in _ob_durum_opts if str(d).strip() and str(d).upper() not in ["NONE", "NAN"]] +
+                [("📋", "Aşamasız", _ob_asamasiz())]),
+            ("📞 AŞAMA", [(_ob_ikon(a), a, _ob_kolon_sayi("islem_asamasi", a)) for a in _ob_grp1]),
+            ("📅 1. AŞAMA", [(_ob_ikon(a), a, _ob_kolon_sayi("asama1", a)) for a in _ob_grp2]),
+            ("📄 2. AŞAMA", [(_ob_ikon(a), a, _ob_kolon_sayi("asama2", a)) for a in _ob_grp3]),
+            ("🧪 3. AŞAMA", [(_ob_ikon(a), a, _ob_kolon_sayi("asama3", a)) for a in _ob_grp4]),
+            ("🏆 SONUÇ", [(_ob_ikon(a), a, _ob_kolon_sayi("sonuc", a)) for a in _ob_grp5]),
+        ]
+
+        for _grp_ad, _kalemler in _ob_gruplar:
+            if not _kalemler: continue
+            st.caption(_grp_ad)
+            _ob_cols = st.columns(len(_kalemler))
+            for _c, (_ik, _ad, _sayi) in zip(_ob_cols, _kalemler):
+                _c.markdown(
+                    f"<div style='border:1px solid #e2e8f0;border-radius:8px;padding:8px 6px;text-align:center;margin-bottom:6px;'>"
+                    f"<div style='font-size:16px;'>{_ik}</div>"
+                    f"<div style='font-size:17px;font-weight:700;'>{_sayi}</div>"
+                    f"<div style='font-size:10px;color:#64748b;'>{_ad}</div></div>",
+                    unsafe_allow_html=True)
+
     st.divider()
 
     _periyot = st.session_state.get("patron_periyot", "ay")
