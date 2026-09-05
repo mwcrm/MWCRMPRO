@@ -4250,7 +4250,7 @@ section[data-testid="stSidebar"] { display: none !important; }
     df = _atama_filtresi_uygula(df)
 
 
-    # ── BÖLGELER — açılır/kapanır, kısa etiketli kutucuklar, il/ilçe'den otomatik hesaplanır ──
+    # ── BÖLGELER — SOL MENÜDE (sidebar), açılır/kapanır, kısa etiketli kutucuklar ──
     if not df.empty and "il" in df.columns:
         _bl_kisa_ad = {"İstanbul Anadolu": "İst And", "İstanbul Avrupa": "İst Avr"}
         _bl_ikon = {
@@ -4284,44 +4284,45 @@ section[data-testid="stSidebar"] { display: none !important; }
         _bl_chip_bolge = _bl_chip_bolge_ham.fillna("Havuz (Bölgesiz)")
         _bl_chip_sayim = _bl_chip_bolge.value_counts()
         if not _bl_chip_sayim.empty:
-            with st.expander(f"📍 Bölgeler  ·  {len(_bl_chip_sayim)} bölge", expanded=False):
-                _bl_chip_cols = st.columns(min(len(_bl_chip_sayim), 8) or 1)
-                for _ci, (_bl_ad, _bl_adet) in enumerate(_bl_chip_sayim.items()):
-                    if _bl_adet <= 0:
-                        continue  # müşterisi olmayan bölge asla gösterilmez
-                    _bl_kisa = _bl_kisa_ad.get(_bl_ad, _bl_ad)
-                    _bl_ic = _bl_ikon.get(_bl_ad, "📍")
-                    _bl_etiket = f"{_bl_ic} {_bl_kisa} {_bl_adet}"
-                    with _bl_chip_cols[_ci % len(_bl_chip_cols)]:
-                        if st.button(_bl_etiket, key=f"cl_bolge_chip_{_bl_ad}", use_container_width=True,
-                                     type="primary" if _bl_ad == "Havuz (Bölgesiz)" else "secondary"):
-                            if _bl_ad == "Havuz (Bölgesiz)":
-                                # Havuz'daki kayıtların çoğu boş/tanımsız il içerebilir — gerçek il
-                                # değerlerine dayanmayan, "hiçbir tanımlı bölgeye uymayanlar" filtresi kullanılır.
-                                st.session_state["_bl_havuz_filtre"] = True
-                                if "_cl_fil_il_multi" in st.session_state:
-                                    del st.session_state["_cl_fil_il_multi"]
-                                if "_cl_fil_ilce_multi" in st.session_state:
-                                    del st.session_state["_cl_fil_ilce_multi"]
-                                if "_bl_ilce_filtre" in st.session_state:
-                                    del st.session_state["_bl_ilce_filtre"]
-                                st.session_state.pop("_bl_ilce_filtre_ad", None)
-                            else:
-                                st.session_state.pop("_bl_havuz_filtre", None)
-                                _bl_chip_df = df[_bl_chip_bolge == _bl_ad]
-                                if "il" in _bl_chip_df.columns:
-                                    st.session_state["_cl_fil_il_multi"] = sorted(
-                                        _bl_chip_df["il"].dropna().astype(str).unique().tolist())
-                                if "_cl_fil_ilce_multi" in st.session_state:
-                                    del st.session_state["_cl_fil_ilce_multi"]
-                                if _bl_ilce_kol_cl and _bl_ad in ("İstanbul Anadolu", "İstanbul Avrupa"):
-                                    st.session_state["_bl_ilce_filtre"] = sorted(
-                                        _bl_chip_df["ilce"].dropna().astype(str).unique().tolist())
-                                    st.session_state["_bl_ilce_filtre_ad"] = _bl_ad
-                                elif "_bl_ilce_filtre" in st.session_state:
-                                    del st.session_state["_bl_ilce_filtre"]
+            with st.sidebar:
+                with st.expander(f"📍 Bölge  ·  {len(_bl_chip_sayim)} bölge", expanded=False):
+                    _bl_chip_cols = st.columns(2)
+                    for _ci, (_bl_ad, _bl_adet) in enumerate(_bl_chip_sayim.items()):
+                        if _bl_adet <= 0:
+                            continue  # müşterisi olmayan bölge asla gösterilmez
+                        _bl_kisa = _bl_kisa_ad.get(_bl_ad, _bl_ad)
+                        _bl_ic = _bl_ikon.get(_bl_ad, "📍")
+                        _bl_etiket = f"{_bl_ic} {_bl_kisa} {_bl_adet}"
+                        with _bl_chip_cols[_ci % len(_bl_chip_cols)]:
+                            if st.button(_bl_etiket, key=f"cl_bolge_chip_{_bl_ad}", use_container_width=True,
+                                         type="primary" if _bl_ad == "Havuz (Bölgesiz)" else "secondary"):
+                                if _bl_ad == "Havuz (Bölgesiz)":
+                                    # Havuz'daki kayıtların çoğu boş/tanımsız il içerebilir — gerçek il
+                                    # değerlerine dayanmayan, "hiçbir tanımlı bölgeye uymayanlar" filtresi kullanılır.
+                                    st.session_state["_bl_havuz_filtre"] = True
+                                    if "_cl_fil_il_multi" in st.session_state:
+                                        del st.session_state["_cl_fil_il_multi"]
+                                    if "_cl_fil_ilce_multi" in st.session_state:
+                                        del st.session_state["_cl_fil_ilce_multi"]
+                                    if "_bl_ilce_filtre" in st.session_state:
+                                        del st.session_state["_bl_ilce_filtre"]
                                     st.session_state.pop("_bl_ilce_filtre_ad", None)
-                            st.rerun()
+                                else:
+                                    st.session_state.pop("_bl_havuz_filtre", None)
+                                    _bl_chip_df = df[_bl_chip_bolge == _bl_ad]
+                                    if "il" in _bl_chip_df.columns:
+                                        st.session_state["_cl_fil_il_multi"] = sorted(
+                                            _bl_chip_df["il"].dropna().astype(str).unique().tolist())
+                                    if "_cl_fil_ilce_multi" in st.session_state:
+                                        del st.session_state["_cl_fil_ilce_multi"]
+                                    if _bl_ilce_kol_cl and _bl_ad in ("İstanbul Anadolu", "İstanbul Avrupa"):
+                                        st.session_state["_bl_ilce_filtre"] = sorted(
+                                            _bl_chip_df["ilce"].dropna().astype(str).unique().tolist())
+                                        st.session_state["_bl_ilce_filtre_ad"] = _bl_ad
+                                    elif "_bl_ilce_filtre" in st.session_state:
+                                        del st.session_state["_bl_ilce_filtre"]
+                                        st.session_state.pop("_bl_ilce_filtre_ad", None)
+                                st.rerun()
 
     for _kol in ["aciklama","adres","notlar"]:
         if _kol not in df.columns: df[_kol] = ""
