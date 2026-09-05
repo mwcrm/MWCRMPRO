@@ -12198,9 +12198,15 @@ elif aktif == "patron":
         _per_lbl = f"Bu Ay — {_bugun.strftime('%B %Y')}"
 
     # Tarih filtresi
+    # ÖNEMLİ DÜZELTME: bazı kayıtlarda tarih saat bilgisiyle birlikte gelebiliyor
+    # (örn. "2026-09-05T14:30:00"). Bunu düz "2026-09-05" ile metin olarak
+    # karşılaştırınca saat kısmı yüzünden "büyük" sayılıp filtreden düşüyordu —
+    # bugün/bu ay girilen kayıtlar gösterilmiyordu. Karşılaştırmadan önce
+    # sadece YYYY-MM-DD kısmını (ilk 10 karakter) alıyoruz.
     def _tfil(df, kolon):
         if df.empty or kolon not in df.columns: return pd.DataFrame()
-        return df[(df[kolon].astype(str)>=_bas)&(df[kolon].astype(str)<=_bit)]
+        _tarih_kismi = df[kolon].astype(str).str[:10]
+        return df[(_tarih_kismi >= _bas) & (_tarih_kismi <= _bit)]
 
     _p_rand_p = _tfil(_p_rand, "randevu_tarihi")
     _p_tek_p  = _tfil(_p_tek, "tarih")
@@ -12235,7 +12241,7 @@ elif aktif == "patron":
         for _, _rr in _p_rand_p.iterrows():
             _rt = str(_rr.get("randevu_tarihi",""))[:10]
             if not _rt or _rt < _bas: continue
-            _fm = str(_rr.get("musteri","") or "")
+            _fm = str(_rr.get("musteri_adi","") or _rr.get("musteri","") or "")
             _cr = _cari_map.get(_fm, {"yetkili":"—","gsm":"—","il":"","ilce":""})
             _gorev = str(_rr.get("gorev","") or "")
             _saat = str(_rr.get("randevu_saati","") or "")
