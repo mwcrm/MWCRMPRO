@@ -12234,27 +12234,29 @@ elif aktif == "patron":
     ]
 
     _ob_html = """<style>
-.gdo{border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;margin-bottom:0;background:white;}
-.gdo-grp{margin-bottom:8px;}
-.gdo-grp:last-child{margin-bottom:0;}
-.gdo-grp-title{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
-    padding:2px 8px;border-radius:5px;margin-bottom:5px;}
+.gdo{border:1px solid #e2e8f0;border-radius:12px;padding:10px;margin-bottom:0;background:white;}
 .gdo-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(84px, 1fr));gap:5px;}
 .gdo-box{aspect-ratio:1/1;border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:2px;}
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:2px;position:relative;overflow:hidden;}
+.gdo-tag{position:absolute;top:0;left:0;right:0;font-size:8px;font-weight:700;text-align:center;
+    padding:1px 2px;text-transform:uppercase;letter-spacing:.3px;}
 .gdo-ikon{font-size:16px;line-height:1;}
 .gdo-sayi{font-size:18px;font-weight:800;color:#0f172a;line-height:1.15;}
 .gdo-ad{font-size:9px;color:#64748b;text-align:center;line-height:1.05;padding:0 2px;
     overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
-</style><div class="gdo">"""
+</style><div class="gdo"><div class="gdo-grid">"""
+    # Sadece 1./2./3. AŞAMA gruplarında her kutunun üstünde küçük renkli etiket
+    # gösteriliyor (GENEL/AŞAMA/SONUÇ etiketsiz) — görseldeki görünümle birebir.
+    _ob_tagli_gruplar = {"1. AŞAMA", "2. AŞAMA", "3. AŞAMA"}
     for _gad, _bg, _fg, _kalemler in _ob_gruplar:
-        if not _kalemler: continue
-        _ob_html += f'<div class="gdo-grp"><span class="gdo-grp-title" style="background:{_bg};color:{_fg};">{_gad}</span><div class="gdo-grid">'
         for _ik, _ad, _sayi in _kalemler:
-            _ob_html += (f'<div class="gdo-box"><div class="gdo-ikon">{_ik}</div>'
-                         f'<div class="gdo-sayi">{_sayi}</div><div class="gdo-ad" title="{_ad}">{_ad}</div></div>')
-        _ob_html += '</div></div>'
-    _ob_html += '</div>'
+            _tag_html = f'<div class="gdo-tag" style="background:{_bg};color:{_fg};">{_gad}</div>' if _gad in _ob_tagli_gruplar else ''
+            _pad_top = "18px" if _gad in _ob_tagli_gruplar else "0"
+            _ob_html += (f'<div class="gdo-box">{_tag_html}'
+                         f'<div style="margin-top:{_pad_top};display:flex;flex-direction:column;align-items:center;">'
+                         f'<div class="gdo-ikon">{_ik}</div>'
+                         f'<div class="gdo-sayi">{_sayi}</div><div class="gdo-ad" title="{_ad}">{_ad}</div></div></div>')
+    _ob_html += '</div></div>'
     st.markdown(_ob_html, unsafe_allow_html=True)
 
     st.divider()
