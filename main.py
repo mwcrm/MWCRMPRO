@@ -3319,6 +3319,14 @@ button[data-testid="manage-app-button"] { display: none !important; }
                     _bl_kisa_ad_nav = {"İstanbul Anadolu": "İst And", "İstanbul Avrupa": "İst Avr"}
                     if not _bl_sayim_nav.empty:
                         with st.expander(f"📍 Bölge  ·  {len(_bl_sayim_nav)} bölge", expanded=False):
+                            st.markdown("""<style>
+#mw-bolge-chip-wrap .stButton button {
+    font-size: 10px !important; padding: 3px 4px !important;
+    min-height: 1.7rem !important; height: auto !important;
+    white-space: normal !important; line-height: 1.2 !important;
+    word-break: break-word !important;
+}
+</style><div id="mw-bolge-chip-wrap">""", unsafe_allow_html=True)
                             _bl_cols_nav = st.columns(2)
                             for _cni, (_bl_ad_nav, _bl_adet_nav) in enumerate(_bl_sayim_nav.items()):
                                 if _bl_adet_nav <= 0:
@@ -3349,6 +3357,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
                                                 st.session_state.pop("_bl_ilce_filtre_ad", None)
                                         st.session_state["aktif_tab"] = "liste"
                                         st.rerun()
+                            st.markdown("</div>", unsafe_allow_html=True)
             continue
 
         _acik_mi = st.session_state["_acik_grup"] == _g_ad
