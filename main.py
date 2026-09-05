@@ -3305,7 +3305,44 @@ button[data-testid="manage-app-button"] { display: none !important; }
             # ── BÖLGE — "Müşteri Haritası"nın hemen altında, ikonsuz, sade liste ──
             # Cari Liste'nin kendi verisinden BAĞIMSIZ, hafif/önbellekli bir sorgu.
             # Tıklanınca hem Cari Liste'ye geçer hem de ilgili bölgeye göre filtreler.
+            # NOT: st.button yerine SAF HTML/JS kullanılıyor (aynı sf() query-param
+            # deseni Cari Liste'nin üst rapor barında da kullanılıyor) — Streamlit
+            # buton bileşeninin kendi kutu/kart CSS'ine bağımlı kalmadan, güvenilir
+            # şekilde düz/yan yana yazı görünümü garanti ediliyor.
             if _tek_key == "harita":
+                _blq = st.query_params.get("_blq", "")
+                if _blq:
+                    st.query_params.clear()
+                    if _blq == "__havuz__":
+                        st.session_state["_bl_havuz_filtre"] = True
+                        for _fk_nav in ["_cl_fil_il_multi", "_cl_fil_ilce_multi", "_bl_ilce_filtre"]:
+                            st.session_state.pop(_fk_nav, None)
+                        st.session_state.pop("_bl_ilce_filtre_ad", None)
+                    else:
+                        try:
+                            _bl_df_click = _atama_filtresi_uygula(get_cari_listesi())
+                            _bl_ilce_kol_click = "ilce" if "ilce" in _bl_df_click.columns else None
+                            _bl_bolge_click = _bl_df_click.apply(
+                                lambda r: il_ilce_bolge_bul(r.get("il", ""), r.get(_bl_ilce_kol_click, "") if _bl_ilce_kol_click else ""), axis=1
+                            ).fillna("Havuz (Bölgesiz)")
+                            st.session_state.pop("_bl_havuz_filtre", None)
+                            _bl_chip_df_click = _bl_df_click[_bl_bolge_click == _blq]
+                            if "il" in _bl_chip_df_click.columns:
+                                st.session_state["_cl_fil_il_multi"] = sorted(
+                                    _bl_chip_df_click["il"].dropna().astype(str).unique().tolist())
+                            st.session_state.pop("_cl_fil_ilce_multi", None)
+                            if _bl_ilce_kol_click and _blq in ("İstanbul Anadolu", "İstanbul Avrupa"):
+                                st.session_state["_bl_ilce_filtre"] = sorted(
+                                    _bl_chip_df_click["ilce"].dropna().astype(str).unique().tolist())
+                                st.session_state["_bl_ilce_filtre_ad"] = _blq
+                            else:
+                                st.session_state.pop("_bl_ilce_filtre", None)
+                                st.session_state.pop("_bl_ilce_filtre_ad", None)
+                        except Exception:
+                            pass
+                    st.session_state["aktif_tab"] = "liste"
+                    st.rerun()
+
                 try:
                     _bl_df_nav = _atama_filtresi_uygula(get_cari_listesi())
                 except Exception:
@@ -3319,45 +3356,27 @@ button[data-testid="manage-app-button"] { display: none !important; }
                     _bl_kisa_ad_nav = {"İstanbul Anadolu": "İst And", "İstanbul Avrupa": "İst Avr"}
                     if not _bl_sayim_nav.empty:
                         with st.expander(f"📍 Bölge  ·  {len(_bl_sayim_nav)} bölge", expanded=False):
-                            st.markdown("""<style>
-#mw-bolge-chip-wrap { display:flex !important; flex-wrap:wrap !important; gap:0 !important; align-items:center; }
-#mw-bolge-chip-wrap div[data-testid="stButton"] { width:auto !important; margin:0 !important; }
-#mw-bolge-chip-wrap .stButton button {
-    all: unset !important; cursor: pointer !important;
-    font-size: 12px !important; color: #1a4f9e !important;
-    padding: 2px 6px !important; white-space: nowrap !important;
-}
-#mw-bolge-chip-wrap .stButton button:hover { text-decoration: underline !important; }
-#mw-bolge-chip-wrap .stButton button p { font-size: 12px !important; margin: 0 !important; white-space: nowrap !important; }
-</style><div id="mw-bolge-chip-wrap">""", unsafe_allow_html=True)
-                            for _bni, (_bl_ad_nav, _bl_adet_nav) in enumerate(_bl_sayim_nav.items()):
+                            import json as _bl_jsonlib
+                            _bl_parcalar = []
+                            for _bl_ad_nav, _bl_adet_nav in _bl_sayim_nav.items():
                                 if _bl_adet_nav <= 0:
                                     continue
                                 _bl_kisa_nav = _bl_kisa_ad_nav.get(_bl_ad_nav, _bl_ad_nav)
-                                _bl_etiket_nav = f"{_bl_kisa_nav} {_bl_adet_nav}" + ("" if _bni == len(_bl_sayim_nav) - 1 else "  -")
-                                if st.button(_bl_etiket_nav, key=f"nav_bolge_chip_{_bl_ad_nav}"):
-                                    if _bl_ad_nav == "Havuz (Bölgesiz)":
-                                        st.session_state["_bl_havuz_filtre"] = True
-                                        for _fk_nav in ["_cl_fil_il_multi", "_cl_fil_ilce_multi", "_bl_ilce_filtre"]:
-                                            st.session_state.pop(_fk_nav, None)
-                                        st.session_state.pop("_bl_ilce_filtre_ad", None)
-                                    else:
-                                        st.session_state.pop("_bl_havuz_filtre", None)
-                                        _bl_chip_df_nav = _bl_df_nav[_bl_bolge_nav == _bl_ad_nav]
-                                        if "il" in _bl_chip_df_nav.columns:
-                                            st.session_state["_cl_fil_il_multi"] = sorted(
-                                                _bl_chip_df_nav["il"].dropna().astype(str).unique().tolist())
-                                        st.session_state.pop("_cl_fil_ilce_multi", None)
-                                        if _bl_ilce_kol_nav and _bl_ad_nav in ("İstanbul Anadolu", "İstanbul Avrupa"):
-                                            st.session_state["_bl_ilce_filtre"] = sorted(
-                                                _bl_chip_df_nav["ilce"].dropna().astype(str).unique().tolist())
-                                            st.session_state["_bl_ilce_filtre_ad"] = _bl_ad_nav
-                                        else:
-                                            st.session_state.pop("_bl_ilce_filtre", None)
-                                            st.session_state.pop("_bl_ilce_filtre_ad", None)
-                                    st.session_state["aktif_tab"] = "liste"
-                                    st.rerun()
-                            st.markdown("</div>", unsafe_allow_html=True)
+                                _bl_qkey = "__havuz__" if _bl_ad_nav == "Havuz (Bölgesiz)" else _bl_ad_nav
+                                _bl_qkey_js = _bl_jsonlib.dumps(_bl_qkey)
+                                _bl_parcalar.append(
+                                    f'<span onclick="var u=new URL(window.parent.location.href);'
+                                    f'u.searchParams.set(\'_blq\',{_bl_qkey_js});'
+                                    f'window.parent.location.replace(u.toString());" '
+                                    f'style="cursor:pointer;color:#1a4f9e;font-size:12px;white-space:nowrap;">'
+                                    f'{_bl_kisa_nav} {_bl_adet_nav}</span>'
+                                )
+                            _bl_html_nav = (
+                                '<div style="display:flex;flex-wrap:wrap;gap:2px 6px;align-items:center;">'
+                                + ' <span style="color:#cbd5e1;">·</span> '.join(_bl_parcalar)
+                                + '</div>'
+                            )
+                            st.markdown(_bl_html_nav, unsafe_allow_html=True)
             continue
 
         _acik_mi = st.session_state["_acik_grup"] == _g_ad
