@@ -3326,20 +3326,25 @@ button[data-testid="manage-app-button"] { display: none !important; }
                             st.markdown("""<style>
 div[data-testid="stExpander"] div[data-testid="stVerticalBlockBorderWrapper"] .stButton>button {
     background: transparent !important; border: none !important; box-shadow: none !important;
-    color: #1a4f9e !important; font-size: 12px !important; padding: 1px 4px !important;
-    text-align: left !important; min-height: 1.4rem !important; height: auto !important;
+    color: #1a4f9e !important; font-size: 10px !important; padding: 0px 2px !important;
+    text-align: left !important; min-height: 1.1rem !important; height: auto !important;
+    line-height: 1.3 !important; white-space: nowrap !important;
+}
+div[data-testid="stExpander"] div[data-testid="stVerticalBlockBorderWrapper"] .stButton>button p {
+    font-size: 10px !important; margin: 0 !important; white-space: nowrap !important;
 }
 div[data-testid="stExpander"] div[data-testid="stVerticalBlockBorderWrapper"] .stButton>button:hover {
     text-decoration: underline !important; background: transparent !important;
 }
 div[data-testid="stExpander"] div[data-testid="stVerticalBlockBorderWrapper"] .stButton { margin:0 !important; }
+div[data-testid="stExpander"] div[data-testid="stVerticalBlockBorderWrapper"] div[data-testid="column"] { gap:0 !important; }
 </style>""", unsafe_allow_html=True)
-                            _bl_cols_nav = st.columns(2)
+                            _bl_cols_nav = st.columns(3)
                             for _cni, (_bl_ad_nav, _bl_adet_nav) in enumerate(_bl_sayim_nav.items()):
                                 if _bl_adet_nav <= 0:
                                     continue
                                 _bl_kisa_nav = _bl_kisa_ad_nav.get(_bl_ad_nav, _bl_ad_nav)
-                                with _bl_cols_nav[_cni % 2]:
+                                with _bl_cols_nav[_cni % 3]:
                                     if st.button(f"{_bl_kisa_nav} {_bl_adet_nav}", key=f"nav_bolge_btn_{_bl_ad_nav}"):
                                         try:
                                             if _bl_ad_nav == "Havuz (Bölgesiz)":
