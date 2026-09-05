@@ -3301,6 +3301,54 @@ button[data-testid="manage-app-button"] { display: none !important; }
                          key=f"sb_tek_{_tek_key}"):
                 st.session_state["aktif_tab"] = _tek_key
                 st.rerun()
+
+            # ── BÖLGE — "Müşteri Haritası"nın hemen altında, ikonsuz, sade liste ──
+            # Cari Liste'nin kendi verisinden BAĞIMSIZ, hafif/önbellekli bir sorgu.
+            # Tıklanınca hem Cari Liste'ye geçer hem de ilgili bölgeye göre filtreler.
+            if _tek_key == "harita":
+                try:
+                    _bl_df_nav = _atama_filtresi_uygula(get_cari_listesi())
+                except Exception:
+                    _bl_df_nav = pd.DataFrame()
+                if not _bl_df_nav.empty and "il" in _bl_df_nav.columns:
+                    _bl_ilce_kol_nav = "ilce" if "ilce" in _bl_df_nav.columns else None
+                    _bl_bolge_ham_nav = _bl_df_nav.apply(
+                        lambda r: il_ilce_bolge_bul(r.get("il", ""), r.get(_bl_ilce_kol_nav, "") if _bl_ilce_kol_nav else ""), axis=1)
+                    _bl_bolge_nav = _bl_bolge_ham_nav.fillna("Havuz (Bölgesiz)")
+                    _bl_sayim_nav = _bl_bolge_nav.value_counts()
+                    _bl_kisa_ad_nav = {"İstanbul Anadolu": "İst And", "İstanbul Avrupa": "İst Avr"}
+                    if not _bl_sayim_nav.empty:
+                        with st.expander(f"📍 Bölge  ·  {len(_bl_sayim_nav)} bölge", expanded=False):
+                            _bl_cols_nav = st.columns(2)
+                            for _cni, (_bl_ad_nav, _bl_adet_nav) in enumerate(_bl_sayim_nav.items()):
+                                if _bl_adet_nav <= 0:
+                                    continue
+                                _bl_kisa_nav = _bl_kisa_ad_nav.get(_bl_ad_nav, _bl_ad_nav)
+                                with _bl_cols_nav[_cni % len(_bl_cols_nav)]:
+                                    if st.button(f"{_bl_kisa_nav} {_bl_adet_nav}", key=f"nav_bolge_chip_{_bl_ad_nav}",
+                                                 use_container_width=True,
+                                                 type="primary" if _bl_ad_nav == "Havuz (Bölgesiz)" else "secondary"):
+                                        if _bl_ad_nav == "Havuz (Bölgesiz)":
+                                            st.session_state["_bl_havuz_filtre"] = True
+                                            for _fk_nav in ["_cl_fil_il_multi", "_cl_fil_ilce_multi", "_bl_ilce_filtre"]:
+                                                st.session_state.pop(_fk_nav, None)
+                                            st.session_state.pop("_bl_ilce_filtre_ad", None)
+                                        else:
+                                            st.session_state.pop("_bl_havuz_filtre", None)
+                                            _bl_chip_df_nav = _bl_df_nav[_bl_bolge_nav == _bl_ad_nav]
+                                            if "il" in _bl_chip_df_nav.columns:
+                                                st.session_state["_cl_fil_il_multi"] = sorted(
+                                                    _bl_chip_df_nav["il"].dropna().astype(str).unique().tolist())
+                                            st.session_state.pop("_cl_fil_ilce_multi", None)
+                                            if _bl_ilce_kol_nav and _bl_ad_nav in ("İstanbul Anadolu", "İstanbul Avrupa"):
+                                                st.session_state["_bl_ilce_filtre"] = sorted(
+                                                    _bl_chip_df_nav["ilce"].dropna().astype(str).unique().tolist())
+                                                st.session_state["_bl_ilce_filtre_ad"] = _bl_ad_nav
+                                            else:
+                                                st.session_state.pop("_bl_ilce_filtre", None)
+                                                st.session_state.pop("_bl_ilce_filtre_ad", None)
+                                        st.session_state["aktif_tab"] = "liste"
+                                        st.rerun()
             continue
 
         _acik_mi = st.session_state["_acik_grup"] == _g_ad
@@ -4248,81 +4296,6 @@ section[data-testid="stSidebar"] { display: none !important; }
 
     # ── ATAMA FİLTRESİ — admin hepsini görür, kullanıcı sadece kendine atananları ──
     df = _atama_filtresi_uygula(df)
-
-
-    # ── BÖLGELER — SOL MENÜDE (sidebar), açılır/kapanır, kısa etiketli kutucuklar ──
-    if not df.empty and "il" in df.columns:
-        _bl_kisa_ad = {"İstanbul Anadolu": "İst And", "İstanbul Avrupa": "İst Avr"}
-        _bl_ikon = {
-            "İstanbul Anadolu": "🌉", "İstanbul Avrupa": "🕌", "Havuz (Bölgesiz)": "📦",
-            "Adana": "🌶️", "Adıyaman": "🗿", "Afyonkarahisar": "🍮", "Ağrı": "🗻",
-            "Aksaray": "🐕", "Amasya": "🍎", "Ankara": "🏛️", "Antalya": "🏖️",
-            "Ardahan": "🐄", "Artvin": "🏞️",
-            "Aydın": "🍈", "Balıkesir": "🫒", "Bartın": "⛵", "Batman": "🛢️",
-            "Bayburt": "🧊", "Bilecik": "🏰", "Bingöl": "🎣", "Bitlis": "⛰️",
-            "Bolu": "👨‍🍳", "Burdur": "🌸", "Bursa": "🏔️", "Çanakkale": "🐎",
-            "Çankırı": "🧂", "Çorum": "🫘", "Denizli": "🐓", "Diyarbakır": "🍉",
-            "Düzce": "🌳", "Edirne": "🤼", "Elazığ": "🍒", "Erzincan": "🧈",
-            "Erzurum": "❄️", "Eskişehir": "🎓", "Gaziantep": "🥙", "Giresun": "🌰",
-            "Gümüşhane": "🥈", "Hakkari": "🦅", "Hatay": "🍊", "Iğdır": "🌵",
-            "Isparta": "🌹", "İzmir": "🌊", "Kahramanmaraş": "🍦", "Karabük": "⚒️",
-            "Karaman": "🐑", "Kars": "🧀", "Kastamonu": "🪵", "Kayseri": "🌋",
-            "Kırıkkale": "⚙️", "Kırklareli": "🌻", "Kırşehir": "🥕", "Kilis": "🫓",
-            "Kocaeli": "⚓", "Konya": "🌀", "Kütahya": "🏺", "Malatya": "🍑",
-            "Manisa": "🍇", "Mardin": "🧱", "Mersin": "🍋", "Muğla": "🪂",
-            "Muş": "🌾", "Nevşehir": "🎈", "Niğde": "🥔", "Ordu": "🚡",
-            "Osmaniye": "🐫", "Rize": "🍵", "Sakarya": "🚣", "Samsun": "🚢",
-            "Siirt": "🐐", "Sinop": "🏝️", "Sivas": "🐕‍🦺", "Şanlıurfa": "🍆",
-            "Şırnak": "🏜️", "Tekirdağ": "🍷", "Tokat": "🥩", "Trabzon": "🐟",
-            "Tunceli": "🦌", "Uşak": "🧵", "Van": "🐈", "Yalova": "🌡️",
-            "Yozgat": "🍲", "Zonguldak": "⛏️",
-        }
-        _bl_ilce_kol_cl = "ilce" if "ilce" in df.columns else None
-        _bl_chip_bolge_ham = df.apply(
-            lambda r: il_ilce_bolge_bul(r.get("il",""), r.get(_bl_ilce_kol_cl,"") if _bl_ilce_kol_cl else ""), axis=1)
-        # Tanımsız il/ilçe'ler tek tek kutucuk olmaz, hepsi "Havuz (Bölgesiz)" altında toplanır
-        _bl_chip_bolge = _bl_chip_bolge_ham.fillna("Havuz (Bölgesiz)")
-        _bl_chip_sayim = _bl_chip_bolge.value_counts()
-        if not _bl_chip_sayim.empty:
-            with st.sidebar:
-                with st.expander(f"📍 Bölge  ·  {len(_bl_chip_sayim)} bölge", expanded=False):
-                    _bl_chip_cols = st.columns(2)
-                    for _ci, (_bl_ad, _bl_adet) in enumerate(_bl_chip_sayim.items()):
-                        if _bl_adet <= 0:
-                            continue  # müşterisi olmayan bölge asla gösterilmez
-                        _bl_kisa = _bl_kisa_ad.get(_bl_ad, _bl_ad)
-                        _bl_ic = _bl_ikon.get(_bl_ad, "📍")
-                        _bl_etiket = f"{_bl_ic} {_bl_kisa} {_bl_adet}"
-                        with _bl_chip_cols[_ci % len(_bl_chip_cols)]:
-                            if st.button(_bl_etiket, key=f"cl_bolge_chip_{_bl_ad}", use_container_width=True,
-                                         type="primary" if _bl_ad == "Havuz (Bölgesiz)" else "secondary"):
-                                if _bl_ad == "Havuz (Bölgesiz)":
-                                    # Havuz'daki kayıtların çoğu boş/tanımsız il içerebilir — gerçek il
-                                    # değerlerine dayanmayan, "hiçbir tanımlı bölgeye uymayanlar" filtresi kullanılır.
-                                    st.session_state["_bl_havuz_filtre"] = True
-                                    if "_cl_fil_il_multi" in st.session_state:
-                                        del st.session_state["_cl_fil_il_multi"]
-                                    if "_cl_fil_ilce_multi" in st.session_state:
-                                        del st.session_state["_cl_fil_ilce_multi"]
-                                    if "_bl_ilce_filtre" in st.session_state:
-                                        del st.session_state["_bl_ilce_filtre"]
-                                    st.session_state.pop("_bl_ilce_filtre_ad", None)
-                                else:
-                                    st.session_state.pop("_bl_havuz_filtre", None)
-                                    _bl_chip_df = df[_bl_chip_bolge == _bl_ad]
-                                    if "il" in _bl_chip_df.columns:
-                                        st.session_state["_cl_fil_il_multi"] = sorted(
-                                            _bl_chip_df["il"].dropna().astype(str).unique().tolist())
-                                    if "_cl_fil_ilce_multi" in st.session_state:
-                                        del st.session_state["_cl_fil_ilce_multi"]
-                                    if _bl_ilce_kol_cl and _bl_ad in ("İstanbul Anadolu", "İstanbul Avrupa"):
-                                        st.session_state["_bl_ilce_filtre"] = sorted(
-                                            _bl_chip_df["ilce"].dropna().astype(str).unique().tolist())
-                                        st.session_state["_bl_ilce_filtre_ad"] = _bl_ad
-                                    elif "_bl_ilce_filtre" in st.session_state:
-                                        del st.session_state["_bl_ilce_filtre"]
-                                        st.session_state.pop("_bl_ilce_filtre_ad", None)
-                                st.rerun()
 
     for _kol in ["aciklama","adres","notlar"]:
         if _kol not in df.columns: df[_kol] = ""
