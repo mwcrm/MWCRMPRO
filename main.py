@@ -3356,17 +3356,22 @@ button[data-testid="manage-app-button"] { display: none !important; }
                     _bl_kisa_ad_nav = {"İstanbul Anadolu": "İst And", "İstanbul Avrupa": "İst Avr"}
                     if not _bl_sayim_nav.empty:
                         with st.expander(f"📍 Bölge  ·  {len(_bl_sayim_nav)} bölge", expanded=False):
-                            import json as _bl_jsonlib
+                            import html as _bl_htmllib
                             _bl_parcalar = []
                             for _bl_ad_nav, _bl_adet_nav in _bl_sayim_nav.items():
                                 if _bl_adet_nav <= 0:
                                     continue
                                 _bl_kisa_nav = _bl_kisa_ad_nav.get(_bl_ad_nav, _bl_ad_nav)
                                 _bl_qkey = "__havuz__" if _bl_ad_nav == "Havuz (Bölgesiz)" else _bl_ad_nav
-                                _bl_qkey_js = _bl_jsonlib.dumps(_bl_qkey)
+                                # NOT: bölge adını doğrudan onclick JS metnine gömmüyoruz — özel
+                                # karakterler (çift tırnak vb.) HTML'i bozup TÜM tıklamaları
+                                # çalışmaz hale getiriyordu. Bunun yerine HTML-escape edilmiş bir
+                                # data-* özniteliğine koyup JS'te oradan okuyoruz (güvenli yöntem).
+                                _bl_qkey_esc = _bl_htmllib.escape(_bl_qkey, quote=True)
                                 _bl_parcalar.append(
-                                    f'<div onclick="var u=new URL(window.parent.location.href);'
-                                    f'u.searchParams.set(\'_blq\',{_bl_qkey_js});'
+                                    f'<div data-bl="{_bl_qkey_esc}" '
+                                    f'onclick="var u=new URL(window.parent.location.href);'
+                                    f"u.searchParams.set('_blq', this.getAttribute('data-bl'));"
                                     f'window.parent.location.replace(u.toString());" '
                                     f'style="cursor:pointer;color:#1a4f9e;font-size:12px;white-space:nowrap;'
                                     f'padding:2px 0;">{_bl_kisa_nav} {_bl_adet_nav}</div>'
