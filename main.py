@@ -3365,15 +3365,15 @@ button[data-testid="manage-app-button"] { display: none !important; }
                                 _bl_qkey = "__havuz__" if _bl_ad_nav == "Havuz (Bölgesiz)" else _bl_ad_nav
                                 _bl_qkey_js = _bl_jsonlib.dumps(_bl_qkey)
                                 _bl_parcalar.append(
-                                    f'<span onclick="var u=new URL(window.parent.location.href);'
+                                    f'<div onclick="var u=new URL(window.parent.location.href);'
                                     f'u.searchParams.set(\'_blq\',{_bl_qkey_js});'
                                     f'window.parent.location.replace(u.toString());" '
-                                    f'style="cursor:pointer;color:#1a4f9e;font-size:12px;white-space:nowrap;">'
-                                    f'{_bl_kisa_nav} {_bl_adet_nav}</span>'
+                                    f'style="cursor:pointer;color:#1a4f9e;font-size:12px;white-space:nowrap;'
+                                    f'padding:2px 0;">{_bl_kisa_nav} {_bl_adet_nav}</div>'
                                 )
                             _bl_html_nav = (
-                                '<div style="display:flex;flex-wrap:wrap;gap:2px 6px;align-items:center;">'
-                                + ' <span style="color:#cbd5e1;">·</span> '.join(_bl_parcalar)
+                                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;">'
+                                + ''.join(_bl_parcalar)
                                 + '</div>'
                             )
                             st.markdown(_bl_html_nav, unsafe_allow_html=True)
