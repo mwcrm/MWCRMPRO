@@ -5794,14 +5794,14 @@ function kartSec(id){
         return _liste
 
     col_config = {
-        "Seç":           st.column_config.CheckboxColumn("Seç", default=False),
+        "Seç":           st.column_config.CheckboxColumn("Seç", default=False, width=_w("Seç")),
         "tarih":         st.column_config.TextColumn("İşlem Tarih", disabled=True, width=_w("tarih")),
         "guncelleme_tarihi": st.column_config.TextColumn("Güncelleme Tarihi", disabled=True, width=_w("guncelleme_tarihi"), help="Bu müşteriye en son ne zaman not, teklif veya mesaj/işlem eklendiğini gösterir."),
         "id":            st.column_config.NumberColumn("ID", disabled=True, width=_w("id")),
         "olusturan": None, "silindi": None,
         "beklenen_ciro":    st.column_config.NumberColumn("Hedef ₺",  format="%,.0f ₺", width=_w("beklenen_ciro")),
         "gerceklesen_ciro": st.column_config.NumberColumn("Gerçek ₺", format="%,.0f ₺", width=_w("gerceklesen_ciro")),
-        "rakip_firma":   st.column_config.TextColumn("Rakip Firma", width=_w("rakip_firma")),
+        "rakip_firma":   st.column_config.TextColumn("Özel", width=_w("rakip_firma")),
         "firma":         st.column_config.TextColumn("Firma",     width=_w("firma")),
         "yetkili":       st.column_config.TextColumn("Yetkili",   width=_w("yetkili")),
         "gsm":           st.column_config.TextColumn("GSM",       width=_w("gsm")),
@@ -5812,7 +5812,7 @@ function kartSec(id){
         "ilce":          st.column_config.TextColumn("İlçe",      width=_w("ilce")),
         "durum":         st.column_config.SelectboxColumn("Durum", options=["Tümü"] + [x for x in tum_durum_opts if str(x).upper() not in ["NONE","NAN",""]], width=_w("durum")),
         "temsilci":      st.column_config.TextColumn("Temsilci",  width=_w("temsilci")),
-        "islem_asamasi": st.column_config.SelectboxColumn("Aşama", options=["Tümü", "Arama", "Tekrar Ara", "Mesaj", "E-Mail"], width=_w("islem_asamasi")),
+        "islem_asamasi": st.column_config.SelectboxColumn("İLK TEMAS", options=["Tümü", "Arama", "Tekrar Ara", "Mesaj", "E-Mail"], width=_w("islem_asamasi")),
         "aciklama":      st.column_config.TextColumn("Açıklama",  width=_w("aciklama")),
         "📅 Son Randevu": st.column_config.TextColumn("📅 Son Randevu", disabled=False, width=_w("📅 Son Randevu"), help="Manuel tarih yazıp kaydedebilirsin (örn. 15.08.2026 veya 15.08.2026 14:00) — gerçek bir randevu kaydı oluşturulur."),
         "📨 Notlar":     st.column_config.TextColumn("📨 Notlar", disabled=True, width=_w("📨 Notlar")),
@@ -8002,7 +8002,7 @@ function updateBot(v){{
         st.markdown("### 📐 Cari Liste Kolon Ayarları")
         st.caption("Genişlik ayarlayın, gizlemek istediklerinizi kapatın → Kaydet")
         _KOL_VARS_UI = {
-            "tarih":90,"guncelleme_tarihi":100,
+            "Seç":40,"tarih":90,"guncelleme_tarihi":100,
             "firma":100,"rakip_firma":100,"yetkili":100,"gsm":110,"sabit":100,"email":100,
             "adres":120,"il":80,"ilce":70,"durum":90,"temsilci":90,
             "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50,
@@ -8011,10 +8011,10 @@ function updateBot(v){{
             "🧾 Teklif":70,"💬 Mesaj":70
         }
         _KG_UI_ETIKET = {
-            "tarih":"İşlem Tarih","guncelleme_tarihi":"Güncelleme Tarihi",
-            "firma":"Firma","rakip_firma":"Rakip Firma","yetkili":"Yetkili","gsm":"GSM","sabit":"S.Tel",
+            "Seç":"Seç (işaret kutusu)","tarih":"İşlem Tarih","guncelleme_tarihi":"Güncelleme Tarihi",
+            "firma":"Firma","rakip_firma":"Özel","yetkili":"Yetkili","gsm":"GSM","sabit":"S.Tel",
             "email":"Email","adres":"Adres","il":"İl","ilce":"İlçe",
-            "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"Aşama",
+            "durum":"Durum","temsilci":"Temsilci","islem_asamasi":"İLK TEMAS",
             "aciklama":"Açıklama","📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID",
             "asama1":"1. Aşama","asama2":"2. Aşama","asama3":"3. Aşama","sonuc":"Sonuç","ara_islem":"Ara İşlem",
             "beklenen_ciro":"Hedef ₺","gerceklesen_ciro":"Gerçek ₺","✅ Analiz":"Analiz","Varış İli":"Varış İli","Koli/Palet":"Koli/Palet",
