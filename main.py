@@ -1672,9 +1672,9 @@ section[data-testid="stSidebar"] {
    NOT: Tablo (data_editor) canvas ile çizildiği için normal font-size CSS'i
    onu küçültemiyor. "zoom" özelliği tarayıcının PİKSEL bazında her şeyi
    (canvas dahil) küçültmesini sağlar — gerçek/kalıcı çözüm budur. */
-[data-testid="stAppViewContainer"] { zoom: 0.80 !important; }
-section[data-testid="stSidebar"] { zoom: 0.80 !important; }
-html { font-size: 14px !important; }
+[data-testid="stAppViewContainer"] { zoom: 0.92 !important; }
+section[data-testid="stSidebar"] { zoom: 0.92 !important; }
+html { font-size: 15px !important; }
 .block-container { padding-top: 1.2rem !important; padding-bottom: 1.5rem !important; }
 section[data-testid="stSidebar"] .block-container { padding-top: 1rem !important; }
 /* Streamlit 1.40+ konteyner sınıfını değiştirdi — eski .block-container artık
