@@ -5112,6 +5112,33 @@ function kartSec(id){
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
     _cok_secili_idler = set()
     with st.expander("🔍 Filtreler & Arama", expanded=False):
+        # ── YENİ FİRMA KONTROLÜ — "Satır Ekle" ile elle firma adı yazmadan önce,
+        # aynı/benzer isimde zaten kayıtlı müşteri var mı diye anlık arama.
+        # ÖNEMLİ: Kelime kelime ayrı ayrı arama YAPILMAZ — yazılan ifade (boşluk/nokta
+        # farkları yok sayılarak) ART ARDA/BÜTÜN olarak firma adında geçiyor mu diye
+        # bakılır. Örn. "KAPKA HEDİ" yazınca sadece "KAPKA HEDİYELİK..." gibi bu ifadeyi
+        # ard arda içeren firmalar gelir; sadece "HEDİ" geçen alakasız firmalar gelmez.
+        _yf_ara = st.text_input("🔍 Yeni firma eklemeden önce kontrol et",
+                                 key="_cl_yeni_firma_ara", placeholder="Firma adının bir kısmını veya tamamını yazın...")
+        if _yf_ara and _yf_ara.strip() and "firma" in df.columns:
+            def _yf_norm(_s):
+                return (str(_s).upper().replace("İ", "I").replace("Ş", "S")
+                        .replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C"))
+            _yf_q_bosluksuz = _yf_norm(_yf_ara.strip()).replace(" ", "").replace(".", "")
+            _yf_kaynak = df.copy()
+            _yf_kaynak["_yf_norm_bs"] = (_yf_kaynak["firma"].apply(_yf_norm)
+                                          .str.replace(" ", "", regex=False).str.replace(".", "", regex=False))
+            _yf_eslesen = _yf_kaynak[_yf_kaynak["_yf_norm_bs"].apply(
+                lambda _tam: bool(_yf_q_bosluksuz) and _yf_q_bosluksuz in _tam
+            )]
+            if not _yf_eslesen.empty:
+                st.warning(f"⚠️ '{_yf_ara}' ile eşleşen {len(_yf_eslesen)} kayıtlı müşteri bulundu — mükerrer girmemek için kontrol edin:")
+                _yf_kol = [c for c in ["id", "firma", "yetkili", "gsm", "il", "ilce"] if c in _yf_eslesen.columns]
+                st.dataframe(_yf_eslesen[_yf_kol].head(15), use_container_width=True, hide_index=True)
+            else:
+                st.caption(f"✅ '{_yf_ara}' ile eşleşen kayıtlı müşteri yok — yeni firma olarak güvenle eklenebilir.")
+        st.divider()
+
         # ── TEK SATIR FİLTRE ───────────────────────────────────────────────────
         if st.session_state.get("kart_sec_reset"):
             st.session_state.pop("kart_sec_reset", None)
@@ -5299,33 +5326,6 @@ function kartSec(id){
             secili_kart = _esles[0] if _esles else "-- Müşteri Seçin --"
         else:
             secili_kart = "-- Müşteri Seçin --"
-
-        # ── YENİ FİRMA KONTROLÜ — "Satır Ekle" ile elle firma adı yazmadan önce,
-        # aynı/benzer isimde zaten kayıtlı müşteri var mı diye anlık arama.
-        # ÖNEMLİ: Kelime kelime ayrı ayrı arama YAPILMAZ — yazılan ifade (boşluk/nokta
-        # farkları yok sayılarak) ART ARDA/BÜTÜN olarak firma adında geçiyor mu diye
-        # bakılır. Örn. "KAPKA HEDİ" yazınca sadece "KAPKA HEDİYELİK..." gibi bu ifadeyi
-        # ard arda içeren firmalar gelir; sadece "HEDİ" geçen alakasız firmalar gelmez.
-        st.divider()
-        _yf_ara = st.text_input("🔍 Yeni firma eklemeden önce kontrol et",
-                                 key="_cl_yeni_firma_ara", placeholder="Firma adının bir kısmını veya tamamını yazın...")
-        if _yf_ara and _yf_ara.strip() and "firma" in df.columns:
-            def _yf_norm(_s):
-                return (str(_s).upper().replace("İ", "I").replace("Ş", "S")
-                        .replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C"))
-            _yf_q_bosluksuz = _yf_norm(_yf_ara.strip()).replace(" ", "").replace(".", "")
-            _yf_kaynak = df.copy()
-            _yf_kaynak["_yf_norm_bs"] = (_yf_kaynak["firma"].apply(_yf_norm)
-                                          .str.replace(" ", "", regex=False).str.replace(".", "", regex=False))
-            _yf_eslesen = _yf_kaynak[_yf_kaynak["_yf_norm_bs"].apply(
-                lambda _tam: bool(_yf_q_bosluksuz) and _yf_q_bosluksuz in _tam
-            )]
-            if not _yf_eslesen.empty:
-                st.warning(f"⚠️ '{_yf_ara}' ile eşleşen {len(_yf_eslesen)} kayıtlı müşteri bulundu — mükerrer girmemek için kontrol edin:")
-                _yf_kol = [c for c in ["id", "firma", "yetkili", "gsm", "il", "ilce"] if c in _yf_eslesen.columns]
-                st.dataframe(_yf_eslesen[_yf_kol].head(15), use_container_width=True, hide_index=True)
-            else:
-                st.caption(f"✅ '{_yf_ara}' ile eşleşen kayıtlı müşteri yok — yeni firma olarak güvenle eklenebilir.")
 
     # Varsayılan: hiçbir filtre seçilmemişse tüm liste gelsin
     if not st.session_state.get("_toplam_aktif") and \
