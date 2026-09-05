@@ -12181,69 +12181,81 @@ elif aktif == "patron":
     # bağımsız bir blok olarak, sayfa her açıldığında YENİDEN hesaplanıyor.
     # Yani Cari Liste'de bir kayıt/aşama değişirse, burası da otomatik güncellenir
     # (aynı canlı veriden okunduğu için) — ama iki bar birbirinden bağımsız kodlar.
-    with st.expander("📊 Genel Durum Özeti (Cari Liste ile aynı kategoriler)", expanded=True):
-        _ob_df = _p_cari
-        _ob_durum_opts = _tanimlar_yukle("durum") or ["Özel Müşteri", "Portföy"]
-        _ob_asama_opts = _tanimlar_yukle("asama") or []
+    # Görsel: CSS Grid ile TÜM kutular eşit kare boyutta, boşluksuz/sıkı düzen.
+    _ob_df = _p_cari
+    _ob_durum_opts = _tanimlar_yukle("durum") or ["Özel Müşteri", "Portföy"]
+    _ob_asama_opts = _tanimlar_yukle("asama") or []
 
-        def _ob_norm(s):
-            return (str(s or "").strip().upper().replace("İ", "I").replace("Ş", "S")
-                    .replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C"))
+    def _ob_norm(s):
+        return (str(s or "").strip().upper().replace("İ", "I").replace("Ş", "S")
+                .replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C"))
 
-        def _ob_durum_sayi(ad):
-            if ad == "Toplam": return len(_ob_df)
-            if _ob_df.empty or "durum" not in _ob_df.columns: return 0
-            return len(_ob_df[_ob_df["durum"] == ad])
+    def _ob_durum_sayi(ad):
+        if ad == "Toplam": return len(_ob_df)
+        if _ob_df.empty or "durum" not in _ob_df.columns: return 0
+        return len(_ob_df[_ob_df["durum"] == ad])
 
-        def _ob_kolon_sayi(kolon, ad):
-            if _ob_df.empty or kolon not in _ob_df.columns: return 0
-            _adn = _ob_norm(ad)
-            return len(_ob_df[_ob_df[kolon].apply(_ob_norm) == _adn])
+    def _ob_kolon_sayi(kolon, ad):
+        if _ob_df.empty or kolon not in _ob_df.columns: return 0
+        _adn = _ob_norm(ad)
+        return len(_ob_df[_ob_df[kolon].apply(_ob_norm) == _adn])
 
-        _ob_grp1 = [a for a in _ob_asama_opts if a in ["Arama", "Tekrar Ara", "E-Mail", "Mail", "Mesaj", "Whatsapp Mesaj"]]
-        _ob_grp2 = [a for a in _ob_asama_opts if a in ["Randevu"]]
-        _ob_grp3 = [a for a in _ob_asama_opts if a in ["Teklif"]]
-        _ob_grp4 = [a for a in _ob_asama_opts if a in ["Deneme", "TAKİP", "Sözleşme", "Fiyat Hazırla"]]
-        _ob_grp5 = [a for a in _ob_asama_opts if a in ["Kazanıldı", "Kaybedildi", "Devam Ediyor"]]
-        if "Devam Ediyor" not in _ob_grp5: _ob_grp5.append("Devam Ediyor")
+    _ob_grp1 = [a for a in _ob_asama_opts if a in ["Arama", "Tekrar Ara", "E-Mail", "Mail", "Mesaj", "Whatsapp Mesaj"]]
+    _ob_grp2 = [a for a in _ob_asama_opts if a in ["Randevu"]]
+    _ob_grp3 = [a for a in _ob_asama_opts if a in ["Teklif"]]
+    _ob_grp4 = [a for a in _ob_asama_opts if a in ["Deneme", "TAKİP", "Sözleşme", "Fiyat Hazırla"]]
+    _ob_grp5 = [a for a in _ob_asama_opts if a in ["Kazanıldı", "Kaybedildi", "Devam Ediyor"]]
+    if "Devam Ediyor" not in _ob_grp5: _ob_grp5.append("Devam Ediyor")
 
-        def _ob_asamasiz():
-            if _ob_df.empty or "islem_asamasi" not in _ob_df.columns: return 0
-            _tum = _ob_grp1 + _ob_grp2 + _ob_grp3 + _ob_grp4 + _ob_grp5
-            return len(_ob_df[~_ob_df["islem_asamasi"].isin(_tum) | _ob_df["islem_asamasi"].isna()])
+    def _ob_asamasiz():
+        if _ob_df.empty or "islem_asamasi" not in _ob_df.columns: return 0
+        _tum = _ob_grp1 + _ob_grp2 + _ob_grp3 + _ob_grp4 + _ob_grp5
+        return len(_ob_df[~_ob_df["islem_asamasi"].isin(_tum) | _ob_df["islem_asamasi"].isna()])
 
-        def _ob_ikon(a):
-            _m = {"arama": "📞", "tekrar ara": "📲", "mesaj": "💬", "mail": "📧", "e-mail": "📧",
-                  "whatsapp": "💬", "takip": "📌", "randevu": "📅", "teklif": "📄",
-                  "fiyat hazırla": "💰", "deneme": "🧪", "sözleşme": "📝",
-                  "devam ediyor": "⏳", "kazanıldı": "🏆", "kaybedildi": "❌"}
-            for k, v in _m.items():
-                if k in str(a).lower(): return v
-            return "🔹"
+    def _ob_ikon(a):
+        _m = {"arama": "📞", "tekrar ara": "📲", "mesaj": "💬", "mail": "📧", "e-mail": "📧",
+              "whatsapp": "💬", "takip": "📌", "randevu": "📅", "teklif": "📄",
+              "fiyat hazırla": "💰", "deneme": "🧪", "sözleşme": "📝",
+              "devam ediyor": "⏳", "kazanıldı": "🏆", "kaybedildi": "❌"}
+        for k, v in _m.items():
+            if k in str(a).lower(): return v
+        return "🔹"
 
-        _ob_gruplar = [
-            ("📊 GENEL", [("📊", "Toplam", len(_ob_df))] +
-                [("📦" if d == "Portföy" else "⭐" if d == "Özel Müşteri" else "🔹", d, _ob_durum_sayi(d))
-                 for d in _ob_durum_opts if str(d).strip() and str(d).upper() not in ["NONE", "NAN"]] +
-                [("📋", "Aşamasız", _ob_asamasiz())]),
-            ("📞 AŞAMA", [(_ob_ikon(a), a, _ob_kolon_sayi("islem_asamasi", a)) for a in _ob_grp1]),
-            ("📅 1. AŞAMA", [(_ob_ikon(a), a, _ob_kolon_sayi("asama1", a)) for a in _ob_grp2]),
-            ("📄 2. AŞAMA", [(_ob_ikon(a), a, _ob_kolon_sayi("asama2", a)) for a in _ob_grp3]),
-            ("🧪 3. AŞAMA", [(_ob_ikon(a), a, _ob_kolon_sayi("asama3", a)) for a in _ob_grp4]),
-            ("🏆 SONUÇ", [(_ob_ikon(a), a, _ob_kolon_sayi("sonuc", a)) for a in _ob_grp5]),
-        ]
+    _ob_gruplar = [
+        ("GENEL", "#eff6ff", "#1d4ed8", [("📊", "Toplam", len(_ob_df))] +
+            [("📦" if d == "Portföy" else "⭐" if d == "Özel Müşteri" else "🔹", d, _ob_durum_sayi(d))
+             for d in _ob_durum_opts if str(d).strip() and str(d).upper() not in ["NONE", "NAN"]] +
+            [("📋", "Aşamasız", _ob_asamasiz())]),
+        ("AŞAMA", "#fff7ed", "#c2410c", [(_ob_ikon(a), a, _ob_kolon_sayi("islem_asamasi", a)) for a in _ob_grp1]),
+        ("1. AŞAMA", "#f0fdf4", "#15803d", [(_ob_ikon(a), a, _ob_kolon_sayi("asama1", a)) for a in _ob_grp2]),
+        ("2. AŞAMA", "#faf5ff", "#7e22ce", [(_ob_ikon(a), a, _ob_kolon_sayi("asama2", a)) for a in _ob_grp3]),
+        ("3. AŞAMA", "#fefce8", "#a16207", [(_ob_ikon(a), a, _ob_kolon_sayi("asama3", a)) for a in _ob_grp4]),
+        ("SONUÇ", "#fef2f2", "#b91c1c", [(_ob_ikon(a), a, _ob_kolon_sayi("sonuc", a)) for a in _ob_grp5]),
+    ]
 
-        for _grp_ad, _kalemler in _ob_gruplar:
-            if not _kalemler: continue
-            st.caption(_grp_ad)
-            _ob_cols = st.columns(len(_kalemler))
-            for _c, (_ik, _ad, _sayi) in zip(_ob_cols, _kalemler):
-                _c.markdown(
-                    f"<div style='border:1px solid #e2e8f0;border-radius:8px;padding:8px 6px;text-align:center;margin-bottom:6px;'>"
-                    f"<div style='font-size:16px;'>{_ik}</div>"
-                    f"<div style='font-size:17px;font-weight:700;'>{_sayi}</div>"
-                    f"<div style='font-size:10px;color:#64748b;'>{_ad}</div></div>",
-                    unsafe_allow_html=True)
+    _ob_html = """<style>
+.gdo{border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;margin-bottom:0;background:white;}
+.gdo-grp{margin-bottom:8px;}
+.gdo-grp:last-child{margin-bottom:0;}
+.gdo-grp-title{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;
+    padding:2px 8px;border-radius:5px;margin-bottom:5px;}
+.gdo-grid{display:grid;grid-template-columns:repeat(auto-fill, minmax(84px, 1fr));gap:5px;}
+.gdo-box{aspect-ratio:1/1;border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding:2px;}
+.gdo-ikon{font-size:16px;line-height:1;}
+.gdo-sayi{font-size:18px;font-weight:800;color:#0f172a;line-height:1.15;}
+.gdo-ad{font-size:9px;color:#64748b;text-align:center;line-height:1.05;padding:0 2px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+</style><div class="gdo">"""
+    for _gad, _bg, _fg, _kalemler in _ob_gruplar:
+        if not _kalemler: continue
+        _ob_html += f'<div class="gdo-grp"><span class="gdo-grp-title" style="background:{_bg};color:{_fg};">{_gad}</span><div class="gdo-grid">'
+        for _ik, _ad, _sayi in _kalemler:
+            _ob_html += (f'<div class="gdo-box"><div class="gdo-ikon">{_ik}</div>'
+                         f'<div class="gdo-sayi">{_sayi}</div><div class="gdo-ad" title="{_ad}">{_ad}</div></div>')
+        _ob_html += '</div></div>'
+    _ob_html += '</div>'
+    st.markdown(_ob_html, unsafe_allow_html=True)
 
     st.divider()
 
