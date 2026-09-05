@@ -3320,20 +3320,22 @@ button[data-testid="manage-app-button"] { display: none !important; }
                     if not _bl_sayim_nav.empty:
                         with st.expander(f"📍 Bölge  ·  {len(_bl_sayim_nav)} bölge", expanded=False):
                             st.markdown("""<style>
+#mw-bolge-chip-wrap { display:flex !important; flex-wrap:wrap !important; gap:0 !important; align-items:center; }
+#mw-bolge-chip-wrap div[data-testid="stButton"] { width:auto !important; margin:0 !important; }
 #mw-bolge-chip-wrap .stButton button {
-    all: unset !important; cursor: pointer !important; display: block !important;
-    width: 100% !important; font-size: 12px !important; color: #1a4f9e !important;
-    padding: 2px 4px !important; text-align: left !important; line-height: 1.5 !important;
+    all: unset !important; cursor: pointer !important;
+    font-size: 12px !important; color: #1a4f9e !important;
+    padding: 2px 6px !important; white-space: nowrap !important;
 }
 #mw-bolge-chip-wrap .stButton button:hover { text-decoration: underline !important; }
-#mw-bolge-chip-wrap .stButton button p { font-size: 12px !important; margin: 0 !important; }
-#mw-bolge-chip-wrap .stButton { margin: 0 !important; }
+#mw-bolge-chip-wrap .stButton button p { font-size: 12px !important; margin: 0 !important; white-space: nowrap !important; }
 </style><div id="mw-bolge-chip-wrap">""", unsafe_allow_html=True)
-                            for _bl_ad_nav, _bl_adet_nav in _bl_sayim_nav.items():
+                            for _bni, (_bl_ad_nav, _bl_adet_nav) in enumerate(_bl_sayim_nav.items()):
                                 if _bl_adet_nav <= 0:
                                     continue
                                 _bl_kisa_nav = _bl_kisa_ad_nav.get(_bl_ad_nav, _bl_ad_nav)
-                                if st.button(f"{_bl_kisa_nav}  ·  {_bl_adet_nav}", key=f"nav_bolge_chip_{_bl_ad_nav}"):
+                                _bl_etiket_nav = f"{_bl_kisa_nav} {_bl_adet_nav}" + ("" if _bni == len(_bl_sayim_nav) - 1 else "  -")
+                                if st.button(_bl_etiket_nav, key=f"nav_bolge_chip_{_bl_ad_nav}"):
                                     if _bl_ad_nav == "Havuz (Bölgesiz)":
                                         st.session_state["_bl_havuz_filtre"] = True
                                         for _fk_nav in ["_cl_fil_il_multi", "_cl_fil_ilce_multi", "_bl_ilce_filtre"]:
