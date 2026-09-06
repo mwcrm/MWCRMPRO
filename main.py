@@ -2809,7 +2809,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "dis_nakliye_toplu", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "mukerrer"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "dis_nakliye_toplu", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "rapor", "excel", "e_tablo", "kullanici", "admin_rapor", "harita", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -2818,6 +2818,7 @@ _TAB_ETIKETLER = {
     "kayitli_teklifler": "📋 Kayıtlı Teklifler",
     "sozlesme": "📜 Sözleşmeler",
     "excel": "📥 Excel Aktar",
+    "e_tablo": "📊 E-Tablo",
     "dis_nakliye": "🚚 Dış Nakliye",
     "dis_nakliye_toplu": "🚚 Dış Nakliyeler Listesi",
     
@@ -3269,7 +3270,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
     </style>""", unsafe_allow_html=True)
 
     _MENU_GRUPLARI = [
-        ("🧾 Cari işlemleri",    ["yeni", "liste", "dis_nakliye_toplu", "excel", "mukerrer"]),
+        ("🧾 Cari işlemleri",    ["yeni", "liste", "dis_nakliye_toplu", "excel", "e_tablo", "mukerrer"]),
         ("📅 Randevu ve teklif", ["randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler"]),
         ("🚚 Saha",              ["harita"]),
         ("⚙️ Yönetim",          ["kullanici"]),
@@ -9909,18 +9910,6 @@ elif aktif == "excel":
     sayfa_log("excel")
     import io
 
-    # Kaydedilmiş Google E-Tablo bağlantısını (varsa) DB'den bir kere yükle
-    if "_gs_sheet_url" not in st.session_state:
-        st.session_state["_gs_sheet_url"] = ""
-        try:
-            _sb_gs_init = get_sb_client()
-            if _sb_gs_init:
-                _r_gs_init = _sb_gs_init.table("kullanici_tercih").select("deger").eq("kullanici", "__liste_ui__").eq("anahtar", "_gs_sheet_url").execute()
-                if _r_gs_init.data:
-                    st.session_state["_gs_sheet_url"] = _r_gs_init.data[0]["deger"]
-        except Exception:
-            pass
-
     st.markdown("## 📥 Excel ile Toplu Veri Aktarımı")
 
     sablon_kolonlar = ["firma","yetkili","gsm","sabit","email","adres","ilce","il","durum","temsilci","islem_asamasi","beklenen_ciro","gerceklesen_ciro"]
@@ -9932,76 +9921,17 @@ elif aktif == "excel":
 
     st.divider()
 
-    # ── GOOGLE E-TABLO BAĞLANTISI — "sayfayı her açtığımda otomatik kontrol etsin"
-    # isteğine göre: bağlantı bir kere girilip kaydedilir, sayfa her açıldığında
-    # (kısa bir önbellek süresiyle) otomatik yeniden okunur. Ayrıca istenirse
-    # elle "🔄 Şimdi Kontrol Et" ile anında tazelenebilir.
-    # NOT: E-tablonun paylaşım ayarı "Bağlantıya sahip olan herkes görüntüleyebilir"
-    # olmalı — aksi halde (özel/kısıtlı paylaşımda) bu yöntemle okunamaz, çünkü
-    # burada bir Google hesabı girişi/kimlik doğrulaması YAPILMIYOR (sadece genel
-    # CSV dışa aktarma linki kullanılıyor).
-    with st.expander("🔗 Google E-Tablo ile Otomatik Senkronizasyon", expanded=False):
-        st.caption("E-tablonun paylaşım ayarının **'Bağlantıya sahip olan herkes görüntüleyebilir'** olması gerekir.")
-        _gs_url_kayitli = st.session_state.get("_gs_sheet_url", "")
-        _gs_url = st.text_input("Google E-Tablo bağlantısı (tam URL)", value=_gs_url_kayitli,
-                                 placeholder="https://docs.google.com/spreadsheets/d/....../edit?gid=...",
-                                 key="_gs_url_input")
-        _gsc1, _gsc2 = st.columns([1, 1])
-        _gs_kaydet = _gsc1.button("💾 Bağlantıyı Kaydet", key="_gs_kaydet_btn", use_container_width=True)
-        _gs_yenile = _gsc2.button("🔄 Şimdi Kontrol Et", key="_gs_yenile_btn", use_container_width=True)
-        if _gs_kaydet and _gs_url.strip():
-            st.session_state["_gs_sheet_url"] = _gs_url.strip()
-            try:
-                _sb_gs = get_sb_client()
-                if _sb_gs:
-                    _sb_gs.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_gs_sheet_url").execute()
-                    _sb_gs.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_gs_sheet_url", "deger": _gs_url.strip()}).execute()
-            except Exception:
-                pass
-            st.toast("💾 Bağlantı kaydedildi", icon="🔗")
-            st.rerun()
-
-        def _gs_export_url_uret(_ham_url):
-            """docs.google.com/spreadsheets/d/{ID}/edit?gid={GID} formatındaki
-            bağlantıyı CSV dışa aktarma linkine çevirir."""
-            import re as _gs_re
-            _id_m = _gs_re.search(r"/spreadsheets/d/([a-zA-Z0-9_-]+)", _ham_url)
-            if not _id_m:
-                return None
-            _sheet_id = _id_m.group(1)
-            _gid_m = _gs_re.search(r"[?#&]gid=(\d+)", _ham_url)
-            _gid = _gid_m.group(1) if _gid_m else "0"
-            return f"https://docs.google.com/spreadsheets/d/{_sheet_id}/export?format=csv&gid={_gid}"
-
-        @st.cache_data(ttl=300, show_spinner=False)
-        def _gs_veri_oku(_export_url):
-            return pd.read_csv(_export_url)
-
-        _gs_df_yukl = None
-        _gs_aktif_url = st.session_state.get("_gs_sheet_url", "")
-        if _gs_aktif_url:
-            if _gs_yenile:
-                _gs_veri_oku.clear()
-            _gs_export_url = _gs_export_url_uret(_gs_aktif_url)
-            if not _gs_export_url:
-                st.error("⚠️ Bağlantı formatı tanınamadı — 'docs.google.com/spreadsheets/d/...' içeren tam URL'yi yapıştırın.")
-            else:
-                try:
-                    _gs_df_yukl = _gs_veri_oku(_gs_export_url)
-                    st.success(f"✅ Bağlı — {len(_gs_df_yukl)} satır okundu (her 5 dakikada bir otomatik yenilenir, veya '🔄 Şimdi Kontrol Et' ile hemen).")
-                    st.dataframe(_gs_df_yukl.head(10), use_container_width=True, hide_index=True)
-                except Exception as _gs_hata:
-                    st.error(f"⚠️ E-tablo okunamadı: {_gs_hata}\n\nEn olası sebep: paylaşım ayarı 'Bağlantıya sahip olan herkes görüntüleyebilir' değil.")
-
-    st.divider()
+    if st.session_state.get("_gs_df_hazir") is not None:
+        st.info(f"📊 '📊 E-Tablo' sayfasından aktarılan {len(st.session_state['_gs_df_hazir'])} satır kullanılıyor. "
+                "Farklı bir Excel dosyası yüklersen o öncelikli olur.")
 
     yukl_dosya = st.file_uploader("Excel dosyası yükle", type=["xlsx","xls"], key="excel_yukle")
 
     if yukl_dosya is not None:
         df_yukl = pd.read_excel(yukl_dosya)
         df_yukl.columns = [str(c).strip().lower().replace(" ","_") for c in df_yukl.columns]
-    elif _gs_df_yukl is not None:
-        df_yukl = _gs_df_yukl.copy()
+    elif st.session_state.get("_gs_df_hazir") is not None:
+        df_yukl = st.session_state["_gs_df_hazir"].copy()
         df_yukl.columns = [str(c).strip().lower().replace(" ","_") for c in df_yukl.columns]
     else:
         df_yukl = None
@@ -12287,6 +12217,84 @@ elif aktif == "admin_rapor":
                             st.rerun()
 
 
+
+elif aktif == "e_tablo":
+    sayfa_log("e_tablo")
+    st.markdown("## 📊 Google E-Tablo ile Otomatik Senkronizasyon")
+    st.caption("E-tablonun paylaşım ayarının **'Bağlantıya sahip olan herkes görüntüleyebilir'** olması gerekir "
+               "— burada bir Google hesabı girişi yapılmıyor, sadece herkese açık CSV dışa aktarma linki kullanılıyor.")
+
+    # Kaydedilmiş bağlantıyı (varsa) DB'den bir kere yükle
+    if "_gs_sheet_url" not in st.session_state:
+        st.session_state["_gs_sheet_url"] = ""
+        try:
+            _sb_gs_init = get_sb_client()
+            if _sb_gs_init:
+                _r_gs_init = _sb_gs_init.table("kullanici_tercih").select("deger").eq("kullanici", "__liste_ui__").eq("anahtar", "_gs_sheet_url").execute()
+                if _r_gs_init.data:
+                    st.session_state["_gs_sheet_url"] = _r_gs_init.data[0]["deger"]
+        except Exception:
+            pass
+
+    _gs_url_kayitli = st.session_state.get("_gs_sheet_url", "")
+    _gs_url = st.text_input("Google E-Tablo bağlantısı (tam URL)", value=_gs_url_kayitli,
+                             placeholder="https://docs.google.com/spreadsheets/d/....../edit?gid=...",
+                             key="_gs_url_input")
+    _gsc1, _gsc2 = st.columns([1, 1])
+    _gs_kaydet = _gsc1.button("💾 Bağlantıyı Kaydet", key="_gs_kaydet_btn", use_container_width=True, type="primary")
+    _gs_yenile = _gsc2.button("🔄 Şimdi Kontrol Et", key="_gs_yenile_btn", use_container_width=True)
+    if _gs_kaydet and _gs_url.strip():
+        st.session_state["_gs_sheet_url"] = _gs_url.strip()
+        try:
+            _sb_gs = get_sb_client()
+            if _sb_gs:
+                _sb_gs.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_gs_sheet_url").execute()
+                _sb_gs.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_gs_sheet_url", "deger": _gs_url.strip()}).execute()
+        except Exception:
+            pass
+        st.toast("💾 Bağlantı kaydedildi", icon="🔗")
+        st.rerun()
+
+    st.divider()
+
+    def _gs_export_url_uret(_ham_url):
+        """docs.google.com/spreadsheets/d/{ID}/edit?gid={GID} formatındaki
+        bağlantıyı CSV dışa aktarma linkine çevirir."""
+        import re as _gs_re
+        _id_m = _gs_re.search(r"/spreadsheets/d/([a-zA-Z0-9_-]+)", _ham_url)
+        if not _id_m:
+            return None
+        _sheet_id = _id_m.group(1)
+        _gid_m = _gs_re.search(r"[?#&]gid=(\d+)", _ham_url)
+        _gid = _gid_m.group(1) if _gid_m else "0"
+        return f"https://docs.google.com/spreadsheets/d/{_sheet_id}/export?format=csv&gid={_gid}"
+
+    @st.cache_data(ttl=300, show_spinner=False)
+    def _gs_veri_oku(_export_url):
+        return pd.read_csv(_export_url)
+
+    _gs_aktif_url = st.session_state.get("_gs_sheet_url", "")
+    if not _gs_aktif_url:
+        st.info("💡 Yukarıya bir Google E-Tablo bağlantısı yapıştırıp kaydedin.")
+    else:
+        if _gs_yenile:
+            _gs_veri_oku.clear()
+        _gs_export_url = _gs_export_url_uret(_gs_aktif_url)
+        if not _gs_export_url:
+            st.error("⚠️ Bağlantı formatı tanınamadı — 'docs.google.com/spreadsheets/d/...' içeren tam URL'yi yapıştırın.")
+        else:
+            try:
+                _gs_df = _gs_veri_oku(_gs_export_url)
+                st.success(f"✅ Bağlı — {len(_gs_df)} satır okundu (her 5 dakikada bir otomatik yenilenir, veya '🔄 Şimdi Kontrol Et' ile hemen).")
+                st.dataframe(_gs_df.head(20), use_container_width=True, hide_index=True)
+                st.divider()
+                if st.button("📥 Bu Veriyi Cari Listeye Aktarmaya Hazırla →", type="primary", key="_gs_aktar_hazirla"):
+                    st.session_state["_gs_df_hazir"] = _gs_df
+                    st.session_state["aktif_tab"] = "excel"
+                    st.toast("📊 Veri hazırlandı — 'Excel Aktar' sayfasında devam edin", icon="📥")
+                    st.rerun()
+            except Exception as _gs_hata:
+                st.error(f"⚠️ E-tablo okunamadı: {_gs_hata}\n\nEn olası sebep: paylaşım ayarı 'Bağlantıya sahip olan herkes görüntüleyebilir' değil.")
 
 elif aktif == "harita":
     sayfa_log("harita")
