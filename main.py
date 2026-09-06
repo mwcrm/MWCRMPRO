@@ -4640,7 +4640,9 @@ section[data-testid="stSidebar"] { display: none !important; }
     ]
     for _dn in tum_durum_opts:
         if str(_dn).upper() in ["NONE","NAN",""] or _dn in ["Portföy","Özel Müşteri"]: continue
-        _genel_items.append((_durum_ikon(_dn), _dn, _durum_sayi(_dn), f"durum_{_dn}", _dn in _aktif_fil_durum))
+        _dn_sayi = _durum_sayi(_dn)
+        if _dn_sayi <= 0: continue  # 0 kayıtlı durum tipleri üst raporda gösterilmez
+        _genel_items.append((_durum_ikon(_dn), _dn, _dn_sayi, f"durum_{_dn}", _dn in _aktif_fil_durum))
 
     # ── Gerçek Mesaj sayısı — islem_kaydi tablosundan (WhatsApp/Email gönderim
     # kayıtları) + Cari Liste'de MANUEL yazılan override değerleri. Cari
