@@ -5192,10 +5192,20 @@ function kartSec(id){
                 _yf_duzenlenen = st.data_editor(
                     _yf_gosterilecek, use_container_width=True, hide_index=True,
                     disabled=["id"], key="_yf_duzenle_editor", num_rows="dynamic",
-                    column_config={"Seç": st.column_config.CheckboxColumn("Seç", default=False),
-                                   "id": st.column_config.NumberColumn("ID"),
-                                   "rakip_firma": st.column_config.TextColumn("Özel"),
-                                   "aciklama": st.column_config.TextColumn("Açıklama")}
+                    column_config={
+                        "Seç": st.column_config.CheckboxColumn("Seç", default=False, width="small"),
+                        "id": st.column_config.NumberColumn("ID", width="small"),
+                        "firma": st.column_config.TextColumn("firma", width="small"),
+                        "yetkili": st.column_config.TextColumn("yet", width="small"),
+                        "rakip_firma": st.column_config.TextColumn("Öze", width="small"),
+                        "gsm": st.column_config.TextColumn("gsm", width="small"),
+                        "sabit": st.column_config.TextColumn("sabit", width="small"),
+                        "email": st.column_config.TextColumn("em", width="small"),
+                        "adres": st.column_config.TextColumn("adres", width="small"),
+                        "ilce": st.column_config.TextColumn("ilce", width="small"),
+                        "il": st.column_config.TextColumn("il", width="small"),
+                        "aciklama": st.column_config.TextColumn("Açıklama", width="small"),
+                    }
                 )
                 if st.button("💾 Değişiklikleri Kaydet", key="_yf_duzenle_kaydet_btn"):
                     _yf_guncellenen = 0
