@@ -4773,6 +4773,13 @@ section[data-testid="stSidebar"] { display: none !important; }
         "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama3",a),f"asama3_{a}",False)) for a in _grp4_asama]),
         "sonuc":    ("🏆","SONUÇ",    None, [((_asama_ikon(a),a,_kolon_sayi("sonuc",a),f"sonuc_{a}",False)) for a in _grp5_asama]),
     }
+    # ── GEÇİCİ KONTROL SATIRI — kullanıcıyla birlikte doğrulama için. Sorun
+    # çözülünce bu satır kaldırılabilir. "asama2" kolonundaki ham değerleri
+    # tek tek sayıp gösteriyor, rapor kutusuyla birebir karşılaştırma imkanı verir.
+    if "asama2" in df.columns:
+        import collections as _dbgcol
+        _dbg_asama2_sayim = _dbgcol.Counter(df["asama2"].dropna().astype(str).str.strip())
+        st.caption(f"🔧 KONTROL — Toplam kayıt: {len(df)}  ·  asama2 kolonundaki ham değer dağılımı: {dict(_dbg_asama2_sayim)}")
     # HTML oluştur - 2 satırlı tablo
     # ── Rapor barı SABİT %100 genişlikte kalır, kendi başına kaymaz/kaydırılmaz.
     # Cari Liste tablosu, kendi ayrı kolon-genişliği formülüyle (aşağıda _w())
