@@ -5185,9 +5185,44 @@ function kartSec(id){
                 lambda _tam: bool(_yf_q_bosluksuz) and _yf_q_bosluksuz in _tam
             )]
             if not _yf_eslesen.empty:
-                st.warning(f"⚠️ '{_yf_ara}' ile eşleşen {len(_yf_eslesen)} kayıtlı müşteri bulundu — mükerrer girmemek için kontrol edin:")
-                _yf_kol = [c for c in ["id", "firma", "yetkili", "gsm", "il", "ilce"] if c in _yf_eslesen.columns]
-                st.dataframe(_yf_eslesen[_yf_kol].head(15), use_container_width=True, hide_index=True)
+                st.warning(f"⚠️ '{_yf_ara}' ile eşleşen {len(_yf_eslesen)} kayıtlı müşteri bulundu — mükerrer girmemek için kontrol edin. "
+                           f"Eksik bilgi varsa aşağıda düzenleyip kaydedebilirsin:")
+                _yf_kol = [c for c in ["id", "firma", "gsm", "sabit", "email", "adres", "ilce", "il"] if c in _yf_eslesen.columns]
+                _yf_gosterilecek = _yf_eslesen[_yf_kol].head(15).copy()
+                _yf_duzenlenen = st.data_editor(
+                    _yf_gosterilecek, use_container_width=True, hide_index=True,
+                    disabled=["id"], key="_yf_duzenle_editor",
+                    column_config={"id": st.column_config.NumberColumn("ID")}
+                )
+                if st.button("💾 Değişiklikleri Kaydet", key="_yf_duzenle_kaydet_btn"):
+                    _yf_guncellenen = 0
+                    _yf_kayit_hatasi = []
+                    _sb_yf = get_sb_client()
+                    for _yi in range(len(_yf_duzenlenen)):
+                        _satir_yeni = _yf_duzenlenen.iloc[_yi]
+                        _satir_eski = _yf_gosterilecek.iloc[_yi]
+                        _yf_fark = {}
+                        for _yc in _yf_kol:
+                            if _yc == "id": continue
+                            _yv, _ev = _satir_yeni[_yc], _satir_eski[_yc]
+                            _yv_str = "" if pd.isna(_yv) else str(_yv)
+                            _ev_str = "" if pd.isna(_ev) else str(_ev)
+                            if _yv_str != _ev_str:
+                                _yf_fark[_yc] = _yv_str
+                        if _yf_fark and _sb_yf:
+                            try:
+                                _sb_yf.table("cari_kartlar").update(_yf_fark).eq("id", int(_satir_yeni["id"])).execute()
+                                _yf_guncellenen += 1
+                            except Exception as _yf_hata:
+                                _yf_kayit_hatasi.append(f"ID {int(_satir_yeni['id'])}: {_yf_hata}")
+                    if _yf_guncellenen:
+                        st.toast(f"💾 {_yf_guncellenen} kayıt güncellendi", icon="✅")
+                        st.cache_data.clear()
+                        st.rerun()
+                    elif _yf_kayit_hatasi:
+                        st.error("Bazı kayıtlar güncellenemedi:\n" + "\n".join(_yf_kayit_hatasi))
+                    else:
+                        st.info("Herhangi bir değişiklik bulunamadı.")
             else:
                 st.caption(f"✅ '{_yf_ara}' ile eşleşen kayıtlı müşteri yok — yeni firma olarak güvenle eklenebilir.")
         st.divider()
