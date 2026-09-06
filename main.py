@@ -5141,106 +5141,6 @@ function kartSec(id){
     # ── GELİŞMİŞ FİLTRE PANEL ────────────────────────────────────────────────
     _cok_secili_idler = set()
     with st.expander("🔍 Filtreler & Arama", expanded=False):
-        # ── YENİ FİRMA KONTROLÜ — "Satır Ekle" ile elle firma adı yazmadan önce,
-        # aynı/benzer isimde zaten kayıtlı müşteri var mı diye anlık arama.
-        # ÖNEMLİ: Kelime kelime ayrı ayrı arama YAPILMAZ — yazılan ifade (boşluk/nokta
-        # farkları yok sayılarak) ART ARDA/BÜTÜN olarak firma adında geçiyor mu diye
-        # bakılır. Örn. "KAPKA HEDİ" yazınca sadece "KAPKA HEDİYELİK..." gibi bu ifadeyi
-        # ard arda içeren firmalar gelir; sadece "HEDİ" geçen alakasız firmalar gelmez.
-        _yf_ara = st.text_input("🔍 Yeni firma eklemeden önce kontrol et",
-                                 key="_cl_yeni_firma_ara", placeholder="Firma adının bir kısmını veya tamamını yazın...")
-        if _yf_ara and _yf_ara.strip() and "firma" in df.columns:
-            def _yf_norm(_s):
-                return (str(_s).upper().replace("İ", "I").replace("Ş", "S")
-                        .replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C"))
-            _yf_q_bosluksuz = _yf_norm(_yf_ara.strip()).replace(" ", "").replace(".", "")
-            _yf_kaynak = df.copy()
-            _yf_kaynak["_yf_norm_bs"] = (_yf_kaynak["firma"].apply(_yf_norm)
-                                          .str.replace(" ", "", regex=False).str.replace(".", "", regex=False))
-            _yf_eslesen = _yf_kaynak[_yf_kaynak["_yf_norm_bs"].apply(
-                lambda _tam: bool(_yf_q_bosluksuz) and _yf_q_bosluksuz in _tam
-            )]
-            if not _yf_eslesen.empty:
-                st.caption(f"⚠️ {len(_yf_eslesen)} eşleşen kayıt bulundu — kontrol edin.")
-                _yf_kol = [c for c in ["id", "firma", "yetkili", "rakip_firma", "gsm", "sabit", "email", "adres", "ilce", "il", "aciklama"] if c in _yf_eslesen.columns]
-                _yf_gosterilecek = _yf_eslesen[_yf_kol].head(15).copy()
-                _yf_gosterilecek.insert(0, "Seç", False)
-                _yf_duzenlenen = st.data_editor(
-                    _yf_gosterilecek, use_container_width=True, hide_index=True,
-                    disabled=["id"], key="_yf_duzenle_editor", num_rows="dynamic",
-                    column_config={
-                        "Seç": st.column_config.CheckboxColumn("Seç", default=False, width="small"),
-                        "id": st.column_config.NumberColumn("ID", width="small"),
-                        "firma": st.column_config.TextColumn("firma", width="small"),
-                        "yetkili": st.column_config.TextColumn("yet", width="small"),
-                        "rakip_firma": st.column_config.TextColumn("Öze", width="small"),
-                        "gsm": st.column_config.TextColumn("gsm", width="small"),
-                        "sabit": st.column_config.TextColumn("sabit", width="small"),
-                        "email": st.column_config.TextColumn("em", width="small"),
-                        "adres": st.column_config.TextColumn("adres", width="small"),
-                        "ilce": st.column_config.TextColumn("ilce", width="small"),
-                        "il": st.column_config.TextColumn("il", width="small"),
-                        "aciklama": st.column_config.TextColumn("Açıklama", width="small"),
-                    }
-                )
-                if st.button("💾 Değişiklikleri Kaydet", key="_yf_duzenle_kaydet_btn"):
-                    _yf_guncellenen = 0
-                    _yf_eklenen = 0
-                    _yf_kayit_hatasi = []
-                    _sb_yf = get_sb_client()
-                    _yf_eski_idler = set(_yf_gosterilecek["id"].dropna().astype(int).tolist())
-                    for _yi in range(len(_yf_duzenlenen)):
-                        _satir_yeni = _yf_duzenlenen.iloc[_yi]
-                        _yf_id_ham = _satir_yeni.get("id")
-                        _yf_mevcut_mi = pd.notna(_yf_id_ham) and int(_yf_id_ham) in _yf_eski_idler
-                        if _yf_mevcut_mi:
-                            # Mevcut kayıt — sadece değişen alanları güncelle
-                            _satir_eski = _yf_gosterilecek[_yf_gosterilecek["id"] == int(_yf_id_ham)].iloc[0]
-                            _yf_fark = {}
-                            for _yc in _yf_kol:
-                                if _yc == "id": continue
-                                _yv, _ev = _satir_yeni[_yc], _satir_eski[_yc]
-                                _yv_str = "" if pd.isna(_yv) else str(_yv)
-                                _ev_str = "" if pd.isna(_ev) else str(_ev)
-                                if _yv_str != _ev_str:
-                                    _yf_fark[_yc] = _yv_str
-                            if _yf_fark and _sb_yf:
-                                try:
-                                    _sb_yf.table("cari_kartlar").update(_yf_fark).eq("id", int(_yf_id_ham)).execute()
-                                    _yf_guncellenen += 1
-                                except Exception as _yf_hata:
-                                    _yf_kayit_hatasi.append(f"ID {int(_yf_id_ham)}: {_yf_hata}")
-                        else:
-                            # ID yok/tanınmıyor — "Satır Ekle" ile eklenmiş YENİ kayıt
-                            _yf_yeni_kayit = {}
-                            for _yc in _yf_kol:
-                                if _yc == "id": continue
-                                _yv = _satir_yeni[_yc]
-                                if pd.notna(_yv) and str(_yv).strip():
-                                    _yf_yeni_kayit[_yc] = str(_yv).strip()
-                            if _yf_yeni_kayit.get("firma") and _sb_yf:
-                                try:
-                                    _sb_yf.table("cari_kartlar").insert(_yf_yeni_kayit).execute()
-                                    _yf_eklenen += 1
-                                except Exception as _yf_hata:
-                                    _yf_kayit_hatasi.append(f"Yeni satır ({_yf_yeni_kayit.get('firma')}): {_yf_hata}")
-                            elif not _yf_yeni_kayit.get("firma") and any(_yf_yeni_kayit.values()):
-                                _yf_kayit_hatasi.append("Yeni satır: 'firma' adı boş olamaz, kaydedilmedi.")
-                    if _yf_guncellenen or _yf_eklenen:
-                        _mesaj_parca = []
-                        if _yf_guncellenen: _mesaj_parca.append(f"{_yf_guncellenen} kayıt güncellendi")
-                        if _yf_eklenen: _mesaj_parca.append(f"{_yf_eklenen} yeni firma eklendi")
-                        st.toast(f"💾 {' · '.join(_mesaj_parca)}", icon="✅")
-                        st.cache_data.clear()
-                        st.rerun()
-                    if _yf_kayit_hatasi:
-                        st.error("Bazı satırlar kaydedilemedi:\n" + "\n".join(_yf_kayit_hatasi))
-                    if not _yf_guncellenen and not _yf_eklenen and not _yf_kayit_hatasi:
-                        st.info("Herhangi bir değişiklik bulunamadı.")
-            else:
-                st.caption(f"✅ '{_yf_ara}' ile eşleşen kayıtlı müşteri yok — yeni firma olarak güvenle eklenebilir.")
-        st.divider()
-
         # ── TEK SATIR FİLTRE ───────────────────────────────────────────────────
         if st.session_state.get("kart_sec_reset"):
             st.session_state.pop("kart_sec_reset", None)
@@ -5253,10 +5153,17 @@ function kartSec(id){
             st.session_state.pop("kart_sec_reset", None)
             st.session_state.pop("kart_sec", None)
 
-        _fc = st.columns([2, 1.5, 1.2, 1.2, 1.0, 0.8, 2, 1.2])
+        _fc = st.columns([2, 1.5, 1.2, 1.2, 1.0, 0.8, 2, 1.2, 1.6])
 
         secili_kart_inline = _fc[0].selectbox("m", kart_opts_inline, key="kart_sec_inline", label_visibility="collapsed")
         ara_txt = _fc[1].text_input("a", placeholder="🔍 Firma, yetkili, il...", key="ara_liste", label_visibility="collapsed")
+        # ── YENİ FİRMA KONTROLÜ — "Satır Ekle" ile elle firma adı yazmadan önce,
+        # aynı/benzer isimde zaten kayıtlı müşteri var mı diye anlık arama.
+        # ÖNEMLİ: Kelime kelime ayrı ayrı arama YAPILMAZ — yazılan ifade (boşluk/nokta
+        # farkları yok sayılarak) ART ARDA/BÜTÜN olarak firma adında geçiyor mu diye
+        # bakılır. Örn. "KAPKA HEDİ" yazınca sadece "KAPKA HEDİYELİK..." gibi bu ifadeyi
+        # ard arda içeren firmalar gelir; sadece "HEDİ" geçen alakasız firmalar gelmez.
+        _yf_ara = _fc[8].text_input("yf", placeholder="🔍 Yeni firma kontrol...", key="_cl_yeni_firma_ara", label_visibility="collapsed")
 
         _fk_sfx = st.session_state.get("_filtre_reset_sayac", 0)
         _asama_def = [] if st.session_state.get("_filtre_sifirla_flag") else [x for x in st.session_state.get("_cl_fil_asama_multi",[]) if x in tum_asama_opts]
@@ -5313,6 +5220,98 @@ function kartSec(id){
         for _cs in _cok_secili_ham:
             try: _cok_secili_idler.add(int(_cs.split("]")[0].replace("[","").strip()))
             except: pass
+
+        # ── YENİ FİRMA KONTROLÜ SONUCU — arama kutusu artık tek satırlık filtre
+        # barının içinde (yer kaplamasın diye); eşleşme bulununca sonuç/düzenleme
+        # tablosu burada, filtre satırının hemen altında gösteriliyor.
+        if _yf_ara and _yf_ara.strip() and "firma" in df.columns:
+            def _yf_norm(_s):
+                return (str(_s).upper().replace("İ", "I").replace("Ş", "S")
+                        .replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C"))
+            _yf_q_bosluksuz = _yf_norm(_yf_ara.strip()).replace(" ", "").replace(".", "")
+            _yf_kaynak = df.copy()
+            _yf_kaynak["_yf_norm_bs"] = (_yf_kaynak["firma"].apply(_yf_norm)
+                                          .str.replace(" ", "", regex=False).str.replace(".", "", regex=False))
+            _yf_eslesen = _yf_kaynak[_yf_kaynak["_yf_norm_bs"].apply(
+                lambda _tam: bool(_yf_q_bosluksuz) and _yf_q_bosluksuz in _tam
+            )]
+            if not _yf_eslesen.empty:
+                st.caption(f"⚠️ {len(_yf_eslesen)} eşleşen kayıt bulundu — kontrol edin.")
+                _yf_kol = [c for c in ["id", "firma", "yetkili", "rakip_firma", "gsm", "sabit", "email", "adres", "ilce", "il", "aciklama"] if c in _yf_eslesen.columns]
+                _yf_gosterilecek = _yf_eslesen[_yf_kol].head(15).copy()
+                _yf_gosterilecek.insert(0, "Seç", False)
+                _yf_duzenlenen = st.data_editor(
+                    _yf_gosterilecek, use_container_width=True, hide_index=True,
+                    disabled=["id"], key="_yf_duzenle_editor", num_rows="dynamic",
+                    column_config={
+                        "Seç": st.column_config.CheckboxColumn("Seç", default=False, width="small"),
+                        "id": st.column_config.NumberColumn("ID", width="small"),
+                        "firma": st.column_config.TextColumn("firma", width="small"),
+                        "yetkili": st.column_config.TextColumn("yet", width="small"),
+                        "rakip_firma": st.column_config.TextColumn("Öze", width="small"),
+                        "gsm": st.column_config.TextColumn("gsm", width="small"),
+                        "sabit": st.column_config.TextColumn("sabit", width="small"),
+                        "email": st.column_config.TextColumn("em", width="small"),
+                        "adres": st.column_config.TextColumn("adres", width="small"),
+                        "ilce": st.column_config.TextColumn("ilce", width="small"),
+                        "il": st.column_config.TextColumn("il", width="small"),
+                        "aciklama": st.column_config.TextColumn("Açıklama", width="small"),
+                    }
+                )
+                if st.button("💾 Değişiklikleri Kaydet", key="_yf_duzenle_kaydet_btn"):
+                    _yf_guncellenen = 0
+                    _yf_eklenen = 0
+                    _yf_kayit_hatasi = []
+                    _sb_yf = get_sb_client()
+                    _yf_eski_idler = set(_yf_gosterilecek["id"].dropna().astype(int).tolist())
+                    for _yi in range(len(_yf_duzenlenen)):
+                        _satir_yeni = _yf_duzenlenen.iloc[_yi]
+                        _yf_id_ham = _satir_yeni.get("id")
+                        _yf_mevcut_mi = pd.notna(_yf_id_ham) and int(_yf_id_ham) in _yf_eski_idler
+                        if _yf_mevcut_mi:
+                            _satir_eski = _yf_gosterilecek[_yf_gosterilecek["id"] == int(_yf_id_ham)].iloc[0]
+                            _yf_fark = {}
+                            for _yc in _yf_kol:
+                                if _yc == "id": continue
+                                _yv, _ev = _satir_yeni[_yc], _satir_eski[_yc]
+                                _yv_str = "" if pd.isna(_yv) else str(_yv)
+                                _ev_str = "" if pd.isna(_ev) else str(_ev)
+                                if _yv_str != _ev_str:
+                                    _yf_fark[_yc] = _yv_str
+                            if _yf_fark and _sb_yf:
+                                try:
+                                    _sb_yf.table("cari_kartlar").update(_yf_fark).eq("id", int(_yf_id_ham)).execute()
+                                    _yf_guncellenen += 1
+                                except Exception as _yf_hata:
+                                    _yf_kayit_hatasi.append(f"ID {int(_yf_id_ham)}: {_yf_hata}")
+                        else:
+                            _yf_yeni_kayit = {}
+                            for _yc in _yf_kol:
+                                if _yc == "id": continue
+                                _yv = _satir_yeni[_yc]
+                                if pd.notna(_yv) and str(_yv).strip():
+                                    _yf_yeni_kayit[_yc] = str(_yv).strip()
+                            if _yf_yeni_kayit.get("firma") and _sb_yf:
+                                try:
+                                    _sb_yf.table("cari_kartlar").insert(_yf_yeni_kayit).execute()
+                                    _yf_eklenen += 1
+                                except Exception as _yf_hata:
+                                    _yf_kayit_hatasi.append(f"Yeni satır ({_yf_yeni_kayit.get('firma')}): {_yf_hata}")
+                            elif not _yf_yeni_kayit.get("firma") and any(_yf_yeni_kayit.values()):
+                                _yf_kayit_hatasi.append("Yeni satır: 'firma' adı boş olamaz, kaydedilmedi.")
+                    if _yf_guncellenen or _yf_eklenen:
+                        _mesaj_parca = []
+                        if _yf_guncellenen: _mesaj_parca.append(f"{_yf_guncellenen} kayıt güncellendi")
+                        if _yf_eklenen: _mesaj_parca.append(f"{_yf_eklenen} yeni firma eklendi")
+                        st.toast(f"💾 {' · '.join(_mesaj_parca)}", icon="✅")
+                        st.cache_data.clear()
+                        st.rerun()
+                    if _yf_kayit_hatasi:
+                        st.error("Bazı satırlar kaydedilemedi:\n" + "\n".join(_yf_kayit_hatasi))
+                    if not _yf_guncellenen and not _yf_eklenen and not _yf_kayit_hatasi:
+                        st.info("Herhangi bir değişiklik bulunamadı.")
+            else:
+                st.caption(f"✅ '{_yf_ara}' ile eşleşen kayıtlı müşteri yok — yeni firma olarak güvenle eklenebilir.")
 
         # ── Çoklu Firma Taslakları — seçili firmaları isimle kaydet, sonra tek tıkla geri yükle ──
         if "_cok_firma_taslaklar" not in st.session_state:
