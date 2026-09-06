@@ -12348,8 +12348,13 @@ elif aktif == "e_tablo":
                     json={"islem": "ekle", "veri": {"Firma": f"TEST — MWCRMPRO {_gs_dt.datetime.now().strftime('%H:%M:%S')}"}},
                     timeout=15
                 )
-                st.json(_test_yanit.json())
-                st.success("✅ İstek gönderildi — e-tabloya bakıp yeni bir 'TEST — MWCRMPRO ...' satırı eklendiğini kontrol et.")
+                st.caption(f"HTTP durum kodu: {_test_yanit.status_code}")
+                try:
+                    st.json(_test_yanit.json())
+                    st.success("✅ İstek gönderildi — e-tabloya bakıp yeni bir 'TEST — MWCRMPRO ...' satırı eklendiğini kontrol et.")
+                except Exception:
+                    st.error("⚠️ Yanıt JSON değil — Google'dan gelen ham cevap aşağıda (muhtemelen erişim/yetki sorunu):")
+                    st.code(_test_yanit.text[:2000] if _test_yanit.text else "(BOŞ YANIT)")
             except Exception as _gs_test_hata:
                 st.error(f"⚠️ Test başarısız: {_gs_test_hata}")
 
