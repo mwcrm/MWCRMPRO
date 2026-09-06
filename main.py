@@ -12286,6 +12286,10 @@ elif aktif == "e_tablo":
             _gs_tum_sayfalar = None
             st.error(f"⚠️ E-tablo okunamadı: {_gs_okuma_hata}")
 
+        if _gs_tum_sayfalar is not None and not _gs_tum_sayfalar:
+            st.warning("⚠️ Bağlantı çalıştı ama e-tabloda hiç sekme/veri bulunamadı. "
+                       "Apps Script'in doğru e-tabloya bağlı olduğundan emin olun.")
+
         if _gs_tum_sayfalar:
             _gs_sekme_adlari = list(_gs_tum_sayfalar.keys())
             st.success(f"✅ Bağlı — {len(_gs_sekme_adlari)} sekme bulundu: {', '.join(_gs_sekme_adlari)}")
