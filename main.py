@@ -10150,12 +10150,48 @@ elif aktif == "excel":
                             st.code(h)
 
             # ── TASLAK: Şüpheli Mükerrer Kayıtlar — henüz sisteme ID almadılar ──
+            if "_ex_tas_gecilen" not in st.session_state:
+                st.session_state["_ex_tas_gecilen"] = set()
+            _ex_taslak_kayitlar = [tk for _ti0, tk in enumerate(_ex_taslak_kayitlar)
+                                    if f"{tk['firma']}_{_ti0}" not in st.session_state["_ex_tas_gecilen"]]
             if _ex_taslak_kayitlar:
                 st.divider()
                 st.warning(f"⚠️ {len(_ex_taslak_kayitlar)} kayıt taslakta bekliyor — bunlara henüz ID verilmedi, sisteme eklenmedi. "
-                           "Aşağıda mevcut kayıtla karşılaştırıp siz karar verin.")
+                           "Aşağıda mevcut kayıtla karşılaştırıp siz karar verin: aynen ekleyin, düzenleyip ekleyin, ya da vazgeçin.")
+
+                # ── Şüpheli mükerrer karşılaştırma listesini Excel olarak indir ──
+                _ex_indir_satirlar = []
+                for _tk_i in _ex_taslak_kayitlar:
+                    _es_i = _tk_i["_eslesen"][0] if _tk_i["_eslesen"] else {}
+                    _ex_indir_satirlar.append({
+                        "Sebep": _tk_i.get("_sebep", ""),
+                        "Excel - Firma": _tk_i.get("firma", ""),
+                        "Excel - Yetkili": _tk_i.get("yetkili", ""),
+                        "Excel - GSM": _tk_i.get("gsm", ""),
+                        "Excel - Sabit": _tk_i.get("sabit", ""),
+                        "Excel - İl": _tk_i.get("il", ""),
+                        "Excel - İlçe": _tk_i.get("ilce", ""),
+                        "Excel - Hedef Ciro": _tk_i.get("beklenen_ciro", 0),
+                        "Sistem - ID": _es_i.get("id", ""),
+                        "Sistem - Firma": _es_i.get("firma", ""),
+                        "Sistem - Yetkili": _es_i.get("yetkili", ""),
+                        "Sistem - GSM": _es_i.get("gsm", ""),
+                        "Sistem - Sabit": _es_i.get("sabit", ""),
+                        "Sistem - İl": _es_i.get("il", ""),
+                        "Sistem - İlçe": _es_i.get("ilce", ""),
+                        "Sistem - Hedef Ciro": _es_i.get("beklenen_ciro", 0),
+                    })
+                _ex_indir_buf = io.BytesIO()
+                pd.DataFrame(_ex_indir_satirlar).to_excel(_ex_indir_buf, index=False, engine="openpyxl")
+                _ex_indir_buf.seek(0)
+                st.download_button("📥 Şüpheli Mükerrer Listesini Excel Olarak İndir", data=_ex_indir_buf,
+                                    file_name=f"mukerrer_karsilastirma_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                    key="ex_tas_excel_indir")
+
                 with st.expander(f"🔍 Taslaktaki {len(_ex_taslak_kayitlar)} şüpheli kaydı incele", expanded=True):
                     for _ti, _tk in enumerate(_ex_taslak_kayitlar):
+                        _ex_tas_anahtar = f"{_tk['firma']}_{_ti}"
                         st.markdown(f"**{_tk['firma']}** — *{_tk['_sebep']}*")
                         _tc1, _tc2 = st.columns(2)
                         with _tc1:
@@ -10174,9 +10210,11 @@ elif aktif == "excel":
                                         f"Hedef ciro: {float(_es.get('beklenen_ciro') or 0):,.0f} ₺")
                             else:
                                 st.caption("💾 Excel dosyasının kendi içinde tekrar ediyor")
-                        _tb1, _tb2 = st.columns(2)
+
+                        _ex_duzenle_flag_key = f"_ex_tas_duzenle_acik_{_ex_tas_anahtar}"
+                        _tb1, _tb2, _tb3 = st.columns(3)
                         with _tb1:
-                            if st.button("✅ Yine de yeni kayıt olarak ekle", key=f"ex_tas_ekle_{_ti}", use_container_width=True):
+                            if st.button("✅ Aynen Ekle", key=f"ex_tas_ekle_{_ex_tas_anahtar}", use_container_width=True):
                                 _sb_tas = get_sb_client()
                                 if _sb_tas:
                                     try:
@@ -10189,6 +10227,47 @@ elif aktif == "excel":
                                     except Exception as _tase:
                                         st.error(f"Hata: {_tase}")
                         with _tb2:
+                            if st.button("✏️ Düzenle", key=f"ex_tas_duzenle_btn_{_ex_tas_anahtar}", use_container_width=True):
+                                st.session_state[_ex_duzenle_flag_key] = not st.session_state.get(_ex_duzenle_flag_key, False)
+                                st.rerun()
+                        with _tb3:
+                            if st.button("❌ Vazgeç (atla)", key=f"ex_tas_vazgec_{_ex_tas_anahtar}", use_container_width=True):
+                                st.session_state["_ex_tas_gecilen"].add(_ex_tas_anahtar)
+                                st.toast(f"❌ '{_tk['firma']}' atlandı — bir daha bu incelemede görünmeyecek", icon="❌")
+                                st.rerun()
+
+                        if st.session_state.get(_ex_duzenle_flag_key, False):
+                            with st.form(key=f"ex_tas_duzenle_form_{_ex_tas_anahtar}"):
+                                st.caption("Kaydetmeden önce alanları düzenleyebilirsin:")
+                                _dc1, _dc2 = st.columns(2)
+                                _dz_firma = _dc1.text_input("Firma", value=_tk.get("firma",""))
+                                _dz_yetkili = _dc2.text_input("Yetkili", value=_tk.get("yetkili",""))
+                                _dz_gsm = _dc1.text_input("GSM", value=_tk.get("gsm",""))
+                                _dz_sabit = _dc2.text_input("Sabit", value=_tk.get("sabit",""))
+                                _dz_email = _dc1.text_input("Email", value=_tk.get("email",""))
+                                _dz_adres = _dc2.text_input("Adres", value=_tk.get("adres",""))
+                                _dz_il = _dc1.text_input("İl", value=_tk.get("il",""))
+                                _dz_ilce = _dc2.text_input("İlçe", value=_tk.get("ilce",""))
+                                _dz_hedef = _dc1.number_input("Hedef ciro", value=float(_tk.get("beklenen_ciro",0) or 0))
+                                if st.form_submit_button("💾 Düzenlediğimi Kaydet ve Ekle", type="primary"):
+                                    _sb_tas2 = get_sb_client()
+                                    if _sb_tas2:
+                                        try:
+                                            _tk_duzenlenmis = {k: v for k, v in _tk.items() if not k.startswith("_")}
+                                            _tk_duzenlenmis.update({
+                                                "firma": _dz_firma, "yetkili": _dz_yetkili, "gsm": _dz_gsm,
+                                                "sabit": _dz_sabit, "email": _dz_email, "adres": _dz_adres,
+                                                "il": _dz_il, "ilce": _dz_ilce, "beklenen_ciro": _dz_hedef,
+                                            })
+                                            _sb_tas2.table("cari_kartlar").insert(_tk_duzenlenmis).execute()
+                                            try: get_cari_listesi.clear()
+                                            except: pass
+                                            st.session_state["_ex_tas_gecilen"].add(_ex_tas_anahtar)
+                                            st.toast(f"✅ '{_dz_firma}' düzenlenmiş haliyle eklendi (yeni ID verildi)", icon="✅")
+                                            st.rerun()
+                                        except Exception as _tase2:
+                                            st.error(f"Hata: {_tase2}")
+                        else:
                             st.caption("Hiçbir şey yapmazsanız bu kayıt sisteme eklenmez, taslakta kalır.")
                         st.markdown("---")
 
