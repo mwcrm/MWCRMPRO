@@ -5146,6 +5146,19 @@ function kartSec(id){
             st.session_state.pop("kart_sec_reset", None)
             st.session_state.pop("kart_sec", None)
 
+        # ── ÜST SATIR — Yeni firma kontrol arama kutusu ve Özel filtresi, en başta ──
+        _fc0 = st.columns([2, 2, 6])
+        # ── YENİ FİRMA KONTROLÜ — "Satır Ekle" ile elle firma adı yazmadan önce,
+        # aynı/benzer isimde zaten kayıtlı müşteri var mı diye anlık arama.
+        # ÖNEMLİ: Kelime kelime ayrı ayrı arama YAPILMAZ — yazılan ifade (boşluk/nokta
+        # farkları yok sayılarak) ART ARDA/BÜTÜN olarak firma adında geçiyor mu diye
+        # bakılır. Örn. "KAPKA HEDİ" yazınca sadece "KAPKA HEDİYELİK..." gibi bu ifadeyi
+        # ard arda içeren firmalar gelir; sadece "HEDİ" geçen alakasız firmalar gelmez.
+        _yf_ara = _fc0[0].text_input("yf", placeholder="🔍 Yeni firma kontrol...", key="_cl_yeni_firma_ara", label_visibility="collapsed")
+        _ozel_opts = sorted(df["rakip_firma"].dropna().astype(str).unique().tolist()) if "rakip_firma" in df.columns else []
+        _ozel_opts = [x for x in _ozel_opts if x not in ["", "nan", "None"]]
+        _ozel_sec = _fc0[1].multiselect("oz", _ozel_opts, key="_cl_fil_ozel_multi", placeholder="🔍 Özel filtrele...", label_visibility="collapsed")
+
         kart_opts_inline = ["-- Müşteri Seçin --", "🔵 Tüm Firmalar"]
         if not df.empty and "firma" in df.columns and "id" in df.columns:
             kart_opts_inline += [f"[{int(i)}] {f}" for i, f in zip(df["id"], df["firma"]) if str(f) not in ["","nan","None"]]
@@ -5153,20 +5166,13 @@ function kartSec(id){
             st.session_state.pop("kart_sec_reset", None)
             st.session_state.pop("kart_sec", None)
 
-        _fc = st.columns([2, 1.5, 1.2, 1.2, 1.0, 0.8, 2, 1.2, 1.6])
+        _fc = st.columns([2, 1.5, 1.2, 1.2, 1.0, 0.8, 2, 1.2])
 
         secili_kart_inline = _fc[0].selectbox("m", kart_opts_inline, key="kart_sec_inline", label_visibility="collapsed")
         # Genel serbest metin arama kutusu kullanıcı isteğiyle kaldırıldı — ara_txt
         # boş sabit tutuluyor (aşağıdaki filtreleme mantığı buna bağlı olduğu için
         # değişkeni koruyoruz, sadece görünür arama kutusunu kaldırdık).
         ara_txt = ""
-        # ── YENİ FİRMA KONTROLÜ — "Satır Ekle" ile elle firma adı yazmadan önce,
-        # aynı/benzer isimde zaten kayıtlı müşteri var mı diye anlık arama.
-        # ÖNEMLİ: Kelime kelime ayrı ayrı arama YAPILMAZ — yazılan ifade (boşluk/nokta
-        # farkları yok sayılarak) ART ARDA/BÜTÜN olarak firma adında geçiyor mu diye
-        # bakılır. Örn. "KAPKA HEDİ" yazınca sadece "KAPKA HEDİYELİK..." gibi bu ifadeyi
-        # ard arda içeren firmalar gelir; sadece "HEDİ" geçen alakasız firmalar gelmez.
-        _yf_ara = _fc[8].text_input("yf", placeholder="🔍 Yeni firma kontrol...", key="_cl_yeni_firma_ara", label_visibility="collapsed")
 
         _fk_sfx = st.session_state.get("_filtre_reset_sayac", 0)
         _asama_def = [] if st.session_state.get("_filtre_sifirla_flag") else [x for x in st.session_state.get("_cl_fil_asama_multi",[]) if x in tum_asama_opts]
@@ -5208,7 +5214,7 @@ function kartSec(id){
 
         # Manuel filtre kutularından biri (Aşama, Durum, Arama, İl, İlçe, Tarih) kullanıldıysa
         # 'Toplam' modu otomatik kapanır — aksi halde seçim görünür ama uygulanmaz
-        if ara_txt or _asama_sec or _durum_sec or _il_sec or _ilce_sec or _guncelleme_tarih_sec:
+        if ara_txt or _asama_sec or _durum_sec or _il_sec or _ilce_sec or _guncelleme_tarih_sec or _ozel_sec:
             st.session_state["_toplam_aktif"] = False
 
         # Çoklu firma seçimi — filtre satırında son sütun
@@ -5391,7 +5397,7 @@ function kartSec(id){
     df_f = df.copy()
     # Toplam aktifse tüm filtreleri zorla sıfırla
     if st.session_state.get("_toplam_aktif", False):
-        ara_txt = ""; _asama_sec = []; _durum_sec = []; _il_sec = []; _ilce_sec = []; _tem_sec = []; filtre_seg = "Tümü"; _guncelleme_tarih_sec = []
+        ara_txt = ""; _asama_sec = []; _durum_sec = []; _il_sec = []; _ilce_sec = []; _tem_sec = []; filtre_seg = "Tümü"; _guncelleme_tarih_sec = []; _ozel_sec = []
         for _fk in ["_cl_fil_asama1","_cl_fil_asama2","_cl_fil_asama3","_cl_fil_sonuc"]:
             st.session_state.pop(_fk, None)
     # Aşamasız filtresi
@@ -5459,6 +5465,8 @@ function kartSec(id){
             df_f = df_f[df_f["il"].astype(str).isin(_il_sec)]
         if _ilce_sec:
             df_f = df_f[df_f["ilce"].astype(str).isin(_ilce_sec)]
+        if _ozel_sec and "rakip_firma" in df_f.columns:
+            df_f = df_f[df_f["rakip_firma"].astype(str).isin(_ozel_sec)]
         if _tem_sec:
             df_f = df_f[df_f["temsilci"].astype(str).isin(_tem_sec)]
         if _guncelleme_tarih_sec:
@@ -5595,7 +5603,7 @@ function kartSec(id){
                        "muhtemelen arşivlenmiş/silinmiş ya da başka bir kullanıcı tarafından kaldırılmış. "
                        "Bu bir gösterim sınırı değil, o kayıtlar artık mevcut değil.")
 
-    _aktif_fil_sayisi = sum([bool(ara_txt),bool(_asama_sec),bool(_durum_sec),filtre_seg!="Tümü",bool(_il_sec),bool(_ilce_sec),bool(_tem_sec),bool(_guncelleme_tarih_sec)])
+    _aktif_fil_sayisi = sum([bool(ara_txt),bool(_asama_sec),bool(_durum_sec),filtre_seg!="Tümü",bool(_il_sec),bool(_ilce_sec),bool(_tem_sec),bool(_guncelleme_tarih_sec),bool(_ozel_sec)])
     if secili_kart != "-- Müşteri Seçin --" and "[" in secili_kart:
         try:
             kart_id = int(secili_kart.split("]")[0].replace("[","").strip())
