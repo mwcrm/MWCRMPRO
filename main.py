@@ -5185,7 +5185,10 @@ function kartSec(id){
                 lambda _tam: bool(_yf_q_bosluksuz) and _yf_q_bosluksuz in _tam
             )]
             if not _yf_eslesen.empty:
-                st.caption(f"⚠️ '{_yf_ara}' ile eşleşen {len(_yf_eslesen)} kayıtlı müşteri bulundu — mükerrer girmemek için kontrol edin.")
+                st.markdown(
+                    f"<div style='font-size:10px;color:#94a3b8;line-height:1.2;margin:2px 0;'>"
+                    f"⚠️ '{_yf_ara}' ile eşleşen {len(_yf_eslesen)} kayıtlı müşteri bulundu — mükerrer girmemek için kontrol edin.</div>",
+                    unsafe_allow_html=True)
                 _yf_kol = [c for c in ["id", "firma", "yetkili", "rakip_firma", "gsm", "sabit", "email", "adres", "ilce", "il", "aciklama"] if c in _yf_eslesen.columns]
                 _yf_gosterilecek = _yf_eslesen[_yf_kol].head(15).copy()
                 _yf_gosterilecek.insert(0, "Seç", False)
