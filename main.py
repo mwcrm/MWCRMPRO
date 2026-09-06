@@ -2809,7 +2809,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "dis_nakliye_toplu", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "rapor", "excel", "e_tablo", "kullanici", "admin_rapor", "harita", "mukerrer"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "dis_nakliye_toplu", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "mukerrer"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -2818,7 +2818,6 @@ _TAB_ETIKETLER = {
     "kayitli_teklifler": "📋 Kayıtlı Teklifler",
     "sozlesme": "📜 Sözleşmeler",
     "excel": "📥 Excel Aktar",
-    "e_tablo": "📊 E-Tablo",
     "dis_nakliye": "🚚 Dış Nakliye",
     "dis_nakliye_toplu": "🚚 Dış Nakliyeler Listesi",
     
@@ -3270,7 +3269,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
     </style>""", unsafe_allow_html=True)
 
     _MENU_GRUPLARI = [
-        ("🧾 Cari işlemleri",    ["yeni", "liste", "dis_nakliye_toplu", "excel", "e_tablo", "mukerrer"]),
+        ("🧾 Cari işlemleri",    ["yeni", "liste", "dis_nakliye_toplu", "excel", "mukerrer"]),
         ("📅 Randevu ve teklif", ["randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler"]),
         ("🚚 Saha",              ["harita"]),
         ("⚙️ Yönetim",          ["kullanici"]),
@@ -9921,17 +9920,10 @@ elif aktif == "excel":
 
     st.divider()
 
-    if st.session_state.get("_gs_df_hazir") is not None:
-        st.info(f"📊 '📊 E-Tablo' sayfasından aktarılan {len(st.session_state['_gs_df_hazir'])} satır kullanılıyor. "
-                "Farklı bir Excel dosyası yüklersen o öncelikli olur.")
-
     yukl_dosya = st.file_uploader("Excel dosyası yükle", type=["xlsx","xls"], key="excel_yukle")
 
     if yukl_dosya is not None:
         df_yukl = pd.read_excel(yukl_dosya)
-        df_yukl.columns = [str(c).strip().lower().replace(" ","_") for c in df_yukl.columns]
-    elif st.session_state.get("_gs_df_hazir") is not None:
-        df_yukl = st.session_state["_gs_df_hazir"].copy()
         df_yukl.columns = [str(c).strip().lower().replace(" ","_") for c in df_yukl.columns]
     else:
         df_yukl = None
@@ -12217,191 +12209,6 @@ elif aktif == "admin_rapor":
                             st.rerun()
 
 
-
-elif aktif == "e_tablo":
-    sayfa_log("e_tablo")
-    st.markdown("## 📊 Google E-Tablo ile Tam Senkronizasyon")
-    st.caption("Kaç sekme/veri varsa hepsi aynen burada görünür. Salt-okunur modda "
-               "10 saniyede bir otomatik yenilenir; '✏️ Düzenle' modunda değişiklik "
-               "yapıp e-tabloya geri gönderebilirsin.")
-
-    # Tek bağlantı — Apps Script Web App URL, hem okuma (GET) hem yazma (POST) için.
-    if "_gs_yazma_url" not in st.session_state:
-        st.session_state["_gs_yazma_url"] = ""
-        try:
-            _sb_gsw_init = get_sb_client()
-            if _sb_gsw_init:
-                _r_gsw_init = _sb_gsw_init.table("kullanici_tercih").select("deger").eq("kullanici", "__liste_ui__").eq("anahtar", "_gs_yazma_url").execute()
-                if _r_gsw_init.data:
-                    st.session_state["_gs_yazma_url"] = _r_gsw_init.data[0]["deger"]
-        except Exception:
-            pass
-
-    _gs_yazma_url_giris = st.text_input("Apps Script Web App URL (hem okuma hem yazma)",
-                                         value=st.session_state.get("_gs_yazma_url", ""),
-                                         placeholder="https://script.google.com/macros/s/AKfycb.../exec",
-                                         key="_gs_yazma_url_input")
-    _gswc1, _gswc2 = st.columns([1, 1])
-    if _gswc1.button("💾 Bağlantıyı Kaydet", key="_gs_yazma_kaydet_btn", use_container_width=True, type="primary"):
-        if _gs_yazma_url_giris.strip():
-            st.session_state["_gs_yazma_url"] = _gs_yazma_url_giris.strip()
-            try:
-                _sb_gsw = get_sb_client()
-                if _sb_gsw:
-                    _sb_gsw.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_gs_yazma_url").execute()
-                    _sb_gsw.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_gs_yazma_url", "deger": _gs_yazma_url_giris.strip()}).execute()
-            except Exception:
-                pass
-            st.toast("💾 Bağlantı kaydedildi", icon="🔗")
-            st.rerun()
-        else:
-            st.warning("Önce bir link yapıştırın.")
-    _gs_yenile = _gswc2.button("🔄 Şimdi Kontrol Et", key="_gs_yenile_btn", use_container_width=True)
-
-    st.divider()
-
-    _gs_aktif_url = st.session_state.get("_gs_yazma_url", "")
-    if not _gs_aktif_url:
-        st.info("💡 Yukarıya Apps Script Web App bağlantısını yapıştırıp kaydedin.")
-    else:
-        import requests as _gs_requests
-
-        # ── HIZ İÇİN: önce sadece sekme İSİMLERİNİ çekiyoruz (çok hızlı),
-        # seçilen sekmenin VERİSİNİ ise ayrı ve sadece o an gerektiğinde
-        # çekiyoruz. Tüm sekmelerin tüm verisini tek seferde çekmek (eski
-        # yöntem) büyük tablolarda 20 saniyeyi aşıp zaman aşımına yol açıyordu.
-        @st.cache_data(ttl=30, show_spinner=False)
-        def _gs_sekme_adlari_oku(_url):
-            _r = _gs_requests.get(_url, timeout=30)
-            try:
-                _j = _r.json()
-            except Exception:
-                raise Exception(f"HTTP {_r.status_code} — JSON değil, ham yanıt: {_r.text[:500]}")
-            if _j.get("durum") != "ok":
-                raise Exception(_j.get("mesaj", "bilinmeyen hata"))
-            return _j["sheet_adlari"]
-
-        @st.cache_data(ttl=10, show_spinner=False)
-        def _gs_sekme_verisi_oku(_url, _sekme_adi):
-            _r = _gs_requests.get(_url, params={"sheet": _sekme_adi}, timeout=45)
-            try:
-                _j = _r.json()
-            except Exception:
-                raise Exception(f"HTTP {_r.status_code} — JSON değil, ham yanıt: {_r.text[:500]}")
-            if _j.get("durum") != "ok":
-                raise Exception(_j.get("mesaj", "bilinmeyen hata"))
-            return _j.get("headers", []), _j.get("rows", [])
-
-        if _gs_yenile:
-            _gs_sekme_adlari_oku.clear()
-            _gs_sekme_verisi_oku.clear()
-
-        try:
-            _gs_sekme_adlari = _gs_sekme_adlari_oku(_gs_aktif_url)
-        except Exception as _gs_okuma_hata:
-            _gs_sekme_adlari = None
-            st.error(f"⚠️ Sekme listesi okunamadı: {_gs_okuma_hata}")
-
-        if _gs_sekme_adlari is not None and not _gs_sekme_adlari:
-            st.warning("⚠️ Bağlantı çalıştı ama e-tabloda hiç sekme bulunamadı.")
-
-        if _gs_sekme_adlari:
-            st.success(f"✅ Bağlı — {len(_gs_sekme_adlari)} sekme bulundu: {', '.join(_gs_sekme_adlari)}")
-
-            _gs_sec_sekme = st.selectbox("Görüntülenecek sekme", _gs_sekme_adlari, key="_gs_sec_sekme")
-            _gs_duzenle_mod = st.toggle("✏️ Düzenle", key="_gs_duzenle_mod",
-                                         help="Açıkken bu sekmede değişiklik yapıp e-tabloya geri gönderebilirsin. "
-                                              "Açıkken otomatik yenileme DURUR (değişikliklerin kaybolmaması için).")
-
-            try:
-                _gs_basliklar, _gs_satirlar = _gs_sekme_verisi_oku(_gs_aktif_url, _gs_sec_sekme)
-            except Exception as _gs_veri_hata:
-                _gs_basliklar, _gs_satirlar = [], []
-                st.error(f"⚠️ '{_gs_sec_sekme}' sekmesi okunamadı: {_gs_veri_hata}")
-
-            # Sütun adları boş/tekrarlı olabilir — pandas için güvenli hale getir
-            _gs_kol_guvenli = []
-            _gs_gorulen = {}
-            for _ci, _cad in enumerate(_gs_basliklar):
-                _cad2 = str(_cad).strip() if str(_cad).strip() else f"Sütun{_ci+1}"
-                _gorulen_sayi = _gs_gorulen.get(_cad2, 0)
-                _gs_gorulen[_cad2] = _gorulen_sayi + 1
-                _gs_kol_guvenli.append(_cad2 if _gorulen_sayi == 0 else f"{_cad2}_{_gorulen_sayi}")
-            _gs_df_sekme = pd.DataFrame(_gs_satirlar, columns=_gs_kol_guvenli if _gs_kol_guvenli else None)
-
-            if not _gs_duzenle_mod:
-                st.markdown("<script>setTimeout(function(){ window.parent.location.reload(); }, 10000);</script>", unsafe_allow_html=True)
-                st.caption(f"🔄 Bu sayfa açıkken her 10 saniyede bir otomatik yenilenir  ·  {len(_gs_df_sekme)} satır")
-                st.dataframe(_gs_df_sekme, use_container_width=True, hide_index=True)
-                st.divider()
-                if st.button("📥 Bu Sekmeyi Cari Listeye Aktarmaya Hazırla →", key="_gs_aktar_hazirla"):
-                    st.session_state["_gs_df_hazir"] = _gs_df_sekme
-                    st.session_state["aktif_tab"] = "excel"
-                    st.toast("📊 Veri hazırlandı — 'Excel Aktar' sayfasında devam edin", icon="📥")
-                    st.rerun()
-            else:
-                st.caption(f"✏️ Düzenleme modu — {len(_gs_df_sekme)} satır. Değişiklik yapıp aşağıdaki butonla gönder.")
-                _gs_duzenlenen = st.data_editor(_gs_df_sekme, use_container_width=True, num_rows="fixed",
-                                                 key=f"_gs_editor_{_gs_sec_sekme}")
-                if st.button("💾 Değişiklikleri E-Tabloya Gönder", type="primary", key="_gs_gonder_btn"):
-                    _gs_degisen_satir = 0
-                    _gs_hatalar = []
-                    for _ri in range(len(_gs_duzenlenen)):
-                        _satir_yeni = _gs_duzenlenen.iloc[_ri]
-                        _satir_eski = _gs_df_sekme.iloc[_ri]
-                        _fark = {}
-                        for _col in _gs_kol_guvenli:
-                            _yv = _satir_yeni[_col]
-                            _ev = _satir_eski[_col]
-                            if str(_yv) != str(_ev):
-                                # Apps Script'e gönderirken GERÇEK (orijinal) sütun başlığını kullan
-                                _orijinal_ad = _gs_basliklar[_gs_kol_guvenli.index(_col)]
-                                _fark[_orijinal_ad] = _yv
-                        if _fark:
-                            try:
-                                _resp = _gs_requests.post(_gs_aktif_url, json={
-                                    "sheet": _gs_sec_sekme, "islem": "satir_guncelle",
-                                    "satir_no": _ri + 2,  # +1 başlık satırı, +1 index->satır no
-                                    "veri": _fark
-                                }, timeout=30)
-                                if _resp.json().get("durum") == "ok":
-                                    _gs_degisen_satir += 1
-                                else:
-                                    _gs_hatalar.append(f"Satır {_ri+2}: {_resp.json().get('mesaj')}")
-                            except Exception as _gs_gonder_hata:
-                                _gs_hatalar.append(f"Satır {_ri+2}: {_gs_gonder_hata}")
-                    if _gs_degisen_satir:
-                        st.toast(f"💾 {_gs_degisen_satir} satır e-tabloya gönderildi", icon="✅")
-                        _gs_sekme_verisi_oku.clear()
-                    if _gs_hatalar:
-                        st.error("Bazı satırlar gönderilemedi:\n" + "\n".join(_gs_hatalar))
-                    if not _gs_degisen_satir and not _gs_hatalar:
-                        st.info("Herhangi bir değişiklik bulunamadı.")
-
-    st.divider()
-    with st.expander("🧪 Test Satırı Gönder (bağlantıyı doğrulamak için)", expanded=False):
-        if st.button("🧪 Test Satırı Gönder", key="_gs_yazma_test_btn"):
-            _gs_test_url = st.session_state.get("_gs_yazma_url", "")
-            if not _gs_test_url:
-                st.warning("Önce bağlantıyı kaydedin.")
-            else:
-                try:
-                    import requests as _gs_requests2
-                    import datetime as _gs_dt
-                    _test_yanit = _gs_requests2.post(
-                        _gs_test_url,
-                        json={"islem": "ekle", "veri": {"Firma": f"TEST — MWCRMPRO {_gs_dt.datetime.now().strftime('%H:%M:%S')}"}},
-                        timeout=15
-                    )
-                    st.caption(f"HTTP durum kodu: {_test_yanit.status_code}")
-                    try:
-                        st.json(_test_yanit.json())
-                        st.success("✅ İstek gönderildi.")
-                    except Exception:
-                        st.error("⚠️ Yanıt JSON değil:")
-                        st.code(_test_yanit.text[:2000] if _test_yanit.text else "(BOŞ YANIT)")
-                except Exception as _gs_test_hata:
-                    st.error(f"⚠️ Test başarısız: {_gs_test_hata}")
 
 elif aktif == "harita":
     sayfa_log("harita")
