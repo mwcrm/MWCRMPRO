@@ -10038,18 +10038,35 @@ elif aktif == "excel":
 
             # ── ID ALMADAN ÖNCE MÜKERRER TESPİTİ ──────────────────────────────
             # Her müşterinin ID'si kalıcıdır, asla değişmez — bu yüzden sisteme
-            # ID vererek eklemeden önce, firma adı hâlihazırda var mı diye bakılır.
+            # ID vererek eklemeden önce, firma adı VEYA telefon numarası
+            # hâlihazırda var mı diye bakılır (ikisinden biri eşleşirse şüpheli
+            # mükerrer sayılır, onaylanmadan sisteme eklenmez).
             _ex_mevcut_df = get_cari_listesi()
             _ex_mevcut_isimler = {}
+            _ex_mevcut_telefonlar = {}
+
+            def _ex_tel_norm(_v):
+                _s = str(_v or "").strip()
+                _s = "".join(ch for ch in _s if ch.isdigit())
+                if _s.endswith(".0"):  # ihtimale karşı, zaten yukarıda digit filtrelendi ama garanti olsun
+                    _s = _s[:-2]
+                # Baştaki 0/90 farklarını yok say — son 10 haneyi karşılaştır
+                return _s[-10:] if len(_s) >= 10 else _s
+
             if not _ex_mevcut_df.empty and "firma" in _ex_mevcut_df.columns:
                 for _, _mr in _ex_mevcut_df.iterrows():
                     _ex_ad = str(_mr.get("firma","")).strip().upper()
                     if _ex_ad:
                         _ex_mevcut_isimler.setdefault(_ex_ad, []).append(_mr.to_dict())
+                    for _tel_kol in ["gsm", "sabit"]:
+                        _ex_tel_n = _ex_tel_norm(_mr.get(_tel_kol, ""))
+                        if _ex_tel_n:
+                            _ex_mevcut_telefonlar.setdefault(_ex_tel_n, []).append(_mr.to_dict())
 
             _ex_temiz_kayitlar = []
             _ex_taslak_kayitlar = []
             _ex_dosya_icinde_gorulen = set()
+            _ex_dosya_icinde_telefon = set()
 
             for _ei, _row in df_yukl.iterrows():
                 _ex_firma = str(_row.get("firma","") or "").strip()
@@ -10073,14 +10090,27 @@ elif aktif == "excel":
                     "silindi": 0,
                 }
                 _ex_ad_norm = _ex_firma.upper()
+                _ex_gsm_norm = _ex_tel_norm(_ex_kayit["gsm"])
+                _ex_sabit_norm = _ex_tel_norm(_ex_kayit["sabit"])
+
                 if _ex_ad_norm in _ex_mevcut_isimler:
-                    _ex_taslak_kayitlar.append({**_ex_kayit, "_sebep": "Sistemde zaten var",
+                    _ex_taslak_kayitlar.append({**_ex_kayit, "_sebep": "Firma adı sistemde zaten var",
                                                  "_eslesen": _ex_mevcut_isimler[_ex_ad_norm]})
+                elif _ex_gsm_norm and _ex_gsm_norm in _ex_mevcut_telefonlar:
+                    _ex_taslak_kayitlar.append({**_ex_kayit, "_sebep": "Telefon (GSM) numarası sistemde başka bir firmada kayıtlı",
+                                                 "_eslesen": _ex_mevcut_telefonlar[_ex_gsm_norm]})
+                elif _ex_sabit_norm and _ex_sabit_norm in _ex_mevcut_telefonlar:
+                    _ex_taslak_kayitlar.append({**_ex_kayit, "_sebep": "Sabit telefon numarası sistemde başka bir firmada kayıtlı",
+                                                 "_eslesen": _ex_mevcut_telefonlar[_ex_sabit_norm]})
                 elif _ex_ad_norm in _ex_dosya_icinde_gorulen:
                     _ex_taslak_kayitlar.append({**_ex_kayit, "_sebep": "Excel dosyasında tekrar ediyor",
                                                  "_eslesen": []})
+                elif _ex_gsm_norm and _ex_gsm_norm in _ex_dosya_icinde_telefon:
+                    _ex_taslak_kayitlar.append({**_ex_kayit, "_sebep": "Excel dosyasında aynı telefon başka satırda da var",
+                                                 "_eslesen": []})
                 else:
                     _ex_dosya_icinde_gorulen.add(_ex_ad_norm)
+                    if _ex_gsm_norm: _ex_dosya_icinde_telefon.add(_ex_gsm_norm)
                     _ex_temiz_kayitlar.append(_ex_kayit)
 
             _ex_c1, _ex_c2 = st.columns(2)
