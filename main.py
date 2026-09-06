@@ -5156,7 +5156,10 @@ function kartSec(id){
         _fc = st.columns([2, 1.5, 1.2, 1.2, 1.0, 0.8, 2, 1.2, 1.6])
 
         secili_kart_inline = _fc[0].selectbox("m", kart_opts_inline, key="kart_sec_inline", label_visibility="collapsed")
-        ara_txt = _fc[1].text_input("a", placeholder="🔍 Firma, yetkili, il...", key="ara_liste", label_visibility="collapsed")
+        # Genel serbest metin arama kutusu kullanıcı isteğiyle kaldırıldı — ara_txt
+        # boş sabit tutuluyor (aşağıdaki filtreleme mantığı buna bağlı olduğu için
+        # değişkeni koruyoruz, sadece görünür arama kutusunu kaldırdık).
+        ara_txt = ""
         # ── YENİ FİRMA KONTROLÜ — "Satır Ekle" ile elle firma adı yazmadan önce,
         # aynı/benzer isimde zaten kayıtlı müşteri var mı diye anlık arama.
         # ÖNEMLİ: Kelime kelime ayrı ayrı arama YAPILMAZ — yazılan ifade (boşluk/nokta
@@ -5343,65 +5346,6 @@ function kartSec(id){
                     }).execute()
             except Exception as _tsk_db_hata:
                 st.error(f"⚠️ Taslak veritabanına kaydedilemedi: {_tsk_db_hata}")
-
-        # İl/İlçe filtresiyle eşleşen firma ID'leri — çoklu firma kutusu boşken de taslağa kaydedebilmek için
-        _il_ilce_secili_idler = set()
-        if (_il_sec or _ilce_sec) and "id" in df.columns:
-            _df_ilfiltre_tsk = df.copy()
-            if _il_sec and "il" in _df_ilfiltre_tsk.columns:
-                _df_ilfiltre_tsk = _df_ilfiltre_tsk[_df_ilfiltre_tsk["il"].astype(str).isin(_il_sec)]
-            if _ilce_sec and "ilce" in _df_ilfiltre_tsk.columns:
-                _df_ilfiltre_tsk = _df_ilfiltre_tsk[_df_ilfiltre_tsk["ilce"].astype(str).isin(_ilce_sec)]
-            _il_ilce_secili_idler = set(int(x) for x in _df_ilfiltre_tsk["id"].dropna().astype(int).tolist())
-
-        with st.expander(f"📂 Çoklu Firma Taslakları ({len(st.session_state['_cok_firma_taslaklar'])})", expanded=False):
-            _tsk_dict = st.session_state["_cok_firma_taslaklar"]
-            _tsk_opts = sorted(_tsk_dict.keys())
-            _tc1, _tc2, _tc3 = st.columns([2, 1, 1])
-            _tsk_sec_ms = _tc1.multiselect("Kayıtlı taslaklar", _tsk_opts, key="_cok_tsk_sec_ms", label_visibility="collapsed", placeholder="📂 Taslak seç (birden fazlası birleştirilir)")
-            if _tc2.button("📂 Yükle", key="_cok_tsk_yukle", use_container_width=True, disabled=(len(_tsk_sec_ms) == 0)):
-                _tsk_ids = set()
-                for _ts in _tsk_sec_ms:
-                    _tsk_ids |= set(_tsk_dict.get(_ts, []))
-                st.session_state["_cok_tsk_bekleyen"] = list(_tsk_ids)
-                if len(_tsk_sec_ms) > 1:
-                    st.toast(f"✅ {len(_tsk_sec_ms)} taslak birleştirilerek yüklendi — {len(_tsk_ids)} firma", icon="📂")
-                else:
-                    st.toast(f"✅ '{_tsk_sec_ms[0]}' taslağı yüklendi — {len(_tsk_ids)} firma", icon="📂")
-                st.rerun()
-            if _tc3.button("🗑️ Sil", key="_cok_tsk_sil", use_container_width=True, disabled=(len(_tsk_sec_ms) == 0)):
-                for _ts in _tsk_sec_ms:
-                    _tsk_dict.pop(_ts, None)
-                _cok_firma_taslak_kaydet_db()
-                st.toast(f"🗑️ {len(_tsk_sec_ms)} taslak silindi", icon="🗑️")
-                st.rerun()
-            st.divider()
-            _tsk_kaynak_idler = _cok_secili_idler if _cok_secili_ham else _il_ilce_secili_idler
-            _tsk_kaynak_var = bool(_cok_secili_ham) or bool(_il_sec) or bool(_ilce_sec)
-            if not _cok_secili_ham and (_il_sec or _ilce_sec):
-                _il_ilce_etiket = " / ".join([x for x in [", ".join(_il_sec), ", ".join(_ilce_sec)] if x])
-                st.caption(f"📍 İl/İlçe seçimine göre kaydedilecek: **{_il_ilce_etiket}** ({len(_tsk_kaynak_idler)} firma)")
-            # Taslağı yükledikten sonra yukarıdaki "🔍 Çoklu firma..." kutusunda firma ekleyip çıkarabilirsiniz —
-            # tek bir taslak seçiliyse, o değişikliği doğrudan aynı taslağın üzerine kaydetme imkanı:
-            if len(_tsk_sec_ms) == 1 and _cok_secili_ham:
-                if st.button(f"🔁 '{_tsk_sec_ms[0]}' taslağını güncelle (eklenen/çıkarılan firmalarla)", key="_cok_tsk_guncelle_btn", use_container_width=True):
-                    _tsk_dict[_tsk_sec_ms[0]] = sorted(_tsk_kaynak_idler)
-                    _cok_firma_taslak_kaydet_db()
-                    st.toast(f"🔁 '{_tsk_sec_ms[0]}' güncellendi — {len(_tsk_kaynak_idler)} firma", icon="🔁")
-                    st.rerun()
-            _tk1, _tk2 = st.columns([3, 1])
-            _tsk_yeni_ad = _tk1.text_input("Yeni taslak adı", key="_cok_tsk_yeni_ad", placeholder="Örn: Ataşehir Kampanya", label_visibility="collapsed")
-            if _tk2.button("💾 Farklı Kaydet", key="_cok_tsk_kaydet_btn", use_container_width=True, type="primary", disabled=not _tsk_kaynak_var):
-                _ad_temiz = (_tsk_yeni_ad or "").strip()
-                if _ad_temiz:
-                    _tsk_dict[_ad_temiz] = sorted(_tsk_kaynak_idler)
-                    _cok_firma_taslak_kaydet_db()
-                    st.toast(f"💾 '{_ad_temiz}' kaydedildi — {len(_tsk_kaynak_idler)} firma", icon="💾")
-                    st.rerun()
-                else:
-                    st.warning("Bir taslak adı yazın.")
-            if not _tsk_kaynak_var:
-                st.caption("💡 Yukarıdaki '🔍 Çoklu firma...' kutusundan firma seçin YA DA İl/İlçe filtresi uygulayın. Sonra: yeni isimle kaydedin, ya da (tek taslak seçiliyse) mevcut taslağı güncelleyin.")
 
         if st.session_state.get("_filtre_sifirla_flag"):
             del st.session_state["_filtre_sifirla_flag"]
@@ -6538,7 +6482,7 @@ function kartSec(id){
                     st.rerun()
                 else:
                     st.warning("Bir taslak adı yazın.")
-            st.caption("💡 Bu taslak, yukarıdaki '🔍 Filtreler & Arama' panelindeki '📂 Çoklu Firma Taslakları' listesinden de yüklenebilir.")
+            pass  # (Eski açıklama kaldırıldı — "Çoklu Firma Taslakları" paneli Filtreler & Arama'dan kaldırıldı)
 
     # ── NOT DİALOG — sadece seçili olunca açılır ────────────────────────────
     if secili_sayi == 1:
