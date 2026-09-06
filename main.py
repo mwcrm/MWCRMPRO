@@ -5185,14 +5185,14 @@ function kartSec(id){
                 lambda _tam: bool(_yf_q_bosluksuz) and _yf_q_bosluksuz in _tam
             )]
             if not _yf_eslesen.empty:
-                st.warning(f"⚠️ '{_yf_ara}' ile eşleşen {len(_yf_eslesen)} kayıtlı müşteri bulundu — mükerrer girmemek için kontrol edin. "
-                           f"Eksik bilgi varsa aşağıda düzenleyip kaydedebilirsin, alta yeni satır ekleyip hızlıca yeni cari de girebilirsin:")
-                _yf_kol = [c for c in ["id", "firma", "gsm", "sabit", "email", "adres", "ilce", "il"] if c in _yf_eslesen.columns]
+                st.caption(f"⚠️ '{_yf_ara}' ile eşleşen {len(_yf_eslesen)} kayıtlı müşteri bulundu — mükerrer girmemek için kontrol edin.")
+                _yf_kol = [c for c in ["id", "firma", "rakip_firma", "gsm", "sabit", "email", "adres", "ilce", "il"] if c in _yf_eslesen.columns]
                 _yf_gosterilecek = _yf_eslesen[_yf_kol].head(15).copy()
                 _yf_duzenlenen = st.data_editor(
                     _yf_gosterilecek, use_container_width=True, hide_index=True,
                     disabled=["id"], key="_yf_duzenle_editor", num_rows="dynamic",
-                    column_config={"id": st.column_config.NumberColumn("ID")}
+                    column_config={"id": st.column_config.NumberColumn("ID"),
+                                   "rakip_firma": st.column_config.TextColumn("Özel")}
                 )
                 if st.button("💾 Değişiklikleri Kaydet", key="_yf_duzenle_kaydet_btn"):
                     _yf_guncellenen = 0
