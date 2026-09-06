@@ -12271,11 +12271,16 @@ elif aktif == "harita":
     if _hdf.empty:
         st.warning("Cari listede müşteri bulunamadı.")
     else:
-        _hc1,_hc2,_hc3 = st.columns(3)
-        _h_durum = _hc1.multiselect("Durum filtrele", sorted(_hdf["durum"].dropna().unique().tolist()) if "durum" in _hdf.columns else [], key="h_durum")
-        _h_seg   = _hc2.multiselect("Segment", sorted(_hdf["segment"].dropna().unique().tolist()) if "segment" in _hdf.columns else [], key="h_seg")
-        _h_tem   = _hc3.multiselect("Temsilci", sorted(_hdf["temsilci"].dropna().unique().tolist()) if "temsilci" in _hdf.columns else [], key="h_tem")
+        _hc1,_hc2,_hc3,_hc4,_hc5 = st.columns(5)
+        _h_il    = _hc1.multiselect("İl filtrele", sorted(_hdf["il"].dropna().unique().tolist()) if "il" in _hdf.columns else [], key="h_il")
+        _h_ilce_opts = sorted(_hdf[_hdf["il"].isin(_h_il)]["ilce"].dropna().unique().tolist()) if _h_il and "ilce" in _hdf.columns else (sorted(_hdf["ilce"].dropna().unique().tolist()) if "ilce" in _hdf.columns else [])
+        _h_ilce  = _hc2.multiselect("İlçe filtrele", _h_ilce_opts, key="h_ilce")
+        _h_durum = _hc3.multiselect("Durum filtrele", sorted(_hdf["durum"].dropna().unique().tolist()) if "durum" in _hdf.columns else [], key="h_durum")
+        _h_seg   = _hc4.multiselect("Segment", sorted(_hdf["segment"].dropna().unique().tolist()) if "segment" in _hdf.columns else [], key="h_seg")
+        _h_tem   = _hc5.multiselect("Temsilci", sorted(_hdf["temsilci"].dropna().unique().tolist()) if "temsilci" in _hdf.columns else [], key="h_tem")
         _hdf_f = _hdf.copy()
+        if _h_il    and "il" in _hdf_f.columns: _hdf_f = _hdf_f[_hdf_f["il"].isin(_h_il)]
+        if _h_ilce  and "ilce" in _hdf_f.columns: _hdf_f = _hdf_f[_hdf_f["ilce"].isin(_h_ilce)]
         if _h_durum and "durum" in _hdf_f.columns: _hdf_f = _hdf_f[_hdf_f["durum"].isin(_h_durum)]
         if _h_seg   and "segment" in _hdf_f.columns: _hdf_f = _hdf_f[_hdf_f["segment"].isin(_h_seg)]
         if _h_tem   and "temsilci" in _hdf_f.columns: _hdf_f = _hdf_f[_hdf_f["temsilci"].isin(_h_tem)]
@@ -12525,10 +12530,9 @@ elif aktif == "harita":
 <script>
 var pins = """ + _pins_json + """;
 var map = L.map('map').setView([39.5,33.0],6);
-// CartoDB Positron — ücretsiz, anahtar gerektirmez, Google Haritalar'a benzer
-// temiz/modern görünüm (varsayılan OpenStreetMap tile'larından daha sade).
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
-  attribution:'© OpenStreetMap © CARTO', maxZoom:19, subdomains:'abcd'
+// OpenStreetMap standart tile — tamamen ücretsiz, anahtar gerektirmez.
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+  attribution:'© OpenStreetMap', maxZoom:19
 }).addTo(map);
 var cl = L.markerClusterGroup({maxClusterRadius:45,spiderfyOnMaxZoom:true,showCoverageOnHover:false});
 var rnk={};
