@@ -12266,32 +12266,46 @@ elif aktif == "e_tablo":
     else:
         import requests as _gs_requests
 
-        @st.cache_data(ttl=10, show_spinner=False)
-        def _gs_tum_sayfalari_oku(_url):
-            _r = _gs_requests.get(_url, timeout=20)
+        # ── HIZ İÇİN: önce sadece sekme İSİMLERİNİ çekiyoruz (çok hızlı),
+        # seçilen sekmenin VERİSİNİ ise ayrı ve sadece o an gerektiğinde
+        # çekiyoruz. Tüm sekmelerin tüm verisini tek seferde çekmek (eski
+        # yöntem) büyük tablolarda 20 saniyeyi aşıp zaman aşımına yol açıyordu.
+        @st.cache_data(ttl=30, show_spinner=False)
+        def _gs_sekme_adlari_oku(_url):
+            _r = _gs_requests.get(_url, timeout=30)
             try:
                 _j = _r.json()
             except Exception:
                 raise Exception(f"HTTP {_r.status_code} — JSON değil, ham yanıt: {_r.text[:500]}")
             if _j.get("durum") != "ok":
                 raise Exception(_j.get("mesaj", "bilinmeyen hata"))
-            return _j["sheets"]
+            return _j["sheet_adlari"]
+
+        @st.cache_data(ttl=10, show_spinner=False)
+        def _gs_sekme_verisi_oku(_url, _sekme_adi):
+            _r = _gs_requests.get(_url, params={"sheet": _sekme_adi}, timeout=45)
+            try:
+                _j = _r.json()
+            except Exception:
+                raise Exception(f"HTTP {_r.status_code} — JSON değil, ham yanıt: {_r.text[:500]}")
+            if _j.get("durum") != "ok":
+                raise Exception(_j.get("mesaj", "bilinmeyen hata"))
+            return _j.get("headers", []), _j.get("rows", [])
 
         if _gs_yenile:
-            _gs_tum_sayfalari_oku.clear()
+            _gs_sekme_adlari_oku.clear()
+            _gs_sekme_verisi_oku.clear()
 
         try:
-            _gs_tum_sayfalar = _gs_tum_sayfalari_oku(_gs_aktif_url)
+            _gs_sekme_adlari = _gs_sekme_adlari_oku(_gs_aktif_url)
         except Exception as _gs_okuma_hata:
-            _gs_tum_sayfalar = None
-            st.error(f"⚠️ E-tablo okunamadı: {_gs_okuma_hata}")
+            _gs_sekme_adlari = None
+            st.error(f"⚠️ Sekme listesi okunamadı: {_gs_okuma_hata}")
 
-        if _gs_tum_sayfalar is not None and not _gs_tum_sayfalar:
-            st.warning("⚠️ Bağlantı çalıştı ama e-tabloda hiç sekme/veri bulunamadı. "
-                       "Apps Script'in doğru e-tabloya bağlı olduğundan emin olun.")
+        if _gs_sekme_adlari is not None and not _gs_sekme_adlari:
+            st.warning("⚠️ Bağlantı çalıştı ama e-tabloda hiç sekme bulunamadı.")
 
-        if _gs_tum_sayfalar:
-            _gs_sekme_adlari = list(_gs_tum_sayfalar.keys())
+        if _gs_sekme_adlari:
             st.success(f"✅ Bağlı — {len(_gs_sekme_adlari)} sekme bulundu: {', '.join(_gs_sekme_adlari)}")
 
             _gs_sec_sekme = st.selectbox("Görüntülenecek sekme", _gs_sekme_adlari, key="_gs_sec_sekme")
@@ -12299,9 +12313,12 @@ elif aktif == "e_tablo":
                                          help="Açıkken bu sekmede değişiklik yapıp e-tabloya geri gönderebilirsin. "
                                               "Açıkken otomatik yenileme DURUR (değişikliklerin kaybolmaması için).")
 
-            _gs_veri = _gs_tum_sayfalar.get(_gs_sec_sekme, {"headers": [], "rows": []})
-            _gs_basliklar = _gs_veri.get("headers", [])
-            _gs_satirlar = _gs_veri.get("rows", [])
+            try:
+                _gs_basliklar, _gs_satirlar = _gs_sekme_verisi_oku(_gs_aktif_url, _gs_sec_sekme)
+            except Exception as _gs_veri_hata:
+                _gs_basliklar, _gs_satirlar = [], []
+                st.error(f"⚠️ '{_gs_sec_sekme}' sekmesi okunamadı: {_gs_veri_hata}")
+
             # Sütun adları boş/tekrarlı olabilir — pandas için güvenli hale getir
             _gs_kol_guvenli = []
             _gs_gorulen = {}
@@ -12346,7 +12363,7 @@ elif aktif == "e_tablo":
                                     "sheet": _gs_sec_sekme, "islem": "satir_guncelle",
                                     "satir_no": _ri + 2,  # +1 başlık satırı, +1 index->satır no
                                     "veri": _fark
-                                }, timeout=15)
+                                }, timeout=30)
                                 if _resp.json().get("durum") == "ok":
                                     _gs_degisen_satir += 1
                                 else:
@@ -12355,7 +12372,7 @@ elif aktif == "e_tablo":
                                 _gs_hatalar.append(f"Satır {_ri+2}: {_gs_gonder_hata}")
                     if _gs_degisen_satir:
                         st.toast(f"💾 {_gs_degisen_satir} satır e-tabloya gönderildi", icon="✅")
-                        _gs_tum_sayfalari_oku.clear()
+                        _gs_sekme_verisi_oku.clear()
                     if _gs_hatalar:
                         st.error("Bazı satırlar gönderilemedi:\n" + "\n".join(_gs_hatalar))
                     if not _gs_degisen_satir and not _gs_hatalar:
