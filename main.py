@@ -4716,6 +4716,16 @@ section[data-testid="stSidebar"] { display: none !important; }
 
     @st.cache_data(ttl=60, show_spinner=False)
     def _rbar_teklif_toplam_yukle(_aktif_idler):
+        # ID'leri normalize eden yardımcı — bazı kayıtlarda musteri_id "123" yerine
+        # "123.0" gibi ondalıklı/farklı biçimde saklanmış olabilir; bu farklar
+        # eşleşmeyi kaçırıp gerçek teklifleri toplamdan düşürüyordu (rapor düşük
+        # çıkıyordu). Her ID'yi aynı sade tam sayı metnine çeviriyoruz.
+        def _id_norm_f(_v):
+            _s = str(_v).strip()
+            try:
+                return str(int(float(_s)))
+            except Exception:
+                return _s
         _toplam = 0
         try:
             _sb_rbf = get_sb_client()
@@ -4723,17 +4733,19 @@ section[data-testid="stSidebar"] { display: none !important; }
                 return 0
             _r_rbf = _sb_rbf.table("teklifler").select("musteri_id").execute()
             import collections as _rbfcol
-            _gercek_sayac_f = _rbfcol.Counter([str(r.get("musteri_id","")) for r in (_r_rbf.data or [])])
-            _override_map_f = {}
+            _gercek_sayac_f = _rbfcol.Counter([_id_norm_f(r.get("musteri_id","")) for r in (_r_rbf.data or [])])
+            _override_map_f_ham = {}
             try:
                 _r_rbfov = _sb_rbf.table("kullanici_tercih").select("deger").eq(
                     "kullanici","__liste_ui__").eq("anahtar","_teklif_manuel_override").execute()
                 if _r_rbfov.data:
                     import json as _rbfovj
-                    _override_map_f = _rbfovj.loads(_r_rbfov.data[0]["deger"])
+                    _override_map_f_ham = _rbfovj.loads(_r_rbfov.data[0]["deger"])
             except Exception:
                 pass
-            _tum_idler_f = (set(_gercek_sayac_f.keys()) | set(_override_map_f.keys())) & set(_aktif_idler)
+            _override_map_f = {_id_norm_f(k): v for k, v in _override_map_f_ham.items()}
+            _aktif_idler_norm = set(_id_norm_f(x) for x in _aktif_idler)
+            _tum_idler_f = (set(_gercek_sayac_f.keys()) | set(_override_map_f.keys())) & _aktif_idler_norm
             for _mid in _tum_idler_f:
                 if _mid in _override_map_f:
                     try: _toplam += int("".join(ch for ch in str(_override_map_f[_mid]) if ch.isdigit()) or 0)
@@ -6096,10 +6108,16 @@ function kartSec(id){
                     _r3 = _sb3.table("teklifler").select("musteri_id").execute()
                     return _r3.data or []
                 return []
+            def _id_norm_cl(_v):
+                _s = str(_v).strip()
+                try:
+                    return str(int(float(_s)))
+                except Exception:
+                    return _s
             _res_tek_data_cl = _tum_teklif_sayac_yukle()
             if _res_tek_data_cl:
                 import collections as _coltek_cl
-                _tek_sayac_cl = _coltek_cl.Counter([str(r.get("musteri_id","")) for r in _res_tek_data_cl])
+                _tek_sayac_cl = _coltek_cl.Counter([_id_norm_cl(r.get("musteri_id","")) for r in _res_tek_data_cl])
         except Exception:
             _tek_sayac_cl = {}
     if "id" in df_edit.columns:
