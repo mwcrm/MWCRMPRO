@@ -4524,10 +4524,15 @@ section[data-testid="stSidebar"] { display: none !important; }
     _grp2_asama = [a for a in tum_asama_opts if a in ["Randevu"]]
 
     # 2. AŞAMA — Teklif
-    _grp3_asama = [a for a in tum_asama_opts if a in ["Teklif"]]
+    # NOT: tanımlarda aynı isim (büyük/küçük harf farklı vb.) birden fazla kez
+    # kayıtlıysa çift sayıma yol açabiliyordu — normalize edilmiş isme göre
+    # TEKİLLEŞTİRİLİYOR, "Teklif" sadece BİR kutu olarak sayılır.
+    _grp3_asama_ham = [a for a in tum_asama_opts if a in ["Teklif"]]
+    _grp3_asama = list(dict.fromkeys(_grp3_asama_ham))  # sırayı koruyarak tekilleştir
 
-    # 3. AŞAMA — Deneme, TAKİP, Sözleşme, Fiyat Hazırla
-    _grp4_asama = [a for a in tum_asama_opts if a in ["Deneme","TAKİP","Sözleşme","Fiyat Hazırla"]]
+    # 3. AŞAMA — Deneme, TAKİP, Sözleşme, Fiyat Hazırla (aynı tekilleştirme)
+    _grp4_asama_ham = [a for a in tum_asama_opts if a in ["Deneme","TAKİP","Sözleşme","Fiyat Hazırla"]]
+    _grp4_asama = list(dict.fromkeys(_grp4_asama_ham))
 
     # SONUÇ
     _grp5_asama = [a for a in tum_asama_opts if a in ["Kazanıldı","Kaybedildi","Devam Ediyor"]]
@@ -4773,13 +4778,6 @@ section[data-testid="stSidebar"] { display: none !important; }
         "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama3",a),f"asama3_{a}",False)) for a in _grp4_asama]),
         "sonuc":    ("🏆","SONUÇ",    None, [((_asama_ikon(a),a,_kolon_sayi("sonuc",a),f"sonuc_{a}",False)) for a in _grp5_asama]),
     }
-    # ── GEÇİCİ KONTROL SATIRI — kullanıcıyla birlikte doğrulama için. Sorun
-    # çözülünce bu satır kaldırılabilir. "asama2" kolonundaki ham değerleri
-    # tek tek sayıp gösteriyor, rapor kutusuyla birebir karşılaştırma imkanı verir.
-    if "asama2" in df.columns:
-        import collections as _dbgcol
-        _dbg_asama2_sayim = _dbgcol.Counter(df["asama2"].dropna().astype(str).str.strip())
-        st.caption(f"🔧 KONTROL — Toplam kayıt: {len(df)}  ·  asama2 kolonundaki ham değer dağılımı: {dict(_dbg_asama2_sayim)}")
     # HTML oluştur - 2 satırlı tablo
     # ── Rapor barı SABİT %100 genişlikte kalır, kendi başına kaymaz/kaydırılmaz.
     # Cari Liste tablosu, kendi ayrı kolon-genişliği formülüyle (aşağıda _w())
