@@ -5270,6 +5270,13 @@ function kartSec(id){
                         "aciklama": st.column_config.TextColumn("Açıklama", width="small"),
                     }
                 )
+                # ── NOT PANELİ — ana Cari Liste tablosuyla AYNI davranış: tek
+                # satır "Seç" işaretlenince o müşterinin not paneli açılır. ──
+                _yf_secili_satirlar = _yf_duzenlenen[_yf_duzenlenen["Seç"] == True]
+                if len(_yf_secili_satirlar) == 1 and pd.notna(_yf_secili_satirlar.iloc[0].get("id")):
+                    _yf_sel_id = int(_yf_secili_satirlar.iloc[0]["id"])
+                    _yf_sel_firma = str(_yf_secili_satirlar.iloc[0].get("firma", ""))
+                    not_dialog(_yf_sel_id, _yf_sel_firma)
                 if st.button("💾 Değişiklikleri Kaydet", key="_yf_duzenle_kaydet_btn"):
                     _yf_guncellenen = 0
                     _yf_eklenen = 0
