@@ -12269,7 +12269,10 @@ elif aktif == "e_tablo":
         @st.cache_data(ttl=10, show_spinner=False)
         def _gs_tum_sayfalari_oku(_url):
             _r = _gs_requests.get(_url, timeout=20)
-            _j = _r.json()
+            try:
+                _j = _r.json()
+            except Exception:
+                raise Exception(f"HTTP {_r.status_code} — JSON değil, ham yanıt: {_r.text[:500]}")
             if _j.get("durum") != "ok":
                 raise Exception(_j.get("mesaj", "bilinmeyen hata"))
             return _j["sheets"]
