@@ -12269,7 +12269,7 @@ elif aktif == "e_tablo":
         _gid = _gid_m.group(1) if _gid_m else "0"
         return f"https://docs.google.com/spreadsheets/d/{_sheet_id}/export?format=csv&gid={_gid}"
 
-    @st.cache_data(ttl=300, show_spinner=False)
+    @st.cache_data(ttl=10, show_spinner=False)
     def _gs_veri_oku(_export_url):
         return pd.read_csv(_export_url)
 
@@ -12277,6 +12277,11 @@ elif aktif == "e_tablo":
     if not _gs_aktif_url:
         st.info("💡 Yukarıya bir Google E-Tablo bağlantısı yapıştırıp kaydedin.")
     else:
+        # Bu sayfa açıkken 10 saniyede bir otomatik yeniden yükleniyor —
+        # gerçek "push" değil ama pratikte neredeyse anında hissettiren
+        # bir yöntem. Sadece bu sayfadayken çalışır (başka sayfaya geçince durur).
+        st.markdown("<script>setTimeout(function(){ window.parent.location.reload(); }, 10000);</script>", unsafe_allow_html=True)
+        st.caption("🔄 Bu sayfa açıkken her 10 saniyede bir otomatik yenilenir.")
         if _gs_yenile:
             _gs_veri_oku.clear()
         _gs_export_url = _gs_export_url_uret(_gs_aktif_url)
@@ -12285,7 +12290,7 @@ elif aktif == "e_tablo":
         else:
             try:
                 _gs_df = _gs_veri_oku(_gs_export_url)
-                st.success(f"✅ Bağlı — {len(_gs_df)} satır okundu (her 5 dakikada bir otomatik yenilenir, veya '🔄 Şimdi Kontrol Et' ile hemen).")
+                st.success(f"✅ Bağlı — {len(_gs_df)} satır okundu (her 10 saniyede bir otomatik yenilenir, veya '🔄 Şimdi Kontrol Et' ile hemen).")
                 st.dataframe(_gs_df.head(20), use_container_width=True, hide_index=True)
                 st.divider()
                 if st.button("📥 Bu Veriyi Cari Listeye Aktarmaya Hazırla →", type="primary", key="_gs_aktar_hazirla"):
@@ -12295,6 +12300,58 @@ elif aktif == "e_tablo":
                     st.rerun()
             except Exception as _gs_hata:
                 st.error(f"⚠️ E-tablo okunamadı: {_gs_hata}\n\nEn olası sebep: paylaşım ayarı 'Bağlantıya sahip olan herkes görüntüleyebilir' değil.")
+
+    st.divider()
+    st.markdown("#### ✍️ Sistemden E-Tabloya Yazma (Apps Script)")
+    st.caption("Sana verdiğim Apps Script kodunu 'Web uygulaması' olarak yayınladıktan sonra aldığın linki buraya yapıştır.")
+
+    if "_gs_yazma_url" not in st.session_state:
+        st.session_state["_gs_yazma_url"] = ""
+        try:
+            _sb_gsw_init = get_sb_client()
+            if _sb_gsw_init:
+                _r_gsw_init = _sb_gsw_init.table("kullanici_tercih").select("deger").eq("kullanici", "__liste_ui__").eq("anahtar", "_gs_yazma_url").execute()
+                if _r_gsw_init.data:
+                    st.session_state["_gs_yazma_url"] = _r_gsw_init.data[0]["deger"]
+        except Exception:
+            pass
+
+    _gs_yazma_url_giris = st.text_input("Apps Script Web App URL", value=st.session_state.get("_gs_yazma_url", ""),
+                                         placeholder="https://script.google.com/macros/s/AKfycb.../exec",
+                                         key="_gs_yazma_url_input")
+    _gswc1, _gswc2 = st.columns([1, 1])
+    if _gswc1.button("💾 Yazma Bağlantısını Kaydet", key="_gs_yazma_kaydet_btn", use_container_width=True, type="primary"):
+        if _gs_yazma_url_giris.strip():
+            st.session_state["_gs_yazma_url"] = _gs_yazma_url_giris.strip()
+            try:
+                _sb_gsw = get_sb_client()
+                if _sb_gsw:
+                    _sb_gsw.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_gs_yazma_url").execute()
+                    _sb_gsw.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_gs_yazma_url", "deger": _gs_yazma_url_giris.strip()}).execute()
+            except Exception:
+                pass
+            st.toast("💾 Yazma bağlantısı kaydedildi", icon="✍️")
+            st.rerun()
+        else:
+            st.warning("Önce bir link yapıştırın.")
+
+    if _gswc2.button("🧪 Test Satırı Gönder", key="_gs_yazma_test_btn", use_container_width=True):
+        _gs_test_url = st.session_state.get("_gs_yazma_url", "")
+        if not _gs_test_url:
+            st.warning("Önce yazma bağlantısını kaydedin.")
+        else:
+            try:
+                import requests as _gs_requests
+                import datetime as _gs_dt
+                _test_yanit = _gs_requests.post(
+                    _gs_test_url,
+                    json={"islem": "ekle", "veri": {"Firma": f"TEST — MWCRMPRO {_gs_dt.datetime.now().strftime('%H:%M:%S')}"}},
+                    timeout=15
+                )
+                st.json(_test_yanit.json())
+                st.success("✅ İstek gönderildi — e-tabloya bakıp yeni bir 'TEST — MWCRMPRO ...' satırı eklendiğini kontrol et.")
+            except Exception as _gs_test_hata:
+                st.error(f"⚠️ Test başarısız: {_gs_test_hata}")
 
 elif aktif == "harita":
     sayfa_log("harita")
