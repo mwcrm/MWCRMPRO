@@ -4864,6 +4864,31 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
 </script>"""
     st.markdown(_html, unsafe_allow_html=True)
 
+    # ── AKTİF FİLTRE UYARISI — rapor kutuları HER ZAMAN filtre öncesi TÜM
+    # listeye göre hesaplanır; tablo ise aktif filtrelere göre daralmış
+    # olabilir. Bu ikisi karşılaştırıldığında "sayı tutmuyor" gibi görünür —
+    # aslında ikisi de doğru, sadece FARKLI kapsamlara bakıyorlar. Karışıklığı
+    # önlemek için hangi filtrelerin aktif olduğunu burada açıkça gösteriyoruz.
+    _af_aktif_liste = []
+    if st.session_state.get("ara_liste"): _af_aktif_liste.append(f"Arama: '{st.session_state['ara_liste']}'")
+    if st.session_state.get("_cl_fil_durum_multi"): _af_aktif_liste.append(f"Durum: {', '.join(st.session_state['_cl_fil_durum_multi'])}")
+    if st.session_state.get("_cl_fil_asama_multi"): _af_aktif_liste.append(f"Aşama: {', '.join(st.session_state['_cl_fil_asama_multi'])}")
+    if st.session_state.get("_cl_fil_il_multi"): _af_aktif_liste.append(f"İl: {', '.join(st.session_state['_cl_fil_il_multi'])}")
+    if st.session_state.get("_cl_fil_ilce_multi"): _af_aktif_liste.append(f"İlçe: {', '.join(st.session_state['_cl_fil_ilce_multi'])}")
+    if st.session_state.get("_cl_fil_temsilci_multi"): _af_aktif_liste.append(f"Temsilci: {', '.join(st.session_state['_cl_fil_temsilci_multi'])}")
+    if st.session_state.get("_cl_fil_asama1"): _af_aktif_liste.append(f"1. Aşama: {st.session_state['_cl_fil_asama1']}")
+    if st.session_state.get("_cl_fil_asama2"): _af_aktif_liste.append(f"2. Aşama: {st.session_state['_cl_fil_asama2']}")
+    if st.session_state.get("_cl_fil_asama3"): _af_aktif_liste.append(f"3. Aşama: {st.session_state['_cl_fil_asama3']}")
+    if st.session_state.get("_cl_fil_sonuc"): _af_aktif_liste.append(f"Sonuç: {st.session_state['_cl_fil_sonuc']}")
+    if st.session_state.get("_bl_havuz_filtre"): _af_aktif_liste.append("Bölge: Havuz (Bölgesiz)")
+    if st.session_state.get("_asamasiz_aktif"): _af_aktif_liste.append("Aşamasız")
+    if st.session_state.get("_mesaj_gercek_aktif"): _af_aktif_liste.append("Mesaj (gerçek)")
+    if _af_aktif_liste:
+        st.warning(f"⚠️ Şu an aktif filtre(ler): **{' · '.join(_af_aktif_liste)}** — "
+                   f"yukarıdaki rapor kutuları bu filtrelerden ETKİLENMEZ, her zaman TÜM listeye göre hesaplanır. "
+                   f"Tablodaki satır sayısı ise bu filtrelere göre DARALTILMIŞ görünümü gösterir — "
+                   f"ikisini karşılaştırırken bunu göz önünde bulundur.")
+
     # Grup ayar param
     _qp_grp_gizli = st.query_params.get("_grp_gizli","")
     _qp_grp_sira  = st.query_params.get("_grp_sira","")
@@ -12343,8 +12368,56 @@ elif aktif == "harita":
                      .replace("Ğ","ğ").replace("Ü","ü").replace("Ö","ö")
                      .replace("Ç","ç").lower().strip())
 
+        # ── ÜCRETSİZ ADRES BAZLI KONUM BULMA (GEOCODING) — Google Maps API
+        # gerektirmez, OpenStreetMap'in ücretsiz Nominatim servisini kullanır.
+        # Sonuçlar kalıcı olarak önbelleğe alınır (bir adres bir daha asla
+        # tekrar sorgulanmaz) — bu yüzden ilk seferden sonra çok hızlıdır.
+        @st.cache_data(ttl=3600, show_spinner=False)
+        def _harita_geo_cache_yukle():
+            try:
+                _sb_g = get_sb_client()
+                if _sb_g:
+                    _r_g = _sb_g.table("kullanici_tercih").select("deger").eq(
+                        "kullanici", "__liste_ui__").eq("anahtar", "_harita_geocode_cache").execute()
+                    if _r_g.data:
+                        return _hj.loads(_r_g.data[0]["deger"])
+            except Exception:
+                pass
+            return {}
+
+        def _harita_geo_cache_kaydet(_cache):
+            try:
+                _sb_g2 = get_sb_client()
+                if _sb_g2:
+                    _deger = _hj.dumps(_cache, ensure_ascii=False)
+                    _sb_g2.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_harita_geocode_cache").execute()
+                    _sb_g2.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_harita_geocode_cache", "deger": _deger}).execute()
+            except Exception:
+                pass
+
+        def _harita_geo_sorgu(_adres, _ilce, _il):
+            """OpenStreetMap Nominatim (ücretsiz, anahtar gerektirmez) ile
+            adresi lat/lng koordinatına çevirir. Bulamazsa None döner."""
+            import requests as _hreq
+            _q = ", ".join([p for p in [_adres, _ilce, _il, "Türkiye"] if p and p != "—"])
+            try:
+                _resp = _hreq.get("https://nominatim.openstreetmap.org/search",
+                                   params={"q": _q, "format": "json", "limit": 1, "countrycodes": "tr"},
+                                   headers={"User-Agent": "MWCRMPRO-Musteri-Haritasi/1.0"}, timeout=8)
+                _sonuc = _resp.json()
+                if _sonuc:
+                    return float(_sonuc[0]["lat"]), float(_sonuc[0]["lon"])
+            except Exception:
+                pass
+            return None
+
+        _geo_cache = _harita_geo_cache_yukle()
+        _harita_geo_sfx = st.session_state.get("_harita_geo_sfx", 0)
+
         _gorulen_firmalar = set()
         _pins = []
+        _hassas_sayi = 0
+        _yaklasik_kayitlar = []  # (anahtar, adres, ilce, il) — henüz geocode edilmemişler
         for _, _hr in _hdf_f.iterrows():
             _il   = _tr_lower(str(_hr.get("il","")   or ""))
             _ilce = _tr_lower(str(_hr.get("ilce","") or ""))
@@ -12356,29 +12429,42 @@ elif aktif == "harita":
             _seg  = str(_hr.get("segment","") or "—")
             _tem  = str(_hr.get("temsilci","") or "—")
             _tel  = str(_hr.get("gsm","")   or "—")
+            _adres_ham = str(_hr.get("adres","") or "").strip()
             _adrs = str(_hr.get("adres","") or "—").replace("'","&#39;").replace('"','&quot;')
             _lat, _lng = None, None
-            # Önce ilçe — tam eşleşme
-            if _ilce:
-                if _ilce in _ILCE_KOOR:
-                    _lat, _lng = _ILCE_KOOR[_ilce]
-                else:
-                    for _k in _ILCE_KOOR:
-                        if _tr_lower(_k) == _ilce:
-                            _lat, _lng = _ILCE_KOOR[_k]; break
-            # Sonra il — tam eşleşme
-            if _lat is None and _il:
-                if _il in _IL_KOOR:
-                    _lat, _lng = _IL_KOOR[_il]
-                else:
-                    for _k in _IL_KOOR:
-                        if _tr_lower(_k) == _il or _il[:5] == _tr_lower(_k)[:5]:
-                            _lat, _lng = _IL_KOOR[_k]; break
-            if _lat is None: continue
-            _seed = int(hashlib.md5(_firma_ham.encode()).hexdigest()[:8], 16)
-            random.seed(_seed)
-            _lat += random.uniform(-0.008, 0.008)
-            _lng += random.uniform(-0.008, 0.008)
+            _hassas = False
+
+            # 1) ÖNCE önbellekte gerçek adres bazlı koordinat var mı bak (hassas)
+            _geo_anahtar = _tr_lower(f"{_adres_ham}|{_hr.get('ilce','')}|{_hr.get('il','')}")
+            if _adres_ham and _geo_anahtar in _geo_cache and _geo_cache[_geo_anahtar]:
+                _lat, _lng = _geo_cache[_geo_anahtar]
+                _hassas = True
+                _hassas_sayi += 1
+            elif _adres_ham:
+                _yaklasik_kayitlar.append(_geo_anahtar)
+
+            # 2) Yoksa eski yöntem — il/ilçe merkezine yaklaşık (jitter'lı)
+            if _lat is None:
+                if _ilce:
+                    if _ilce in _ILCE_KOOR:
+                        _lat, _lng = _ILCE_KOOR[_ilce]
+                    else:
+                        for _k in _ILCE_KOOR:
+                            if _tr_lower(_k) == _ilce:
+                                _lat, _lng = _ILCE_KOOR[_k]; break
+                if _lat is None and _il:
+                    if _il in _IL_KOOR:
+                        _lat, _lng = _IL_KOOR[_il]
+                    else:
+                        for _k in _IL_KOOR:
+                            if _tr_lower(_k) == _il or _il[:5] == _tr_lower(_k)[:5]:
+                                _lat, _lng = _IL_KOOR[_k]; break
+                if _lat is None: continue
+                _seed = int(hashlib.md5(_firma_ham.encode()).hexdigest()[:8], 16)
+                random.seed(_seed)
+                _lat += random.uniform(-0.008, 0.008)
+                _lng += random.uniform(-0.008, 0.008)
+
             _renk = _DURUM_RENK.get(_durum, "#64748b")
             # Randevu varsa kırmızı override
             if _firma_ham in _rand_acik:
@@ -12392,7 +12478,28 @@ elif aktif == "harita":
             _pins.append({"lat":round(_lat,5),"lng":round(_lng,5),"firma":_firma,
                 "durum":_durum,"renk":_renk,"seg":_seg,"tem":_tem,"tel":_tel,
                 "il":str(_hr.get("il","")).title(),"ilce":str(_hr.get("ilce","")).title(),
-                "adres":_adrs,"rand":_rand_etiketi})
+                "adres":_adrs,"rand":_rand_etiketi,"hassas":_hassas})
+
+        # ── Adres bazlı konum bulma paneli ──────────────────────────────────
+        _yaklasik_kayitlar = list(dict.fromkeys(_yaklasik_kayitlar))  # tekilleştir
+        _hgc1, _hgc2, _hgc3 = st.columns([2, 1, 1])
+        _hgc1.caption(f"📍 {_hassas_sayi} müşteri TAM ADRESİNDEN, {len(_yaklasik_kayitlar)} müşteri il/ilçe merkezinden (yaklaşık) gösteriliyor.")
+        if _yaklasik_kayitlar and _hgc2.button(f"🔍 Sıradaki 15 Adresi Bul", key="_harita_geo_bul_btn", use_container_width=True):
+            import time as _htime
+            _bulunan = 0
+            with st.spinner(f"Adresler OpenStreetMap üzerinden aranıyor (yaklaşık {min(15,len(_yaklasik_kayitlar))*1.1:.0f} saniye sürer)..."):
+                for _anahtar in _yaklasik_kayitlar[:15]:
+                    _parcalar = _anahtar.split("|")
+                    _sonuc = _harita_geo_sorgu(_parcalar[0], _parcalar[1] if len(_parcalar) > 1 else "", _parcalar[2] if len(_parcalar) > 2 else "")
+                    _geo_cache[_anahtar] = list(_sonuc) if _sonuc else None
+                    if _sonuc: _bulunan += 1
+                    _htime.sleep(1.1)  # Nominatim kullanım kuralı: saniyede en fazla 1 istek
+            _harita_geo_cache_kaydet(_geo_cache)
+            _harita_geo_cache_yukle.clear()
+            st.toast(f"📍 {_bulunan} adres bulundu, {15-_bulunan} adres eşleşmedi (yaklaşık konumda kalacak)", icon="✅")
+            st.rerun()
+        if _yaklasik_kayitlar:
+            _hgc3.caption(f"Tahmini süre: ~{len(_yaklasik_kayitlar)*1.1/60:.1f} dk (tamamı için)")
 
         _pins_json = _hj.dumps(_pins, ensure_ascii=False)
         _harita_html = """<!DOCTYPE html>
@@ -12418,18 +12525,23 @@ elif aktif == "harita":
 <script>
 var pins = """ + _pins_json + """;
 var map = L.map('map').setView([39.5,33.0],6);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:18}).addTo(map);
-var cl = L.markerClusterGroup({maxClusterRadius:50,spiderfyOnMaxZoom:true,showCoverageOnHover:false});
+// CartoDB Positron — ücretsiz, anahtar gerektirmez, Google Haritalar'a benzer
+// temiz/modern görünüm (varsayılan OpenStreetMap tile'larından daha sade).
+L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',{
+  attribution:'© OpenStreetMap © CARTO', maxZoom:19, subdomains:'abcd'
+}).addTo(map);
+var cl = L.markerClusterGroup({maxClusterRadius:45,spiderfyOnMaxZoom:true,showCoverageOnHover:false});
 var rnk={};
 pins.forEach(function(p){
   rnk[p.durum]=p.renk;
-  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="24" height="32" viewBox="0 0 24 32">'
+  var boyut = p.hassas ? 30 : 24;  // hassas (gerçek adres) pin'ler biraz daha büyük/belirgin
+  var svg='<svg xmlns="http://www.w3.org/2000/svg" width="'+boyut+'" height="'+(boyut*4/3)+'" viewBox="0 0 24 32">'
     +'<path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20C24 5.4 18.6 0 12 0z" fill="'+p.renk+'" stroke="white" stroke-width="1.5"/>'
     +'<circle cx="12" cy="12" r="5" fill="white" opacity="0.9"/></svg>';
-  var ic=L.divIcon({html:svg,className:'',iconSize:[24,32],iconAnchor:[12,32],popupAnchor:[0,-30]});
+  var ic=L.divIcon({html:svg,className:'',iconSize:[boyut,boyut*4/3],iconAnchor:[boyut/2,boyut*4/3],popupAnchor:[0,-boyut]});
   var pop='<div class="pp"><h4>'+p.firma+(p.rand?' <span style="font-size:11px;color:#dc2626">'+p.rand+'</span>':'')+'</h4><table>'
     +'<tr><td>İl/İlçe</td><td>'+p.il+(p.ilce?' / '+p.ilce:'')+'</td></tr>'
-    +'<tr><td>Adres</td><td>'+p.adres+'</td></tr>'
+    +'<tr><td>Adres</td><td>'+p.adres+(p.hassas?' <span style="color:#16a34a;font-size:10px;">📍 hassas</span>':' <span style="color:#d97706;font-size:10px;">~yaklaşık</span>')+'</td></tr>'
     +'<tr><td>Durum</td><td>'+p.durum+'</td></tr>'
     +'<tr><td>Segment</td><td>'+p.seg+'</td></tr>'
     +'<tr><td>Temsilci</td><td>'+p.tem+'</td></tr>'
