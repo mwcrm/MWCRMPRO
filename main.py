@@ -4769,7 +4769,7 @@ section[data-testid="stSidebar"] { display: none !important; }
         "genel":    ("📊","GENEL",    None, _genel_items),
         "iletisim": ("🤝","İlk Temas",    None, [((_asama_ikon(a),a,_asama_sayi(a),f"asama_{a}",a in _aktif_fil_asama)) for a in _grp1_asama_goster] + [("💬","Mesaj",_mesaj_gercek_toplam,"mesaj_gercek",_mesaj_gercek_aktif_flag)]),
         "asama1":   ("📅","1. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama1",a),f"asama1_{a}",False)) for a in _grp2_asama]),
-        "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,(_teklif_firma_sayisi if a=="Teklif" else _kolon_sayi("asama2",a)),f"asama2_{a}",False)) for a in _grp3_asama]),
+        "asama2":   ("📄","2. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama2",a),f"asama2_{a}",False)) for a in _grp3_asama]),
         "asama3":   ("🧪","3. AŞAMA", None, [((_asama_ikon(a),a,_kolon_sayi("asama3",a),f"asama3_{a}",False)) for a in _grp4_asama]),
         "sonuc":    ("🏆","SONUÇ",    None, [((_asama_ikon(a),a,_kolon_sayi("sonuc",a),f"sonuc_{a}",False)) for a in _grp5_asama]),
     }
