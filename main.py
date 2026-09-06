@@ -4864,30 +4864,6 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
 </script>"""
     st.markdown(_html, unsafe_allow_html=True)
 
-    # ── AKTİF FİLTRE UYARISI — rapor kutuları HER ZAMAN filtre öncesi TÜM
-    # listeye göre hesaplanır; tablo ise aktif filtrelere göre daralmış
-    # olabilir. Bu ikisi karşılaştırıldığında "sayı tutmuyor" gibi görünür —
-    # aslında ikisi de doğru, sadece FARKLI kapsamlara bakıyorlar. Karışıklığı
-    # önlemek için hangi filtrelerin aktif olduğunu burada açıkça gösteriyoruz.
-    _af_aktif_liste = []
-    if st.session_state.get("ara_liste"): _af_aktif_liste.append(f"Arama: '{st.session_state['ara_liste']}'")
-    if st.session_state.get("_cl_fil_durum_multi"): _af_aktif_liste.append(f"Durum: {', '.join(st.session_state['_cl_fil_durum_multi'])}")
-    if st.session_state.get("_cl_fil_asama_multi"): _af_aktif_liste.append(f"Aşama: {', '.join(st.session_state['_cl_fil_asama_multi'])}")
-    if st.session_state.get("_cl_fil_il_multi"): _af_aktif_liste.append(f"İl: {', '.join(st.session_state['_cl_fil_il_multi'])}")
-    if st.session_state.get("_cl_fil_ilce_multi"): _af_aktif_liste.append(f"İlçe: {', '.join(st.session_state['_cl_fil_ilce_multi'])}")
-    if st.session_state.get("_cl_fil_temsilci_multi"): _af_aktif_liste.append(f"Temsilci: {', '.join(st.session_state['_cl_fil_temsilci_multi'])}")
-    if st.session_state.get("_cl_fil_asama1"): _af_aktif_liste.append(f"1. Aşama: {st.session_state['_cl_fil_asama1']}")
-    if st.session_state.get("_cl_fil_asama2"): _af_aktif_liste.append(f"2. Aşama: {st.session_state['_cl_fil_asama2']}")
-    if st.session_state.get("_cl_fil_asama3"): _af_aktif_liste.append(f"3. Aşama: {st.session_state['_cl_fil_asama3']}")
-    if st.session_state.get("_cl_fil_sonuc"): _af_aktif_liste.append(f"Sonuç: {st.session_state['_cl_fil_sonuc']}")
-    if st.session_state.get("_bl_havuz_filtre"): _af_aktif_liste.append("Bölge: Havuz (Bölgesiz)")
-    if st.session_state.get("_asamasiz_aktif"): _af_aktif_liste.append("Aşamasız")
-    if st.session_state.get("_mesaj_gercek_aktif"): _af_aktif_liste.append("Mesaj (gerçek)")
-    if _af_aktif_liste:
-        st.warning(f"⚠️ Şu an aktif filtre(ler): **{' · '.join(_af_aktif_liste)}** — "
-                   f"yukarıdaki rapor kutuları bu filtrelerden ETKİLENMEZ, her zaman TÜM listeye göre hesaplanır. "
-                   f"Tablodaki satır sayısı ise bu filtrelere göre DARALTILMIŞ görünümü gösterir — "
-                   f"ikisini karşılaştırırken bunu göz önünde bulundur.")
 
     # Grup ayar param
     _qp_grp_gizli = st.query_params.get("_grp_gizli","")
