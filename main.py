@@ -5895,9 +5895,16 @@ function kartSec(id){
         "ara_islem":     st.column_config.TextColumn("Ara İşlem", width=_w("ara_islem")),
         "sonuc":         st.column_config.SelectboxColumn("Sonuç", options=_asama_secenek_guvenli("sonuc", ["Tümü", "Kazanıldı", "Kaybedildi", "Devam Ediyor"]), width=_w("sonuc")),
     }
+    _IL_KISA_ETIKET = {"İstanbul":"İst","Bursa":"Brs","İzmir":"İzm","Manisa":"Man","Tekirdağ":"Tek",
+                        "Kocaeli":"Koc","Ankara":"Ank","Konya":"Kon","Denizli":"Den","Adana":"Ada",
+                        "Gaziantep":"Gaz","Kayseri":"Kay","Antalya":"Ant","Aydın":"Ayd","Balıkesir":"Bal",
+                        "Diyarbakır":"Diy","Erzurum":"Erz","Eskişehir":"Esk","Hatay":"Hat","Kahramanmaraş":"Kah",
+                        "Malatya":"Mal","Mardin":"Mar","Mersin":"Mrs","Muğla":"Muğ","Ordu":"Ord",
+                        "Sakarya":"Sak","Samsun":"Sam","Trabzon":"Tra","Van":"Van","Şanlıurfa":"Şan","Diğer":"Diğ"}
     for _il_kol_cfg in _IL_SUTUN_LISTESI:
-        col_config[_il_kol_cfg] = st.column_config.TextColumn(_il_kol_cfg, width=_w(_il_kol_cfg),
-            help="Bu firmanın bu ile ne gönderdiğini serbestçe yazın (sayı veya metin).")
+        col_config[_il_kol_cfg] = st.column_config.TextColumn(
+            _IL_KISA_ETIKET.get(_il_kol_cfg, _il_kol_cfg[:3]), width=_w(_il_kol_cfg),
+            help=f"{_il_kol_cfg} — Bu firmanın bu ile ne gönderdiğini serbestçe yazın (sayı veya metin).")
     # Sütun sırası — sizin verdiğiniz şablonla birebir: Seç, İşlem Tarih, Id, Firma, Yetkili,
     # Gsm, S.Tel, E-Mail, Adres, İlçe, İl, Hedef(+Gerçek), Durum, Analiz, Aşama, 1-2-3.Aşama,
     # Açıklama, Notlar, Son Randevu, Teklif, Mesaj, Sonuç. Temsilci silinmedi, en sona eklendi.
