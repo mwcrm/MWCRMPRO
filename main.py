@@ -1,4 +1,13 @@
 import streamlit as st
+
+# ── İL SÜTUNLARI — GLOBAL sabit (birden fazla sayfadan erişilir: Cari Liste
+# tablosunda kolon olarak, Kullanıcılar sayfasındaki Kolon Ayarları'nda genişlik
+# ayarı olarak). Tek bir sayfanın içinde tanımlanırsa diğer sayfa NameError alır.
+_IL_SUTUN_LISTESI = ["İstanbul","Bursa","İzmir","Manisa","Tekirdağ","Kocaeli","Ankara","Konya",
+                     "Denizli","Adana","Gaziantep","Kayseri","Antalya","Aydın","Balıkesir",
+                     "Diyarbakır","Erzurum","Eskişehir","Hatay","Kahramanmaraş","Malatya",
+                     "Mardin","Mersin","Muğla","Ordu","Sakarya","Samsun","Trabzon","Van",
+                     "Şanlıurfa","Diğer"]
 import sqlite3
 import pandas as pd
 import shutil
@@ -5848,12 +5857,7 @@ function kartSec(id){
                     _liste.append(_v)
         return _liste
 
-    # ── İL SÜTUNLARI — sabit liste (col_config ve col_order'dan önce tanımlı olmalı) ──
-    _IL_SUTUN_LISTESI = ["İstanbul","Bursa","İzmir","Manisa","Tekirdağ","Kocaeli","Ankara","Konya",
-                         "Denizli","Adana","Gaziantep","Kayseri","Antalya","Aydın","Balıkesir",
-                         "Diyarbakır","Erzurum","Eskişehir","Hatay","Kahramanmaraş","Malatya",
-                         "Mardin","Mersin","Muğla","Ordu","Sakarya","Samsun","Trabzon","Van",
-                         "Şanlıurfa","Diğer"]
+    # ── İL SÜTUNLARI — global sabit (dosyanın en başında tanımlı), burada tekrar tanımlanmaz ──
 
     col_config = {
         "Seç":           st.column_config.CheckboxColumn("Seç", default=False, width=_w("Seç")),
