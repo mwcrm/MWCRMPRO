@@ -5886,7 +5886,7 @@ function kartSec(id){
         "adres":110,"il":70,"ilce":60,"durum":80,"temsilci":80,
         "islem_asamasi":80,"aciklama":110,"📅 Son Randevu":170,"📨 Notlar":50,"id":40,
         "beklenen_ciro":70,"gerceklesen_ciro":70,"✅ Analiz":70,"Varış İli":90,"Koli/Palet":110,
-        "🧾 Teklif":70,"💬 Mesaj":70,"Varış İlleri":110,"Fiyatlandırma":110,
+        "🧾 Teklif":70,"💬 Mesaj":70,
         "asama1":90,"asama2":90,"asama3":90,"sonuc":90,"ara_islem":90
     }
     for _il_vars in _IL_SUTUN_LISTESI:
@@ -5972,10 +5972,6 @@ function kartSec(id){
         "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=False, width=_w("💬 Mesaj"), help="Sadece rakam girin (örn. 3). İkon otomatik eklenir. Boş bırakırsan otomatik hesaplanan sayı geri döner."),
         "Varış İli":     st.column_config.TextColumn("Varış İli", disabled=False, width=_w("Varış İli"), help="Müşterinin kargo varış ili — manuel serbest metin. Buraya veya Koli/Palet'e bir şey yazılırsa Analiz otomatik ✅ olur."),
         "Koli/Palet":    st.column_config.TextColumn("Koli/Palet", disabled=False, width=_w("Koli/Palet"), help="Koli, palet vb. bilgiler — manuel, sınırsız serbest metin."),
-        "Varış İlleri":  st.column_config.TextColumn("Varış İlleri", width=_w("Varış İlleri"),
-            help="Karışık/serbest yazılan il isimlerini (örn. 'istanbul ankara izmir') buraya yaz — Kaydet'e basınca eşleşen il sütunları otomatik işaretlenir. Kaydettikten sonra bu kutu boşalır."),
-        "Fiyatlandırma": st.column_config.TextColumn("Fiyatlandırma", width=_w("Fiyatlandırma"),
-            help="Buraya yazdığın her şey Kaydet'e basınca 'Koli/Palet' alanına eklenir. Kaydettikten sonra bu kutu boşalır."),
         "asama1":        st.column_config.SelectboxColumn("1. Aşama", options=_asama_secenek_guvenli("asama1", ["", "Randevu"]), width=_w("asama1")),
         "asama2":        st.column_config.SelectboxColumn("2. Aşama", options=_asama_secenek_guvenli("asama2", ["", "Teklif"]), width=_w("asama2")),
         "asama3":        st.column_config.SelectboxColumn("3. Aşama", options=_asama_secenek_guvenli("asama3", ["Tümü", "Deneme", "TAKİP", "Fiyat Hazırla", "Sözleşme"]), width=_w("asama3")),
@@ -6017,7 +6013,7 @@ function kartSec(id){
             df_f = df_f.sort_values("_cl2_key").drop(columns=["_cl2_key"]).reset_index(drop=True)
 
     col_order = ["Seç","tarih","guncelleme_tarihi","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
-                 "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","Varış İli","Koli/Palet","Varış İlleri","Fiyatlandırma","islem_asamasi",
+                 "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","Varış İli","Koli/Palet","islem_asamasi",
                  "asama1","asama2","asama3","aciklama","📨 Notlar","📅 Son Randevu",
                  "🧾 Teklif","💬 Mesaj","ara_islem","sonuc","temsilci"] + _IL_SUTUN_LISTESI
     # Gizli kolonları çıkar
@@ -6199,14 +6195,6 @@ function kartSec(id){
     else:
         df_edit["Varış İli"] = ""
         df_edit["Koli/Palet"] = ""
-
-    # ── HIZLI GİRİŞ SÜTUNLARI — her zaman BOŞ başlar (kalıcı veri değil,
-    # sadece "yaz ve kaydet" ile diğer alanlara aktarılan geçici giriş kutuları):
-    # "Varış İlleri" — karışık/serbest yazılan il isimlerini ayırıp, eşleşen
-    #   il sütunlarını (aşağıdaki 31 il kolonu) "✓" ile işaretler.
-    # "Fiyatlandırma" — yazılan her şeyi olduğu gibi "Koli/Palet" alanına ekler.
-    df_edit["Varış İlleri"] = ""
-    df_edit["Fiyatlandırma"] = ""
 
     _not_detay = {}
     _not_sayac = {}
@@ -8273,7 +8261,7 @@ function updateBot(v){{
             "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50,
             "asama1":100,"asama2":100,"asama3":100,"sonuc":100,"ara_islem":100,
             "beklenen_ciro":80,"gerceklesen_ciro":80,"✅ Analiz":80,"Varış İli":100,"Koli/Palet":120,
-            "🧾 Teklif":70,"💬 Mesaj":70,"Varış İlleri":110,"Fiyatlandırma":110
+            "🧾 Teklif":70,"💬 Mesaj":70
         }
         for _il_kv in _IL_SUTUN_LISTESI:
             _KOL_VARS_UI[_il_kv] = 60
@@ -8285,7 +8273,7 @@ function updateBot(v){{
             "aciklama":"Açıklama","📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID",
             "asama1":"1. Aşama","asama2":"2. Aşama","asama3":"3. Aşama","sonuc":"Sonuç","ara_islem":"Ara İşlem",
             "beklenen_ciro":"Hedef ₺","gerceklesen_ciro":"Gerçek ₺","✅ Analiz":"Analiz","Varış İli":"Varış İli","Koli/Palet":"Koli/Palet",
-            "🧾 Teklif":"Teklif","💬 Mesaj":"Mesaj","Varış İlleri":"Varış İlleri","Fiyatlandırma":"Fiyatlandırma"
+            "🧾 Teklif":"Teklif","💬 Mesaj":"Mesaj"
         }
         for _il_ke in _IL_SUTUN_LISTESI:
             _KG_UI_ETIKET[_il_ke] = _il_ke
