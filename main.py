@@ -2406,7 +2406,7 @@ def not_dialog(cari_id, firma_adi=""):
     max-width: 1900px !important;
 }
 </style>""", unsafe_allow_html=True)
-    _tab_not, _tab_rdv, _tab_yetkili, _tab_dn, _tab_teklif, _tab_sozlesme, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "🚚 Dış Nakliye", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
+    _tab_not, _tab_rdv, _tab_yetkili, _tab_dn, _tab_teklif, _tab_sozlesme, _tab_varis, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "🚚 Dış Nakliye", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "📦 Varış/Fiyat", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
     with _tab_not:
         not_paneli(cari_id, firma_adi, key_prefix="dlg")
     with _tab_rdv:
@@ -2715,6 +2715,89 @@ def not_dialog(cari_id, firma_adi=""):
             st.session_state["aktif_tab"] = "sozlesme"
             st.session_state["sozlesme_musteri_onsel"] = firma_adi
             st.rerun()
+    with _tab_varis:
+        st.caption("Karışık/serbest yazabilirsin — aynı Cari Liste'deki 'Varış İlleri' ve "
+                   "'Fiyatlandırma' sütunlarıyla birebir aynı şekilde çalışır.")
+
+        def _vd_norm(_s):
+            return (str(_s or "").strip().upper().replace("İ", "I").replace("Ş", "S")
+                    .replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C"))
+
+        _vd_sb = get_sb_client()
+
+        # Mevcut il matrisini bu firma için göster
+        _vd_matris_firma = {}
+        try:
+            if _vd_sb:
+                _r_vdm = _vd_sb.table("kullanici_tercih").select("deger").eq(
+                    "kullanici", "__liste_ui__").eq("anahtar", "_il_gonderim_matrisi").execute()
+                if _r_vdm.data:
+                    import json as _vdmj
+                    _vd_tum_matris = _vdmj.loads(_r_vdm.data[0]["deger"])
+                    _vd_matris_firma = _vd_tum_matris.get(str(int(cari_id)), {})
+        except Exception:
+            pass
+        _vd_dolu = {k: v for k, v in _vd_matris_firma.items() if str(v).strip()}
+        if _vd_dolu:
+            st.caption(f"📍 Şu an işaretli iller: {', '.join(f'{k} ({v})' for k, v in _vd_dolu.items())}")
+        else:
+            st.caption("📍 Şu an hiç il işaretlenmemiş.")
+
+        _vd_illeri = st.text_input("Varış İlleri", key=f"dlg_varis_illeri_{cari_id}",
+                                    placeholder="Örn: istanbul ankara izmir (karışık yazabilirsin)")
+        if st.button("💾 İlleri İşaretle", key=f"dlg_varis_illeri_kaydet_{cari_id}", use_container_width=True):
+            if _vd_illeri.strip() and _vd_sb:
+                try:
+                    _r_vdm2 = _vd_sb.table("kullanici_tercih").select("deger").eq(
+                        "kullanici", "__liste_ui__").eq("anahtar", "_il_gonderim_matrisi").execute()
+                    import json as _vdmj2
+                    _vd_tum_matris2 = _vdmj2.loads(_r_vdm2.data[0]["deger"]) if _r_vdm2.data else {}
+                    _vd_id_str = str(int(cari_id))
+                    _vd_tum_matris2.setdefault(_vd_id_str, {})
+                    _vd_metin_norm = _vd_norm(_vd_illeri)
+                    _vd_eslesen = []
+                    for _il_ad_vd in _IL_SUTUN_LISTESI:
+                        if _il_ad_vd == "Diğer":
+                            continue
+                        if _vd_norm(_il_ad_vd) in _vd_metin_norm:
+                            if not str(_vd_tum_matris2[_vd_id_str].get(_il_ad_vd, "")).strip():
+                                _vd_tum_matris2[_vd_id_str][_il_ad_vd] = "✓"
+                            _vd_eslesen.append(_il_ad_vd)
+                    _vd_sb.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_il_gonderim_matrisi").execute()
+                    _vd_sb.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_il_gonderim_matrisi",
+                                                              "deger": _vdmj2.dumps(_vd_tum_matris2, ensure_ascii=False)}).execute()
+                    if _vd_eslesen:
+                        st.toast(f"✅ İşaretlendi: {', '.join(_vd_eslesen)}", icon="📍")
+                    else:
+                        st.warning("Yazdığın metinde tanınan bir il ismi bulunamadı.")
+                    st.rerun()
+                except Exception as _vd_hata:
+                    st.error(f"Hata: {_vd_hata}")
+            else:
+                st.warning("Önce bir şey yazın.")
+
+        st.divider()
+        _vd_fiyat = st.text_input("Fiyatlandırma", key=f"dlg_fiyat_{cari_id}",
+                                   placeholder="Buraya yazdığın her şey Koli/Palet alanına eklenir")
+        if st.button("💾 Koli/Palet'e Ekle", key=f"dlg_fiyat_kaydet_{cari_id}", use_container_width=True):
+            if _vd_fiyat.strip() and _vd_sb:
+                try:
+                    _r_kpo = _vd_sb.table("kullanici_tercih").select("deger").eq(
+                        "kullanici", "__liste_ui__").eq("anahtar", "_koli_palet_manuel").execute()
+                    import json as _kpoj
+                    _kp_map = _kpoj.loads(_r_kpo.data[0]["deger"]) if _r_kpo.data else {}
+                    _kp_id_str = str(int(cari_id))
+                    _kp_mevcut = str(_kp_map.get(_kp_id_str, "")).strip()
+                    _kp_map[_kp_id_str] = (_kp_mevcut + "\n" + _vd_fiyat.strip()).strip() if _kp_mevcut else _vd_fiyat.strip()
+                    _vd_sb.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_koli_palet_manuel").execute()
+                    _vd_sb.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_koli_palet_manuel",
+                                                              "deger": _kpoj.dumps(_kp_map, ensure_ascii=False)}).execute()
+                    st.toast("✅ Koli/Palet güncellendi", icon="📦")
+                    st.rerun()
+                except Exception as _vd_hata2:
+                    st.error(f"Hata: {_vd_hata2}")
+            else:
+                st.warning("Önce bir şey yazın.")
     with _tab_duz:
         st.caption(f"**{firma_adi}** — kayıtlı tüm bilgilerle eksiksiz düzenleme ekranı açılır.")
         if st.button("✏️ Cari Kartı Düzenle", key=f"dlg_cari_duzenle_{cari_id}", type="primary", use_container_width=True):
@@ -5803,7 +5886,7 @@ function kartSec(id){
         "adres":110,"il":70,"ilce":60,"durum":80,"temsilci":80,
         "islem_asamasi":80,"aciklama":110,"📅 Son Randevu":170,"📨 Notlar":50,"id":40,
         "beklenen_ciro":70,"gerceklesen_ciro":70,"✅ Analiz":70,"Varış İli":90,"Koli/Palet":110,
-        "🧾 Teklif":70,"💬 Mesaj":70,
+        "🧾 Teklif":70,"💬 Mesaj":70,"Varış İlleri":110,"Fiyatlandırma":110,
         "asama1":90,"asama2":90,"asama3":90,"sonuc":90,"ara_islem":90
     }
     for _il_vars in _IL_SUTUN_LISTESI:
@@ -5889,6 +5972,10 @@ function kartSec(id){
         "💬 Mesaj":      st.column_config.TextColumn("💬 Mesaj", disabled=False, width=_w("💬 Mesaj"), help="Sadece rakam girin (örn. 3). İkon otomatik eklenir. Boş bırakırsan otomatik hesaplanan sayı geri döner."),
         "Varış İli":     st.column_config.TextColumn("Varış İli", disabled=False, width=_w("Varış İli"), help="Müşterinin kargo varış ili — manuel serbest metin. Buraya veya Koli/Palet'e bir şey yazılırsa Analiz otomatik ✅ olur."),
         "Koli/Palet":    st.column_config.TextColumn("Koli/Palet", disabled=False, width=_w("Koli/Palet"), help="Koli, palet vb. bilgiler — manuel, sınırsız serbest metin."),
+        "Varış İlleri":  st.column_config.TextColumn("Varış İlleri", width=_w("Varış İlleri"),
+            help="Karışık/serbest yazılan il isimlerini (örn. 'istanbul ankara izmir') buraya yaz — Kaydet'e basınca eşleşen il sütunları otomatik işaretlenir. Kaydettikten sonra bu kutu boşalır."),
+        "Fiyatlandırma": st.column_config.TextColumn("Fiyatlandırma", width=_w("Fiyatlandırma"),
+            help="Buraya yazdığın her şey Kaydet'e basınca 'Koli/Palet' alanına eklenir. Kaydettikten sonra bu kutu boşalır."),
         "asama1":        st.column_config.SelectboxColumn("1. Aşama", options=_asama_secenek_guvenli("asama1", ["", "Randevu"]), width=_w("asama1")),
         "asama2":        st.column_config.SelectboxColumn("2. Aşama", options=_asama_secenek_guvenli("asama2", ["", "Teklif"]), width=_w("asama2")),
         "asama3":        st.column_config.SelectboxColumn("3. Aşama", options=_asama_secenek_guvenli("asama3", ["Tümü", "Deneme", "TAKİP", "Fiyat Hazırla", "Sözleşme"]), width=_w("asama3")),
@@ -5930,7 +6017,7 @@ function kartSec(id){
             df_f = df_f.sort_values("_cl2_key").drop(columns=["_cl2_key"]).reset_index(drop=True)
 
     col_order = ["Seç","tarih","guncelleme_tarihi","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
-                 "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","Varış İli","Koli/Palet","islem_asamasi",
+                 "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","Varış İli","Koli/Palet","Varış İlleri","Fiyatlandırma","islem_asamasi",
                  "asama1","asama2","asama3","aciklama","📨 Notlar","📅 Son Randevu",
                  "🧾 Teklif","💬 Mesaj","ara_islem","sonuc","temsilci"] + _IL_SUTUN_LISTESI
     # Gizli kolonları çıkar
@@ -6112,6 +6199,15 @@ function kartSec(id){
     else:
         df_edit["Varış İli"] = ""
         df_edit["Koli/Palet"] = ""
+
+    # ── HIZLI GİRİŞ SÜTUNLARI — her zaman BOŞ başlar (kalıcı veri değil,
+    # sadece "yaz ve kaydet" ile diğer alanlara aktarılan geçici giriş kutuları):
+    # "Varış İlleri" — karışık/serbest yazılan il isimlerini ayırıp, eşleşen
+    #   il sütunlarını (aşağıdaki 31 il kolonu) "✓" ile işaretler.
+    # "Fiyatlandırma" — yazılan her şeyi olduğu gibi "Koli/Palet" alanına ekler.
+    df_edit["Varış İlleri"] = ""
+    df_edit["Fiyatlandırma"] = ""
+
     _not_detay = {}
     _not_sayac = {}
     if sb_liste:
@@ -6780,6 +6876,13 @@ function kartSec(id){
                         else:
                             _koli_ov_guncel.pop(str(_rid_ex), None)
                         _ex_degisti = True
+                    # ── "Fiyatlandırma" hızlı-giriş — yazılan her şey Koli/Palet'e eklenir ──
+                    if "Fiyatlandırma" in _deg_ex:
+                        _v_fiyat = str(_deg_ex["Fiyatlandırma"] or "").strip()
+                        if _v_fiyat:
+                            _mevcut_koli = _koli_ov_guncel.get(str(_rid_ex), "").strip()
+                            _koli_ov_guncel[str(_rid_ex)] = (_mevcut_koli + "\n" + _v_fiyat).strip() if _mevcut_koli else _v_fiyat
+                            _ex_degisti = True
                 if _ex_degisti:
                     st.session_state["_analiz_manuel_override"] = _analiz_ov_guncel
                     st.session_state["_cikis_ili_manuel"] = _cikis_ov_guncel
@@ -6909,9 +7012,15 @@ function kartSec(id){
                 # gönderiyor" bilgisi firma bazlı olarak burada tutulur.
                 _ilm_degisti = False
                 _ilm_guncel = dict(_il_gonderim_matrisi)
+
+                def _vi_norm(_s):
+                    return (str(_s or "").strip().upper().replace("İ", "I").replace("Ş", "S")
+                            .replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C"))
+
                 for _idx_str_ilm, _deg_ilm in _edited_rows.items():
                     _ilm_fark = {k: v for k, v in _deg_ilm.items() if k in _IL_SUTUN_LISTESI}
-                    if not _ilm_fark:
+                    _varis_illeri_metni = str(_deg_ilm.get("Varış İlleri", "") or "").strip()
+                    if not _ilm_fark and not _varis_illeri_metni:
                         continue
                     _idxn_ilm = int(_idx_str_ilm)
                     if _idxn_ilm >= len(_rows):
@@ -6923,7 +7032,19 @@ function kartSec(id){
                     _ilm_guncel.setdefault(_rid_ilm_str, {})
                     for _ilk, _ilv in _ilm_fark.items():
                         _ilm_guncel[_rid_ilm_str][_ilk] = str(_ilv) if _ilv is not None else ""
-                    _ilm_degisti = True
+                        _ilm_degisti = True
+                    # ── "Varış İlleri" hızlı-giriş — karışık/serbest yazılan il
+                    # isimlerini ayırıp, eşleşen il sütununu (boşsa) "✓" ile işaretler.
+                    if _varis_illeri_metni:
+                        _vi_metin_norm = _vi_norm(_varis_illeri_metni)
+                        for _il_ad_vi in _IL_SUTUN_LISTESI:
+                            if _il_ad_vi == "Diğer":
+                                continue
+                            if _vi_norm(_il_ad_vi) in _vi_metin_norm:
+                                _mevcut_deg = _ilm_guncel[_rid_ilm_str].get(_il_ad_vi, "")
+                                if not str(_mevcut_deg).strip():
+                                    _ilm_guncel[_rid_ilm_str][_il_ad_vi] = "✓"
+                                    _ilm_degisti = True
                 if _ilm_degisti:
                     _il_gonderim_matrisi_kaydet(_ilm_guncel)
                     try: _il_gonderim_matrisi_yukle.clear()
@@ -6939,7 +7060,7 @@ function kartSec(id){
                         return None
                     guncelle = {}
                     for k, v in degisiklikler.items():
-                        if k in ("Seç", "🗑️ Sil", "🧾 Teklif", "💬 Mesaj", "✅ Analiz", "Varış İli", "Koli/Palet", "📅 Son Randevu") or k in _IL_SUTUN_LISTESI: continue
+                        if k in ("Seç", "🗑️ Sil", "🧾 Teklif", "💬 Mesaj", "✅ Analiz", "Varış İli", "Koli/Palet", "📅 Son Randevu", "Varış İlleri", "Fiyatlandırma") or k in _IL_SUTUN_LISTESI: continue
                         if k in ("beklenen_ciro", "gerceklesen_ciro"):
                             try: guncelle[k] = float(v or 0)
                             except: guncelle[k] = 0
@@ -8152,7 +8273,7 @@ function updateBot(v){{
             "islem_asamasi":90,"aciklama":120,"📅 Son Randevu":180,"📨 Notlar":60,"id":50,
             "asama1":100,"asama2":100,"asama3":100,"sonuc":100,"ara_islem":100,
             "beklenen_ciro":80,"gerceklesen_ciro":80,"✅ Analiz":80,"Varış İli":100,"Koli/Palet":120,
-            "🧾 Teklif":70,"💬 Mesaj":70
+            "🧾 Teklif":70,"💬 Mesaj":70,"Varış İlleri":110,"Fiyatlandırma":110
         }
         for _il_kv in _IL_SUTUN_LISTESI:
             _KOL_VARS_UI[_il_kv] = 60
@@ -8164,7 +8285,7 @@ function updateBot(v){{
             "aciklama":"Açıklama","📅 Son Randevu":"Randevu","📨 Notlar":"Notlar","id":"ID",
             "asama1":"1. Aşama","asama2":"2. Aşama","asama3":"3. Aşama","sonuc":"Sonuç","ara_islem":"Ara İşlem",
             "beklenen_ciro":"Hedef ₺","gerceklesen_ciro":"Gerçek ₺","✅ Analiz":"Analiz","Varış İli":"Varış İli","Koli/Palet":"Koli/Palet",
-            "🧾 Teklif":"Teklif","💬 Mesaj":"Mesaj"
+            "🧾 Teklif":"Teklif","💬 Mesaj":"Mesaj","Varış İlleri":"Varış İlleri","Fiyatlandırma":"Fiyatlandırma"
         }
         for _il_ke in _IL_SUTUN_LISTESI:
             _KG_UI_ETIKET[_il_ke] = _il_ke
