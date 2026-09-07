@@ -5806,6 +5806,8 @@ function kartSec(id){
         "🧾 Teklif":70,"💬 Mesaj":70,
         "asama1":90,"asama2":90,"asama3":90,"sonuc":90,"ara_islem":90
     }
+    for _il_vars in _IL_SUTUN_LISTESI:
+        _KOL_VARSAYILAN[_il_vars] = 10
     # Gizli kolonları DB'den yükle
     if "_kol_genislik_init" not in st.session_state:
         try:
@@ -5894,7 +5896,7 @@ function kartSec(id){
         "sonuc":         st.column_config.SelectboxColumn("Sonuç", options=_asama_secenek_guvenli("sonuc", ["Tümü", "Kazanıldı", "Kaybedildi", "Devam Ediyor"]), width=_w("sonuc")),
     }
     for _il_kol_cfg in _IL_SUTUN_LISTESI:
-        col_config[_il_kol_cfg] = st.column_config.TextColumn(_il_kol_cfg, width="small",
+        col_config[_il_kol_cfg] = st.column_config.TextColumn(_il_kol_cfg, width=_w(_il_kol_cfg),
             help="Bu firmanın bu ile ne gönderdiğini serbestçe yazın (sayı veya metin).")
     # Sütun sırası — sizin verdiğiniz şablonla birebir: Seç, İşlem Tarih, Id, Firma, Yetkili,
     # Gsm, S.Tel, E-Mail, Adres, İlçe, İl, Hedef(+Gerçek), Durum, Analiz, Aşama, 1-2-3.Aşama,
@@ -8218,14 +8220,12 @@ function updateBot(v){{
                     except Exception as _kgize:
                         st.toast(f"⚠️ Gizle/Göster kaydedilemedi: {_kgize}", icon="⚠️")
                     st.rerun()
-                # Slider — gizliyse devre dışı. İl sütunları için minimum 3'e
-                # kadar daraltılabilsin (dar/az yer kaplasınlar), diğerleri 5'te kalsın.
-                _kg_min = 3 if _k in _IL_SUTUN_LISTESI else 5
+                # Slider — gizliyse devre dışı.
                 _yeni_kg_ui[_k] = st.slider(
                     f"{'~~' if _gizli_mi else ''}{_etiket}",
-                    min_value=_kg_min, max_value=400,
-                    value=max(int(_kg_ui_mevcut.get(_k, _KOL_VARS_UI.get(_k,100))), _kg_min),
-                    step=1 if _k in _IL_SUTUN_LISTESI else 5, key=f"ui_kg_{_k}",
+                    min_value=5, max_value=400,
+                    value=max(int(_kg_ui_mevcut.get(_k, _KOL_VARS_UI.get(_k,100))), 5),
+                    step=5, key=f"ui_kg_{_k}",
                     disabled=_gizli_mi
                 )
                 if _gizli_mi:
