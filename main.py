@@ -4866,6 +4866,57 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
 </script>"""
     st.markdown(_html, unsafe_allow_html=True)
 
+    # ── İL BAŞLIKLARI — kullanıcının verdiği sabit sırayla, + "Diğer" ────────
+    # Tıklanınca o ile göre filtreler (native buton — güvenilir çalışsın diye).
+    _il_ana_liste = ["İSTANBUL","BURSA","İZMİR","MANİSA","TEKİRDAĞ","KOCAELİ","ANKARA","KONYA",
+                      "DENİZLİ","ADANA","GAZİANTEP","KAYSERİ","ANTALYA","AYDIN","BALIKESİR",
+                      "DİYARBAKIR","ERZURUM","ESKİŞEHİR","HATAY","KAHRAMANMARAŞ","MALATYA",
+                      "MARDİN","MERSİN","MUĞLA","ORDU","SAKARYA","SAMSUN","TRABZON","VAN","ŞANLIURFA"]
+    _il_diger_liste = ["ADIYAMAN","AFYONKARAHİSAR","AĞRI","AKSARAY","AMASYA","ARDAHAN","ARTVİN",
+                        "BARTIN","BATMAN","BAYBURT","BİLECİK","BİNGÖL","BİTLİS","BOLU","BURDUR",
+                        "ÇANAKKALE","ÇANKIRI","ÇORUM","DÜZCE","EDİRNE","ELAZIĞ","ERZİNCAN",
+                        "GİRESUN","GÜMÜŞHANE","HAKKARİ","IĞDIR","ISPARTA","KARABÜK","KARAMAN",
+                        "KARS","KASTAMONU","KIRIKKALE","KIRKLARELİ","KIRŞEHİR","KİLİS","KÜTAHYA",
+                        "MUŞ","NEVŞEHİR","NİĞDE","OSMANİYE","RİZE","SİİRT","SİNOP","SİVAS",
+                        "ŞIRNAK","TOKAT","TUNCELİ","UŞAK","YALOVA","YOZGAT","ZONGULDAK"]
+
+    def _ilb_norm(_s):
+        return (str(_s or "").strip().upper().replace("İ","I").replace("Ş","S")
+                .replace("Ğ","G").replace("Ü","U").replace("Ö","O").replace("Ç","C"))
+
+    if "il" in df.columns:
+        _ilb_norm_col = df["il"].apply(_ilb_norm)
+        _ilb_diger_norm = set(_ilb_norm(x) for x in _il_diger_liste)
+
+        def _ilb_sayi(_il_ad):
+            return int((_ilb_norm_col == _ilb_norm(_il_ad)).sum())
+        _ilb_diger_sayi = int(_ilb_norm_col.isin(_ilb_diger_norm).sum())
+
+        with st.expander("📍 İl Başlıkları", expanded=False):
+            _ilb_tum_liste = _il_ana_liste + ["__DIGER__"]
+            _ilb_cols_per_row = 8
+            for _ilb_i in range(0, len(_ilb_tum_liste), _ilb_cols_per_row):
+                _ilb_satir = _ilb_tum_liste[_ilb_i:_ilb_i + _ilb_cols_per_row]
+                _ilb_cols = st.columns(_ilb_cols_per_row)
+                for _ilb_j, _ilb_ad in enumerate(_ilb_satir):
+                    with _ilb_cols[_ilb_j]:
+                        if _ilb_ad == "__DIGER__":
+                            _ilb_etiket = f"Diğer ({_ilb_diger_sayi})"
+                        else:
+                            _ilb_etiket = f"{_ilb_ad.title()} ({_ilb_sayi(_ilb_ad)})"
+                        if st.button(_ilb_etiket, key=f"ilb_btn_{_ilb_ad}", use_container_width=True):
+                            if _ilb_ad == "__DIGER__":
+                                _ilb_esl = [x for x in df["il"].dropna().unique().tolist() if _ilb_norm(x) in _ilb_diger_norm]
+                                st.session_state["_cl_fil_il_multi"] = sorted(_ilb_esl)
+                            else:
+                                _ilb_esl = [x for x in df["il"].dropna().unique().tolist() if _ilb_norm(x) == _ilb_norm(_ilb_ad)]
+                                st.session_state["_cl_fil_il_multi"] = sorted(_ilb_esl) if _ilb_esl else [_ilb_ad]
+                            st.session_state.pop("_cl_fil_ilce_multi", None)
+                            st.session_state["_toplam_aktif"] = False
+                            st.session_state["_asamasiz_aktif"] = False
+                            st.session_state["_mesaj_gercek_aktif"] = False
+                            st.rerun()
+
 
     # Grup ayar param
     _qp_grp_gizli = st.query_params.get("_grp_gizli","")
