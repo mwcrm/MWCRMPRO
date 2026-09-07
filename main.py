@@ -5848,6 +5848,13 @@ function kartSec(id){
                     _liste.append(_v)
         return _liste
 
+    # ── İL SÜTUNLARI — sabit liste (col_config ve col_order'dan önce tanımlı olmalı) ──
+    _IL_SUTUN_LISTESI = ["İstanbul","Bursa","İzmir","Manisa","Tekirdağ","Kocaeli","Ankara","Konya",
+                         "Denizli","Adana","Gaziantep","Kayseri","Antalya","Aydın","Balıkesir",
+                         "Diyarbakır","Erzurum","Eskişehir","Hatay","Kahramanmaraş","Malatya",
+                         "Mardin","Mersin","Muğla","Ordu","Sakarya","Samsun","Trabzon","Van",
+                         "Şanlıurfa","Diğer"]
+
     col_config = {
         "Seç":           st.column_config.CheckboxColumn("Seç", default=False, width=_w("Seç")),
         "tarih":         st.column_config.TextColumn("İşlem Tarih", disabled=True, width=_w("tarih")),
@@ -5908,13 +5915,6 @@ function kartSec(id){
             df_f = df_f.copy()
             df_f["_cl2_key"] = df_f["id"].map(_cl2_map).fillna(len(_cl2_sirali))
             df_f = df_f.sort_values("_cl2_key").drop(columns=["_cl2_key"]).reset_index(drop=True)
-
-    # ── İL SÜTUNLARI — sabit liste, tablonun sonuna eklenecek ────────────────
-    _IL_SUTUN_LISTESI = ["İstanbul","Bursa","İzmir","Manisa","Tekirdağ","Kocaeli","Ankara","Konya",
-                         "Denizli","Adana","Gaziantep","Kayseri","Antalya","Aydın","Balıkesir",
-                         "Diyarbakır","Erzurum","Eskişehir","Hatay","Kahramanmaraş","Malatya",
-                         "Mardin","Mersin","Muğla","Ordu","Sakarya","Samsun","Trabzon","Van",
-                         "Şanlıurfa","Diğer"]
 
     col_order = ["Seç","tarih","guncelleme_tarihi","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
                  "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","Varış İli","Koli/Palet","islem_asamasi",
