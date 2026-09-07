@@ -8218,12 +8218,16 @@ function updateBot(v){{
                     # buton görsel olarak tepkisiz kalmasın.
                     st.session_state["_kol_gizli"] = _gizli_ui
                     st.session_state.pop("_kol_genislik_init", None)
-                    # Kalıcı olması için DB'ye de yaz
+                    # Kalıcı olması için DB'ye de yaz (upsert+on_conflict yerine
+                    # sil+ekle — kullanici_tercih tablosunda bu kısıt olmadığı
+                    # için upsert sessizce başarısız oluyordu, ayarlar hiç
+                    # kalıcı olmuyordu).
                     try:
-                        _sb_kg_ui.table("kullanici_tercih").upsert({
+                        _sb_kg_ui.table("kullanici_tercih").delete().eq("kullanici","__liste_ui__").eq("anahtar","_kol_gizli").execute()
+                        _sb_kg_ui.table("kullanici_tercih").insert({
                             "kullanici":"__liste_ui__","anahtar":"_kol_gizli",
                             "deger":_kguj.dumps(_gizli_ui, ensure_ascii=False)
-                        }, on_conflict="kullanici,anahtar").execute()
+                        }).execute()
                     except Exception as _kgize:
                         st.toast(f"⚠️ Gizle/Göster kaydedilemedi: {_kgize}", icon="⚠️")
                     st.rerun()
@@ -8250,14 +8254,18 @@ function updateBot(v){{
                 _sb_kg_s = get_sb_client()
                 if _sb_kg_s:
                     import json as _kgsj2
-                    _sb_kg_s.table("kullanici_tercih").upsert({
+                    # NOT: upsert(on_conflict=...) yerine sil+ekle — aynı bilinen
+                    # kısıt sorununu (sessiz başarısızlık) önlemek için.
+                    _sb_kg_s.table("kullanici_tercih").delete().eq("kullanici","__liste_ui__").eq("anahtar","_kol_genislik").execute()
+                    _sb_kg_s.table("kullanici_tercih").insert({
                         "kullanici":"__liste_ui__","anahtar":"_kol_genislik",
                         "deger":_kgsj2.dumps(_yeni_kg_ui, ensure_ascii=False)
-                    }, on_conflict="kullanici,anahtar").execute()
-                    _sb_kg_s.table("kullanici_tercih").upsert({
+                    }).execute()
+                    _sb_kg_s.table("kullanici_tercih").delete().eq("kullanici","__liste_ui__").eq("anahtar","_kol_gizli").execute()
+                    _sb_kg_s.table("kullanici_tercih").insert({
                         "kullanici":"__liste_ui__","anahtar":"_kol_gizli",
                         "deger":_kgsj2.dumps(_gizli_ui, ensure_ascii=False)
-                    }, on_conflict="kullanici,anahtar").execute()
+                    }).execute()
                 st.session_state["_kol_genislik"] = _yeni_kg_ui
                 st.session_state["_kol_gizli"] = _gizli_ui
                 st.session_state.pop("_kol_genislik_init", None)
