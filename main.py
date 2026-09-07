@@ -2761,7 +2761,7 @@ def not_dialog(cari_id, firma_adi=""):
                             continue
                         if _vd_norm(_il_ad_vd) in _vd_metin_norm:
                             if not str(_vd_tum_matris2[_vd_id_str].get(_il_ad_vd, "")).strip():
-                                _vd_tum_matris2[_vd_id_str][_il_ad_vd] = "✓"
+                                _vd_tum_matris2[_vd_id_str][_il_ad_vd] = _il_ad_vd
                             _vd_eslesen.append(_il_ad_vd)
                     _vd_sb.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_il_gonderim_matrisi").execute()
                     _vd_sb.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_il_gonderim_matrisi",
@@ -6629,23 +6629,8 @@ function kartSec(id){
     secili_sayi = len(secili_df)
     secili_idler = secili_df["id"].tolist() if not secili_df.empty else []
 
-    # ── Tablodaki "Seç" işaretli satırları taslak olarak kaydet ─────────────
-    if secili_sayi > 0:
-        with st.expander(f"📂 İşaretli {secili_sayi} Firmayı Taslak Olarak Kaydet", expanded=False):
-            _tsk_dict_cb = st.session_state.get("_cok_firma_taslaklar", {})
-            _cbk1, _cbk2 = st.columns([3, 1])
-            _tsk_cb_ad = _cbk1.text_input("Taslak adı", key="_cb_tsk_ad", placeholder="Örn: Bu haftaki seçim", label_visibility="collapsed")
-            if _cbk2.button("💾 Kaydet", key="_cb_tsk_kaydet_btn", use_container_width=True, type="primary"):
-                _cb_ad_temiz = (_tsk_cb_ad or "").strip()
-                if _cb_ad_temiz:
-                    _tsk_dict_cb[_cb_ad_temiz] = sorted(int(x) for x in secili_idler)
-                    st.session_state["_cok_firma_taslaklar"] = _tsk_dict_cb
-                    _cok_firma_taslak_kaydet_db()
-                    st.toast(f"💾 '{_cb_ad_temiz}' kaydedildi — {secili_sayi} firma", icon="💾")
-                    st.rerun()
-                else:
-                    st.warning("Bir taslak adı yazın.")
-            pass  # (Eski açıklama kaldırıldı — "Çoklu Firma Taslakları" paneli Filtreler & Arama'dan kaldırıldı)
+    # ── "Seç" işaretli firmaları taslak olarak kaydetme paneli kullanıcı
+    # isteğiyle kaldırıldı (arşivleme/silme butonlarıyla birlikte, aşağıda) ──
 
     # ── NOT DİALOG — sadece seçili olunca açılır ────────────────────────────
     if secili_sayi == 1:
@@ -7031,7 +7016,7 @@ function kartSec(id){
                             if _vi_norm(_il_ad_vi) in _vi_metin_norm:
                                 _mevcut_deg = _ilm_guncel[_rid_ilm_str].get(_il_ad_vi, "")
                                 if not str(_mevcut_deg).strip():
-                                    _ilm_guncel[_rid_ilm_str][_il_ad_vi] = "✓"
+                                    _ilm_guncel[_rid_ilm_str][_il_ad_vi] = _il_ad_vi
                                     _ilm_degisti = True
                 if _ilm_degisti:
                     _il_gonderim_matrisi_kaydet(_ilm_guncel)
@@ -7163,96 +7148,10 @@ function kartSec(id){
                     st.error(f"Hata: {'; '.join(hata_list[:2])}")
                 st.rerun()
     with btn_a:
-        if secili_sayi > 0:
-            _arsiv_onay_gerekli = secili_sayi > 3
-            if _arsiv_onay_gerekli and not st.session_state.get("_liste_arsiv_onay_bekliyor"):
-                if st.button(f"🗑️ Seçili {secili_sayi} → Arşive", use_container_width=True, key="liste_arsiv"):
-                    st.session_state["_liste_arsiv_onay_bekliyor"] = True
-                    st.rerun()
-            elif _arsiv_onay_gerekli:
-                st.warning(f"⚠️ {secili_sayi} kayıt (3'ten fazla) arşive gönderilecek. Emin misiniz?")
-                _aa1, _aa2 = st.columns(2)
-                with _aa1:
-                    if st.button(f"✅ Evet, {secili_sayi} kaydı arşive gönder", type="primary", use_container_width=True, key="liste_arsiv_onay"):
-                        for rid in secili_idler:
-                            try:
-                                if sb_liste: sb_liste.table("cari_kartlar").update({"silindi":1}).eq("id",int(rid)).execute()
-                                else: db_update("cari_kartlar",{"silindi":1},"id",int(rid))
-                            except: pass
-                        try: db_read.clear()
-                        except: pass
-                        try: get_cari_listesi.clear()
-                        except: pass
-                        st.session_state.pop("cari_editor", None)
-                        st.session_state.pop("_liste_arsiv_onay_bekliyor", None)
-                        st.success(f"✅ {secili_sayi} arşive gönderildi!"); st.rerun()
-                with _aa2:
-                    if st.button("❌ Vazgeç", use_container_width=True, key="liste_arsiv_vazgec"):
-                        st.session_state.pop("_liste_arsiv_onay_bekliyor", None)
-                        st.rerun()
-            else:
-                if st.button(f"🗑️ Seçili {secili_sayi} → Arşive", use_container_width=True, key="liste_arsiv"):
-                    for rid in secili_idler:
-                        try:
-                            if sb_liste: sb_liste.table("cari_kartlar").update({"silindi":1}).eq("id",int(rid)).execute()
-                            else: db_update("cari_kartlar",{"silindi":1},"id",int(rid))
-                        except: pass
-                    try: db_read.clear()
-                    except: pass
-                    try: get_cari_listesi.clear()
-                    except: pass
-                    st.session_state.pop("cari_editor", None)
-                    st.success(f"✅ {secili_sayi} arşive gönderildi!"); st.rerun()
-        else:
-            pass
+        pass  # (Seçili → Arşive butonu kullanıcı isteğiyle kaldırıldı)
 
     with btn_s:
-        if secili_sayi > 0:
-            _sil_onay_gerekli = secili_sayi > 3
-            if _sil_onay_gerekli and not st.session_state.get("_liste_sil_onay_bekliyor"):
-                if st.button(f"❌ Seçili {secili_sayi} → Sil", use_container_width=True, key="liste_sil"):
-                    st.session_state["_liste_sil_onay_bekliyor"] = True
-                    st.rerun()
-            elif _sil_onay_gerekli:
-                st.warning(f"⚠️ {secili_sayi} kayıt (3'ten fazla) KALICI olarak silinecek, geri alınamaz! Emin misiniz?")
-                _sa1, _sa2 = st.columns(2)
-                with _sa1:
-                    if st.button(f"✅ Evet, {secili_sayi} kaydı kalıcı sil", type="primary", use_container_width=True, key="liste_sil_onay"):
-                        for rid in secili_idler:
-                            try:
-                                if sb_liste: sb_liste.table("cari_kartlar").delete().eq("id",int(rid)).execute()
-                                else:
-                                    conn_s = get_conn()
-                                    conn_s.execute("DELETE FROM cari_kartlar WHERE id=?", (int(rid),))
-                                    conn_s.commit(); conn_s.close()
-                            except: pass
-                        try: db_read.clear()
-                        except: pass
-                        try: get_cari_listesi.clear()
-                        except: pass
-                        st.session_state.pop("cari_editor", None)
-                        st.session_state.pop("_liste_sil_onay_bekliyor", None)
-                        st.success("✅ Silindi!"); st.rerun()
-                with _sa2:
-                    if st.button("❌ Vazgeç", use_container_width=True, key="liste_sil_vazgec"):
-                        st.session_state.pop("_liste_sil_onay_bekliyor", None)
-                        st.rerun()
-            else:
-                if st.button(f"❌ Seçili {secili_sayi} → Sil", use_container_width=True, key="liste_sil"):
-                    for rid in secili_idler:
-                        try:
-                            if sb_liste: sb_liste.table("cari_kartlar").delete().eq("id",int(rid)).execute()
-                            else:
-                                conn_s = get_conn()
-                                conn_s.execute("DELETE FROM cari_kartlar WHERE id=?", (int(rid),))
-                                conn_s.commit(); conn_s.close()
-                        except: pass
-                    try: db_read.clear()
-                    except: pass
-                    try: get_cari_listesi.clear()
-                    except: pass
-                    st.session_state.pop("cari_editor", None)
-                    st.success("✅ Silindi!"); st.rerun()
+        pass  # (Seçili → Sil butonu kullanıcı isteğiyle kaldırıldı)
 
 
 
