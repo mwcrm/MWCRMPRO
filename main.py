@@ -4866,57 +4866,6 @@ function gs(id,dir){{var u=new URL(window.parent.location.href);var s=JSON.parse
 </script>"""
     st.markdown(_html, unsafe_allow_html=True)
 
-    # ── İL BAŞLIKLARI — kullanıcının verdiği sabit sırayla, + "Diğer" ────────
-    # Tıklanınca o ile göre filtreler (native buton — güvenilir çalışsın diye).
-    _il_ana_liste = ["İSTANBUL","BURSA","İZMİR","MANİSA","TEKİRDAĞ","KOCAELİ","ANKARA","KONYA",
-                      "DENİZLİ","ADANA","GAZİANTEP","KAYSERİ","ANTALYA","AYDIN","BALIKESİR",
-                      "DİYARBAKIR","ERZURUM","ESKİŞEHİR","HATAY","KAHRAMANMARAŞ","MALATYA",
-                      "MARDİN","MERSİN","MUĞLA","ORDU","SAKARYA","SAMSUN","TRABZON","VAN","ŞANLIURFA"]
-    _il_diger_liste = ["ADIYAMAN","AFYONKARAHİSAR","AĞRI","AKSARAY","AMASYA","ARDAHAN","ARTVİN",
-                        "BARTIN","BATMAN","BAYBURT","BİLECİK","BİNGÖL","BİTLİS","BOLU","BURDUR",
-                        "ÇANAKKALE","ÇANKIRI","ÇORUM","DÜZCE","EDİRNE","ELAZIĞ","ERZİNCAN",
-                        "GİRESUN","GÜMÜŞHANE","HAKKARİ","IĞDIR","ISPARTA","KARABÜK","KARAMAN",
-                        "KARS","KASTAMONU","KIRIKKALE","KIRKLARELİ","KIRŞEHİR","KİLİS","KÜTAHYA",
-                        "MUŞ","NEVŞEHİR","NİĞDE","OSMANİYE","RİZE","SİİRT","SİNOP","SİVAS",
-                        "ŞIRNAK","TOKAT","TUNCELİ","UŞAK","YALOVA","YOZGAT","ZONGULDAK"]
-
-    def _ilb_norm(_s):
-        return (str(_s or "").strip().upper().replace("İ","I").replace("Ş","S")
-                .replace("Ğ","G").replace("Ü","U").replace("Ö","O").replace("Ç","C"))
-
-    if "il" in df.columns:
-        _ilb_norm_col = df["il"].apply(_ilb_norm)
-        _ilb_diger_norm = set(_ilb_norm(x) for x in _il_diger_liste)
-
-        def _ilb_sayi(_il_ad):
-            return int((_ilb_norm_col == _ilb_norm(_il_ad)).sum())
-        _ilb_diger_sayi = int(_ilb_norm_col.isin(_ilb_diger_norm).sum())
-
-        with st.expander("📍 İl Başlıkları", expanded=False):
-            _ilb_tum_liste = _il_ana_liste + ["__DIGER__"]
-            _ilb_cols_per_row = 8
-            for _ilb_i in range(0, len(_ilb_tum_liste), _ilb_cols_per_row):
-                _ilb_satir = _ilb_tum_liste[_ilb_i:_ilb_i + _ilb_cols_per_row]
-                _ilb_cols = st.columns(_ilb_cols_per_row)
-                for _ilb_j, _ilb_ad in enumerate(_ilb_satir):
-                    with _ilb_cols[_ilb_j]:
-                        if _ilb_ad == "__DIGER__":
-                            _ilb_etiket = f"Diğer ({_ilb_diger_sayi})"
-                        else:
-                            _ilb_etiket = f"{_ilb_ad.title()} ({_ilb_sayi(_ilb_ad)})"
-                        if st.button(_ilb_etiket, key=f"ilb_btn_{_ilb_ad}", use_container_width=True):
-                            if _ilb_ad == "__DIGER__":
-                                _ilb_esl = [x for x in df["il"].dropna().unique().tolist() if _ilb_norm(x) in _ilb_diger_norm]
-                                st.session_state["_cl_fil_il_multi"] = sorted(_ilb_esl)
-                            else:
-                                _ilb_esl = [x for x in df["il"].dropna().unique().tolist() if _ilb_norm(x) == _ilb_norm(_ilb_ad)]
-                                st.session_state["_cl_fil_il_multi"] = sorted(_ilb_esl) if _ilb_esl else [_ilb_ad]
-                            st.session_state.pop("_cl_fil_ilce_multi", None)
-                            st.session_state["_toplam_aktif"] = False
-                            st.session_state["_asamasiz_aktif"] = False
-                            st.session_state["_mesaj_gercek_aktif"] = False
-                            st.rerun()
-
 
     # Grup ayar param
     _qp_grp_gizli = st.query_params.get("_grp_gizli","")
@@ -5933,6 +5882,9 @@ function kartSec(id){
         "ara_islem":     st.column_config.TextColumn("Ara İşlem", width=_w("ara_islem")),
         "sonuc":         st.column_config.SelectboxColumn("Sonuç", options=_asama_secenek_guvenli("sonuc", ["Tümü", "Kazanıldı", "Kaybedildi", "Devam Ediyor"]), width=_w("sonuc")),
     }
+    for _il_kol_cfg in _IL_SUTUN_LISTESI:
+        col_config[_il_kol_cfg] = st.column_config.TextColumn(_il_kol_cfg, width="small",
+            help="Bu firmanın bu ile ne gönderdiğini serbestçe yazın (sayı veya metin).")
     # Sütun sırası — sizin verdiğiniz şablonla birebir: Seç, İşlem Tarih, Id, Firma, Yetkili,
     # Gsm, S.Tel, E-Mail, Adres, İlçe, İl, Hedef(+Gerçek), Durum, Analiz, Aşama, 1-2-3.Aşama,
     # Açıklama, Notlar, Son Randevu, Teklif, Mesaj, Sonuç. Temsilci silinmedi, en sona eklendi.
@@ -5957,10 +5909,17 @@ function kartSec(id){
             df_f["_cl2_key"] = df_f["id"].map(_cl2_map).fillna(len(_cl2_sirali))
             df_f = df_f.sort_values("_cl2_key").drop(columns=["_cl2_key"]).reset_index(drop=True)
 
+    # ── İL SÜTUNLARI — sabit liste, tablonun sonuna eklenecek ────────────────
+    _IL_SUTUN_LISTESI = ["İstanbul","Bursa","İzmir","Manisa","Tekirdağ","Kocaeli","Ankara","Konya",
+                         "Denizli","Adana","Gaziantep","Kayseri","Antalya","Aydın","Balıkesir",
+                         "Diyarbakır","Erzurum","Eskişehir","Hatay","Kahramanmaraş","Malatya",
+                         "Mardin","Mersin","Muğla","Ordu","Sakarya","Samsun","Trabzon","Van",
+                         "Şanlıurfa","Diğer"]
+
     col_order = ["Seç","tarih","guncelleme_tarihi","id","rakip_firma","firma","yetkili","gsm","sabit","email","adres","ilce","il",
                  "beklenen_ciro","gerceklesen_ciro","durum","✅ Analiz","Varış İli","Koli/Palet","islem_asamasi",
                  "asama1","asama2","asama3","aciklama","📨 Notlar","📅 Son Randevu",
-                 "🧾 Teklif","💬 Mesaj","ara_islem","sonuc","temsilci"]
+                 "🧾 Teklif","💬 Mesaj","ara_islem","sonuc","temsilci"] + _IL_SUTUN_LISTESI
     # Gizli kolonları çıkar
     _kol_gizli_map = {"firma":"firma","rakip_firma":"rakip_firma","yetkili":"yetkili","gsm":"gsm","sabit":"sabit","email":"email",
                       "adres":"adres","il":"il","ilce":"ilce","durum":"durum","temsilci":"temsilci",
@@ -5993,6 +5952,41 @@ function kartSec(id){
     if "ara_islem" not in df_edit.columns:
         df_edit["ara_islem"] = ""
     df_edit["ara_islem"] = df_edit["ara_islem"].fillna("").astype(str).replace("nan","")
+
+    # ── İL SÜTUNLARI — "hangi ile ne gönderiyor" serbest metin sütunları.
+    # cari_kartlar tablosunda gerçek kolon AÇILMIYOR (yeni migration yok kuralı) —
+    # bunun yerine her firma-il çifti için girilen değer, kullanici_tercih
+    # tablosunda TEK bir JSON haritada saklanıyor: {cari_id: {il_adı: değer}}.
+    @st.cache_data(ttl=30, show_spinner=False)
+    def _il_gonderim_matrisi_yukle():
+        try:
+            _sb_ilm = get_sb_client()
+            if _sb_ilm:
+                _r_ilm = _sb_ilm.table("kullanici_tercih").select("deger").eq(
+                    "kullanici", "__liste_ui__").eq("anahtar", "_il_gonderim_matrisi").execute()
+                if _r_ilm.data:
+                    import json as _ilmj
+                    return _ilmj.loads(_r_ilm.data[0]["deger"])
+        except Exception:
+            pass
+        return {}
+
+    def _il_gonderim_matrisi_kaydet(_matris):
+        try:
+            _sb_ilm2 = get_sb_client()
+            if _sb_ilm2:
+                import json as _ilmj2
+                _deger = _ilmj2.dumps(_matris, ensure_ascii=False)
+                _sb_ilm2.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_il_gonderim_matrisi").execute()
+                _sb_ilm2.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_il_gonderim_matrisi", "deger": _deger}).execute()
+        except Exception:
+            pass
+
+    _il_gonderim_matrisi = _il_gonderim_matrisi_yukle()
+    if "id" in df_edit.columns:
+        for _il_kol in _IL_SUTUN_LISTESI:
+            df_edit[_il_kol] = df_edit["id"].apply(
+                lambda _rid: _il_gonderim_matrisi.get(str(int(_rid)), {}).get(_il_kol, "") if pd.notna(_rid) else "")
 
     # Son randevu bilgisini ekle (tarih + saat + bölge) — normalize edilmiş eşleştirme
     try:
@@ -6897,6 +6891,31 @@ function kartSec(id){
                     except:
                         pass
 
+                # ── İL SÜTUNLARI kaydı — cari_kartlar'a değil, ayrı JSON haritaya
+                # yazılır (kullanici_tercih._il_gonderim_matrisi). "Hangi ile ne
+                # gönderiyor" bilgisi firma bazlı olarak burada tutulur.
+                _ilm_degisti = False
+                _ilm_guncel = dict(_il_gonderim_matrisi)
+                for _idx_str_ilm, _deg_ilm in _edited_rows.items():
+                    _ilm_fark = {k: v for k, v in _deg_ilm.items() if k in _IL_SUTUN_LISTESI}
+                    if not _ilm_fark:
+                        continue
+                    _idxn_ilm = int(_idx_str_ilm)
+                    if _idxn_ilm >= len(_rows):
+                        continue
+                    _rid_ilm = int(float(str(_rows[_idxn_ilm].get("id", 0))))
+                    if not _rid_ilm:
+                        continue
+                    _rid_ilm_str = str(_rid_ilm)
+                    _ilm_guncel.setdefault(_rid_ilm_str, {})
+                    for _ilk, _ilv in _ilm_fark.items():
+                        _ilm_guncel[_rid_ilm_str][_ilk] = str(_ilv) if _ilv is not None else ""
+                    _ilm_degisti = True
+                if _ilm_degisti:
+                    _il_gonderim_matrisi_kaydet(_ilm_guncel)
+                    try: _il_gonderim_matrisi_yukle.clear()
+                    except: pass
+
                 def _tek_satir_guncelle(idx_str, degisiklikler):
                     """Tek bir satırı DB'ye yazar — paralel çalıştırılabilsin diye ayrı fonksiyon."""
                     idx = int(idx_str)
@@ -6907,7 +6926,7 @@ function kartSec(id){
                         return None
                     guncelle = {}
                     for k, v in degisiklikler.items():
-                        if k in ("Seç", "🗑️ Sil", "🧾 Teklif", "💬 Mesaj", "✅ Analiz", "Varış İli", "Koli/Palet", "📅 Son Randevu"): continue
+                        if k in ("Seç", "🗑️ Sil", "🧾 Teklif", "💬 Mesaj", "✅ Analiz", "Varış İli", "Koli/Palet", "📅 Son Randevu") or k in _IL_SUTUN_LISTESI: continue
                         if k in ("beklenen_ciro", "gerceklesen_ciro"):
                             try: guncelle[k] = float(v or 0)
                             except: guncelle[k] = 0
