@@ -8141,6 +8141,8 @@ function updateBot(v){{
             "beklenen_ciro":80,"gerceklesen_ciro":80,"✅ Analiz":80,"Varış İli":100,"Koli/Palet":120,
             "🧾 Teklif":70,"💬 Mesaj":70
         }
+        for _il_kv in _IL_SUTUN_LISTESI:
+            _KOL_VARS_UI[_il_kv] = 60
         _KG_UI_ETIKET = {
             "Seç":"Seç (işaret kutusu)","tarih":"İşlem Tarih","guncelleme_tarihi":"Güncelleme Tarihi",
             "firma":"Firma","rakip_firma":"Özel","yetkili":"Yetkili","gsm":"GSM","sabit":"S.Tel",
@@ -8151,6 +8153,8 @@ function updateBot(v){{
             "beklenen_ciro":"Hedef ₺","gerceklesen_ciro":"Gerçek ₺","✅ Analiz":"Analiz","Varış İli":"Varış İli","Koli/Palet":"Koli/Palet",
             "🧾 Teklif":"Teklif","💬 Mesaj":"Mesaj"
         }
+        for _il_ke in _IL_SUTUN_LISTESI:
+            _KG_UI_ETIKET[_il_ke] = _il_ke
         # ÖNEMLİ: Ana listenin de kullandığı session_state["_kol_genislik"] tek doğruluk kaynağıdır.
         # Burada AYRI bir DB sorgusu yapmıyoruz — aksi halde iki farklı kaynak birbirini
         # ezip "ayarladığım gibi kalmıyor" sorununa yol açıyordu.
@@ -8210,12 +8214,14 @@ function updateBot(v){{
                     except Exception as _kgize:
                         st.toast(f"⚠️ Gizle/Göster kaydedilemedi: {_kgize}", icon="⚠️")
                     st.rerun()
-                # Slider — gizliyse devre dışı
+                # Slider — gizliyse devre dışı. İl sütunları için minimum 3'e
+                # kadar daraltılabilsin (dar/az yer kaplasınlar), diğerleri 5'te kalsın.
+                _kg_min = 3 if _k in _IL_SUTUN_LISTESI else 5
                 _yeni_kg_ui[_k] = st.slider(
                     f"{'~~' if _gizli_mi else ''}{_etiket}",
-                    min_value=5, max_value=400,
-                    value=int(_kg_ui_mevcut.get(_k, _KOL_VARS_UI.get(_k,100))),
-                    step=5, key=f"ui_kg_{_k}",
+                    min_value=_kg_min, max_value=400,
+                    value=max(int(_kg_ui_mevcut.get(_k, _KOL_VARS_UI.get(_k,100))), _kg_min),
+                    step=1 if _k in _IL_SUTUN_LISTESI else 5, key=f"ui_kg_{_k}",
                     disabled=_gizli_mi
                 )
                 if _gizli_mi:
