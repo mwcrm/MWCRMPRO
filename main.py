@@ -95,6 +95,36 @@ def get_sb_client():
     return None
 
 
+# ── İL GÖNDERİM MATRİSİ — GLOBAL (Cari Liste tablosu VE Notlar&Randevu
+# dialog'undaki "Varış/Fiyat" sekmesi AYNI fonksiyonu/önbelleği paylaşır.
+# Ayrı ayrı tanımlanırsa, dialogdan kaydedince Cari Liste'nin önbelleği
+# temizlenmiyor, yazılan iller tabloda hemen görünmüyordu.
+@st.cache_data(ttl=30, show_spinner=False)
+def _il_gonderim_matrisi_yukle():
+    try:
+        _sb_ilm = get_sb_client()
+        if _sb_ilm:
+            _r_ilm = _sb_ilm.table("kullanici_tercih").select("deger").eq(
+                "kullanici", "__liste_ui__").eq("anahtar", "_il_gonderim_matrisi").execute()
+            if _r_ilm.data:
+                import json as _ilmj
+                return _ilmj.loads(_r_ilm.data[0]["deger"])
+    except Exception:
+        pass
+    return {}
+
+def _il_gonderim_matrisi_kaydet(_matris):
+    try:
+        _sb_ilm2 = get_sb_client()
+        if _sb_ilm2:
+            import json as _ilmj2
+            _deger = _ilmj2.dumps(_matris, ensure_ascii=False)
+            _sb_ilm2.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_il_gonderim_matrisi").execute()
+            _sb_ilm2.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_il_gonderim_matrisi", "deger": _deger}).execute()
+    except Exception:
+        pass
+
+
 @st.cache_resource
 def get_sb_service():
     """Supabase service_role client — log ve admin işlemler için"""
@@ -2716,27 +2746,15 @@ def not_dialog(cari_id, firma_adi=""):
             st.session_state["sozlesme_musteri_onsel"] = firma_adi
             st.rerun()
     with _tab_varis:
-        st.caption("Karışık/serbest yazabilirsin — aynı Cari Liste'deki 'Varış İlleri' ve "
-                   "'Fiyatlandırma' sütunlarıyla birebir aynı şekilde çalışır.")
+        st.caption("Karışık/serbest yazabilirsin — aynı Cari Liste'deki il sütunlarıyla birebir aynı şekilde çalışır.")
 
         def _vd_norm(_s):
             return (str(_s or "").strip().upper().replace("İ", "I").replace("Ş", "S")
                     .replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C"))
 
-        _vd_sb = get_sb_client()
-
-        # Mevcut il matrisini bu firma için göster
-        _vd_matris_firma = {}
-        try:
-            if _vd_sb:
-                _r_vdm = _vd_sb.table("kullanici_tercih").select("deger").eq(
-                    "kullanici", "__liste_ui__").eq("anahtar", "_il_gonderim_matrisi").execute()
-                if _r_vdm.data:
-                    import json as _vdmj
-                    _vd_tum_matris = _vdmj.loads(_r_vdm.data[0]["deger"])
-                    _vd_matris_firma = _vd_tum_matris.get(str(int(cari_id)), {})
-        except Exception:
-            pass
+        # Global paylaşılan fonksiyon — Cari Liste tablosuyla AYNI önbelleği kullanır.
+        _vd_tum_matris = _il_gonderim_matrisi_yukle()
+        _vd_matris_firma = _vd_tum_matris.get(str(int(cari_id)), {})
         _vd_dolu = {k: v for k, v in _vd_matris_firma.items() if str(v).strip()}
         if _vd_dolu:
             st.caption(f"📍 Şu an işaretli iller: {', '.join(f'{k} ({v})' for k, v in _vd_dolu.items())}")
@@ -2746,12 +2764,9 @@ def not_dialog(cari_id, firma_adi=""):
         _vd_illeri = st.text_input("Varış İlleri", key=f"dlg_varis_illeri_{cari_id}",
                                     placeholder="Örn: istanbul ankara izmir (karışık yazabilirsin)")
         if st.button("💾 İlleri İşaretle", key=f"dlg_varis_illeri_kaydet_{cari_id}", use_container_width=True):
-            if _vd_illeri.strip() and _vd_sb:
+            if _vd_illeri.strip():
                 try:
-                    _r_vdm2 = _vd_sb.table("kullanici_tercih").select("deger").eq(
-                        "kullanici", "__liste_ui__").eq("anahtar", "_il_gonderim_matrisi").execute()
-                    import json as _vdmj2
-                    _vd_tum_matris2 = _vdmj2.loads(_r_vdm2.data[0]["deger"]) if _r_vdm2.data else {}
+                    _vd_tum_matris2 = dict(_il_gonderim_matrisi_yukle())
                     _vd_id_str = str(int(cari_id))
                     _vd_tum_matris2.setdefault(_vd_id_str, {})
                     _vd_metin_norm = _vd_norm(_vd_illeri)
@@ -2761,11 +2776,10 @@ def not_dialog(cari_id, firma_adi=""):
                             continue
                         if _vd_norm(_il_ad_vd) in _vd_metin_norm:
                             if not str(_vd_tum_matris2[_vd_id_str].get(_il_ad_vd, "")).strip():
-                                _vd_tum_matris2[_vd_id_str][_il_ad_vd] = _il_ad_vd
+                                _vd_tum_matris2[_vd_id_str][_il_ad_vd] = _il_ad_vd.upper()
                             _vd_eslesen.append(_il_ad_vd)
-                    _vd_sb.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_il_gonderim_matrisi").execute()
-                    _vd_sb.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_il_gonderim_matrisi",
-                                                              "deger": _vdmj2.dumps(_vd_tum_matris2, ensure_ascii=False)}).execute()
+                    _il_gonderim_matrisi_kaydet(_vd_tum_matris2)
+                    _il_gonderim_matrisi_yukle.clear()  # Cari Liste tablosu da HEMEN güncel görsün
                     if _vd_eslesen:
                         st.toast(f"✅ İşaretlendi: {', '.join(_vd_eslesen)}", icon="📍")
                     else:
@@ -2777,6 +2791,7 @@ def not_dialog(cari_id, firma_adi=""):
                 st.warning("Önce bir şey yazın.")
 
         st.divider()
+        _vd_sb = get_sb_client()
         _vd_fiyat = st.text_input("Fiyatlandırma", key=f"dlg_fiyat_{cari_id}",
                                    placeholder="Buraya yazdığın her şey Koli/Palet alanına eklenir")
         if st.button("💾 Koli/Palet'e Ekle", key=f"dlg_fiyat_kaydet_{cari_id}", use_container_width=True):
@@ -2792,6 +2807,7 @@ def not_dialog(cari_id, firma_adi=""):
                     _vd_sb.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_koli_palet_manuel").execute()
                     _vd_sb.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_koli_palet_manuel",
                                                               "deger": _kpoj.dumps(_kp_map, ensure_ascii=False)}).execute()
+                    st.session_state["_koli_palet_manuel"] = _kp_map  # Cari Liste tablosu da hemen görsün
                     st.toast("✅ Koli/Palet güncellendi", icon="📦")
                     st.rerun()
                 except Exception as _vd_hata2:
@@ -6049,35 +6065,9 @@ function kartSec(id){
         df_edit["ara_islem"] = ""
     df_edit["ara_islem"] = df_edit["ara_islem"].fillna("").astype(str).replace("nan","")
 
-    # ── İL SÜTUNLARI — "hangi ile ne gönderiyor" serbest metin sütunları.
-    # cari_kartlar tablosunda gerçek kolon AÇILMIYOR (yeni migration yok kuralı) —
-    # bunun yerine her firma-il çifti için girilen değer, kullanici_tercih
-    # tablosunda TEK bir JSON haritada saklanıyor: {cari_id: {il_adı: değer}}.
-    @st.cache_data(ttl=30, show_spinner=False)
-    def _il_gonderim_matrisi_yukle():
-        try:
-            _sb_ilm = get_sb_client()
-            if _sb_ilm:
-                _r_ilm = _sb_ilm.table("kullanici_tercih").select("deger").eq(
-                    "kullanici", "__liste_ui__").eq("anahtar", "_il_gonderim_matrisi").execute()
-                if _r_ilm.data:
-                    import json as _ilmj
-                    return _ilmj.loads(_r_ilm.data[0]["deger"])
-        except Exception:
-            pass
-        return {}
-
-    def _il_gonderim_matrisi_kaydet(_matris):
-        try:
-            _sb_ilm2 = get_sb_client()
-            if _sb_ilm2:
-                import json as _ilmj2
-                _deger = _ilmj2.dumps(_matris, ensure_ascii=False)
-                _sb_ilm2.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_il_gonderim_matrisi").execute()
-                _sb_ilm2.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_il_gonderim_matrisi", "deger": _deger}).execute()
-        except Exception:
-            pass
-
+    # ── İL SÜTUNLARI — global fonksiyonlar (dosya başında tanımlı) kullanılıyor,
+    # burada tekrar tanımlanmaz — hem burası hem Notlar&Randevu dialog'u AYNI
+    # önbelleği paylaşır, biri kaydedince diğeri de hemen güncel görür.
     _il_gonderim_matrisi = _il_gonderim_matrisi_yukle()
     if "id" in df_edit.columns:
         for _il_kol in _IL_SUTUN_LISTESI:
@@ -7016,7 +7006,7 @@ function kartSec(id){
                             if _vi_norm(_il_ad_vi) in _vi_metin_norm:
                                 _mevcut_deg = _ilm_guncel[_rid_ilm_str].get(_il_ad_vi, "")
                                 if not str(_mevcut_deg).strip():
-                                    _ilm_guncel[_rid_ilm_str][_il_ad_vi] = _il_ad_vi
+                                    _ilm_guncel[_rid_ilm_str][_il_ad_vi] = _il_ad_vi.upper()
                                     _ilm_degisti = True
                 if _ilm_degisti:
                     _il_gonderim_matrisi_kaydet(_ilm_guncel)
