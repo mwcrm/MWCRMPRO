@@ -2827,105 +2827,107 @@ def not_dialog(cari_id, firma_adi=""):
 
         st.divider()
         _vd_sb = get_sb_client()
-        st.caption("Karışık yazabilirsin — örn. **'ankara 30 desi 200'** veya **'adana 110 desi 1500'**. "
-                   "100 desi'ye kadar otomatik **KOLİ** sayılır; 101 desi ve üzeri için paket tipini seçmen istenir.")
-        _vd_fiyat = st.text_input("Fiyatlandırma", key=f"dlg_fiyat_{cari_id}",
-                                   placeholder="Örn: ankara 30 desi 200 tl")
+        st.caption("Karışık ve BİRDEN FAZLA il/fiyat aynı anda yazabilirsin — örn. "
+                   "**'ankara 30 desi 300 manisa 30 desi 350 izmir palet 105 desi 1500'**. "
+                   "100 desi'ye kadar otomatik **KOLİ**, üzeri otomatik **PALET** sayılır (hiçbir şey sorulmaz).")
+        _vd_fiyat = st.text_area("Fiyatlandırma", key=f"dlg_fiyat_{cari_id}", height=80,
+                                  placeholder="Örn: ankara 30 desi 300 manisa 30 desi 350 izmir 105 desi 1500")
 
         def _fy_norm(_s):
             return (str(_s or "").strip().upper().replace("İ", "I").replace("Ş", "S")
                     .replace("Ğ", "G").replace("Ü", "U").replace("Ö", "O").replace("Ç", "C"))
 
-        if st.button("🔍 Ayrıştır", key=f"dlg_fiyat_ayristir_{cari_id}", use_container_width=True):
+        _fy_sira_liste = [a.upper() for a in _IL_SUTUN_LISTESI[:-1]] + [a.upper() for a in _IL_DIGER_LISTESI]
+
+        def _fy_sira_no(_satir):
+            _sehir_kismi = _satir.split(" - ")[0].strip()
+            return _fy_sira_liste.index(_sehir_kismi) if _sehir_kismi in _fy_sira_liste else 999
+
+        if st.button("🔍 Ayrıştır ve Hazırla", key=f"dlg_fiyat_ayristir_{cari_id}", use_container_width=True):
             if not _vd_fiyat.strip():
                 st.warning("Önce bir şey yazın.")
             else:
                 import re as _fy_re
-                _fy_metin_norm = _fy_norm(_vd_fiyat)
-                # Şehir bul (30 başlıklı + 50 diğer il)
-                _fy_sehir = None
-                for _il_ad_fy in (_IL_SUTUN_LISTESI[:-1] + _IL_DIGER_LISTESI):
-                    if _fy_norm(_il_ad_fy) in _fy_metin_norm:
-                        _fy_sehir = _il_ad_fy.upper()
-                        break
-                # Desi bul — "30 desi", "desi 30" gibi
-                _fy_desi_m = _fy_re.search(r"(\d+)\s*DESI|DESI\s*(\d+)", _fy_metin_norm)
-                _fy_desi = None
-                if _fy_desi_m:
-                    _fy_desi = int(_fy_desi_m.group(1) or _fy_desi_m.group(2))
-                # Fiyat bul — "200 tl" ya da metindeki desi'den farklı SON sayı
-                _fy_tum_sayilar = [int(x) for x in _fy_re.findall(r"\d+", _vd_fiyat)]
-                _fy_fiyat_m = _fy_re.search(r"(\d+)\s*TL", _fy_metin_norm)
-                if _fy_fiyat_m:
-                    _fy_fiyat = int(_fy_fiyat_m.group(1))
-                elif _fy_desi is not None and len(_fy_tum_sayilar) >= 2:
-                    _fy_fiyat = [n for n in _fy_tum_sayilar if n != _fy_desi][-1] if any(n != _fy_desi for n in _fy_tum_sayilar) else _fy_tum_sayilar[-1]
-                elif _fy_tum_sayilar:
-                    _fy_fiyat = _fy_tum_sayilar[-1]
-                else:
-                    _fy_fiyat = None
-                # Paket tipi bul (metinde geçiyorsa)
-                _fy_tip_anahtar = {"KOLI":"KOLİ","PALET":"PALET","SANDIK":"SANDIK","VARIL":"VARİL","IBC":"IBC","PARCA":"PARÇA"}
-                _fy_tip = None
-                for _fy_ta, _fy_tv in _fy_tip_anahtar.items():
-                    if _fy_ta in _fy_metin_norm:
-                        _fy_tip = _fy_tv
-                        break
-                if _fy_tip is None and _fy_desi is not None:
-                    _fy_tip = "KOLİ" if _fy_desi <= 100 else None  # >100 ise aşağıda sorulacak
-                st.session_state[f"_fy_taslak_{cari_id}"] = {
-                    "sehir": _fy_sehir, "desi": _fy_desi, "fiyat": _fy_fiyat, "tip": _fy_tip
-                }
-                st.rerun()
+                _fy_metin_ham = _vd_fiyat.strip()
+                _fy_tum_iller = _IL_SUTUN_LISTESI[:-1] + _IL_DIGER_LISTESI
+                # Metindeki HER il isminin geçtiği konumu (pozisyon) bul — bir sonraki
+                # il ismine kadar olan kısmı o ilin "bloğu" say. Bu şekilde tek
+                # kutuya birden fazla il/fiyat yazılınca hepsi ayrı ayrı yakalanır.
+                _fy_norm_ham = _fy_norm(_fy_metin_ham)
+                _fy_konumlar = []
+                for _il_ad_fy in _fy_tum_iller:
+                    _il_norm_fy = _fy_norm(_il_ad_fy)
+                    _ara_bas = 0
+                    while True:
+                        _pos = _fy_norm_ham.find(_il_norm_fy, _ara_bas)
+                        if _pos == -1:
+                            break
+                        _fy_konumlar.append((_pos, _il_ad_fy.upper()))
+                        _ara_bas = _pos + len(_il_norm_fy)
+                _fy_konumlar.sort(key=lambda x: x[0])
 
-        _fy_taslak = st.session_state.get(f"_fy_taslak_{cari_id}")
-        if _fy_taslak:
-            st.markdown("**Bulunanlar — eksikse düzelt:**")
-            _fyc1, _fyc2, _fyc3, _fyc4 = st.columns(4)
-            _fy_sehir_secenekleri = [a.upper() for a in (_IL_SUTUN_LISTESI[:-1] + _IL_DIGER_LISTESI)]
-            _fy_sehir_idx = _fy_sehir_secenekleri.index(_fy_taslak["sehir"]) if _fy_taslak["sehir"] in _fy_sehir_secenekleri else 0
-            _fy_sehir_son = _fyc1.selectbox("Şehir", _fy_sehir_secenekleri, index=_fy_sehir_idx, key=f"_fy_sehir_{cari_id}")
-            _fy_desi_son = _fyc2.number_input("Desi", value=int(_fy_taslak["desi"] or 0), key=f"_fy_desi_{cari_id}", step=10)
-            _fy_tip_opts = ["KOLİ", "PALET", "SANDIK", "VARİL", "IBC", "PARÇA"]
-            _fy_tip_varsayilan = _fy_taslak["tip"] if _fy_taslak["tip"] in _fy_tip_opts else ("KOLİ" if _fy_desi_son <= 100 else _fy_tip_opts[0])
-            _fy_tip_idx = _fy_tip_opts.index(_fy_tip_varsayilan)
-            if _fy_desi_son > 100 and _fy_taslak["tip"] is None:
-                st.warning("⚠️ 100 desi üzerinde — paket tipini seç (Palet/Sandık/Varil/IBC/Parça):")
-            _fy_tip_son = _fyc3.selectbox("Paket Tipi", _fy_tip_opts, index=_fy_tip_idx, key=f"_fy_tip_{cari_id}")
-            _fy_fiyat_son = _fyc4.number_input("Fiyat (TL)", value=int(_fy_taslak["fiyat"] or 0), key=f"_fy_fiyat_{cari_id}", step=50)
+                _fy_yeni_satirlar = []
+                for _fi, (_pos, _sehir) in enumerate(_fy_konumlar):
+                    _bit = _fy_konumlar[_fi + 1][0] if _fi + 1 < len(_fy_konumlar) else len(_fy_norm_ham)
+                    _blok = _fy_norm_ham[_pos:_bit]
+                    _blok_sayilar = [int(x) for x in _fy_re.findall(r"\d+", _blok)]
+                    if not _blok_sayilar:
+                        continue
+                    _desi_m = _fy_re.search(r"(\d+)\s*DESI", _blok)
+                    _desi = int(_desi_m.group(1)) if _desi_m else _blok_sayilar[0]
+                    _diger_sayilar = [n for n in _blok_sayilar if n != _desi]
+                    _fiyat = _diger_sayilar[-1] if _diger_sayilar else _desi
+                    _tip = None
+                    for _ta, _tv in {"KOLI":"KOLİ","PALET":"PALET","SANDIK":"SANDIK","VARIL":"VARİL","IBC":"IBC","PARCA":"PARÇA"}.items():
+                        if _ta in _blok:
+                            _tip = _tv
+                            break
+                    if _tip is None:
+                        _tip = "KOLİ" if _desi <= 100 else "PALET"  # hiçbir şey sormadan otomatik karar
+                    _fy_yeni_satirlar.append(f"{_sehir} - {_tip} {_desi} DESİ - {_fiyat} TL")
 
-            if st.button("💾 Onayla ve Ekle", key=f"dlg_fiyat_kaydet_{cari_id}", type="primary", use_container_width=True):
-                if not _fy_sehir_son or not _fy_fiyat_son:
-                    st.warning("Şehir ve fiyat bilgisi olmadan eklenemez.")
+                if not _fy_yeni_satirlar:
+                    st.warning("Yazdığın metinde tanınan bir il ismi bulunamadı.")
                 else:
-                    try:
-                        _fy_yeni_satir = f"{_fy_sehir_son} - {_fy_tip_son} {int(_fy_desi_son)} DESİ - {int(_fy_fiyat_son)} TL"
-                        _r_kpo = _vd_sb.table("kullanici_tercih").select("deger").eq(
-                            "kullanici", "__liste_ui__").eq("anahtar", "_koli_palet_manuel").execute()
-                        import json as _kpoj
-                        _kp_map = _kpoj.loads(_r_kpo.data[0]["deger"]) if _r_kpo.data else {}
-                        _kp_id_str = str(int(cari_id))
-                        _kp_mevcut_satirlar = [s.strip() for s in str(_kp_map.get(_kp_id_str, "") or "").split("\n") if s.strip()]
-                        # Aynı şehir+tip+desi kombinasyonu zaten varsa güncelle, yoksa ekle
-                        _fy_anahtar_str = f"{_fy_sehir_son} - {_fy_tip_son} {int(_fy_desi_son)} DESİ"
-                        _kp_mevcut_satirlar = [s for s in _kp_mevcut_satirlar if not s.startswith(_fy_anahtar_str)]
-                        _kp_mevcut_satirlar.append(_fy_yeni_satir)
-                        # İl sırasına (30 başlıklı il sırası + sonra diğerleri) göre alt alta diz
-                        _fy_sira_liste = [a.upper() for a in _IL_SUTUN_LISTESI[:-1]] + [a.upper() for a in _IL_DIGER_LISTESI]
-                        def _fy_sira_no(_satir):
-                            _sehir_kismi = _satir.split(" - ")[0].strip()
-                            return _fy_sira_liste.index(_sehir_kismi) if _sehir_kismi in _fy_sira_liste else 999
-                        _kp_mevcut_satirlar.sort(key=_fy_sira_no)
-                        _kp_map[_kp_id_str] = "\n".join(_kp_mevcut_satirlar)
-                        _vd_sb.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_koli_palet_manuel").execute()
-                        _vd_sb.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_koli_palet_manuel",
-                                                                  "deger": _kpoj.dumps(_kp_map, ensure_ascii=False)}).execute()
-                        st.session_state["_koli_palet_manuel"] = _kp_map
-                        st.session_state.pop(f"_fy_taslak_{cari_id}", None)
-                        st.toast(f"✅ Eklendi: {_fy_yeni_satir}", icon="📦")
-                        st.rerun()
-                    except Exception as _vd_hata2:
-                        st.error(f"Hata: {_vd_hata2}")
+                    # Mevcut Koli/Palet içeriğiyle birleştir (aynı şehir+tip+desi varsa güncelle)
+                    _r_kpo = _vd_sb.table("kullanici_tercih").select("deger").eq(
+                        "kullanici", "__liste_ui__").eq("anahtar", "_koli_palet_manuel").execute()
+                    import json as _kpoj
+                    _kp_map = _kpoj.loads(_r_kpo.data[0]["deger"]) if _r_kpo.data else {}
+                    _kp_id_str = str(int(cari_id))
+                    _kp_mevcut_satirlar = [s.strip() for s in str(_kp_map.get(_kp_id_str, "") or "").split("\n") if s.strip()]
+                    for _yeni in _fy_yeni_satirlar:
+                        _anahtar_str = _yeni.rsplit(" - ", 1)[0]
+                        _kp_mevcut_satirlar = [s for s in _kp_mevcut_satirlar if s.rsplit(" - ", 1)[0] != _anahtar_str]
+                        _kp_mevcut_satirlar.append(_yeni)
+                    _kp_mevcut_satirlar.sort(key=_fy_sira_no)
+                    # Kaydetmeden önce DÜZ YAZI olarak göster — kullanıcı üzerinde
+                    # elle oynayabilsin, hazır metin dayatılmasın.
+                    st.session_state[f"_fy_hazir_{cari_id}"] = "\n".join(_kp_mevcut_satirlar)
+                    st.rerun()
+
+        _fy_hazir = st.session_state.get(f"_fy_hazir_{cari_id}")
+        if _fy_hazir is not None:
+            st.markdown("**Hazırlanan metin — istersen elle düzenle, sonra kaydet:**")
+            _fy_son_metin = st.text_area("Koli/Palet önizleme", value=_fy_hazir, height=150,
+                                          key=f"_fy_son_metin_{cari_id}", label_visibility="collapsed")
+            if st.button("💾 Kaydet", key=f"dlg_fiyat_kaydet_{cari_id}", type="primary", use_container_width=True):
+                try:
+                    _r_kpo2 = _vd_sb.table("kullanici_tercih").select("deger").eq(
+                        "kullanici", "__liste_ui__").eq("anahtar", "_koli_palet_manuel").execute()
+                    import json as _kpoj2
+                    _kp_map2 = _kpoj2.loads(_r_kpo2.data[0]["deger"]) if _r_kpo2.data else {}
+                    _kp_id_str2 = str(int(cari_id))
+                    _kp_map2[_kp_id_str2] = _fy_son_metin.strip()
+                    _vd_sb.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_koli_palet_manuel").execute()
+                    _vd_sb.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_koli_palet_manuel",
+                                                              "deger": _kpoj2.dumps(_kp_map2, ensure_ascii=False)}).execute()
+                    st.session_state["_koli_palet_manuel"] = _kp_map2
+                    st.session_state.pop(f"_fy_hazir_{cari_id}", None)
+                    st.toast("✅ Koli/Palet güncellendi", icon="📦")
+                    st.rerun()
+                except Exception as _vd_hata2:
+                    st.error(f"Hata: {_vd_hata2}")
     with _tab_duz:
         st.caption(f"**{firma_adi}** — kayıtlı tüm bilgilerle eksiksiz düzenleme ekranı açılır.")
         if st.button("✏️ Cari Kartı Düzenle", key=f"dlg_cari_duzenle_{cari_id}", type="primary", use_container_width=True):
