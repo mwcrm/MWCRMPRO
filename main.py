@@ -2850,9 +2850,13 @@ def not_dialog(cari_id, firma_adi=""):
             _sehir_w = max(len("V.İLİ"), max(len(g[0]) for g in _girisler))
             _tur_metinleri = [f"- {g[1]}" for g in _girisler]
             _tur_w = max(len("TÜR"), max(len(t) for t in _tur_metinleri))
-            _desi_metinleri = [f"{g[2]} DESİ -KG" for g in _girisler]
+            # Sayıları da SABİT genişliğe göre SAĞA yasla — yoksa "30" (2 haneli) ile
+            # "400" (3 haneli) farklı yer kaplayıp "DESİ"/"TL" yazıları kayıyordu.
+            _desi_sayi_w = max(len(str(g[2])) for g in _girisler)
+            _fiyat_sayi_w = max(len(str(g[3])) for g in _girisler)
+            _desi_metinleri = [f"{str(g[2]).rjust(_desi_sayi_w)} DESİ -KG" for g in _girisler]
             _desi_w = max(len("DESİ-KG"), max(len(t) for t in _desi_metinleri))
-            _fiyat_metinleri = [f"{g[3]} TL" for g in _girisler]
+            _fiyat_metinleri = [f"{str(g[3]).rjust(_fiyat_sayi_w)} TL" for g in _girisler]
             _fiyat_w = max(len("TUTAR"), max(len(t) for t in _fiyat_metinleri))
             _baslik = f"{'V.İLİ'.ljust(_sehir_w)}   {'TÜR'.ljust(_tur_w)}   {'DESİ-KG'.ljust(_desi_w)}   {'TUTAR'.ljust(_fiyat_w)}"
             _ayrac = "-" * len(_baslik)
