@@ -5475,6 +5475,13 @@ function kartSec(id){
 
         # Çoklu firma seçimi — filtre satırında son sütun
         _cok_sec_opts = [f"[{int(i)}] {f}" for i, f in zip(df["id"], df["firma"]) if str(f) not in ["","nan","None"]] if not df.empty and "firma" in df.columns else []
+        # ── GEÇİCİ KONTROL — "BARSAN" gibi firmaların bu listede gerçekten olup
+        # olmadığını, TAM (görünmeyen karakterler dahil) haliyle doğrulamak için.
+        _dbg_barsan = [o for o in _cok_sec_opts if "BARSA" in o.upper()]
+        if _dbg_barsan:
+            st.caption(f"🔧 KONTROL — '_cok_sec_opts' listesinde 'BARSA' içeren {len(_dbg_barsan)} kayıt: {[repr(x) for x in _dbg_barsan]}")
+        else:
+            st.caption(f"🔧 KONTROL — '_cok_sec_opts' listesinde ({len(_cok_sec_opts)} toplam kayıt) 'BARSA' içeren HİÇBİR kayıt yok.")
         # Taslak "Yükle" butonundan gelen bekleyen değeri — widget OLUŞTURULMADAN ÖNCE uygulanmalı
         # (Streamlit, widget instantiate edildikten SONRA aynı key'e session_state ataması yapılmasına izin vermiyor)
         if "_cok_tsk_bekleyen" in st.session_state:
