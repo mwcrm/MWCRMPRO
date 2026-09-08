@@ -4238,21 +4238,6 @@ elif aktif == "liste":
     if _son_kaydet_msg:
         st.success(_son_kaydet_msg, icon="✅")
 
-    # ── HER ZAMAN GÖRÜNÜR "TÜM FİRMALARI GÖSTER" BUTONU — sayfanın en üstünde,
-    # gizli/takılı kalmış herhangi bir filtreyi tek tıkla tamamen sıfırlar.
-    if st.button("🔄 TÜM FİRMALARI GÖSTER (Tüm Filtreleri Temizle)", key="_cl_tum_firma_goster_btn", use_container_width=True, type="primary"):
-        for _tf_key in list(st.session_state.keys()):
-            if _tf_key.startswith("_cl_fil_") or _tf_key in [
-                "_toplam_aktif", "_asamasiz_aktif", "_mesaj_gercek_aktif", "_bl_havuz_filtre",
-                "ara_liste", "kart_sec_inline", "_cl_fil_asama1", "_cl_fil_asama2",
-                "_cl_fil_asama3", "_cl_fil_sonuc", "_bl_ilce_filtre", "_bl_ilce_filtre_ad",
-                "_mr_liste_filtre",
-            ]:
-                st.session_state.pop(_tf_key, None)
-        st.session_state["_toplam_aktif"] = True
-        st.toast("✅ Tüm filtreler temizlendi — tüm firmalar gösteriliyor", icon="🔄")
-        st.rerun()
-
     # ── MOBİL KART GÖRÜNÜMÜ ──────────────────────────────────────────────────
     if st.session_state.get("_mobil_mod", False):
         st.markdown("""
