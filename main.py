@@ -2902,6 +2902,14 @@ def not_dialog(cari_id, firma_adi=""):
                             break
                         _fy_konumlar.append((_pos, _il_ad_fy.upper()))
                         _ara_bas = _pos + len(_il_norm_fy)
+                # "ŞEHİRİÇİ" yazılırsa İSTANBUL sayılır (şehir içi = İstanbul içi teslimat)
+                _ara_bas_si = 0
+                while True:
+                    _pos_si = _fy_norm_ham.find("SEHIRICI", _ara_bas_si)
+                    if _pos_si == -1:
+                        break
+                    _fy_konumlar.append((_pos_si, "İSTANBUL"))
+                    _ara_bas_si = _pos_si + len("SEHIRICI")
                 _fy_konumlar.sort(key=lambda x: x[0])
 
                 _fy_yeni_girisler = []
