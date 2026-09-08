@@ -2839,9 +2839,47 @@ def not_dialog(cari_id, firma_adi=""):
 
         _fy_sira_liste = [a.upper() for a in _IL_SUTUN_LISTESI[:-1]] + [a.upper() for a in _IL_DIGER_LISTESI]
 
-        def _fy_sira_no(_satir):
-            _sehir_kismi = _satir.split(" - ")[0].strip()
-            return _fy_sira_liste.index(_sehir_kismi) if _sehir_kismi in _fy_sira_liste else 999
+        def _fy_sira_no(_giris):
+            return _fy_sira_liste.index(_giris[0]) if _giris[0] in _fy_sira_liste else 999
+
+        # ── Hizalı TABLO formatı — en uzun değere göre tüm sütunlar aynı hizada,
+        # şehir grupları arasında ayraç çizgisi. (sehir,tip,desi,fiyat) demetlerinden üretir.
+        def _fy_format_tablo(_girisler):
+            if not _girisler:
+                return ""
+            _sehir_w = max(len("V.İLİ"), max(len(g[0]) for g in _girisler))
+            _tur_metinleri = [f"- {g[1]}" for g in _girisler]
+            _tur_w = max(len("TÜR"), max(len(t) for t in _tur_metinleri))
+            _desi_metinleri = [f"{g[2]} DESİ -KG" for g in _girisler]
+            _desi_w = max(len("DESİ-KG"), max(len(t) for t in _desi_metinleri))
+            _fiyat_metinleri = [f"{g[3]} TL" for g in _girisler]
+            _fiyat_w = max(len("TUTAR"), max(len(t) for t in _fiyat_metinleri))
+            _baslik = f"{'V.İLİ'.ljust(_sehir_w)}   {'TÜR'.ljust(_tur_w)}   {'DESİ-KG'.ljust(_desi_w)}   {'TUTAR'.ljust(_fiyat_w)}"
+            _ayrac = "-" * len(_baslik)
+            _satirlar = [_baslik, _ayrac]
+            _onceki_sehir = None
+            for _g, _tur_m, _desi_m, _fiyat_m in zip(_girisler, _tur_metinleri, _desi_metinleri, _fiyat_metinleri):
+                if _onceki_sehir is not None and _g[0] != _onceki_sehir:
+                    _satirlar.append(_ayrac)
+                _satirlar.append(f"{_g[0].ljust(_sehir_w)}   {_tur_m.ljust(_tur_w)}   {_desi_m.ljust(_desi_w)}   {_fiyat_m.ljust(_fiyat_w)}")
+                _onceki_sehir = _g[0]
+            return "\n".join(_satirlar)
+
+        # ── Var olan (eski düz yazı YA DA tablo) metni geri (sehir,tip,desi,fiyat)
+        # demetlerine ayrıştırır — böylece yeni girişle birleştirilebilir.
+        def _fy_parse_tablo(_metin):
+            import re as _fy_re2
+            _sonuc = []
+            for _satir in str(_metin or "").split("\n"):
+                _s = _satir.strip()
+                if not _s or set(_s) == {"-"}:
+                    continue
+                _m = _fy_re2.search(
+                    r"([A-ZİĞÜŞÖÇa-zığüşöç]+)\s*-?\s*(KOLİ|PALET|SANDIK|VARİL|IBC|PARÇA)\s+(\d+)\s*DESİ.*?(\d+)\s*TL",
+                    _s, _fy_re2.IGNORECASE)
+                if _m:
+                    _sonuc.append((_m.group(1).upper(), _m.group(2).upper(), int(_m.group(3)), int(_m.group(4))))
+            return _sonuc
 
         if st.button("🔍 Ayrıştır ve Hazırla", key=f"dlg_fiyat_ayristir_{cari_id}", use_container_width=True):
             if not _vd_fiyat.strip():
@@ -2866,7 +2904,7 @@ def not_dialog(cari_id, firma_adi=""):
                         _ara_bas = _pos + len(_il_norm_fy)
                 _fy_konumlar.sort(key=lambda x: x[0])
 
-                _fy_yeni_satirlar = []
+                _fy_yeni_girisler = []
                 for _fi, (_pos, _sehir) in enumerate(_fy_konumlar):
                     _bit = _fy_konumlar[_fi + 1][0] if _fi + 1 < len(_fy_konumlar) else len(_fy_norm_ham)
                     _blok = _fy_norm_ham[_pos:_bit]
@@ -2884,32 +2922,36 @@ def not_dialog(cari_id, firma_adi=""):
                             break
                     if _tip is None:
                         _tip = "KOLİ" if _desi <= 100 else "PALET"  # hiçbir şey sormadan otomatik karar
-                    _fy_yeni_satirlar.append(f"{_sehir} - {_tip} {_desi} DESİ - {_fiyat} TL")
+                    _fy_yeni_girisler.append((_sehir, _tip, _desi, _fiyat))
 
-                if not _fy_yeni_satirlar:
+                if not _fy_yeni_girisler:
                     st.warning("Yazdığın metinde tanınan bir il ismi bulunamadı.")
                 else:
-                    # Mevcut Koli/Palet içeriğiyle birleştir (aynı şehir+tip+desi varsa güncelle)
+                    # Mevcut Koli/Palet içeriğini (eski düz yazı ya da tablo, farketmez)
+                    # geri demetlere ayrıştırıp yeni girişlerle birleştir.
                     _r_kpo = _vd_sb.table("kullanici_tercih").select("deger").eq(
                         "kullanici", "__liste_ui__").eq("anahtar", "_koli_palet_manuel").execute()
                     import json as _kpoj
                     _kp_map = _kpoj.loads(_r_kpo.data[0]["deger"]) if _r_kpo.data else {}
                     _kp_id_str = str(int(cari_id))
-                    _kp_mevcut_satirlar = [s.strip() for s in str(_kp_map.get(_kp_id_str, "") or "").split("\n") if s.strip()]
-                    for _yeni in _fy_yeni_satirlar:
-                        _anahtar_str = _yeni.rsplit(" - ", 1)[0]
-                        _kp_mevcut_satirlar = [s for s in _kp_mevcut_satirlar if s.rsplit(" - ", 1)[0] != _anahtar_str]
-                        _kp_mevcut_satirlar.append(_yeni)
-                    _kp_mevcut_satirlar.sort(key=_fy_sira_no)
-                    # Kaydetmeden önce DÜZ YAZI olarak göster — kullanıcı üzerinde
-                    # elle oynayabilsin, hazır metin dayatılmasın.
-                    st.session_state[f"_fy_hazir_{cari_id}"] = "\n".join(_kp_mevcut_satirlar)
+                    _kp_mevcut_girisler = _fy_parse_tablo(_kp_map.get(_kp_id_str, ""))
+                    for _yeni in _fy_yeni_girisler:
+                        _anahtar = (_yeni[0], _yeni[1], _yeni[2])  # sehir+tip+desi aynıysa güncelle
+                        _kp_mevcut_girisler = [g for g in _kp_mevcut_girisler if (g[0], g[1], g[2]) != _anahtar]
+                        _kp_mevcut_girisler.append(_yeni)
+                    _kp_mevcut_girisler.sort(key=lambda g: (_fy_sira_no(g), g[2]))
+                    # Kaydetmeden önce DÜZ/HİZALI TABLO olarak göster — kullanıcı
+                    # üzerinde elle oynayabilsin, hazır metin dayatılmasın.
+                    st.session_state[f"_fy_hazir_{cari_id}"] = _fy_format_tablo(_kp_mevcut_girisler)
                     st.rerun()
 
         _fy_hazir = st.session_state.get(f"_fy_hazir_{cari_id}")
         if _fy_hazir is not None:
-            st.markdown("**Hazırlanan metin — istersen elle düzenle, sonra kaydet:**")
-            _fy_son_metin = st.text_area("Koli/Palet önizleme", value=_fy_hazir, height=150,
+            st.markdown("**Hazırlanan tablo — istersen elle düzenle, sonra kaydet:**")
+            st.markdown("""<style>
+textarea[aria-label="Koli/Palet önizleme"] { font-family: 'Courier New', monospace !important; white-space: pre !important; }
+</style>""", unsafe_allow_html=True)
+            _fy_son_metin = st.text_area("Koli/Palet önizleme", value=_fy_hazir, height=200,
                                           key=f"_fy_son_metin_{cari_id}", label_visibility="collapsed")
             if st.button("💾 Kaydet", key=f"dlg_fiyat_kaydet_{cari_id}", type="primary", use_container_width=True):
                 try:
