@@ -8,6 +8,17 @@ _IL_SUTUN_LISTESI = ["İstanbul","Bursa","İzmir","Manisa","Tekirdağ","Kocaeli"
                      "Diyarbakır","Erzurum","Eskişehir","Hatay","Kahramanmaraş","Malatya",
                      "Mardin","Mersin","Muğla","Ordu","Sakarya","Samsun","Trabzon","Van",
                      "Şanlıurfa","Diğer"]
+
+# "Diğer" başlığının altına, alt alta yazılacak iller (başlığı olmayan 50 il).
+# "Varış İlleri" hızlı-girişinde bu illerden biri yazılırsa "Diğer" sütununa,
+# üstteki 30 il de kendi sütununa gider.
+_IL_DIGER_LISTESI = ["Adıyaman","Afyonkarahisar","Ağrı","Aksaray","Amasya","Ardahan","Artvin",
+                     "Bartın","Batman","Bayburt","Bilecik","Bingöl","Bitlis","Bolu","Burdur",
+                     "Çanakkale","Çankırı","Çorum","Düzce","Edirne","Elazığ","Erzincan",
+                     "Giresun","Gümüşhane","Hakkari","Iğdır","Isparta","Karabük","Karaman",
+                     "Kars","Kastamonu","Kırıkkale","Kırklareli","Kırşehir","Kilis","Kütahya",
+                     "Muş","Nevşehir","Niğde","Osmaniye","Rize","Siirt","Sinop","Sivas",
+                     "Şırnak","Tokat","Tunceli","Uşak","Yalova","Yozgat","Zonguldak"]
 import sqlite3
 import pandas as pd
 import shutil
@@ -2757,7 +2768,8 @@ def not_dialog(cari_id, firma_adi=""):
         _vd_matris_firma = _vd_tum_matris.get(str(int(cari_id)), {})
         _vd_dolu = {k: v for k, v in _vd_matris_firma.items() if str(v).strip()}
         if _vd_dolu:
-            st.caption(f"📍 Şu an işaretli iller: {', '.join(f'{k} ({v})' for k, v in _vd_dolu.items())}")
+            _vd_dolu_metin = ", ".join(f"{k} ({str(v).replace(chr(10), '/')})" for k, v in _vd_dolu.items())
+            st.caption(f"📍 Şu an işaretli iller: {_vd_dolu_metin}")
         else:
             st.caption("📍 Şu an hiç il işaretlenmemiş.")
 
@@ -2775,16 +2787,28 @@ def not_dialog(cari_id, firma_adi=""):
                     # mantığı yazım hatalarını sessizce yutuyordu).
                     _vd_tokenler = [t for t in _vd_re.split(r"[,;\n]+|\s+", _vd_illeri.strip()) if t]
                     _vd_il_norm_map = {_vd_norm(a): a for a in _IL_SUTUN_LISTESI if a != "Diğer"}
+                    _vd_diger_norm_map = {_vd_norm(a): a for a in _IL_DIGER_LISTESI}
                     _vd_eslesen = []
                     _vd_eslesmeyen = []
                     for _tok in _vd_tokenler:
                         _tok_n = _vd_norm(_tok)
                         _bulunan_il = _vd_il_norm_map.get(_tok_n)
+                        _bulunan_diger = _vd_diger_norm_map.get(_tok_n)
                         if _bulunan_il:
                             if not str(_vd_tum_matris2[_vd_id_str].get(_bulunan_il, "")).strip():
                                 _vd_tum_matris2[_vd_id_str][_bulunan_il] = _bulunan_il.upper()
                             if _bulunan_il not in _vd_eslesen:
                                 _vd_eslesen.append(_bulunan_il)
+                        elif _bulunan_diger:
+                            # Başlığı olmayan il — "Diğer" sütununa ALT ALTA (üst üste
+                            # eklenerek, birden fazla girilebilecek şekilde) yazılır.
+                            _mevcut_diger = str(_vd_tum_matris2[_vd_id_str].get("Diğer", "") or "").strip()
+                            _diger_satirlari = [s.strip() for s in _mevcut_diger.split("\n") if s.strip()]
+                            if _bulunan_diger.upper() not in _diger_satirlari:
+                                _diger_satirlari.append(_bulunan_diger.upper())
+                            _vd_tum_matris2[_vd_id_str]["Diğer"] = "\n".join(_diger_satirlari)
+                            if _bulunan_diger not in _vd_eslesen:
+                                _vd_eslesen.append(_bulunan_diger)
                         else:
                             _vd_eslesmeyen.append(_tok)
                     _il_gonderim_matrisi_kaydet(_vd_tum_matris2)
