@@ -2766,23 +2766,34 @@ def not_dialog(cari_id, firma_adi=""):
         if st.button("💾 İlleri İşaretle", key=f"dlg_varis_illeri_kaydet_{cari_id}", use_container_width=True):
             if _vd_illeri.strip():
                 try:
+                    import re as _vd_re
                     _vd_tum_matris2 = dict(_il_gonderim_matrisi_yukle())
                     _vd_id_str = str(int(cari_id))
                     _vd_tum_matris2.setdefault(_vd_id_str, {})
-                    _vd_metin_norm = _vd_norm(_vd_illeri)
+                    # Kelime bazlı TAM eşleşme — böylece yazım hatası olan kelimeler
+                    # de ayrıca gösterilip fark edilebiliyor (önceki "içeriyor mu"
+                    # mantığı yazım hatalarını sessizce yutuyordu).
+                    _vd_tokenler = [t for t in _vd_re.split(r"[,;\n]+|\s+", _vd_illeri.strip()) if t]
+                    _vd_il_norm_map = {_vd_norm(a): a for a in _IL_SUTUN_LISTESI if a != "Diğer"}
                     _vd_eslesen = []
-                    for _il_ad_vd in _IL_SUTUN_LISTESI:
-                        if _il_ad_vd == "Diğer":
-                            continue
-                        if _vd_norm(_il_ad_vd) in _vd_metin_norm:
-                            if not str(_vd_tum_matris2[_vd_id_str].get(_il_ad_vd, "")).strip():
-                                _vd_tum_matris2[_vd_id_str][_il_ad_vd] = _il_ad_vd.upper()
-                            _vd_eslesen.append(_il_ad_vd)
+                    _vd_eslesmeyen = []
+                    for _tok in _vd_tokenler:
+                        _tok_n = _vd_norm(_tok)
+                        _bulunan_il = _vd_il_norm_map.get(_tok_n)
+                        if _bulunan_il:
+                            if not str(_vd_tum_matris2[_vd_id_str].get(_bulunan_il, "")).strip():
+                                _vd_tum_matris2[_vd_id_str][_bulunan_il] = _bulunan_il.upper()
+                            if _bulunan_il not in _vd_eslesen:
+                                _vd_eslesen.append(_bulunan_il)
+                        else:
+                            _vd_eslesmeyen.append(_tok)
                     _il_gonderim_matrisi_kaydet(_vd_tum_matris2)
                     _il_gonderim_matrisi_yukle.clear()  # Cari Liste tablosu da HEMEN güncel görsün
                     if _vd_eslesen:
                         st.toast(f"✅ İşaretlendi: {', '.join(_vd_eslesen)}", icon="📍")
-                    else:
+                    if _vd_eslesmeyen:
+                        st.warning(f"⚠️ Tanınmayan kelime(ler) — yazım hatası olabilir: **{', '.join(_vd_eslesmeyen)}**")
+                    if not _vd_eslesen and not _vd_eslesmeyen:
                         st.warning("Yazdığın metinde tanınan bir il ismi bulunamadı.")
                     st.rerun()
                 except Exception as _vd_hata:
