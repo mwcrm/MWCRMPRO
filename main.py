@@ -2828,11 +2828,10 @@ def not_dialog(cari_id, firma_adi=""):
         st.divider()
         _vd_sb = get_sb_client()
         st.caption("Karışık ve BİRDEN FAZLA il/fiyat aynı anda yazabilirsin — örn. "
-                   "**'amasya koli 30 desi 150 tl 5 adet amasya palet 101-400 desi 1500 tl 3 adet'**. "
-                   "Desi **aralık** (101-400 gibi) da yazılabilir. **Adet** yazarsan Toplam Tutar otomatik hesaplanır. "
-                   "100 desi'ye kadar (tek sayıysa) otomatik **KOLİ**, üzeri/aralıksa otomatik **PALET** sayılır.")
+                   "**'ankara 30 desi 300 manisa 30 desi 350 izmir palet 105 desi 1500'**. "
+                   "100 desi'ye kadar otomatik **KOLİ**, üzeri otomatik **PALET** sayılır (hiçbir şey sorulmaz).")
         _vd_fiyat = st.text_area("Fiyatlandırma", key=f"dlg_fiyat_{cari_id}", height=80,
-                                  placeholder="Örn: amasya koli 30 desi 150 tl 5 adet amasya palet 101-400 desi 1500 tl 3 adet")
+                                  placeholder="Örn: ankara 30 desi 300 manisa 30 desi 350 izmir 105 desi 1500")
 
         def _fy_norm(_s):
             return (str(_s or "").strip().upper().replace("İ", "I").replace("Ş", "S")
@@ -2844,38 +2843,29 @@ def not_dialog(cari_id, firma_adi=""):
             return _fy_sira_liste.index(_giris[0]) if _giris[0] in _fy_sira_liste else 999
 
         # ── Hizalı TABLO formatı — en uzun değere göre tüm sütunlar aynı hizada,
-        # şehir grupları arasında ayraç çizgisi. Girişler: (sehir,tip,desi_str,fiyat,adet)
-        # adet=None ise ADET/TOPLAM TUTAR o satırda "-" gösterilir.
+        # şehir grupları arasında ayraç çizgisi. (sehir,tip,desi,fiyat) demetlerinden üretir.
         def _fy_format_tablo(_girisler):
             if not _girisler:
                 return ""
             _sehir_w = max(len("V.İLİ"), max(len(g[0]) for g in _girisler))
             _tur_metinleri = [f"- {g[1]}" for g in _girisler]
             _tur_w = max(len("TÜR"), max(len(t) for t in _tur_metinleri))
-            _desi_metinleri = [f"{g[2]} DESİ -KG" for g in _girisler]
+            # Sayıları da SABİT genişliğe göre SAĞA yasla — yoksa "30" (2 haneli) ile
+            # "400" (3 haneli) farklı yer kaplayıp "DESİ"/"TL" yazıları kayıyordu.
+            _desi_sayi_w = max(len(str(g[2])) for g in _girisler)
+            _fiyat_sayi_w = max(len(str(g[3])) for g in _girisler)
+            _desi_metinleri = [f"{str(g[2]).rjust(_desi_sayi_w)} DESİ -KG" for g in _girisler]
             _desi_w = max(len("DESİ-KG"), max(len(t) for t in _desi_metinleri))
-            _fiyat_metinleri = [f"{g[3]} TL" for g in _girisler]
+            _fiyat_metinleri = [f"{str(g[3]).rjust(_fiyat_sayi_w)} TL" for g in _girisler]
             _fiyat_w = max(len("TUTAR"), max(len(t) for t in _fiyat_metinleri))
-            _adet_var_mi = any(g[4] is not None for g in _girisler)
-            _adet_metinleri = [(str(g[4]) if g[4] is not None else "-") for g in _girisler]
-            _adet_w = max(len("ADET"), max(len(t) for t in _adet_metinleri)) if _adet_var_mi else 0
-            _toplam_metinleri = [(f"{g[3]*g[4]} TL" if g[4] is not None else "-") for g in _girisler]
-            _toplam_w = max(len("TOPLAM TUTAR"), max(len(t) for t in _toplam_metinleri)) if _adet_var_mi else 0
-            if _adet_var_mi:
-                _baslik = (f"{'V.İLİ'.ljust(_sehir_w)}   {'TÜR'.ljust(_tur_w)}   {'DESİ-KG'.ljust(_desi_w)}   "
-                           f"{'TUTAR'.ljust(_fiyat_w)}   {'ADET'.ljust(_adet_w)}   {'TOPLAM TUTAR'.ljust(_toplam_w)}")
-            else:
-                _baslik = f"{'V.İLİ'.ljust(_sehir_w)}   {'TÜR'.ljust(_tur_w)}   {'DESİ-KG'.ljust(_desi_w)}   {'TUTAR'.ljust(_fiyat_w)}"
+            _baslik = f"{'V.İLİ'.ljust(_sehir_w)}   {'TÜR'.ljust(_tur_w)}   {'DESİ-KG'.ljust(_desi_w)}   {'TUTAR'.ljust(_fiyat_w)}"
             _ayrac = "-" * len(_baslik)
             _satirlar = [_baslik, _ayrac]
             _onceki_sehir = None
-            for _i, _g in enumerate(_girisler):
+            for _g, _tur_m, _desi_m, _fiyat_m in zip(_girisler, _tur_metinleri, _desi_metinleri, _fiyat_metinleri):
                 if _onceki_sehir is not None and _g[0] != _onceki_sehir:
                     _satirlar.append(_ayrac)
-                _satir = f"{_g[0].ljust(_sehir_w)}   {_tur_metinleri[_i].ljust(_tur_w)}   {_desi_metinleri[_i].ljust(_desi_w)}   {_fiyat_metinleri[_i].ljust(_fiyat_w)}"
-                if _adet_var_mi:
-                    _satir += f"   {_adet_metinleri[_i].ljust(_adet_w)}   {_toplam_metinleri[_i].ljust(_toplam_w)}"
-                _satirlar.append(_satir)
+                _satirlar.append(f"{_g[0].ljust(_sehir_w)}   {_tur_m.ljust(_tur_w)}   {_desi_m.ljust(_desi_w)}   {_fiyat_m.ljust(_fiyat_w)}")
                 _onceki_sehir = _g[0]
             return "\n".join(_satirlar)
 
@@ -2914,56 +2904,21 @@ def not_dialog(cari_id, firma_adi=""):
                 for _fi, (_pos, _sehir) in enumerate(_fy_konumlar):
                     _bit = _fy_konumlar[_fi + 1][0] if _fi + 1 < len(_fy_konumlar) else len(_fy_norm_ham)
                     _blok = _fy_norm_ham[_pos:_bit]
-
-                    # ── DESİ ARALIĞI (örn. "101-400" ya da "101 - 400") — varsa PALET sayılır
-                    _aralik_m = _fy_re.search(r"(\d+)\s*-\s*(\d+)", _blok)
-                    _desi_str = None
-                    _desi_tek = None
-                    _blok_temiz = _blok
-                    if _aralik_m:
-                        _desi_str = f"{_aralik_m.group(1)} - {_aralik_m.group(2)}"
-                        _blok_temiz = _blok[:_aralik_m.start()] + " " + _blok[_aralik_m.end():]
-                    else:
-                        _desi_m = _fy_re.search(r"(\d+)\s*(?:DESI|KG)", _blok)  # DESİ ve KG aynı alan sayılır
-                        if _desi_m:
-                            _desi_tek = int(_desi_m.group(1))
-                            _desi_str = str(_desi_tek)
-                            _blok_temiz = _blok[:_desi_m.start()] + " " + _blok[_desi_m.end():]
-
-                    # ── ADET (varsa) — "5 ADET" gibi
-                    _adet_m = _fy_re.search(r"(\d+)\s*ADET", _blok)
-                    _adet = int(_adet_m.group(1)) if _adet_m else None
-                    if _adet_m:
-                        _blok_temiz = _blok_temiz[:_adet_m.start()] + " " + _blok_temiz[_adet_m.end():]
-
-                    # ── TUTAR — "TL" ile biten sayı varsa o, yoksa kalan sayılardan SON olan
-                    _tutar_m = _fy_re.search(r"(\d+)\s*TL", _blok_temiz)
-                    if _tutar_m:
-                        _fiyat = int(_tutar_m.group(1))
-                    else:
-                        _kalan_sayilar = [int(x) for x in _fy_re.findall(r"\d+", _blok_temiz)]
-                        if not _kalan_sayilar and _desi_str is None:
-                            continue
-                        _fiyat = _kalan_sayilar[-1] if _kalan_sayilar else (_desi_tek or 0)
-
-                    if _desi_str is None:
-                        # Ne aralık ne tek desi bulunamadıysa, kalan ilk sayıyı desi say
-                        _kalan_sayilar2 = [int(x) for x in _fy_re.findall(r"\d+", _blok_temiz)]
-                        if not _kalan_sayilar2:
-                            continue
-                        _desi_tek = _kalan_sayilar2[0]
-                        _desi_str = str(_desi_tek)
-
+                    _blok_sayilar = [int(x) for x in _fy_re.findall(r"\d+", _blok)]
+                    if not _blok_sayilar:
+                        continue
+                    _desi_m = _fy_re.search(r"(\d+)\s*(?:DESI|KG)", _blok)  # DESİ ve KG aynı alan sayılır
+                    _desi = int(_desi_m.group(1)) if _desi_m else _blok_sayilar[0]
+                    _diger_sayilar = [n for n in _blok_sayilar if n != _desi]
+                    _fiyat = _diger_sayilar[-1] if _diger_sayilar else _desi
                     _tip = None
                     for _ta, _tv in {"KOLI":"KOLİ","PALET":"PALET","SANDIK":"SANDIK","VARIL":"VARİL","IBC":"IBC","PARCA":"PARÇA"}.items():
                         if _ta in _blok:
                             _tip = _tv
                             break
                     if _tip is None:
-                        # Aralık ise ya da 100'den büyükse PALET, değilse KOLİ — hiçbir şey sormadan otomatik karar
-                        _tip = "PALET" if (_aralik_m or (_desi_tek is not None and _desi_tek > 100)) else "KOLİ"
-
-                    _fy_yeni_girisler.append((_sehir, _tip, _desi_str, _fiyat, _adet))
+                        _tip = "KOLİ" if _desi <= 100 else "PALET"  # hiçbir şey sormadan otomatik karar
+                    _fy_yeni_girisler.append((_sehir, _tip, _desi, _fiyat))
 
                 if not _fy_yeni_girisler:
                     st.warning("Yazdığın metinde tanınan bir il ismi bulunamadı.")
@@ -2971,7 +2926,7 @@ def not_dialog(cari_id, firma_adi=""):
                     # ÖNEMLİ: eski/önceki kayıtlarla BİRLEŞTİRME yapılmıyor — sadece
                     # o an kutuya yazılan veri kullanılır (kullanıcı isteği: sistem
                     # eskileri "hatırlamasın", her seferinde sadece verileni kullansın).
-                    _fy_yeni_girisler.sort(key=lambda g: (_fy_sira_no(g), str(g[2])))
+                    _fy_yeni_girisler.sort(key=lambda g: (_fy_sira_no(g), g[2]))
                     # Kaydetmeden önce DÜZ/HİZALI TABLO olarak göster — kullanıcı
                     # üzerinde elle oynayabilsin, hazır metin dayatılmasın.
                     st.session_state[f"_fy_hazir_{cari_id}"] = _fy_format_tablo(_fy_yeni_girisler)
