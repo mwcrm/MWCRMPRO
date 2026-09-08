@@ -6107,7 +6107,7 @@ function kartSec(id){
     if "id" in df_edit.columns:
         for _il_kol in _IL_SUTUN_LISTESI:
             df_edit[_il_kol] = df_edit["id"].apply(
-                lambda _rid: _il_gonderim_matrisi.get(str(int(_rid)), {}).get(_il_kol, "") if pd.notna(_rid) else "")
+                lambda _rid: (_il_gonderim_matrisi.get(str(int(_rid)), {}).get(_il_kol, "") or "") if pd.notna(_rid) else "")
 
     # Son randevu bilgisini ekle (tarih + saat + bölge) — normalize edilmiş eşleştirme
     try:
@@ -6210,8 +6210,8 @@ function kartSec(id){
     # Varış İli veya Koli/Palet'e bir şey yazılırsa (Analiz'e hiç dokunulmasa
     # bile) "analiz yapılmış" kabul edilip ✅ otomatik gösterilir.
     if "id" in df_edit.columns:
-        df_edit["Varış İli"] = [_cikis_ili_map.get(str(int(rid)), "") for rid in df_edit["id"]]
-        df_edit["Koli/Palet"] = [_koli_palet_map.get(str(int(rid)), "") for rid in df_edit["id"]]
+        df_edit["Varış İli"] = [(_cikis_ili_map.get(str(int(rid)), "") or "") for rid in df_edit["id"]]
+        df_edit["Koli/Palet"] = [(_koli_palet_map.get(str(int(rid)), "") or "") for rid in df_edit["id"]]
         df_edit["✅ Analiz"] = [
             ("✅" if (str(int(rid)) in _analiz_override or str(otomatik or "").strip()
                       or str(varis or "").strip() or str(koli or "").strip()) else "")
