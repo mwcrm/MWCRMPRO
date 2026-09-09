@@ -2438,6 +2438,13 @@ def _dis_nakliye_tasiyici_secici(key_prefix):
 @st.dialog("📋 Notlar & Randevu", width="large")
 def not_dialog(cari_id, firma_adi=""):
     """Ekran ortasında açılan not + randevu + silme + düzenleme penceresi"""
+    # ── AÇIK KALSIN — pencere içinde bir işlem yapılıp (Ayrıştır, Kaydet vb.)
+    # st.rerun() tetiklenince, tabloyu yeniden oluşturan koşul bazen aynı
+    # şekilde tekrar sağlanmayabiliyor ve pencere kapanıyordu. Bu yüzden
+    # hangi firma için açık olduğu ayrıca session_state'te "kalıcı" tutuluyor —
+    # sayfanın en başında bu kayıt varsa pencere garanti yeniden açılıyor.
+    st.session_state["_not_dialog_kalici_id"] = cari_id
+    st.session_state["_not_dialog_kalici_firma"] = firma_adi
     # ── PENCEREYİ GENİŞLET — Streamlit'in "large" seçeneği en fazla 1280px
     # veriyor, Dış Nakliye tablosundaki çok sayıda kolon için yetersiz
     # kalıyordu. CSS ile ekranın büyük kısmını kaplayacak şekilde zorluyoruz.
@@ -2447,6 +2454,10 @@ def not_dialog(cari_id, firma_adi=""):
     max-width: 1900px !important;
 }
 </style>""", unsafe_allow_html=True)
+    if st.button("❌ Bu Pencereyi Kapat", key=f"dlg_kapat_{cari_id}"):
+        st.session_state.pop("_not_dialog_kalici_id", None)
+        st.session_state.pop("_not_dialog_kalici_firma", None)
+        st.rerun()
     _tab_not, _tab_rdv, _tab_yetkili, _tab_dn, _tab_teklif, _tab_sozlesme, _tab_varis, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "🚚 Dış Nakliye", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "📦 Varış/Fiyat", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
     with _tab_not:
         not_paneli(cari_id, firma_adi, key_prefix="dlg")
@@ -2875,7 +2886,14 @@ def not_dialog(cari_id, firma_adi=""):
                 _onceki_sehir = _g[0]
             return "\n".join(_satirlar)
 
-        if st.button("🔍 Ayrıştır ve Hazırla", key=f"dlg_fiyat_ayristir_{cari_id}", use_container_width=True):
+        _fyb1, _fyb2 = st.columns([3, 1])
+        _fy_ayristir_tiklandi = _fyb1.button("🔍 Ayrıştır ve Hazırla", key=f"dlg_fiyat_ayristir_{cari_id}", use_container_width=True)
+        if _fyb2.button("🔄 Yenile", key=f"dlg_fiyat_yenile_{cari_id}", use_container_width=True,
+                        help="Kutuyu ve önizlemeyi temizler, sıfırdan başlarsın."):
+            st.session_state.pop(f"_fy_hazir_{cari_id}", None)
+            st.session_state[f"dlg_fiyat_{cari_id}"] = ""
+            st.rerun()
+        if _fy_ayristir_tiklandi:
             if not _vd_fiyat.strip():
                 st.warning("Önce bir şey yazın.")
             else:
