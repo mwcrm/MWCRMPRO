@@ -2863,6 +2863,7 @@ def not_dialog(cari_id, firma_adi=""):
             st.caption(f"📋 Bu müşteri için {len(_kg_mevcut)} kargo kaydı — düzenleyebilir, seçip silebilirsin:")
             import pandas as _kg_pd
             _kg_df = _kg_pd.DataFrame(_kg_mevcut)
+            _kg_df = _kg_df.fillna("")  # eski kayıtlarda olmayan alanlar "None" değil boş görünsün
             _kg_df.insert(0, "Seç", False)
             _kg_kolon_isim = {"tarih": "Tarih", "takip_no": "Takip No", "gonderen_firma": "Gönderen",
                                "alici_firma": "Alıcı", "fatura_firma": "Fatura Firma",
@@ -13198,6 +13199,7 @@ elif aktif == "kargolar":
             _kk["Müşteri"] = _kl_musteri_map.get(_kk.get("_cari_id"), f"(ID {_kk.get('_cari_id')})")
 
         _kl_df = pd.DataFrame(_kl_tum_kayitlar)
+        _kl_df = _kl_df.fillna("")  # eski kayıtlarda olmayan alanlar "None" değil boş görünsün
         _kl_df.insert(0, "Seç", False)
         _kl_kolon_isim = {"Müşteri": "Müşteri", "tarih": "Tarih", "takip_no": "Takip No", "gonderen_firma": "Gönderen",
                            "alici_firma": "Alıcı", "fatura_firma": "Fatura Firma",
@@ -13210,53 +13212,64 @@ elif aktif == "kargolar":
         _kl_gorunur_kolonlar = ["Seç", "Müşteri"] + [c for c in _kl_kolon_isim if c in _kl_df.columns and c != "Müşteri"]
         _kl_df_goster = _kl_df[_kl_gorunur_kolonlar + ["_cari_id", "_satir_no"]].rename(columns=_kl_kolon_isim)
         st.caption(f"Toplam {len(_kl_df)} kargo kaydı, {_kl_df['_cari_id'].nunique()} müşteride.")
+
+        # Butonlar tablonun ÜSTÜNDE görünsün diye önce boş bir kutu (container)
+        # ayrılıyor, düzenlenen tablo aşağıda oluşuyor, butonlar en son bu
+        # kutunun İÇİNE render ediliyor — ama DOM'da (ekranda) yeri en üstte kalıyor.
+        _kl_btn_kutu = st.container()
+
+        # Tablo yüksekliği: TÜM satırlar tek seferde, kaydırmaya gerek kalmadan
+        # görünsün diye satır sayısına göre otomatik büyütülüyor (üst sınırla).
+        _kl_yukseklik = min(max(38 * (len(_kl_df_goster) + 1) + 20, 200), 900)
         _kl_duzenlenen = st.data_editor(
             _kl_df_goster.drop(columns=["_cari_id", "_satir_no"]), use_container_width=True, hide_index=True,
-            key="kargolar_editor",
+            key="kargolar_editor", height=_kl_yukseklik,
             column_config={"Seç": st.column_config.CheckboxColumn("Seç", default=False)}
         )
-        _klb1, _klb2 = st.columns(2)
-        with _klb1:
-            if st.button("💾 Değişiklikleri Kaydet", key="kargolar_kaydet_btn", type="primary", use_container_width=True):
-                _kl_ters = {v: k for k, v in _kl_kolon_isim.items()}
-                # Her müşteri için kendi listesini ayrı ayrı yeniden oluştur
-                _kl_musteri_gruplari = {}
-                for _idx, _r in _kl_duzenlenen.iterrows():
-                    _cid = int(_kl_df_goster.iloc[_idx]["_cari_id"])
-                    if bool(_r.get("Seç")):
-                        continue  # işaretliler siliniyor sayılır
-                    _kayit = {}
-                    for _kol, _val in _r.items():
-                        if _kol in ("Seç", "Müşteri"):
+
+        with _kl_btn_kutu:
+            _klb1, _klb2 = st.columns(2)
+            with _klb1:
+                if st.button("💾 Değişiklikleri Kaydet", key="kargolar_kaydet_btn", type="primary", use_container_width=True):
+                    _kl_ters = {v: k for k, v in _kl_kolon_isim.items()}
+                    # Her müşteri için kendi listesini ayrı ayrı yeniden oluştur
+                    _kl_musteri_gruplari = {}
+                    for _idx, _r in _kl_duzenlenen.iterrows():
+                        _cid = int(_kl_df_goster.iloc[_idx]["_cari_id"])
+                        if bool(_r.get("Seç")):
+                            continue  # işaretliler siliniyor sayılır
+                        _kayit = {}
+                        for _kol, _val in _r.items():
+                            if _kol in ("Seç", "Müşteri"):
+                                continue
+                            _kayit[_kl_ters.get(_kol, _kol)] = _val
+                        _kl_musteri_gruplari.setdefault(_cid, []).append(_kayit)
+                    # Kayıtları hiç kalmayan (tamamı silinmiş/güncellenmiş) müşteriler için de boş liste yaz
+                    for _cid_hepsi in _kl_df["_cari_id"].unique():
+                        _kargolar_yaz(int(_cid_hepsi), _kl_musteri_gruplari.get(int(_cid_hepsi), []))
+                    _kargolar_tumunu_yukle.clear()
+                    st.toast("✅ Kargo kayıtları güncellendi", icon="🚚")
+                    st.rerun()
+            with _klb2:
+                _kl_secili_sayi = int(_kl_duzenlenen["Seç"].sum()) if "Seç" in _kl_duzenlenen.columns else 0
+                if st.button(f"🗑️ Seçili {_kl_secili_sayi} Kaydı Sil", key="kargolar_sil_btn", use_container_width=True, disabled=_kl_secili_sayi == 0):
+                    _kl_ters2 = {v: k for k, v in _kl_kolon_isim.items()}
+                    _kl_musteri_gruplari2 = {}
+                    for _idx, _r in _kl_duzenlenen.iterrows():
+                        _cid = int(_kl_df_goster.iloc[_idx]["_cari_id"])
+                        if bool(_r.get("Seç")):
                             continue
-                        _kayit[_kl_ters.get(_kol, _kol)] = _val
-                    _kl_musteri_gruplari.setdefault(_cid, []).append(_kayit)
-                # Kayıtları hiç kalmayan (tamamı silinmiş/güncellenmiş) müşteriler için de boş liste yaz
-                for _cid_hepsi in _kl_df["_cari_id"].unique():
-                    _kargolar_yaz(int(_cid_hepsi), _kl_musteri_gruplari.get(int(_cid_hepsi), []))
-                _kargolar_tumunu_yukle.clear()
-                st.toast("✅ Kargo kayıtları güncellendi", icon="🚚")
-                st.rerun()
-        with _klb2:
-            _kl_secili_sayi = int(_kl_duzenlenen["Seç"].sum()) if "Seç" in _kl_duzenlenen.columns else 0
-            if st.button(f"🗑️ Seçili {_kl_secili_sayi} Kaydı Sil", key="kargolar_sil_btn", use_container_width=True, disabled=_kl_secili_sayi == 0):
-                _kl_ters2 = {v: k for k, v in _kl_kolon_isim.items()}
-                _kl_musteri_gruplari2 = {}
-                for _idx, _r in _kl_duzenlenen.iterrows():
-                    _cid = int(_kl_df_goster.iloc[_idx]["_cari_id"])
-                    if bool(_r.get("Seç")):
-                        continue
-                    _kayit2 = {}
-                    for _kol, _val in _r.items():
-                        if _kol in ("Seç", "Müşteri"):
-                            continue
-                        _kayit2[_kl_ters2.get(_kol, _kol)] = _val
-                    _kl_musteri_gruplari2.setdefault(_cid, []).append(_kayit2)
-                for _cid_hepsi2 in _kl_df["_cari_id"].unique():
-                    _kargolar_yaz(int(_cid_hepsi2), _kl_musteri_gruplari2.get(int(_cid_hepsi2), []))
-                _kargolar_tumunu_yukle.clear()
-                st.toast(f"🗑️ {_kl_secili_sayi} kayıt silindi", icon="🗑️")
-                st.rerun()
+                        _kayit2 = {}
+                        for _kol, _val in _r.items():
+                            if _kol in ("Seç", "Müşteri"):
+                                continue
+                            _kayit2[_kl_ters2.get(_kol, _kol)] = _val
+                        _kl_musteri_gruplari2.setdefault(_cid, []).append(_kayit2)
+                    for _cid_hepsi2 in _kl_df["_cari_id"].unique():
+                        _kargolar_yaz(int(_cid_hepsi2), _kl_musteri_gruplari2.get(int(_cid_hepsi2), []))
+                    _kargolar_tumunu_yukle.clear()
+                    st.toast(f"🗑️ {_kl_secili_sayi} kayıt silindi", icon="🗑️")
+                    st.rerun()
 
 elif aktif == "bolgeler":
     sayfa_log("bolgeler")
