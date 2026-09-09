@@ -2458,7 +2458,7 @@ def not_dialog(cari_id, firma_adi=""):
         st.session_state.pop("_not_dialog_kalici_id", None)
         st.session_state.pop("_not_dialog_kalici_firma", None)
         st.rerun()
-    _tab_not, _tab_rdv, _tab_yetkili, _tab_dn, _tab_teklif, _tab_sozlesme, _tab_varis, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "🚚 Dış Nakliye", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "📦 Varış/Fiyat", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
+    _tab_not, _tab_rdv, _tab_yetkili, _tab_dn, _tab_kargo, _tab_teklif, _tab_sozlesme, _tab_varis, _tab_duz, _tab_sil = st.tabs(["📝 Notlar", "📅 Randevu Ekle", "👥 Yetkililer", "🚚 Dış Nakliye", "📦 Kargo Girişi", "⭐ Özel Teklif", "📜 Sözleşme Hazırla", "📦 Varış/Fiyat", "✏️ Cari Kartı Düzenle", "🗑️ Cari Sil"])
     with _tab_not:
         not_paneli(cari_id, firma_adi, key_prefix="dlg")
     with _tab_rdv:
@@ -2755,6 +2755,82 @@ def not_dialog(cari_id, firma_adi=""):
                         st.rerun()
         else:
             st.caption("Bu müşteri için henüz dış nakliye kaydı yok.")
+    with _tab_kargo:
+        # ── KARGO GİRİŞİ — cari_kartlar'a yeni kolon açmadan (migration yok
+        # kuralı), her müşterinin kargo çıkış kayıtları kullanici_tercih
+        # tablosunda MÜŞTERİYE ÖZEL bir anahtarda (JSON liste) tutulur:
+        # anahtar = "_kargo_kayitlari_<cari_id>"
+        _kg_sb = get_sb_client()
+        _kg_anahtar = f"_kargo_kayitlari_{int(cari_id)}"
+
+        @st.cache_data(ttl=30, show_spinner=False)
+        def _kg_kayitlari_yukle(_anahtar):
+            try:
+                _sb_kg = get_sb_client()
+                if _sb_kg:
+                    _r_kg = _sb_kg.table("kullanici_tercih").select("deger").eq(
+                        "kullanici", "__liste_ui__").eq("anahtar", _anahtar).execute()
+                    if _r_kg.data:
+                        import json as _kgj
+                        return _kgj.loads(_r_kg.data[0]["deger"])
+            except Exception:
+                pass
+            return []
+
+        def _kg_kayitlari_kaydet(_anahtar, _liste):
+            try:
+                _sb_kg2 = get_sb_client()
+                if _sb_kg2:
+                    import json as _kgj2
+                    _deger = _kgj2.dumps(_liste, ensure_ascii=False)
+                    _sb_kg2.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", _anahtar).execute()
+                    _sb_kg2.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": _anahtar, "deger": _deger}).execute()
+            except Exception:
+                pass
+
+        st.caption(f"**{firma_adi}** için kargo çıkış kaydı ekle:")
+        with st.form(key=f"kg_form_{cari_id}"):
+            _kgc1, _kgc2, _kgc3 = st.columns(3)
+            _kg_tarih = _kgc1.date_input("Tarih", key=f"kg_tarih_{cari_id}")
+            _kg_takip = _kgc2.text_input("Takip No", key=f"kg_takip_{cari_id}")
+            _kg_tur = _kgc3.text_input("Tür", key=f"kg_tur_{cari_id}", placeholder="Koli / Palet / ...")
+            _kg_gonderen = _kgc1.text_input("Gönderen Firma", key=f"kg_gonderen_{cari_id}")
+            _kg_alici = _kgc2.text_input("Alıcı Firma", value=firma_adi, key=f"kg_alici_{cari_id}")
+            _kg_fatura_firma = _kgc3.text_input("Fatura Firma", key=f"kg_fatura_firma_{cari_id}")
+            _kg_adet = _kgc1.number_input("Adet", min_value=0, step=1, key=f"kg_adet_{cari_id}")
+            _kg_tutar = _kgc2.number_input("Tutar", min_value=0.0, step=0.01, key=f"kg_tutar_{cari_id}")
+            _kg_kdv = _kgc3.number_input("KDV", min_value=0.0, step=0.01, key=f"kg_kdv_{cari_id}")
+            _kg_sigorta = _kgc1.number_input("Sigorta", min_value=0.0, step=0.01, key=f"kg_sigorta_{cari_id}")
+            _kg_toplam_fatura = _kgc2.number_input("Toplam Fatura", min_value=0.0, step=0.01, key=f"kg_toplam_fatura_{cari_id}")
+            _kg_odeme_tur = _kgc3.selectbox("Ödeme Türü", ["", "Nakit", "Havale/EFT", "Çek", "Kredi Kartı", "Diğer"], key=f"kg_odeme_{cari_id}")
+            _kg_tahsilat = _kgc1.selectbox("Tahsilat Durumu", ["", "Tahsil Edildi", "Bekliyor", "Kısmi Tahsilat"], key=f"kg_tahsilat_{cari_id}")
+            if st.form_submit_button("💾 Kargo Girişini Kaydet", type="primary", use_container_width=True):
+                _kg_liste = list(_kg_kayitlari_yukle(_kg_anahtar))
+                _kg_liste.append({
+                    "tarih": str(_kg_tarih), "takip_no": _kg_takip, "gonderen_firma": _kg_gonderen,
+                    "alici_firma": _kg_alici, "fatura_firma": _kg_fatura_firma, "adet": _kg_adet,
+                    "tur": _kg_tur, "tutar": _kg_tutar, "kdv": _kg_kdv, "sigorta": _kg_sigorta,
+                    "toplam_fatura": _kg_toplam_fatura, "odeme_tur": _kg_odeme_tur, "tahsilat_durumu": _kg_tahsilat,
+                })
+                _kg_kayitlari_kaydet(_kg_anahtar, _kg_liste)
+                _kg_kayitlari_yukle.clear()
+                st.toast("✅ Kargo girişi kaydedildi", icon="🚚")
+                st.rerun()
+
+        _kg_mevcut = _kg_kayitlari_yukle(_kg_anahtar)
+        if _kg_mevcut:
+            st.divider()
+            st.caption(f"📋 Bu müşteri için {len(_kg_mevcut)} kargo kaydı:")
+            import pandas as _kg_pd
+            _kg_df = _kg_pd.DataFrame(_kg_mevcut)
+            _kg_kolon_isim = {"tarih": "Tarih", "takip_no": "Takip No", "gonderen_firma": "Gönderen",
+                               "alici_firma": "Alıcı", "fatura_firma": "Fatura Firma", "adet": "Adet",
+                               "tur": "Tür", "tutar": "Tutar", "kdv": "KDV", "sigorta": "Sigorta",
+                               "toplam_fatura": "Toplam Fatura", "odeme_tur": "Ödeme Türü", "tahsilat_durumu": "Tahsilat"}
+            _kg_df = _kg_df.rename(columns=_kg_kolon_isim)
+            st.dataframe(_kg_df, use_container_width=True, hide_index=True)
+        else:
+            st.caption("Bu müşteri için henüz kargo kaydı yok.")
     with _tab_teklif:
         st.caption(f"**{firma_adi}** için özel teklif oluştur — müşteri otomatik seçili şekilde Özel Teklif sayfası açılır.")
         if st.button("⭐ Özel Teklif Sayfasını Aç", key=f"dlg_ozel_teklif_{cari_id}", type="primary", use_container_width=True):
@@ -2841,7 +2917,12 @@ def not_dialog(cari_id, firma_adi=""):
         st.caption("Excel'den kopyaladığın gibi SATIR SATIR yapıştır — her satırda **Şehir, Desi Kg, Birim Fiyat** olsun "
                    "(örn. **'AMASYA 227 3.574'**). **TOPLAM = Desi × Birim Fiyat** olarak otomatik hesaplanır, sana bırakmaz. "
                    "100 desi'ye kadar otomatik **KOLİ**, üzeri otomatik **PALET** sayılır.")
-        _vd_fiyat = st.text_area("Fiyatlandırma", key=f"dlg_fiyat_{cari_id}", height=140,
+        # Sayaçlı (suffix'li) key — "Yenile" butonu, Streamlit'in "widget zaten
+        # oluşturulduktan sonra aynı key'e atama yapılamaz" kısıtı yüzünden
+        # kutunun KENDİ key'ine doğrudan yazamıyor; bunun yerine sayaç artırılıp
+        # bir sonraki çizimde TAMAMEN YENİ (boş) bir kutu oluşturuluyor.
+        _fy_kutu_sfx = st.session_state.get(f"_fy_kutu_sfx_{cari_id}", 0)
+        _vd_fiyat = st.text_area("Fiyatlandırma", key=f"dlg_fiyat_{cari_id}_{_fy_kutu_sfx}", height=140,
                                   placeholder="AMASYA 227 3.574\nAMASYA 300 3.531\nAMASYA 356 3.487")
 
         def _fy_norm(_s):
@@ -2891,7 +2972,7 @@ def not_dialog(cari_id, firma_adi=""):
         if _fyb2.button("🔄 Yenile", key=f"dlg_fiyat_yenile_{cari_id}", use_container_width=True,
                         help="Kutuyu ve önizlemeyi temizler, sıfırdan başlarsın."):
             st.session_state.pop(f"_fy_hazir_{cari_id}", None)
-            st.session_state[f"dlg_fiyat_{cari_id}"] = ""
+            st.session_state[f"_fy_kutu_sfx_{cari_id}"] = _fy_kutu_sfx + 1
             st.rerun()
         if _fy_ayristir_tiklandi:
             if not _vd_fiyat.strip():
