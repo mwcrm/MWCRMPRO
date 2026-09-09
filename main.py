@@ -2860,9 +2860,10 @@ def not_dialog(cari_id, firma_adi=""):
         _kg_mevcut = _kg_kayitlari_yukle(_kg_anahtar)
         if _kg_mevcut:
             st.divider()
-            st.caption(f"📋 Bu müşteri için {len(_kg_mevcut)} kargo kaydı:")
+            st.caption(f"📋 Bu müşteri için {len(_kg_mevcut)} kargo kaydı — düzenleyebilir, seçip silebilirsin:")
             import pandas as _kg_pd
             _kg_df = _kg_pd.DataFrame(_kg_mevcut)
+            _kg_df.insert(0, "Seç", False)
             _kg_kolon_isim = {"tarih": "Tarih", "takip_no": "Takip No", "gonderen_firma": "Gönderen",
                                "alici_firma": "Alıcı", "fatura_firma": "Fatura Firma",
                                "gonderen_il": "Gönderen İl", "alici_il": "Alıcı İl",
@@ -2872,7 +2873,45 @@ def not_dialog(cari_id, firma_adi=""):
                                "dis_nakliye_detay": "Dış Nakliye Detay", "dis_nakliye_tutar": "Dış Nakliye Tutar",
                                "musteri_tutar": "Müşteri Tutar", "kar": "Kar"}
             _kg_df = _kg_df.rename(columns=_kg_kolon_isim)
-            st.dataframe(_kg_df, use_container_width=True, hide_index=True)
+            _kg_duzenlenen = st.data_editor(_kg_df, use_container_width=True, hide_index=True,
+                                             key=f"kg_editor_{cari_id}",
+                                             column_config={"Seç": st.column_config.CheckboxColumn("Seç", default=False)})
+            _kgb1, _kgb2 = st.columns(2)
+            with _kgb1:
+                if st.button("💾 Değişiklikleri Kaydet", key=f"kg_duzenle_kaydet_{cari_id}", use_container_width=True):
+                    _kg_ters_isim = {v: k for k, v in _kg_kolon_isim.items()}
+                    _kg_yeni_liste = []
+                    for _, _r in _kg_duzenlenen.iterrows():
+                        if bool(_r.get("Seç")):
+                            continue  # işaretli olanlar siliniyor sayılır
+                        _kg_kayit = {}
+                        for _kol, _val in _r.items():
+                            if _kol == "Seç":
+                                continue
+                            _kg_kayit[_kg_ters_isim.get(_kol, _kol)] = _val
+                        _kg_yeni_liste.append(_kg_kayit)
+                    _kg_kayitlari_kaydet(_kg_anahtar, _kg_yeni_liste)
+                    _kg_kayitlari_yukle.clear()
+                    st.toast("✅ Kargo kayıtları güncellendi", icon="🚚")
+                    st.rerun()
+            with _kgb2:
+                _kg_secili_sayi = int(_kg_duzenlenen["Seç"].sum()) if "Seç" in _kg_duzenlenen.columns else 0
+                if st.button(f"🗑️ Seçili {_kg_secili_sayi} Kaydı Sil", key=f"kg_sil_btn_{cari_id}", use_container_width=True, disabled=_kg_secili_sayi == 0):
+                    _kg_ters_isim2 = {v: k for k, v in _kg_kolon_isim.items()}
+                    _kg_kalanlar = []
+                    for _, _r in _kg_duzenlenen.iterrows():
+                        if bool(_r.get("Seç")):
+                            continue
+                        _kg_kayit2 = {}
+                        for _kol, _val in _r.items():
+                            if _kol == "Seç":
+                                continue
+                            _kg_kayit2[_kg_ters_isim2.get(_kol, _kol)] = _val
+                        _kg_kalanlar.append(_kg_kayit2)
+                    _kg_kayitlari_kaydet(_kg_anahtar, _kg_kalanlar)
+                    _kg_kayitlari_yukle.clear()
+                    st.toast(f"🗑️ {_kg_secili_sayi} kayıt silindi", icon="🗑️")
+                    st.rerun()
         else:
             st.caption("Bu müşteri için henüz kargo kaydı yok.")
     with _tab_teklif:
@@ -3204,7 +3243,7 @@ def not_paneli(cari_id, firma_adi="", key_prefix="np"):
 
 
 
-_TAB_LISTESI_DEFAULT = ["yeni", "liste", "dis_nakliye_toplu", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "mukerrer"]
+_TAB_LISTESI_DEFAULT = ["yeni", "liste", "dis_nakliye_toplu", "randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler", "rapor", "excel", "kullanici", "admin_rapor", "harita", "mukerrer", "kargolar"]
 _TAB_ETIKETLER = {
     "yeni": "➕ Yeni Kart Ekle",
     "liste": "📋 Cari Liste / Düzenle",
@@ -3221,6 +3260,7 @@ _TAB_ETIKETLER = {
     "mesajlar": "💬 Mesajlar",
     "admin_rapor": "📊 Rapor Tasarla",
     "harita": "🗺️ Müşteri Haritası",
+    "kargolar": "🚚 Kargolar",
     "mukerrer": "🔍 Mükerrer Bul",
     
 }
@@ -3667,6 +3707,7 @@ button[data-testid="manage-app-button"] { display: none !important; }
         ("🧾 Cari işlemleri",    ["yeni", "liste", "dis_nakliye_toplu", "excel", "mukerrer"]),
         ("📅 Randevu ve teklif", ["randevu", "ozel_teklif", "sozlesme", "kayitli_teklifler"]),
         ("🚚 Saha",              ["harita"]),
+        ("📦 Kargo Takip",       ["kargolar"]),
         ("⚙️ Yönetim",          ["kullanici"]),
         ("📊 Raporlar",          ["admin_rapor", "rapor"]),
     ]
@@ -13098,6 +13139,124 @@ Object.entries(rnk).forEach(function(e){
                         f'<span class="mh-sayi">{_mh_sayi}</span><span class="mh-etiket">müşteri</span></div>'
                     )
                 st.markdown(f'<div class="mh-grid">{_mh_kartlar}</div>', unsafe_allow_html=True)
+
+elif aktif == "kargolar":
+    sayfa_log("kargolar")
+    st.markdown("## 🚚 Kargolar — Tüm Müşteriler")
+    st.caption("Tüm müşterilerin kargo giriş kayıtları burada birleşik olarak görünür. "
+               "'Seç' işaretleyip düzenleyebilir veya silebilirsin.")
+
+    @st.cache_data(ttl=30, show_spinner=False)
+    def _kargolar_tumunu_yukle():
+        try:
+            _sb_kt = get_sb_client()
+            if not _sb_kt:
+                return []
+            _r_kt = _sb_kt.table("kullanici_tercih").select("anahtar,deger").eq(
+                "kullanici", "__liste_ui__").like("anahtar", "_kargo_kayitlari_%").execute()
+            import json as _ktj
+            _tum_kayitlar = []
+            for _row in (_r_kt.data or []):
+                try:
+                    _cid = int(str(_row["anahtar"]).replace("_kargo_kayitlari_", ""))
+                except Exception:
+                    continue
+                try:
+                    _liste = _ktj.loads(_row["deger"])
+                except Exception:
+                    _liste = []
+                for _i, _kayit in enumerate(_liste):
+                    _kayit_kopya = dict(_kayit)
+                    _kayit_kopya["_cari_id"] = _cid
+                    _kayit_kopya["_satir_no"] = _i
+                    _tum_kayitlar.append(_kayit_kopya)
+            return _tum_kayitlar
+        except Exception:
+            return []
+
+    def _kargolar_yaz(_cari_id, _yeni_liste_o_musteri):
+        try:
+            _sb_kt2 = get_sb_client()
+            if _sb_kt2:
+                import json as _ktj2
+                _anahtar = f"_kargo_kayitlari_{int(_cari_id)}"
+                _deger = _ktj2.dumps(_yeni_liste_o_musteri, ensure_ascii=False)
+                _sb_kt2.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", _anahtar).execute()
+                _sb_kt2.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": _anahtar, "deger": _deger}).execute()
+        except Exception:
+            pass
+
+    _kl_tum_kayitlar = _kargolar_tumunu_yukle()
+    if not _kl_tum_kayitlar:
+        st.info("💡 Henüz hiçbir müşteride kargo kaydı yok. Cari Liste'de bir firmayı seçip (Seç işareti) açılan pencereden '📦 Kargo Girişi' sekmesiyle ekleyebilirsin.")
+    else:
+        try:
+            _kl_musteri_map = dict(zip(get_cari_listesi()["id"], get_cari_listesi()["firma"]))
+        except Exception:
+            _kl_musteri_map = {}
+        for _kk in _kl_tum_kayitlar:
+            _kk["Müşteri"] = _kl_musteri_map.get(_kk.get("_cari_id"), f"(ID {_kk.get('_cari_id')})")
+
+        _kl_df = pd.DataFrame(_kl_tum_kayitlar)
+        _kl_df.insert(0, "Seç", False)
+        _kl_kolon_isim = {"Müşteri": "Müşteri", "tarih": "Tarih", "takip_no": "Takip No", "gonderen_firma": "Gönderen",
+                           "alici_firma": "Alıcı", "fatura_firma": "Fatura Firma",
+                           "gonderen_il": "Gönderen İl", "alici_il": "Alıcı İl",
+                           "adet": "Adet", "tur": "Tür", "tutar": "Tutar", "kdv": "KDV", "sigorta": "Sigorta",
+                           "toplam_fatura": "Toplam Fatura", "odeme_tur": "Ödeme Türü", "tahsilat_durumu": "Tahsilat",
+                           "dis_nakliye_firma": "Dış Nakliye Firma", "dis_nakliye_fatura": "Dış Nakliye Fatura",
+                           "dis_nakliye_detay": "Dış Nakliye Detay", "dis_nakliye_tutar": "Dış Nakliye Tutar",
+                           "musteri_tutar": "Müşteri Tutar", "kar": "Kar"}
+        _kl_gorunur_kolonlar = ["Seç", "Müşteri"] + [c for c in _kl_kolon_isim if c in _kl_df.columns and c != "Müşteri"]
+        _kl_df_goster = _kl_df[_kl_gorunur_kolonlar + ["_cari_id", "_satir_no"]].rename(columns=_kl_kolon_isim)
+        st.caption(f"Toplam {len(_kl_df)} kargo kaydı, {_kl_df['_cari_id'].nunique()} müşteride.")
+        _kl_duzenlenen = st.data_editor(
+            _kl_df_goster.drop(columns=["_cari_id", "_satir_no"]), use_container_width=True, hide_index=True,
+            key="kargolar_editor",
+            column_config={"Seç": st.column_config.CheckboxColumn("Seç", default=False)}
+        )
+        _klb1, _klb2 = st.columns(2)
+        with _klb1:
+            if st.button("💾 Değişiklikleri Kaydet", key="kargolar_kaydet_btn", type="primary", use_container_width=True):
+                _kl_ters = {v: k for k, v in _kl_kolon_isim.items()}
+                # Her müşteri için kendi listesini ayrı ayrı yeniden oluştur
+                _kl_musteri_gruplari = {}
+                for _idx, _r in _kl_duzenlenen.iterrows():
+                    _cid = int(_kl_df_goster.iloc[_idx]["_cari_id"])
+                    if bool(_r.get("Seç")):
+                        continue  # işaretliler siliniyor sayılır
+                    _kayit = {}
+                    for _kol, _val in _r.items():
+                        if _kol in ("Seç", "Müşteri"):
+                            continue
+                        _kayit[_kl_ters.get(_kol, _kol)] = _val
+                    _kl_musteri_gruplari.setdefault(_cid, []).append(_kayit)
+                # Kayıtları hiç kalmayan (tamamı silinmiş/güncellenmiş) müşteriler için de boş liste yaz
+                for _cid_hepsi in _kl_df["_cari_id"].unique():
+                    _kargolar_yaz(int(_cid_hepsi), _kl_musteri_gruplari.get(int(_cid_hepsi), []))
+                _kargolar_tumunu_yukle.clear()
+                st.toast("✅ Kargo kayıtları güncellendi", icon="🚚")
+                st.rerun()
+        with _klb2:
+            _kl_secili_sayi = int(_kl_duzenlenen["Seç"].sum()) if "Seç" in _kl_duzenlenen.columns else 0
+            if st.button(f"🗑️ Seçili {_kl_secili_sayi} Kaydı Sil", key="kargolar_sil_btn", use_container_width=True, disabled=_kl_secili_sayi == 0):
+                _kl_ters2 = {v: k for k, v in _kl_kolon_isim.items()}
+                _kl_musteri_gruplari2 = {}
+                for _idx, _r in _kl_duzenlenen.iterrows():
+                    _cid = int(_kl_df_goster.iloc[_idx]["_cari_id"])
+                    if bool(_r.get("Seç")):
+                        continue
+                    _kayit2 = {}
+                    for _kol, _val in _r.items():
+                        if _kol in ("Seç", "Müşteri"):
+                            continue
+                        _kayit2[_kl_ters2.get(_kol, _kol)] = _val
+                    _kl_musteri_gruplari2.setdefault(_cid, []).append(_kayit2)
+                for _cid_hepsi2 in _kl_df["_cari_id"].unique():
+                    _kargolar_yaz(int(_cid_hepsi2), _kl_musteri_gruplari2.get(int(_cid_hepsi2), []))
+                _kargolar_tumunu_yukle.clear()
+                st.toast(f"🗑️ {_kl_secili_sayi} kayıt silindi", icon="🗑️")
+                st.rerun()
 
 elif aktif == "bolgeler":
     sayfa_log("bolgeler")
