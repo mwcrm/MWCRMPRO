@@ -2789,14 +2789,25 @@ def not_dialog(cari_id, firma_adi=""):
                 pass
 
         st.caption(f"**{firma_adi}** için kargo çıkış kaydı ekle:")
+        # Kayıtlı müşteri listesi — Gönderen/Alıcı/Fatura Firma alanlarında
+        # elle yazmak yerine sistemdeki müşterilerden seçilebilsin diye.
+        try:
+            _kg_musteri_liste = sorted(get_cari_listesi()["firma"].dropna().astype(str).unique().tolist())
+        except Exception:
+            _kg_musteri_liste = []
+        _kg_musteri_opts = ["-- Seç veya elle yaz --"] + _kg_musteri_liste
         with st.form(key=f"kg_form_{cari_id}"):
             _kgc1, _kgc2, _kgc3 = st.columns(3)
             _kg_tarih = _kgc1.date_input("Tarih", key=f"kg_tarih_{cari_id}")
             _kg_takip = _kgc2.text_input("Takip No", key=f"kg_takip_{cari_id}")
             _kg_tur = _kgc3.text_input("Tür", key=f"kg_tur_{cari_id}", placeholder="Koli / Palet / ...")
-            _kg_gonderen = _kgc1.text_input("Gönderen Firma", key=f"kg_gonderen_{cari_id}")
-            _kg_alici = _kgc2.text_input("Alıcı Firma", value=firma_adi, key=f"kg_alici_{cari_id}")
-            _kg_fatura_firma = _kgc3.text_input("Fatura Firma", key=f"kg_fatura_firma_{cari_id}")
+            _kg_gonderen_sec = _kgc1.selectbox("Gönderen Firma", _kg_musteri_opts, key=f"kg_gonderen_sec_{cari_id}")
+            _kg_gonderen_elle = _kgc1.text_input("(Listede yoksa elle yaz)", key=f"kg_gonderen_elle_{cari_id}", label_visibility="collapsed", placeholder="Listede yoksa buraya elle yaz")
+            _kg_alici_idx = (_kg_musteri_opts.index(firma_adi) if firma_adi in _kg_musteri_opts else 0)
+            _kg_alici_sec = _kgc2.selectbox("Alıcı Firma", _kg_musteri_opts, index=_kg_alici_idx, key=f"kg_alici_sec_{cari_id}")
+            _kg_alici_elle = _kgc2.text_input("(Listede yoksa elle yaz)", key=f"kg_alici_elle_{cari_id}", label_visibility="collapsed", placeholder="Listede yoksa buraya elle yaz")
+            _kg_fatura_sec = _kgc3.selectbox("Fatura Firma", _kg_musteri_opts, key=f"kg_fatura_sec_{cari_id}")
+            _kg_fatura_elle = _kgc3.text_input("(Listede yoksa elle yaz)", key=f"kg_fatura_elle_{cari_id}", label_visibility="collapsed", placeholder="Listede yoksa buraya elle yaz")
             _kg_adet = _kgc1.number_input("Adet", min_value=0, step=1, key=f"kg_adet_{cari_id}")
             _kg_tutar = _kgc2.number_input("Tutar", min_value=0.0, step=0.01, key=f"kg_tutar_{cari_id}")
             _kg_kdv = _kgc3.number_input("KDV", min_value=0.0, step=0.01, key=f"kg_kdv_{cari_id}")
@@ -2805,6 +2816,10 @@ def not_dialog(cari_id, firma_adi=""):
             _kg_odeme_tur = _kgc3.selectbox("Ödeme Türü", ["", "Nakit", "Havale/EFT", "Çek", "Kredi Kartı", "Diğer"], key=f"kg_odeme_{cari_id}")
             _kg_tahsilat = _kgc1.selectbox("Tahsilat Durumu", ["", "Tahsil Edildi", "Bekliyor", "Kısmi Tahsilat"], key=f"kg_tahsilat_{cari_id}")
             if st.form_submit_button("💾 Kargo Girişini Kaydet", type="primary", use_container_width=True):
+                # Elle yazılan varsa o, yoksa seçilen (seçim "-- Seç veya elle yaz --" ise boş) kullanılır
+                _kg_gonderen = _kg_gonderen_elle.strip() or (_kg_gonderen_sec if _kg_gonderen_sec != "-- Seç veya elle yaz --" else "")
+                _kg_alici = _kg_alici_elle.strip() or (_kg_alici_sec if _kg_alici_sec != "-- Seç veya elle yaz --" else "")
+                _kg_fatura_firma = _kg_fatura_elle.strip() or (_kg_fatura_sec if _kg_fatura_sec != "-- Seç veya elle yaz --" else "")
                 _kg_liste = list(_kg_kayitlari_yukle(_kg_anahtar))
                 _kg_liste.append({
                     "tarih": str(_kg_tarih), "takip_no": _kg_takip, "gonderen_firma": _kg_gonderen,
