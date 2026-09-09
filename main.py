@@ -13220,7 +13220,7 @@ elif aktif == "kargolar":
 
         # Tablo yüksekliği: TÜM satırlar tek seferde, kaydırmaya gerek kalmadan
         # görünsün diye satır sayısına göre otomatik büyütülüyor (üst sınırla).
-        _kl_yukseklik = min(max(38 * (len(_kl_df_goster) + 1) + 20, 200), 900)
+        _kl_yukseklik = min(38 * (len(_kl_df_goster) + 1) + 25, 900)
         _kl_duzenlenen = st.data_editor(
             _kl_df_goster.drop(columns=["_cari_id", "_satir_no"]), use_container_width=True, hide_index=True,
             key="kargolar_editor", height=_kl_yukseklik,
