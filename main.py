@@ -2902,9 +2902,28 @@ def not_dialog(cari_id, firma_adi=""):
                                "dis_nakliye_detay": "Dış Nakliye Detay", "dis_nakliye_tutar": "Dış Nakliye Tutar",
                                "musteri_tutar": "Müşteri Tutar", "kar": "Kar", "dis_nakliye_odeme_durumu": "Dış Nak. Ödeme", "fatura_odeme_sekli": "Fatura Ödeme Şekli"}
             _kg_df = _kg_df.rename(columns=_kg_kolon_isim)
+            # Kolon Ayarları'nda ayarlanan (5-50 arası) genişlikleri burada da uygula —
+            # yoksa tablo çok geniş açılıp okunması zorlaşıyordu.
+            if "_kargo_kol_genislik" not in st.session_state:
+                try:
+                    _sb_kg_gen0 = get_sb_client()
+                    if _sb_kg_gen0:
+                        _r_kg_gen0 = _sb_kg_gen0.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kargo_kol_genislik").execute()
+                        if _r_kg_gen0.data:
+                            import json as _kggenj0
+                            st.session_state["_kargo_kol_genislik"] = _kggenj0.loads(_r_kg_gen0.data[0]["deger"])
+                except Exception:
+                    pass
+            _kg_kol_genislik = st.session_state.get("_kargo_kol_genislik", {})
+            _kg_col_config = {"Seç": st.column_config.CheckboxColumn("Seç", default=False, width=40)}
+            for _kg_kol_ad in _kg_df.columns:
+                if _kg_kol_ad == "Seç":
+                    continue
+                _kg_gen = _kg_kol_genislik.get(_kg_kol_ad, 15)
+                _kg_col_config[_kg_kol_ad] = st.column_config.Column(_kg_kol_ad, width=int(_kg_gen) * 8)
             _kg_duzenlenen = st.data_editor(_kg_df, use_container_width=True, hide_index=True,
                                              key=f"kg_editor_{cari_id}",
-                                             column_config={"Seç": st.column_config.CheckboxColumn("Seç", default=False)})
+                                             column_config=_kg_col_config)
             _kgb1, _kgb2 = st.columns(2)
             with _kgb1:
                 if st.button("💾 Değişiklikleri Kaydet", key=f"kg_duzenle_kaydet_{cari_id}", use_container_width=True):
@@ -8643,9 +8662,10 @@ function updateBot(v){{
         st.markdown("### 📦 Kargo Girişi Kolon Ayarları")
         _KARGO_KOL_ETIKET = {
             "Müşteri":"Müşteri","Tarih":"Tarih","Takip No":"Takip No","Gönderen":"Gönderen","Alıcı":"Alıcı",
-            "Fatura Firma":"Fatura Firma","Gönderen İl":"Gönderen İl","Alıcı İl":"Alıcı İl","Adet":"Adet",
+            "Fatura Ödeyen":"Fatura Ödeyen","Gönderen İl":"Gönderen İl","Alıcı İl":"Alıcı İl","Adet":"Adet",
             "Tür":"Tür","Tutar":"Tutar","KDV":"KDV","Sigorta":"Sigorta","Toplam Fatura":"Toplam Fatura",
-            "Ödeme Türü":"Ödeme Türü","Tahsilat":"Tahsilat","Dış Nakliye Firma":"Dış Nak. Firma",
+            "Ödeme Türü":"Ödeme Türü","Fatura Ödeme Şekli":"Fatura Ödeme Şekli","Tahsilat":"Tahsilat",
+            "Dış Nakliye Firma":"Dış Nak. Firma",
             "Dış Nakliye Fatura":"Dış Nak. Fatura","Dış Nakliye Detay":"Dış Nak. Detay",
             "Dış Nakliye Tutar":"Dış Nak. Tutar","Müşteri Tutar":"Müşteri Tutar","Kar":"Kar",
             "Dış Nak. Ödeme":"Dış Nak. Ödeme",
@@ -13378,11 +13398,16 @@ elif aktif == "kargolar":
                 _ozm1.metric("📦 Koli", _oz_koli)
                 _ozm2.metric("🧱 Palet", _oz_palet)
                 _ozm3.metric("📋 Diğer Yük", max(_oz_diger_tur, 0))
-                _oz_toplam_ciro = float(pd.to_numeric(_kl_df.get("toplam_fatura", 0), errors="coerce").fillna(0).sum())
+                # "Toplam Fatura" doldurulmamışsa (genelde durum bu — sadece "Tutar"
+                # kullanılıyor) satır bazında "Toplam Fatura varsa o, yoksa Tutar" alınır.
+                _kl_df = _kl_df.copy()
+                _kl_df["_efektif_tutar"] = pd.to_numeric(_kl_df.get("toplam_fatura", 0), errors="coerce").fillna(0)
+                _kl_tutar_num = pd.to_numeric(_kl_df.get("tutar", 0), errors="coerce").fillna(0)
+                _kl_df.loc[_kl_df["_efektif_tutar"] == 0, "_efektif_tutar"] = _kl_tutar_num
+                _oz_toplam_ciro = float(_kl_df["_efektif_tutar"].sum())
                 st.metric("💰 Toplam Ciro", f"{_oz_toplam_ciro:,.0f} ₺")
                 if "tahsilat_durumu" in _kl_df.columns:
-                    _oz_tahsil_edilen = float(pd.to_numeric(
-                        _kl_df.loc[_kl_df["tahsilat_durumu"] == "Tahsil Edildi", "toplam_fatura"], errors="coerce").fillna(0).sum())
+                    _oz_tahsil_edilen = float(_kl_df.loc[_kl_df["tahsilat_durumu"] == "Tahsil Edildi", "_efektif_tutar"].sum())
                     _oz_kalan_borc = _oz_toplam_ciro - _oz_tahsil_edilen
                     st.caption(f"✅ Tahsil edilen: **{_oz_tahsil_edilen:,.0f} ₺** — ⏳ Kalan borç: **{_oz_kalan_borc:,.0f} ₺**")
                 # İllere göre dağılım (alıcı ili üzerinden — "hangi ile ne gönderdi")
@@ -13403,7 +13428,7 @@ elif aktif == "kargolar":
                     _kl_df_ay = _kl_df.copy()
                     _kl_df_ay["_ay"] = pd.to_datetime(_kl_df_ay["tarih"], errors="coerce").dt.strftime("%Y-%m")
                     _oz_aylik = _kl_df_ay.dropna(subset=["_ay"]).groupby("_ay").agg(
-                        adet=("_ay", "size"), tutar=("toplam_fatura", lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum())
+                        adet=("_ay", "size"), tutar=("_efektif_tutar", "sum")
                     ).sort_index()
                     if not _oz_aylik.empty:
                         st.caption("📅 Aylık olarak ne göndermiş:")
