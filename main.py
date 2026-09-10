@@ -19,6 +19,14 @@ _IL_DIGER_LISTESI = ["Adıyaman","Afyonkarahisar","Ağrı","Aksaray","Amasya","A
                      "Kars","Kastamonu","Kırıkkale","Kırklareli","Kırşehir","Kilis","Kütahya",
                      "Muş","Nevşehir","Niğde","Osmaniye","Rize","Siirt","Sinop","Sivas",
                      "Şırnak","Tokat","Tunceli","Uşak","Yalova","Yozgat","Zonguldak"]
+
+def _tr_buyuk(_s):
+    """Türkçe karakterleri doğru büyüten upper() — Python'un varsayılan .upper()
+    fonksiyonu 'i' harfini 'İ' değil 'I' yapar, bu yanlış Türkçe büyük harfe
+    yol açar. Kargo Girişi gibi serbest metin alanlarını büyük harfe çevirmek
+    için her yerde bu fonksiyon kullanılır."""
+    return str(_s or "").replace("i", "İ").replace("ı", "I").upper()
+
 import sqlite3
 import pandas as pd
 import shutil
@@ -2812,10 +2820,10 @@ def not_dialog(cari_id, firma_adi=""):
         _kg_tarih = _kgc1.date_input("Tarih *", key=f"kg_tarih_{cari_id}")
         _kg_takip = _kgc2.text_input("Takip No", key=f"kg_takip_{cari_id}")
         _kg_tur = _kgc3.text_input("Tür", key=f"kg_tur_{cari_id}", placeholder="Koli / Palet / ...")
-        _kg_gonderen_sec = _kgc1.selectbox("Gönderen Firma", _kg_musteri_opts, key=f"kg_gonderen_sec_{cari_id}")
+        _kg_gonderen_idx = (_kg_musteri_opts.index(firma_adi) if firma_adi in _kg_musteri_opts else 0)
+        _kg_gonderen_sec = _kgc1.selectbox("Gönderen Firma", _kg_musteri_opts, index=_kg_gonderen_idx, key=f"kg_gonderen_sec_{cari_id}")
         _kg_gonderen_elle = _kgc1.text_input("(Listede yoksa elle yaz)", key=f"kg_gonderen_elle_{cari_id}", label_visibility="collapsed", placeholder="Listede yoksa buraya elle yaz")
-        _kg_alici_idx = (_kg_musteri_opts.index(firma_adi) if firma_adi in _kg_musteri_opts else 0)
-        _kg_alici_sec = _kgc2.selectbox("Alıcı Firma", _kg_musteri_opts, index=_kg_alici_idx, key=f"kg_alici_sec_{cari_id}")
+        _kg_alici_sec = _kgc2.selectbox("Alıcı Firma", _kg_musteri_opts, key=f"kg_alici_sec_{cari_id}")
         _kg_alici_elle = _kgc2.text_input("(Listede yoksa elle yaz)", key=f"kg_alici_elle_{cari_id}", label_visibility="collapsed", placeholder="Listede yoksa buraya elle yaz")
         _kg_fatura_sec = _kgc3.selectbox("Fatura Ödeyen *", _kg_musteri_opts, key=f"kg_fatura_sec_{cari_id}")
         _kg_fatura_elle = _kgc3.text_input("(Listede yoksa elle yaz)", key=f"kg_fatura_elle_{cari_id}", label_visibility="collapsed", placeholder="Listede yoksa buraya elle yaz")
@@ -2869,15 +2877,17 @@ def not_dialog(cari_id, firma_adi=""):
                 _kg_alici_il_deger = _kg_alici_il if _kg_alici_il != "-- İl seçilir --" else ""
                 _kg_kar = round(_kg_dn_tutar - _kg_musteri_tutar, 2)
                 _kg_liste = list(_kg_kayitlari_yukle(_kg_anahtar))
+                # Yazdığın her şey (il isimleri dahil) kaydedilirken otomatik
+                # BÜYÜK HARFE çevrilir — Türkçe karaktere duyarlı şekilde.
                 _kg_liste.append({
-                    "tarih": str(_kg_tarih), "takip_no": _kg_takip, "gonderen_firma": _kg_gonderen,
-                    "alici_firma": _kg_alici, "fatura_firma": _kg_fatura_odeyen,
-                    "gonderen_il": _kg_gonderen_il_deger, "alici_il": _kg_alici_il_deger,
+                    "tarih": str(_kg_tarih), "takip_no": _tr_buyuk(_kg_takip), "gonderen_firma": _tr_buyuk(_kg_gonderen),
+                    "alici_firma": _tr_buyuk(_kg_alici), "fatura_firma": _tr_buyuk(_kg_fatura_odeyen),
+                    "gonderen_il": _tr_buyuk(_kg_gonderen_il_deger), "alici_il": _tr_buyuk(_kg_alici_il_deger),
                     "fatura_odeme_sekli": _kg_fatura_odeme_sekli,
-                    "adet": _kg_adet, "tur": _kg_tur, "tutar": _kg_tutar, "kdv": _kg_kdv, "sigorta": _kg_sigorta,
+                    "adet": _kg_adet, "tur": _tr_buyuk(_kg_tur), "tutar": _kg_tutar, "kdv": _kg_kdv, "sigorta": _kg_sigorta,
                     "toplam_fatura": _kg_toplam_fatura, "odeme_tur": _kg_odeme_tur, "tahsilat_durumu": _kg_tahsilat,
-                    "dis_nakliye_firma": _kg_dn_firma, "dis_nakliye_fatura": _kg_dn_fatura,
-                    "dis_nakliye_detay": _kg_dn_detay, "dis_nakliye_tutar": _kg_dn_tutar,
+                    "dis_nakliye_firma": _tr_buyuk(_kg_dn_firma), "dis_nakliye_fatura": _tr_buyuk(_kg_dn_fatura),
+                    "dis_nakliye_detay": _tr_buyuk(_kg_dn_detay), "dis_nakliye_tutar": _kg_dn_tutar,
                     "musteri_tutar": _kg_musteri_tutar, "kar": _kg_kar, "dis_nakliye_odeme_durumu": _kg_dn_odeme,
                 })
                 _kg_kayitlari_kaydet(_kg_anahtar, _kg_liste)
