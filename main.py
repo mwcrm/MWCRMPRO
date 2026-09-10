@@ -2831,6 +2831,7 @@ def not_dialog(cari_id, firma_adi=""):
             _kg_dn_detay = _kgd3.text_input("Dış Nakliye Detay", key=f"kg_dn_detay_{cari_id}", placeholder="Örn: 2 Palet")
             _kg_dn_tutar = _kgd1.number_input("Dış Nakliye Tutar", min_value=0.0, step=0.01, key=f"kg_dn_tutar_{cari_id}")
             _kg_musteri_tutar = _kgd2.number_input("Müşteri Tutar", min_value=0.0, step=0.01, key=f"kg_musteri_tutar_{cari_id}")
+            _kg_dn_odeme = _kgd3.selectbox("Dış Nakliye Ödeme Durumu", ["", "Ödendi", "Ödenmedi", "Kısmi Ödendi"], key=f"kg_dn_odeme_{cari_id}")
             _kgd3.caption("Kar, kaydedince otomatik hesaplanır: Dış Nakliye Tutar − Müşteri Tutar")
             if st.form_submit_button("💾 Kargo Girişini Kaydet", type="primary", use_container_width=True):
                 # Elle yazılan varsa o, yoksa seçilen (seçim "-- Seç veya elle yaz --" ise boş) kullanılır
@@ -2850,7 +2851,7 @@ def not_dialog(cari_id, firma_adi=""):
                     "toplam_fatura": _kg_toplam_fatura, "odeme_tur": _kg_odeme_tur, "tahsilat_durumu": _kg_tahsilat,
                     "dis_nakliye_firma": _kg_dn_firma, "dis_nakliye_fatura": _kg_dn_fatura,
                     "dis_nakliye_detay": _kg_dn_detay, "dis_nakliye_tutar": _kg_dn_tutar,
-                    "musteri_tutar": _kg_musteri_tutar, "kar": _kg_kar,
+                    "musteri_tutar": _kg_musteri_tutar, "kar": _kg_kar, "dis_nakliye_odeme_durumu": _kg_dn_odeme,
                 })
                 _kg_kayitlari_kaydet(_kg_anahtar, _kg_liste)
                 _kg_kayitlari_yukle.clear()
@@ -2872,7 +2873,7 @@ def not_dialog(cari_id, firma_adi=""):
                                "toplam_fatura": "Toplam Fatura", "odeme_tur": "Ödeme Türü", "tahsilat_durumu": "Tahsilat",
                                "dis_nakliye_firma": "Dış Nakliye Firma", "dis_nakliye_fatura": "Dış Nakliye Fatura",
                                "dis_nakliye_detay": "Dış Nakliye Detay", "dis_nakliye_tutar": "Dış Nakliye Tutar",
-                               "musteri_tutar": "Müşteri Tutar", "kar": "Kar"}
+                               "musteri_tutar": "Müşteri Tutar", "kar": "Kar", "dis_nakliye_odeme_durumu": "Dış Nak. Ödeme"}
             _kg_df = _kg_df.rename(columns=_kg_kolon_isim)
             _kg_duzenlenen = st.data_editor(_kg_df, use_container_width=True, hide_index=True,
                                              key=f"kg_editor_{cari_id}",
@@ -8608,6 +8609,56 @@ function updateBot(v){{
             except Exception as _kgue:
                 st.error(f"Hata: {_kgue}")
 
+        # ── 📦 KARGO GİRİŞİ KOLON AYARLARI — ayrı, bağımsız bir ayar seti.
+        # Ana Cari Liste'nin kolon genişlik mantığına dokunmaz, kendi anahtarında
+        # ("_kargo_kol_genislik") saklanır. Genişlik aralığı: 5 – 50.
+        st.divider()
+        st.markdown("### 📦 Kargo Girişi Kolon Ayarları")
+        _KARGO_KOL_ETIKET = {
+            "Müşteri":"Müşteri","Tarih":"Tarih","Takip No":"Takip No","Gönderen":"Gönderen","Alıcı":"Alıcı",
+            "Fatura Firma":"Fatura Firma","Gönderen İl":"Gönderen İl","Alıcı İl":"Alıcı İl","Adet":"Adet",
+            "Tür":"Tür","Tutar":"Tutar","KDV":"KDV","Sigorta":"Sigorta","Toplam Fatura":"Toplam Fatura",
+            "Ödeme Türü":"Ödeme Türü","Tahsilat":"Tahsilat","Dış Nakliye Firma":"Dış Nak. Firma",
+            "Dış Nakliye Fatura":"Dış Nak. Fatura","Dış Nakliye Detay":"Dış Nak. Detay",
+            "Dış Nakliye Tutar":"Dış Nak. Tutar","Müşteri Tutar":"Müşteri Tutar","Kar":"Kar",
+            "Dış Nak. Ödeme":"Dış Nak. Ödeme",
+        }
+        _KARGO_KOL_VARSAYILAN = {k: 15 for k in _KARGO_KOL_ETIKET}
+        try:
+            _sb_kg2 = get_sb_client()
+            _kargo_kg_mevcut = _KARGO_KOL_VARSAYILAN.copy()
+            if _sb_kg2:
+                _r_kargokg = _sb_kg2.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kargo_kol_genislik").execute()
+                if _r_kargokg.data:
+                    import json as _kkgj
+                    _kargo_kg_mevcut = {**_KARGO_KOL_VARSAYILAN, **_kkgj.loads(_r_kargokg.data[0]["deger"])}
+        except Exception:
+            _kargo_kg_mevcut = _KARGO_KOL_VARSAYILAN.copy()
+
+        _yeni_kargo_kg = {}
+        _kargo_ui_cols = st.columns(6)
+        for _ki, _kk_ad in enumerate(_KARGO_KOL_ETIKET.keys()):
+            with _kargo_ui_cols[_ki % 6]:
+                _yeni_kargo_kg[_kk_ad] = st.slider(
+                    _KARGO_KOL_ETIKET[_kk_ad], min_value=5, max_value=50,
+                    value=int(_kargo_kg_mevcut.get(_kk_ad, 15)), step=1, key=f"kargo_kg_{_ki}"
+                )
+        if st.button("💾 Kargo Kolon Ayarlarını Kaydet", type="primary", key="kargo_kg_kaydet_btn"):
+            try:
+                _sb_kg3 = get_sb_client()
+                if _sb_kg3:
+                    import json as _kkgj2
+                    _sb_kg3.table("kullanici_tercih").delete().eq("kullanici","__liste_ui__").eq("anahtar","_kargo_kol_genislik").execute()
+                    _sb_kg3.table("kullanici_tercih").insert({
+                        "kullanici":"__liste_ui__","anahtar":"_kargo_kol_genislik",
+                        "deger":_kkgj2.dumps(_yeni_kargo_kg, ensure_ascii=False)
+                    }).execute()
+                st.session_state["_kargo_kol_genislik"] = _yeni_kargo_kg
+                st.toast("✅ Kargo kolon ayarları kaydedildi!", icon="✅")
+                st.rerun()
+            except Exception as _kkgue:
+                st.error(f"Hata: {_kkgue}")
+
     # ── 🔄 TOPLU DEĞİŞTİR ────────────────────────────────────────────────────
     with kul_tab_toplu:
         st.markdown("### 🔄 Toplu Aşama / Durum Değiştir")
@@ -13187,6 +13238,17 @@ elif aktif == "kargolar":
         except Exception:
             pass
 
+    if "_kargo_kol_genislik" not in st.session_state:
+        try:
+            _sb_kkg0 = get_sb_client()
+            if _sb_kkg0:
+                _r_kkg0 = _sb_kkg0.table("kullanici_tercih").select("deger").eq("kullanici","__liste_ui__").eq("anahtar","_kargo_kol_genislik").execute()
+                if _r_kkg0.data:
+                    import json as _kkgj0
+                    st.session_state["_kargo_kol_genislik"] = _kkgj0.loads(_r_kkg0.data[0]["deger"])
+        except Exception:
+            pass
+
     _kl_tum_kayitlar = _kargolar_tumunu_yukle()
     if not _kl_tum_kayitlar:
         st.info("💡 Henüz hiçbir müşteride kargo kaydı yok. Cari Liste'de bir firmayı seçip (Seç işareti) açılan pencereden '📦 Kargo Girişi' sekmesiyle ekleyebilirsin.")
@@ -13200,6 +13262,27 @@ elif aktif == "kargolar":
 
         _kl_df = pd.DataFrame(_kl_tum_kayitlar)
         _kl_df = _kl_df.fillna("")  # eski kayıtlarda olmayan alanlar "None" değil boş görünsün
+        # Müşteri alfabetik, kendi içinde tarihe göre sırala
+        _kl_df = _kl_df.sort_values(by=["Müşteri", "tarih"], kind="stable").reset_index(drop=True)
+
+        # ── MÜŞTERİ FİLTRESİ — üstte, alfabetik. Seçilince hem liste o müşteriye
+        # daralır hem de doğrudan buradan o müşteri için Kargo Girişi açılabilir.
+        _kl_musteri_secenekler = ["-- Tüm Müşteriler --"] + sorted(_kl_df["Müşteri"].dropna().unique().tolist())
+        _kl_fc1, _kl_fc2 = st.columns([3, 1])
+        _kl_secili_musteri = _kl_fc1.selectbox("Müşteri filtrele", _kl_musteri_secenekler, key="kargolar_musteri_filtre")
+        with _kl_fc2:
+            st.write("")  # dikey hizalama
+            if _kl_secili_musteri != "-- Tüm Müşteriler --":
+                _kl_sec_cari_id = None
+                for _cid_ara, _fad_ara in _kl_musteri_map.items():
+                    if _fad_ara == _kl_secili_musteri:
+                        _kl_sec_cari_id = _cid_ara
+                        break
+                if st.button("📦 Kargo Girişi Ekle", key="kargolar_giris_ac_btn", use_container_width=True, disabled=_kl_sec_cari_id is None):
+                    not_dialog(_kl_sec_cari_id, _kl_secili_musteri)
+        if _kl_secili_musteri != "-- Tüm Müşteriler --":
+            _kl_df = _kl_df[_kl_df["Müşteri"] == _kl_secili_musteri]
+
         _kl_df.insert(0, "Seç", False)
         _kl_kolon_isim = {"Müşteri": "Müşteri", "tarih": "Tarih", "takip_no": "Takip No", "gonderen_firma": "Gönderen",
                            "alici_firma": "Alıcı", "fatura_firma": "Fatura Firma",
@@ -13208,10 +13291,75 @@ elif aktif == "kargolar":
                            "toplam_fatura": "Toplam Fatura", "odeme_tur": "Ödeme Türü", "tahsilat_durumu": "Tahsilat",
                            "dis_nakliye_firma": "Dış Nakliye Firma", "dis_nakliye_fatura": "Dış Nakliye Fatura",
                            "dis_nakliye_detay": "Dış Nakliye Detay", "dis_nakliye_tutar": "Dış Nakliye Tutar",
-                           "musteri_tutar": "Müşteri Tutar", "kar": "Kar"}
+                           "musteri_tutar": "Müşteri Tutar", "kar": "Kar", "dis_nakliye_odeme_durumu": "Dış Nak. Ödeme"}
         _kl_gorunur_kolonlar = ["Seç", "Müşteri"] + [c for c in _kl_kolon_isim if c in _kl_df.columns and c != "Müşteri"]
         _kl_df_goster = _kl_df[_kl_gorunur_kolonlar + ["_cari_id", "_satir_no"]].rename(columns=_kl_kolon_isim)
         st.caption(f"Toplam {len(_kl_df)} kargo kaydı, {_kl_df['_cari_id'].nunique()} müşteride.")
+
+        # ── EXCEL İNDİR — tek sayfalık, bölünmemiş tam liste ──────────────────
+        _kl_excel_buf = io.BytesIO()
+        _kl_df_goster.drop(columns=["Seç", "_cari_id", "_satir_no"]).to_excel(_kl_excel_buf, index=False, engine="openpyxl")
+        _kl_excel_buf.seek(0)
+        st.download_button("📥 Listeyi Excel Olarak İndir", data=_kl_excel_buf,
+                            file_name=f"kargolar_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            key="kargolar_excel_indir")
+
+        # ── MÜŞTERİ ÖZETİ — sadece tek bir müşteri seçiliyken gösterilir ──────
+        if _kl_secili_musteri != "-- Tüm Müşteriler --" and not _kl_df.empty:
+            _ozc1, _ozc2 = st.columns(2)
+            with _ozc1:
+                st.markdown("#### 📦 Müşteri Özeti")
+                _oz_koli = int((_kl_df["tur"].astype(str).str.upper() == "KOLİ").sum()) if "tur" in _kl_df.columns else 0
+                _oz_palet = int((_kl_df["tur"].astype(str).str.upper() == "PALET").sum()) if "tur" in _kl_df.columns else 0
+                _ozm1, _ozm2, _ozm3 = st.columns(3)
+                _ozm1.metric("📦 Koli", _oz_koli)
+                _ozm2.metric("🧱 Palet", _oz_palet)
+                _oz_toplam_ciro = float(pd.to_numeric(_kl_df.get("toplam_fatura", 0), errors="coerce").fillna(0).sum())
+                _ozm3.metric("💰 Toplam Ciro", f"{_oz_toplam_ciro:,.0f} ₺")
+                if "tahsilat_durumu" in _kl_df.columns:
+                    _oz_tahsil_edilen = float(pd.to_numeric(
+                        _kl_df.loc[_kl_df["tahsilat_durumu"] == "Tahsil Edildi", "toplam_fatura"], errors="coerce").fillna(0).sum())
+                    _oz_kalan_borc = _oz_toplam_ciro - _oz_tahsil_edilen
+                    st.caption(f"✅ Tahsil edilen: **{_oz_tahsil_edilen:,.0f} ₺** — ⏳ Kalan borç: **{_oz_kalan_borc:,.0f} ₺**")
+                # İllere göre dağılım (alıcı ili üzerinden)
+                if "alici_il" in _kl_df.columns:
+                    _oz_il_dagilim = _kl_df[_kl_df["alici_il"].astype(str).str.strip() != ""].groupby("alici_il").size().sort_values(ascending=False)
+                    if not _oz_il_dagilim.empty:
+                        st.caption("📍 İllere göre dağılım:")
+                        _kl_ana_il_liste = [a.upper() for a in _IL_SUTUN_LISTESI[:-1]]
+                        _dis_bolge_isaretli = []
+                        for _il_ad_tek, _adet_tek in _oz_il_dagilim.items():
+                            _etiket = f"{_il_ad_tek} ({_adet_tek})"
+                            if str(_il_ad_tek).upper() not in _kl_ana_il_liste:
+                                _etiket += " 🌍 Dış Bölge"
+                            _dis_bolge_isaretli.append(_etiket)
+                        st.write(", ".join(_dis_bolge_isaretli))
+                # Aylık dağılım
+                if "tarih" in _kl_df.columns:
+                    _kl_df_ay = _kl_df.copy()
+                    _kl_df_ay["_ay"] = pd.to_datetime(_kl_df_ay["tarih"], errors="coerce").dt.strftime("%Y-%m")
+                    _oz_aylik = _kl_df_ay.dropna(subset=["_ay"]).groupby("_ay").agg(
+                        adet=("_ay", "size"), tutar=("toplam_fatura", lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum())
+                    ).sort_index()
+                    if not _oz_aylik.empty:
+                        st.caption("📅 Aylık dağılım:")
+                        for _ay, _r in _oz_aylik.iterrows():
+                            st.write(f"**{_ay}**: {int(_r['adet'])} kargo — {_r['tutar']:,.0f} ₺")
+            with _ozc2:
+                st.markdown("#### 🚚 Dış Nakliye Özeti")
+                _oz_dn_tutar = float(pd.to_numeric(_kl_df.get("dis_nakliye_tutar", 0), errors="coerce").fillna(0).sum())
+                _oz_dn_odenen = float(pd.to_numeric(
+                    _kl_df.loc[_kl_df.get("dis_nakliye_odeme_durumu", "") == "Ödendi", "dis_nakliye_tutar"], errors="coerce").fillna(0).sum()) if "dis_nakliye_odeme_durumu" in _kl_df.columns else 0.0
+                _oz_dn_borc = _oz_dn_tutar - _oz_dn_odenen
+                _ozn1, _ozn2 = st.columns(2)
+                _ozn1.metric("🚚 Toplam Dış Nakliye", f"{_oz_dn_tutar:,.0f} ₺")
+                _ozn2.metric("⏳ Ödenmemiş (Borç)", f"{_oz_dn_borc:,.0f} ₺")
+                _oz_toplam_kar = float(pd.to_numeric(_kl_df.get("kar", 0), errors="coerce").fillna(0).sum())
+                st.caption(f"📈 Toplam Kar: **{_oz_toplam_kar:,.0f} ₺**")
+                if "dis_nakliye_odeme_durumu" not in _kl_df.columns or _kl_df.get("dis_nakliye_odeme_durumu", pd.Series(dtype=str)).eq("").all():
+                    st.caption("💡 Ödendi/Ödenmedi takibi için Kargo Girişi formuna 'Dış Nakliye Ödeme Durumu' alanını dolduman yeterli.")
+            st.divider()
 
         # Butonlar tablonun ÜSTÜNDE görünsün diye önce boş bir kutu (container)
         # ayrılıyor, düzenlenen tablo aşağıda oluşuyor, butonlar en son bu
@@ -13221,10 +13369,19 @@ elif aktif == "kargolar":
         # Tablo yüksekliği: TÜM satırlar tek seferde, kaydırmaya gerek kalmadan
         # görünsün diye satır sayısına göre otomatik büyütülüyor (üst sınırla).
         _kl_yukseklik = min(38 * (len(_kl_df_goster) + 1) + 25, 900)
+        # Kolon Ayarları (Kullanıcılar sayfası) sekmesinde ayarlanan genişlikler
+        _kl_kol_genislik = st.session_state.get("_kargo_kol_genislik", {})
+        _kl_col_config = {"Seç": st.column_config.CheckboxColumn("Seç", default=False)}
+        for _kl_kol_ad in _kl_df_goster.columns:
+            if _kl_kol_ad in ("Seç", "_cari_id", "_satir_no"):
+                continue
+            _kl_gen = _kl_kol_genislik.get(_kl_kol_ad)
+            if _kl_gen:
+                _kl_col_config[_kl_kol_ad] = st.column_config.Column(_kl_kol_ad, width=int(_kl_gen) * 8)
         _kl_duzenlenen = st.data_editor(
             _kl_df_goster.drop(columns=["_cari_id", "_satir_no"]), use_container_width=True, hide_index=True,
             key="kargolar_editor", height=_kl_yukseklik,
-            column_config={"Seç": st.column_config.CheckboxColumn("Seç", default=False)}
+            column_config=_kl_col_config
         )
 
         with _kl_btn_kutu:
