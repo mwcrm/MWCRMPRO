@@ -13387,7 +13387,7 @@ elif aktif == "kargolar":
             _kl_aktif_filtre_etiketi = f"Fatura Ödeyen: {_kl_sec_fatura}"
 
         if _kl_aktif_filtre_etiketi and not _kl_df.empty:
-            st.info(f"📋 Aşağıdaki özet şu filtreye göre hesaplanıyor: **{_kl_aktif_filtre_etiketi}** — bu, o firma için bir tür ekstre gibi okunabilir.")
+            st.markdown(f"📋 Aşağıdaki özet şu filtreye göre hesaplanıyor: **{_kl_aktif_filtre_etiketi}** — bu, o firma için bir tür ekstre gibi okunabilir.")
             _ozc1, _ozc2 = st.columns(2)
             with _ozc1:
                 st.markdown("#### 📦 Özet")
