@@ -2804,14 +2804,14 @@ def not_dialog(cari_id, firma_adi=""):
         except Exception:
             _kg_musteri_liste = []
         _kg_musteri_opts = ["-- Seç veya elle yaz --"] + _kg_musteri_liste
-        _kg_il_opts = ["-- İl seçilir --"] + [a for a in _IL_SUTUN_LISTESI if a != "Diğer"] + _IL_DIGER_LISTESI
+        _kg_il_opts = ["-- İl seçilir --"] + [_tr_buyuk(a) for a in (_IL_SUTUN_LISTESI[:-1] + _IL_DIGER_LISTESI)]
         try:
             _kg_tasiyici_opts = ["-- Seç veya elle yaz --"] + _dis_nakliye_tasiyici_yukle()
         except Exception:
             _kg_tasiyici_opts = ["-- Seç veya elle yaz --"]
         # Bu iller "yakın/yerel" sayılır — Alıcı İl bunlardan biriyse Dış Nakliye
         # alanları hiç gösterilmez (dış bölgeye çıkmıyor demektir).
-        _KG_YEREL_ILLER = ["İzmir", "Bursa", "Kocaeli", "Tekirdağ", "İstanbul", "Manisa"]
+        _KG_YEREL_ILLER = [_tr_buyuk(a) for a in ["İzmir", "Bursa", "Kocaeli", "Tekirdağ", "İstanbul", "Manisa"]]
 
         # NOT: st.form KULLANILMIYOR — "Alıcı İl" seçimine göre Dış Nakliye
         # bölümünün anlık (canlı) gösterilip gizlenmesi gerekiyor; form içindeki
