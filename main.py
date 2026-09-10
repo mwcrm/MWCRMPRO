@@ -13353,28 +13353,43 @@ elif aktif == "kargolar":
                             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             key="kargolar_excel_indir")
 
-        # ── MÜŞTERİ ÖZETİ — sadece tek bir müşteri seçiliyken gösterilir ──────
-        if _kl_secili_musteri != "-- Tüm Müşteriler --" and not _kl_df.empty:
+        # ── MÜŞTERİ ÖZETİ — Genel Müşteri, Gönderen, Alıcı ya da Fatura Ödeyen
+        # filtrelerinden HERHANGİ biri seçiliyse gösterilir (sadece "Genel
+        # Müşteri Seç"e bağlı değil — 3 role de aynı özet/ekstre çalışsın diye).
+        _kl_aktif_filtre_etiketi = None
+        if _kl_secili_musteri_genel != "-- Tüm Müşteriler --":
+            _kl_aktif_filtre_etiketi = f"Müşteri: {_kl_secili_musteri_genel}"
+        elif _kl_sec_gonderen != "-- Tümü --":
+            _kl_aktif_filtre_etiketi = f"Gönderen: {_kl_sec_gonderen}"
+        elif _kl_sec_alici != "-- Tümü --":
+            _kl_aktif_filtre_etiketi = f"Alıcı: {_kl_sec_alici}"
+        elif _kl_sec_fatura != "-- Tümü --":
+            _kl_aktif_filtre_etiketi = f"Fatura Ödeyen: {_kl_sec_fatura}"
+
+        if _kl_aktif_filtre_etiketi and not _kl_df.empty:
+            st.info(f"📋 Aşağıdaki özet şu filtreye göre hesaplanıyor: **{_kl_aktif_filtre_etiketi}** — bu, o firma için bir tür ekstre gibi okunabilir.")
             _ozc1, _ozc2 = st.columns(2)
             with _ozc1:
-                st.markdown("#### 📦 Müşteri Özeti")
+                st.markdown("#### 📦 Özet")
                 _oz_koli = int((_kl_df["tur"].astype(str).str.upper() == "KOLİ").sum()) if "tur" in _kl_df.columns else 0
                 _oz_palet = int((_kl_df["tur"].astype(str).str.upper() == "PALET").sum()) if "tur" in _kl_df.columns else 0
+                _oz_diger_tur = int(len(_kl_df)) - _oz_koli - _oz_palet
                 _ozm1, _ozm2, _ozm3 = st.columns(3)
                 _ozm1.metric("📦 Koli", _oz_koli)
                 _ozm2.metric("🧱 Palet", _oz_palet)
+                _ozm3.metric("📋 Diğer Yük", max(_oz_diger_tur, 0))
                 _oz_toplam_ciro = float(pd.to_numeric(_kl_df.get("toplam_fatura", 0), errors="coerce").fillna(0).sum())
-                _ozm3.metric("💰 Toplam Ciro", f"{_oz_toplam_ciro:,.0f} ₺")
+                st.metric("💰 Toplam Ciro", f"{_oz_toplam_ciro:,.0f} ₺")
                 if "tahsilat_durumu" in _kl_df.columns:
                     _oz_tahsil_edilen = float(pd.to_numeric(
                         _kl_df.loc[_kl_df["tahsilat_durumu"] == "Tahsil Edildi", "toplam_fatura"], errors="coerce").fillna(0).sum())
                     _oz_kalan_borc = _oz_toplam_ciro - _oz_tahsil_edilen
                     st.caption(f"✅ Tahsil edilen: **{_oz_tahsil_edilen:,.0f} ₺** — ⏳ Kalan borç: **{_oz_kalan_borc:,.0f} ₺**")
-                # İllere göre dağılım (alıcı ili üzerinden)
+                # İllere göre dağılım (alıcı ili üzerinden — "hangi ile ne gönderdi")
                 if "alici_il" in _kl_df.columns:
                     _oz_il_dagilim = _kl_df[_kl_df["alici_il"].astype(str).str.strip() != ""].groupby("alici_il").size().sort_values(ascending=False)
                     if not _oz_il_dagilim.empty:
-                        st.caption("📍 İllere göre dağılım:")
+                        st.caption("📍 Hangi ile ne kadar gönderilmiş:")
                         _kl_ana_il_liste = [a.upper() for a in _IL_SUTUN_LISTESI[:-1]]
                         _dis_bolge_isaretli = []
                         for _il_ad_tek, _adet_tek in _oz_il_dagilim.items():
@@ -13391,14 +13406,17 @@ elif aktif == "kargolar":
                         adet=("_ay", "size"), tutar=("toplam_fatura", lambda x: pd.to_numeric(x, errors="coerce").fillna(0).sum())
                     ).sort_index()
                     if not _oz_aylik.empty:
-                        st.caption("📅 Aylık dağılım:")
+                        st.caption("📅 Aylık olarak ne göndermiş:")
                         for _ay, _r in _oz_aylik.iterrows():
                             st.write(f"**{_ay}**: {int(_r['adet'])} kargo — {_r['tutar']:,.0f} ₺")
             with _ozc2:
                 st.markdown("#### 🚚 Dış Nakliye Özeti")
                 _oz_dn_tutar = float(pd.to_numeric(_kl_df.get("dis_nakliye_tutar", 0), errors="coerce").fillna(0).sum())
-                _oz_dn_odenen = float(pd.to_numeric(
-                    _kl_df.loc[_kl_df.get("dis_nakliye_odeme_durumu", "") == "Ödendi", "dis_nakliye_tutar"], errors="coerce").fillna(0).sum()) if "dis_nakliye_odeme_durumu" in _kl_df.columns else 0.0
+                if "dis_nakliye_odeme_durumu" in _kl_df.columns:
+                    _oz_dn_odenen = float(pd.to_numeric(
+                        _kl_df.loc[_kl_df["dis_nakliye_odeme_durumu"] == "Ödendi", "dis_nakliye_tutar"], errors="coerce").fillna(0).sum())
+                else:
+                    _oz_dn_odenen = 0.0
                 _oz_dn_borc = _oz_dn_tutar - _oz_dn_odenen
                 _ozn1, _ozn2 = st.columns(2)
                 _ozn1.metric("🚚 Toplam Dış Nakliye", f"{_oz_dn_tutar:,.0f} ₺")
