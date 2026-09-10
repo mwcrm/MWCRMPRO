@@ -13439,35 +13439,43 @@ elif aktif == "kargolar":
                         _oz_tahsil_edilen = float(_kl_df.loc[_kl_df["tahsilat_durumu"] == "Tahsil Edildi", "_efektif_tutar"].sum())
                         _oz_kalan_borc = _oz_toplam_ciro - _oz_tahsil_edilen
                         st.caption(f"✅ Tahsil edilen: **{_oz_tahsil_edilen:,.0f} ₺** — ⏳ Kalan borç: **{_oz_kalan_borc:,.0f} ₺**")
-                    # Tür + İl kombinasyonuna göre dağılım — TABLO olarak (satır satır
-                    # yazı yerine, göz daha kolay tarasın diye).
-                    if "alici_il" in _kl_df.columns and "tur" in _kl_df.columns:
-                        _oz_tur_il = (_kl_df[_kl_df["alici_il"].astype(str).str.strip() != ""]
-                                      .groupby([_kl_df["tur"].astype(str).str.upper().replace("", "(Tür belirtilmemiş)"), "alici_il"])
-                                      .agg(Adet=("alici_il", "size"), Tutar=("_efektif_tutar", "sum"))
-                                      .sort_values("Adet", ascending=False))
-                        if not _oz_tur_il.empty:
-                            st.caption("📍 Tür ve ile göre:")
-                            _kl_ana_il_liste = [a.upper() for a in _IL_SUTUN_LISTESI[:-1]]
-                            _oz_tur_il_goster = _oz_tur_il.reset_index()
-                            _oz_tur_il_goster.columns = ["Tür", "İl", "Adet", "Tutar"]
-                            _oz_tur_il_goster["Bölge"] = _oz_tur_il_goster["İl"].apply(
-                                lambda x: "Yerel" if str(x).upper() in _kl_ana_il_liste else "Dış Bölge")
-                            _oz_tur_il_goster["Tutar"] = _oz_tur_il_goster["Tutar"].apply(lambda x: f"{x:,.0f} ₺")
-                            st.dataframe(_oz_tur_il_goster, use_container_width=True, hide_index=True)
-                    # Aylık dağılım — TABLO
-                    if "tarih" in _kl_df.columns:
-                        _kl_df_ay = _kl_df.copy()
-                        _kl_df_ay["_ay"] = pd.to_datetime(_kl_df_ay["tarih"], errors="coerce").dt.strftime("%Y-%m")
-                        _oz_aylik = _kl_df_ay.dropna(subset=["_ay"]).groupby("_ay").agg(
-                            Adet=("_ay", "size"), Tutar=("_efektif_tutar", "sum")
-                        ).sort_index()
-                        if not _oz_aylik.empty:
-                            st.caption("📅 Aylık dağılım:")
-                            _oz_aylik_goster = _oz_aylik.reset_index().rename(columns={"_ay": "Ay"})
-                            _oz_aylik_goster["Tutar"] = _oz_aylik_goster["Tutar"].apply(lambda x: f"{x:,.0f} ₺")
-                            st.dataframe(_oz_aylik_goster, use_container_width=True, hide_index=True)
+                    # ── AY → İL → TÜR kırılımlı, doğru toplamalı tablo. Yerel ve
+                    # Dış Bölge AYRI tablolarda (istenen: "yoğun il" kolayca görülsün).
+                    if "alici_il" in _kl_df.columns and "tur" in _kl_df.columns and "tarih" in _kl_df.columns:
+                        _kl_ana_il_liste = [a.upper() for a in _IL_SUTUN_LISTESI[:-1]]
+                        _kl_df_ay2 = _kl_df.copy()
+                        _kl_df_ay2["_ay"] = pd.to_datetime(_kl_df_ay2["tarih"], errors="coerce").dt.strftime("%Y-%m")
+                        _kl_df_ay2["_tur_norm"] = _kl_df_ay2["tur"].astype(str).str.strip().str.upper().replace("", "(TÜR BELİRTİLMEMİŞ)")
+                        _kl_df_ay2 = _kl_df_ay2[(_kl_df_ay2["alici_il"].astype(str).str.strip() != "") & _kl_df_ay2["_ay"].notna()]
+                        _kl_df_ay2["_bolge"] = _kl_df_ay2["alici_il"].astype(str).str.upper().apply(
+                            lambda x: "Yerel" if x in _kl_ana_il_liste else "Dış Bölge")
+
+                        def _kl_ay_il_tur_tablo(_bolge_adi):
+                            _alt = _kl_df_ay2[_kl_df_ay2["_bolge"] == _bolge_adi]
+                            if _alt.empty:
+                                return None
+                            _g = (_alt.groupby(["_ay", "alici_il", "_tur_norm"])
+                                  .agg(Adet=("_tur_norm", "size"), Tutar=("_efektif_tutar", "sum"))
+                                  .reset_index()
+                                  .rename(columns={"_ay": "Ay", "alici_il": "İl", "_tur_norm": "Tür"})
+                                  .sort_values(["Ay", "Adet"], ascending=[True, False]))
+                            _g["Tutar"] = _g["Tutar"].apply(lambda x: f"{x:,.0f} ₺")
+                            return _g.reset_index(drop=True)
+
+                        st.caption("📍 Yerel — Ay → İl → Tür (en yoğun il en üstte):")
+                        _kl_yerel_tablo = _kl_ay_il_tur_tablo("Yerel")
+                        if _kl_yerel_tablo is not None:
+                            st.dataframe(_kl_yerel_tablo, use_container_width=True, hide_index=True)
+                        else:
+                            st.caption("Yerel bölgeye ait kayıt yok.")
                 with _ozc2:
+                    st.markdown("#### 🌍 Dış Bölge — Ay → İl → Tür")
+                    _kl_dis_tablo = _kl_ay_il_tur_tablo("Dış Bölge") if "alici_il" in _kl_df.columns and "tur" in _kl_df.columns and "tarih" in _kl_df.columns else None
+                    if _kl_dis_tablo is not None:
+                        st.dataframe(_kl_dis_tablo, use_container_width=True, hide_index=True)
+                    else:
+                        st.caption("Dış bölgeye ait kayıt yok.")
+                    st.divider()
                     st.markdown("#### 🚚 Dış Nakliye Özeti")
                     _oz_dn_tutar = float(pd.to_numeric(_kl_df.get("dis_nakliye_tutar", 0), errors="coerce").fillna(0).sum())
                     if "dis_nakliye_odeme_durumu" in _kl_df.columns:
