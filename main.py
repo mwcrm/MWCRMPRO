@@ -13360,6 +13360,7 @@ elif aktif == "kargolar":
                            "dis_nakliye_detay": "Dış Nakliye Detay", "dis_nakliye_tutar": "Dış Nakliye Tutar",
                            "musteri_tutar": "Müşteri Tutar", "kar": "Kar", "dis_nakliye_odeme_durumu": "Dış Nak. Ödeme", "fatura_odeme_sekli": "Fatura Ödeme Şekli"}
         _kl_gorunur_kolonlar = ["Seç", "Müşteri"] + [c for c in _kl_kolon_isim if c in _kl_df.columns and c != "Müşteri"]
+        _kl_df = _kl_df.reset_index(drop=True)  # filtrelerden sonra index'ler boşluklu kalmasın (iloc hatası önlenir)
         _kl_df_goster = _kl_df[_kl_gorunur_kolonlar + ["_cari_id", "_satir_no"]].rename(columns=_kl_kolon_isim)
         st.caption(f"Toplam {len(_kl_df)} kargo kaydı, {_kl_df['_cari_id'].nunique()} müşteride.")
 
