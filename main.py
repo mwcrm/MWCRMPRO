@@ -2888,10 +2888,12 @@ def not_dialog(cari_id, firma_adi=""):
         _kg_adet = _kgc1.number_input("Adet", min_value=0, step=1, key=f"kg_adet_{cari_id}")
         _kg_tutar = _kgc2.number_input("Tutar", min_value=0.0, step=0.01, key=f"kg_tutar_{cari_id}")
         _kg_kdv = _kgc3.number_input("KDV", min_value=0.0, step=0.01, key=f"kg_kdv_{cari_id}")
-        _kg_sigorta = _kgc1.number_input("Sigorta", min_value=0.0, step=0.01, key=f"kg_sigorta_{cari_id}")
-        _kg_toplam_fatura = _kgc2.number_input("Toplam Fatura", min_value=0.0, step=0.01, key=f"kg_toplam_fatura_{cari_id}")
-        _kg_odeme_tur = _kgc3.selectbox("Ödeme Türü", ["", "Nakit", "Havale/EFT", "Çek", "Kredi Kartı", "Diğer"], key=f"kg_odeme_{cari_id}")
-        _kg_tahsilat = _kgc1.selectbox("Tahsilat Durumu", ["", "Tahsil Edildi", "Bekliyor", "Kısmi Tahsilat"], key=f"kg_tahsilat_{cari_id}")
+        _kg_desi = _kgc1.number_input("Desi", min_value=0.0, step=1.0, key=f"kg_desi_{cari_id}")
+        _kg_kilo = _kgc2.number_input("Kilo", min_value=0.0, step=0.5, key=f"kg_kilo_{cari_id}")
+        _kg_sigorta = _kgc3.number_input("Sigorta", min_value=0.0, step=0.01, key=f"kg_sigorta_{cari_id}")
+        _kg_toplam_fatura = _kgc1.number_input("Toplam Fatura", min_value=0.0, step=0.01, key=f"kg_toplam_fatura_{cari_id}")
+        _kg_odeme_tur = _kgc2.selectbox("Ödeme Türü", ["", "Nakit", "Havale/EFT", "Çek", "Kredi Kartı", "Diğer"], key=f"kg_odeme_{cari_id}")
+        _kg_tahsilat = _kgc3.selectbox("Tahsilat Durumu", ["", "Tahsil Edildi", "Bekliyor", "Kısmi Tahsilat"], key=f"kg_tahsilat_{cari_id}")
 
         # ── Dış Nakliye bölümü — SADECE Alıcı İl "yerel" iller dışında bir il
         # (dış bölge) ise gösterilir. Yerel il seçiliyse bu alanlar hiç görünmez.
@@ -2940,6 +2942,7 @@ def not_dialog(cari_id, firma_adi=""):
                     "gonderen_il": _tr_buyuk(_kg_gonderen_il_deger), "alici_il": _tr_buyuk(_kg_alici_il_deger),
                     "fatura_odeme_sekli": _kg_fatura_odeme_sekli,
                     "adet": _kg_adet, "tur": _tr_buyuk(_kg_tur), "tutar": _kg_tutar, "kdv": _kg_kdv, "sigorta": _kg_sigorta,
+                    "desi": _kg_desi, "kilo": _kg_kilo,
                     "toplam_fatura": _kg_toplam_fatura, "odeme_tur": _kg_odeme_tur, "tahsilat_durumu": _kg_tahsilat,
                     "dis_nakliye_firma": _tr_buyuk(_kg_dn_firma), "dis_nakliye_fatura": _tr_buyuk(_kg_dn_fatura),
                     "dis_nakliye_detay": _tr_buyuk(_kg_dn_detay), "dis_nakliye_tutar": _kg_dn_tutar,
@@ -2972,7 +2975,7 @@ def not_dialog(cari_id, firma_adi=""):
                                "toplam_fatura": "Toplam Fatura", "odeme_tur": "Ödeme Türü", "tahsilat_durumu": "Tahsilat",
                                "dis_nakliye_firma": "Dış Nakliye Firma", "dis_nakliye_fatura": "Dış Nakliye Fatura",
                                "dis_nakliye_detay": "Dış Nakliye Detay", "dis_nakliye_tutar": "Dış Nakliye Tutar",
-                               "musteri_tutar": "Müşteri Tutar", "kar": "Kar", "dis_nakliye_odeme_durumu": "Dış Nak. Ödeme", "fatura_odeme_sekli": "Fatura Ödeme Şekli"}
+                               "musteri_tutar": "Müşteri Tutar", "kar": "Kar", "dis_nakliye_odeme_durumu": "Dış Nak. Ödeme", "fatura_odeme_sekli": "Fatura Ödeme Şekli", "desi": "Desi", "kilo": "Kilo"}
             _kg_df = _kg_df.rename(columns=_kg_kolon_isim)
             # Kolon Ayarları'nda ayarlanan (5-50 arası) genişlikleri burada da uygula —
             # yoksa tablo çok geniş açılıp okunması zorlaşıyordu.
@@ -8740,7 +8743,7 @@ function updateBot(v){{
             "Dış Nakliye Firma":"Dış Nak. Firma",
             "Dış Nakliye Fatura":"Dış Nak. Fatura","Dış Nakliye Detay":"Dış Nak. Detay",
             "Dış Nakliye Tutar":"Dış Nak. Tutar","Müşteri Tutar":"Müşteri Tutar","Kar":"Kar",
-            "Dış Nak. Ödeme":"Dış Nak. Ödeme",
+            "Dış Nak. Ödeme":"Dış Nak. Ödeme", "Desi":"Desi", "Kilo":"Kilo",
         }
         _KARGO_KOL_VARSAYILAN = {k: 15 for k in _KARGO_KOL_ETIKET}
         try:
@@ -13446,7 +13449,7 @@ elif aktif == "kargolar":
                            "toplam_fatura": "Toplam Fatura", "odeme_tur": "Ödeme Türü", "tahsilat_durumu": "Tahsilat",
                            "dis_nakliye_firma": "Dış Nakliye Firma", "dis_nakliye_fatura": "Dış Nakliye Fatura",
                            "dis_nakliye_detay": "Dış Nakliye Detay", "dis_nakliye_tutar": "Dış Nakliye Tutar",
-                           "musteri_tutar": "Müşteri Tutar", "kar": "Kar", "dis_nakliye_odeme_durumu": "Dış Nak. Ödeme", "fatura_odeme_sekli": "Fatura Ödeme Şekli"}
+                           "musteri_tutar": "Müşteri Tutar", "kar": "Kar", "dis_nakliye_odeme_durumu": "Dış Nak. Ödeme", "fatura_odeme_sekli": "Fatura Ödeme Şekli", "desi": "Desi", "kilo": "Kilo"}
         _kl_gorunur_kolonlar = ["Seç", "Müşteri"] + [c for c in _kl_kolon_isim if c in _kl_df.columns and c != "Müşteri"]
         _kl_df = _kl_df.reset_index(drop=True)  # filtrelerden sonra index'ler boşluklu kalmasın (iloc hatası önlenir)
         _kl_df_goster = _kl_df[_kl_gorunur_kolonlar + ["_cari_id", "_satir_no"]].rename(columns=_kl_kolon_isim)
