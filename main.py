@@ -2846,6 +2846,14 @@ def not_dialog(cari_id, firma_adi=""):
         # NOT: st.form KULLANILMIYOR — "Alıcı İl" seçimine göre Dış Nakliye
         # bölümünün anlık (canlı) gösterilip gizlenmesi gerekiyor; form içindeki
         # widget'lar sadece gönderilince işlenir, canlı tepki veremez.
+        # ── Manuel olarak hatırlanan Alıcı Firma isimleri de "Alıcı Firma"
+        # açılır listesine eklenir — bir daha elle yazmaya gerek kalmasın,
+        # doğrudan listeden seçilebilsin.
+        _kg_manuel_alici_hafiza = _kg_manuel_alici_yukle()
+        _kg_musteri_opts_buyuk = set(_tr_buyuk(x) for x in _kg_musteri_liste)
+        _kg_hafizadan_ek = sorted([f for f in _kg_manuel_alici_hafiza.keys() if f not in _kg_musteri_opts_buyuk])
+        _kg_alici_opts = ["-- Seç veya elle yaz --"] + sorted(set(_kg_musteri_liste) | set(_kg_hafizadan_ek))
+
         _kgc1, _kgc2, _kgc3 = st.columns(3)
         _kg_tarih = _kgc1.date_input("Tarih *", key=f"kg_tarih_{cari_id}")
         _kg_takip = _kgc2.text_input("Takip No", key=f"kg_takip_{cari_id}")
@@ -2853,7 +2861,7 @@ def not_dialog(cari_id, firma_adi=""):
         _kg_gonderen_idx = (_kg_musteri_opts.index(firma_adi) if firma_adi in _kg_musteri_opts else 0)
         _kg_gonderen_sec = _kgc1.selectbox("Gönderen Firma", _kg_musteri_opts, index=_kg_gonderen_idx, key=f"kg_gonderen_sec_{cari_id}")
         _kg_gonderen_elle = _kgc1.text_input("(Listede yoksa elle yaz)", key=f"kg_gonderen_elle_{cari_id}", label_visibility="collapsed", placeholder="Listede yoksa buraya elle yaz")
-        _kg_alici_sec = _kgc2.selectbox("Alıcı Firma", _kg_musteri_opts, key=f"kg_alici_sec_{cari_id}")
+        _kg_alici_sec = _kgc2.selectbox("Alıcı Firma", _kg_alici_opts, key=f"kg_alici_sec_{cari_id}")
         _kg_alici_elle = _kgc2.text_input("(Listede yoksa elle yaz)", key=f"kg_alici_elle_{cari_id}", label_visibility="collapsed", placeholder="Listede yoksa buraya elle yaz")
         # ── Fatura Ödeyen — "Ödeme Türü (Fatura)" seçimine göre OTOMATİK belirlenir:
         # PÖ veya CH ise Gönderen Firma, ÜA ise Alıcı Firma otomatik seçilir.
@@ -2873,7 +2881,6 @@ def not_dialog(cari_id, firma_adi=""):
         _kg_gonderen_il = _kgc1.selectbox("Gönderen İl", _kg_il_opts, key=f"kg_gonderen_il_{cari_id}")
         # ── Alıcı İl — daha önce bu Alıcı Firma için kaydedilmiş bir il varsa
         # otomatik önerilir (elle her seferinde yazmaya gerek kalmasın diye).
-        _kg_manuel_alici_hafiza = _kg_manuel_alici_yukle()
         _kg_alici_firma_hesaplanan = _kg_alici_elle.strip() or (_kg_alici_sec if _kg_alici_sec != "-- Seç veya elle yaz --" else "")
         _kg_alici_il_varsayilan_idx = 0
         if _kg_alici_firma_hesaplanan:
