@@ -2825,11 +2825,25 @@ def not_dialog(cari_id, firma_adi=""):
         _kg_gonderen_elle = _kgc1.text_input("(Listede yoksa elle yaz)", key=f"kg_gonderen_elle_{cari_id}", label_visibility="collapsed", placeholder="Listede yoksa buraya elle yaz")
         _kg_alici_sec = _kgc2.selectbox("Alıcı Firma", _kg_musteri_opts, key=f"kg_alici_sec_{cari_id}")
         _kg_alici_elle = _kgc2.text_input("(Listede yoksa elle yaz)", key=f"kg_alici_elle_{cari_id}", label_visibility="collapsed", placeholder="Listede yoksa buraya elle yaz")
-        _kg_fatura_sec = _kgc3.selectbox("Fatura Ödeyen *", _kg_musteri_opts, key=f"kg_fatura_sec_{cari_id}")
+        # ── Fatura Ödeyen — "Ödeme Türü (Fatura)" seçimine göre OTOMATİK belirlenir:
+        # PÖ veya CH ise Gönderen Firma, ÜA ise Alıcı Firma otomatik seçilir.
+        # (O widget kodda daha aşağıda tanımlı olsa da, session_state'teki
+        # ÖNCEKİ seçimi buradan okuyabiliyoruz — Streamlit rerun'da widget
+        # değerleri kod çalışmadan ÖNCE zaten session_state'te hazır olur.)
+        _kg_gonderen_hesaplanan = _kg_gonderen_elle.strip() or (_kg_gonderen_sec if _kg_gonderen_sec != "-- Seç veya elle yaz --" else "")
+        _kg_alici_hesaplanan = _kg_alici_elle.strip() or (_kg_alici_sec if _kg_alici_sec != "-- Seç veya elle yaz --" else "")
+        _kg_odeme_sekli_onceki = st.session_state.get(f"kg_fatura_odeme_sekli_{cari_id}", "")
+        _kg_fatura_varsayilan_idx = 0
+        if _kg_odeme_sekli_onceki in ("PÖ", "CH") and _kg_gonderen_hesaplanan in _kg_musteri_opts:
+            _kg_fatura_varsayilan_idx = _kg_musteri_opts.index(_kg_gonderen_hesaplanan)
+        elif _kg_odeme_sekli_onceki == "ÜA" and _kg_alici_hesaplanan in _kg_musteri_opts:
+            _kg_fatura_varsayilan_idx = _kg_musteri_opts.index(_kg_alici_hesaplanan)
+        _kg_fatura_sec = _kgc3.selectbox("Fatura Ödeyen *", _kg_musteri_opts, index=_kg_fatura_varsayilan_idx, key=f"kg_fatura_sec_{cari_id}")
         _kg_fatura_elle = _kgc3.text_input("(Listede yoksa elle yaz)", key=f"kg_fatura_elle_{cari_id}", label_visibility="collapsed", placeholder="Listede yoksa buraya elle yaz")
         _kg_gonderen_il = _kgc1.selectbox("Gönderen İl", _kg_il_opts, key=f"kg_gonderen_il_{cari_id}")
         _kg_alici_il = _kgc2.selectbox("Alıcı İl", _kg_il_opts, key=f"kg_alici_il_{cari_id}")
-        _kg_fatura_odeme_sekli = _kgc3.selectbox("Ödeme Türü (Fatura)", ["", "Faturasız", "PÖ", "ÜA", "ÇH"], key=f"kg_fatura_odeme_sekli_{cari_id}")
+        _kg_fatura_odeme_sekli = _kgc3.selectbox("Ödeme Türü (Fatura)", ["", "Faturasız", "PÖ", "ÜA", "CH"], key=f"kg_fatura_odeme_sekli_{cari_id}",
+                                                  help="PÖ/CH seçilirse Fatura Ödeyen otomatik Gönderen olur, ÜA seçilirse otomatik Alıcı olur.")
         _kg_adet = _kgc1.number_input("Adet", min_value=0, step=1, key=f"kg_adet_{cari_id}")
         _kg_tutar = _kgc2.number_input("Tutar", min_value=0.0, step=0.01, key=f"kg_tutar_{cari_id}")
         _kg_kdv = _kgc3.number_input("KDV", min_value=0.0, step=0.01, key=f"kg_kdv_{cari_id}")
