@@ -13474,6 +13474,9 @@ elif aktif == "kargolar":
         elif _kl_sec_fatura != "-- Tümü --":
             _kl_aktif_filtre_etiketi = f"Fatura Ödeyen: {_kl_sec_fatura}"
 
+        _kl_detay = None
+        _kl_detay_toplam_adet = 0
+        _kl_detay_toplam_tutar = 0.0
         if _kl_aktif_filtre_etiketi and not _kl_df.empty:
             with st.expander(f"📊 Özet / Ekstre — {_kl_aktif_filtre_etiketi}", expanded=True):
                 # "Toplam Fatura" doldurulmamışsa (genelde durum bu — sadece "Tutar"
@@ -13514,17 +13517,20 @@ elif aktif == "kargolar":
                     _kl_rapor["Firma"] = _kl_secili_firma_adi
 
                     if not _kl_rapor.empty:
-                        # DETAY — her kayıt kendi satırında, aya göre sıralı
+                        # DETAY — her kayıt kendi satırında, aya göre sıralı.
+                        # "ADET" = o satırdaki iş/paket miktarı (kaç adet eşya).
+                        # "KARGO ADETİ" = her satır 1 kargo işlemi sayılır — toplanınca
+                        # kaç AYRI kargo/iş yapıldığını gösterir (ikisi karıştırılmasın).
                         _kl_detay = _kl_rapor.sort_values(["_ay_sira"])[["Ay", "Hat", "alici_il", "Firma", "Tür", "adet", "_efektif_tutar"]].copy()
                         _kl_detay.columns = ["AY", "HAT", "ALICI İL", "FİRMA", "TÜR", "ADET", "TUTAR"]
-                        _kl_detay.insert(6, "DESİ-KG", "")  # şu an ayrı bir desi/kg alanı tutulmuyor
+                        _kl_detay.insert(6, "KARGO ADETİ", 1)
+                        _kl_detay.insert(7, "DESİ-KG", "")  # şu an ayrı bir desi/kg alanı tutulmuyor
                         _kl_detay["TUTAR"] = pd.to_numeric(_kl_detay["TUTAR"], errors="coerce").fillna(0).apply(lambda x: f"{x:,.0f} ₺")
-
-                        st.caption("📋 Detay:")
-                        st.dataframe(_kl_detay, use_container_width=True, hide_index=True,
-                                     height=min(38 * (len(_kl_detay) + 1) + 25, 500))
-
-                st.divider()
+                        # NOT: Streamlit iç içe expander desteklemediği için bu tablo
+                        # burada SAKLANIP, dış "Özet/Ekstre" paneli kapandıktan SONRA
+                        # kendi bağımsız açılır/kapanır panelinde gösteriliyor (aşağıda).
+                        _kl_detay_toplam_adet = int(pd.to_numeric(_kl_rapor["adet"], errors="coerce").fillna(0).sum())
+                        _kl_detay_toplam_tutar = float(_kl_rapor["_efektif_tutar"].sum())
                 st.markdown("#### 🚚 Dış Nakliye Özeti")
                 _oz_dn_tutar = float(pd.to_numeric(_kl_df.get("dis_nakliye_tutar", 0), errors="coerce").fillna(0).sum())
                 if "dis_nakliye_odeme_durumu" in _kl_df.columns:
@@ -13541,6 +13547,14 @@ elif aktif == "kargolar":
                 if "dis_nakliye_odeme_durumu" not in _kl_df.columns or _kl_df.get("dis_nakliye_odeme_durumu", pd.Series(dtype=str)).eq("").all():
                     st.caption("💡 Ödendi/Ödenmedi takibi için Kargo Girişi formuna 'Dış Nakliye Ödeme Durumu' alanını dolduman yeterli.")
             st.divider()
+
+        # ── DETAY RAPORU — kendi bağımsız açılır/kapanır paneli. Hangi müşteri
+        # (Gönderen/Alıcı/Fatura Ödeyen/Genel) seçilirse seçilsin aynı şekilde çalışır.
+        if _kl_detay is not None and not _kl_detay.empty:
+            with st.expander(f"📋 Detay Raporu — {_kl_aktif_filtre_etiketi} ({len(_kl_detay)} kayıt)", expanded=True):
+                st.dataframe(_kl_detay, use_container_width=True, hide_index=True,
+                             height=min(38 * (len(_kl_detay) + 1) + 25, 500))
+                st.caption(f"Toplam: **{_kl_detay_toplam_adet} adet** ({len(_kl_detay)} ayrı kargo işlemi) — **{_kl_detay_toplam_tutar:,.0f} ₺**")
 
         # ── TÜM MÜŞTERİLER GENEL RAPORU — filtrelerden bağımsız, sistemdeki
         # HERKESİ kapsar. Firma + Gönderen İl + Alıcı İl + Tür kırılımlı, altında
