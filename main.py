@@ -144,6 +144,36 @@ def _il_gonderim_matrisi_kaydet(_matris):
         pass
 
 
+# ── MANUEL ALICI FİRMA HAFIZASI — Kargo Girişi'nde elle yazılan Alıcı Firma
+# isimleri kalıcı olarak {firma: il} şeklinde saklanır. Bir daha o firma adı
+# yazılınca ili otomatik gelir; yeni bir firma-il çifti girildikçe otomatik
+# kaydedilir. cari_kartlar'a yeni kolon açılmaz (migration yok kuralı).
+@st.cache_data(ttl=30, show_spinner=False)
+def _kg_manuel_alici_yukle():
+    try:
+        _sb_ma = get_sb_client()
+        if _sb_ma:
+            _r_ma = _sb_ma.table("kullanici_tercih").select("deger").eq(
+                "kullanici", "__liste_ui__").eq("anahtar", "_kargo_manuel_alici_firmalar").execute()
+            if _r_ma.data:
+                import json as _maj
+                return _maj.loads(_r_ma.data[0]["deger"])
+    except Exception:
+        pass
+    return {}
+
+def _kg_manuel_alici_kaydet(_sozluk):
+    try:
+        _sb_ma2 = get_sb_client()
+        if _sb_ma2:
+            import json as _maj2
+            _deger = _maj2.dumps(_sozluk, ensure_ascii=False)
+            _sb_ma2.table("kullanici_tercih").delete().eq("kullanici", "__liste_ui__").eq("anahtar", "_kargo_manuel_alici_firmalar").execute()
+            _sb_ma2.table("kullanici_tercih").insert({"kullanici": "__liste_ui__", "anahtar": "_kargo_manuel_alici_firmalar", "deger": _deger}).execute()
+    except Exception:
+        pass
+
+
 @st.cache_resource
 def get_sb_service():
     """Supabase service_role client — log ve admin işlemler için"""
@@ -2841,7 +2871,18 @@ def not_dialog(cari_id, firma_adi=""):
         _kg_fatura_sec = _kgc3.selectbox("Fatura Ödeyen *", _kg_musteri_opts, index=_kg_fatura_varsayilan_idx, key=f"kg_fatura_sec_{cari_id}")
         _kg_fatura_elle = _kgc3.text_input("(Listede yoksa elle yaz)", key=f"kg_fatura_elle_{cari_id}", label_visibility="collapsed", placeholder="Listede yoksa buraya elle yaz")
         _kg_gonderen_il = _kgc1.selectbox("Gönderen İl", _kg_il_opts, key=f"kg_gonderen_il_{cari_id}")
-        _kg_alici_il = _kgc2.selectbox("Alıcı İl", _kg_il_opts, key=f"kg_alici_il_{cari_id}")
+        # ── Alıcı İl — daha önce bu Alıcı Firma için kaydedilmiş bir il varsa
+        # otomatik önerilir (elle her seferinde yazmaya gerek kalmasın diye).
+        _kg_manuel_alici_hafiza = _kg_manuel_alici_yukle()
+        _kg_alici_firma_hesaplanan = _kg_alici_elle.strip() or (_kg_alici_sec if _kg_alici_sec != "-- Seç veya elle yaz --" else "")
+        _kg_alici_il_varsayilan_idx = 0
+        if _kg_alici_firma_hesaplanan:
+            _kg_hafizadaki_il = _kg_manuel_alici_hafiza.get(_tr_buyuk(_kg_alici_firma_hesaplanan))
+            if _kg_hafizadaki_il and _kg_hafizadaki_il in _kg_il_opts:
+                _kg_alici_il_varsayilan_idx = _kg_il_opts.index(_kg_hafizadaki_il)
+        _kg_alici_il = _kgc2.selectbox("Alıcı İl", _kg_il_opts, index=_kg_alici_il_varsayilan_idx, key=f"kg_alici_il_{cari_id}")
+        if _kg_alici_firma_hesaplanan and _kg_alici_il != "-- İl seçilir --" and _kg_manuel_alici_hafiza.get(_tr_buyuk(_kg_alici_firma_hesaplanan)):
+            st.caption(f"💡 '{_kg_alici_firma_hesaplanan}' için daha önce kaydedilen il otomatik önerildi.")
         _kg_fatura_odeme_sekli = _kgc3.selectbox("Ödeme Türü (Fatura)", ["", "Faturasız", "PÖ", "ÜA", "CH"], key=f"kg_fatura_odeme_sekli_{cari_id}",
                                                   help="PÖ/CH seçilirse Fatura Ödeyen otomatik Gönderen olur, ÜA seçilirse otomatik Alıcı olur.")
         _kg_adet = _kgc1.number_input("Adet", min_value=0, step=1, key=f"kg_adet_{cari_id}")
@@ -2906,6 +2947,13 @@ def not_dialog(cari_id, firma_adi=""):
                 })
                 _kg_kayitlari_kaydet(_kg_anahtar, _kg_liste)
                 _kg_kayitlari_yukle.clear()
+                # Alıcı Firma + Alıcı İl çiftini kalıcı hafızaya yaz — bir dahaki
+                # sefere bu firma yazılınca ili otomatik gelsin.
+                if _kg_alici and _kg_alici_il_deger:
+                    _kg_hafiza_guncel = dict(_kg_manuel_alici_hafiza)
+                    _kg_hafiza_guncel[_tr_buyuk(_kg_alici)] = _tr_buyuk(_kg_alici_il_deger)
+                    _kg_manuel_alici_kaydet(_kg_hafiza_guncel)
+                    _kg_manuel_alici_yukle.clear()
                 st.toast("✅ Kargo girişi kaydedildi", icon="🚚")
                 st.rerun()
 
@@ -13331,6 +13379,22 @@ elif aktif == "kargolar":
         for _kk in _kl_tum_kayitlar:
             _kk["Müşteri"] = _kl_musteri_map.get(_kk.get("_cari_id"), f"(ID {_kk.get('_cari_id')})")
 
+        # ── BİR KERELİK DOLDURMA — geçmişte girilmiş tüm (Alıcı Firma, Alıcı İl)
+        # çiftlerini kalıcı hafızaya aktarır. Sonrasında her yeni girişte zaten
+        # otomatik güncelleniyor, bu buton sadece ESKİ kayıtları yakalamak için.
+        if st.button("🔄 Geçmiş Kayıtlardan Alıcı-İl Hafızasını Doldur (bir kerelik)", key="kl_hafiza_doldur_btn"):
+            _kl_hafiza_yeni = dict(_kg_manuel_alici_yukle())
+            _kl_eklenen = 0
+            for _kk2 in _kl_tum_kayitlar:
+                _af = str(_kk2.get("alici_firma", "")).strip()
+                _ai = str(_kk2.get("alici_il", "")).strip()
+                if _af and _ai and _tr_buyuk(_af) not in _kl_hafiza_yeni:
+                    _kl_hafiza_yeni[_tr_buyuk(_af)] = _tr_buyuk(_ai)
+                    _kl_eklenen += 1
+            _kg_manuel_alici_kaydet(_kl_hafiza_yeni)
+            _kg_manuel_alici_yukle.clear()
+            st.toast(f"✅ {_kl_eklenen} yeni firma-il çifti hafızaya eklendi (toplam {len(_kl_hafiza_yeni)})", icon="💾")
+
         _kl_df = pd.DataFrame(_kl_tum_kayitlar)
         _kl_df = _kl_df.fillna("")  # eski kayıtlarda olmayan alanlar "None" değil boş görünsün
         # Müşteri alfabetik, kendi içinde tarihe göre sırala
@@ -13412,102 +13476,96 @@ elif aktif == "kargolar":
 
         if _kl_aktif_filtre_etiketi and not _kl_df.empty:
             with st.expander(f"📊 Özet / Ekstre — {_kl_aktif_filtre_etiketi}", expanded=True):
-                _ozc1, _ozc2 = st.columns(2)
-                with _ozc1:
-                    st.markdown("#### 📦 Özet")
-                    # Her tür kendi adıyla ayrı ayrı gösterilir — "Diğer Yük" diye
-                    # toplanmaz. Boş/tanımsız türler "(Tür belirtilmemiş)" sayılır.
-                    if "tur" in _kl_df.columns:
-                        _oz_tur_sayim = (_kl_df["tur"].astype(str).str.strip().str.upper()
-                                          .replace("", "(TÜR BELİRTİLMEMİŞ)")
-                                          .value_counts())
-                    else:
-                        _oz_tur_sayim = pd.Series(dtype=int)
-                    if not _oz_tur_sayim.empty:
-                        _oz_tur_cols = st.columns(min(len(_oz_tur_sayim), 5))
-                        for _oz_i, (_oz_tur_ad, _oz_tur_adet) in enumerate(_oz_tur_sayim.items()):
-                            _oz_tur_cols[_oz_i % len(_oz_tur_cols)].metric(f"📦 {_oz_tur_ad}", int(_oz_tur_adet))
-                    # "Toplam Fatura" doldurulmamışsa (genelde durum bu — sadece "Tutar"
-                    # kullanılıyor) satır bazında "Toplam Fatura varsa o, yoksa Tutar" alınır.
-                    _kl_df = _kl_df.copy()
-                    _kl_df["_efektif_tutar"] = pd.to_numeric(_kl_df.get("toplam_fatura", 0), errors="coerce").fillna(0)
-                    _kl_tutar_num = pd.to_numeric(_kl_df.get("tutar", 0), errors="coerce").fillna(0)
-                    _kl_df.loc[_kl_df["_efektif_tutar"] == 0, "_efektif_tutar"] = _kl_tutar_num
-                    _oz_toplam_ciro = float(_kl_df["_efektif_tutar"].sum())
-                    st.metric("💰 Toplam Ciro", f"{_oz_toplam_ciro:,.0f} ₺")
-                    if "tahsilat_durumu" in _kl_df.columns:
-                        _oz_tahsil_edilen = float(_kl_df.loc[_kl_df["tahsilat_durumu"] == "Tahsil Edildi", "_efektif_tutar"].sum())
-                        _oz_kalan_borc = _oz_toplam_ciro - _oz_tahsil_edilen
-                        st.caption(f"✅ Tahsil edilen: **{_oz_tahsil_edilen:,.0f} ₺** — ⏳ Kalan borç: **{_oz_kalan_borc:,.0f} ₺**")
-                    # ── AY → İL → TÜR kırılımlı, doğru toplamalı tablo. Yerel ve
-                    # Dış Bölge AYRI tablolarda (istenen: "yoğun il" kolayca görülsün).
-                    if "alici_il" in _kl_df.columns and "tur" in _kl_df.columns and "tarih" in _kl_df.columns:
-                        # ÖNEMLİ: "Yerel" sadece bu 6 il — Kargo Girişi formundaki
-                        # Dış Nakliye tetikleme mantığıyla AYNI liste (tutarlılık için).
-                        _kl_ana_il_liste = [_tr_buyuk(a) for a in ["İzmir", "Bursa", "Manisa", "Tekirdağ", "İstanbul", "Kocaeli"]]
-                        _kl_df_ay2 = _kl_df.copy()
-                        _kl_df_ay2["_ay"] = pd.to_datetime(_kl_df_ay2["tarih"], errors="coerce").dt.strftime("%Y-%m")
-                        _kl_df_ay2["_tur_norm"] = _kl_df_ay2["tur"].astype(str).str.strip().str.upper().replace("", "(TÜR BELİRTİLMEMİŞ)")
-                        _kl_df_ay2 = _kl_df_ay2[(_kl_df_ay2["alici_il"].astype(str).str.strip() != "") & _kl_df_ay2["_ay"].notna()]
-                        _kl_df_ay2["_bolge"] = _kl_df_ay2["alici_il"].astype(str).str.upper().apply(
-                            lambda x: "Yerel" if x in _kl_ana_il_liste else "Dış Bölge")
+                # "Toplam Fatura" doldurulmamışsa (genelde durum bu — sadece "Tutar"
+                # kullanılıyor) satır bazında "Toplam Fatura varsa o, yoksa Tutar" alınır.
+                _kl_df = _kl_df.copy()
+                _kl_df["_efektif_tutar"] = pd.to_numeric(_kl_df.get("toplam_fatura", 0), errors="coerce").fillna(0)
+                _kl_tutar_num = pd.to_numeric(_kl_df.get("tutar", 0), errors="coerce").fillna(0)
+                _kl_df.loc[_kl_df["_efektif_tutar"] == 0, "_efektif_tutar"] = _kl_tutar_num
+                _oz_toplam_ciro = float(_kl_df["_efektif_tutar"].sum())
+                _ozm1, _ozm2 = st.columns(2)
+                _ozm1.metric("💰 Toplam Ciro", f"{_oz_toplam_ciro:,.0f} ₺")
+                if "tahsilat_durumu" in _kl_df.columns:
+                    _oz_tahsil_edilen = float(_kl_df.loc[_kl_df["tahsilat_durumu"] == "Tahsil Edildi", "_efektif_tutar"].sum())
+                    _oz_kalan_borc = _oz_toplam_ciro - _oz_tahsil_edilen
+                    _ozm2.metric("⏳ Kalan Borç", f"{_oz_kalan_borc:,.0f} ₺")
 
-                        def _kl_ay_il_tur_tablo(_bolge_adi):
-                            _alt = _kl_df_ay2[_kl_df_ay2["_bolge"] == _bolge_adi]
-                            if _alt.empty:
-                                return None
-                            _g = (_alt.groupby(["_ay", "alici_il", "_tur_norm"])
-                                  .agg(Adet=("_tur_norm", "size"), Tutar=("_efektif_tutar", "sum"))
-                                  .reset_index()
-                                  .rename(columns={"_ay": "Ay", "alici_il": "İl", "_tur_norm": "Tür"})
-                                  .sort_values(["Ay", "Adet"], ascending=[True, False]))
-                            _g["Tutar"] = _g["Tutar"].apply(lambda x: f"{x:,.0f} ₺")
-                            return _g.reset_index(drop=True)
+                # ── AY | HAT | ALICI İL | FİRMA | TÜR | ADET | DESİ-KG | TUTAR ──
+                # Kullanıcının verdiği tam formata göre: önce DETAY satırları (her
+                # kargo kaydı kendi satırında, aya göre sıralı), sonra GENEL TOPLAM
+                # (Hat+İl+Tür bazında, tüm aylar toplanmış), en altta HEPSİ (dip toplam).
+                if "alici_il" in _kl_df.columns and "tur" in _kl_df.columns and "tarih" in _kl_df.columns:
+                    _kl_ana_il_liste = [_tr_buyuk(a) for a in ["İzmir", "Bursa", "Manisa", "Tekirdağ", "İstanbul", "Kocaeli"]]
+                    _kl_ay_ad_map = {"01":"OCAK","02":"ŞUBAT","03":"MART","04":"NİSAN","05":"MAYIS","06":"HAZİRAN",
+                                      "07":"TEMMUZ","08":"AĞUSTOS","09":"EYLÜL","10":"EKİM","11":"KASIM","12":"ARALIK"}
+                    _kl_rapor = _kl_df.copy()
+                    _kl_rapor["_tarih_dt"] = pd.to_datetime(_kl_rapor["tarih"], errors="coerce")
+                    _kl_rapor = _kl_rapor[_kl_rapor["alici_il"].astype(str).str.strip() != ""]
+                    _kl_rapor["Ay"] = _kl_rapor["_tarih_dt"].dt.strftime("%m").map(_kl_ay_ad_map).fillna("(Tarihsiz)")
+                    _kl_rapor["_ay_sira"] = _kl_rapor["_tarih_dt"].dt.strftime("%Y-%m")
+                    _kl_rapor["Hat"] = _kl_rapor["alici_il"].astype(str).str.upper().apply(
+                        lambda x: "NORMAL" if x in _kl_ana_il_liste else "DIŞ BÖLGE")
+                    _kl_rapor["Tür"] = _kl_rapor["tur"].astype(str).str.strip().str.upper().replace("", "(TÜR BELİRTİLMEMİŞ)")
+                    # "FİRMA" sütunu, HANGİ filtre aktifse onun seçtiği gerçek firma
+                    # adı olmalı (kaydın "sahibi" olan müşteri değil — örn. Gönderen
+                    # filtrelenmişse Gönderen firma adı yazılır).
+                    _kl_secili_firma_adi = (_kl_aktif_filtre_etiketi.split(": ", 1)[1]
+                                             if _kl_aktif_filtre_etiketi and ": " in _kl_aktif_filtre_etiketi else "")
+                    _kl_rapor["Firma"] = _kl_secili_firma_adi
 
-                        st.caption("📍 Yerel — Ay → İl → Tür (en yoğun il en üstte):")
-                        _kl_yerel_tablo = _kl_ay_il_tur_tablo("Yerel")
-                        if _kl_yerel_tablo is not None:
-                            st.dataframe(_kl_yerel_tablo, use_container_width=True, hide_index=True)
-                        else:
-                            st.caption("Yerel bölgeye ait kayıt yok.")
-                with _ozc2:
-                    st.markdown("#### 🌍 Dış Bölge — Ay → İl → Tür")
-                    _kl_dis_tablo = _kl_ay_il_tur_tablo("Dış Bölge") if "alici_il" in _kl_df.columns and "tur" in _kl_df.columns and "tarih" in _kl_df.columns else None
-                    if _kl_dis_tablo is not None:
-                        st.dataframe(_kl_dis_tablo, use_container_width=True, hide_index=True)
-                    else:
-                        st.caption("Dış bölgeye ait kayıt yok.")
-                    st.divider()
-                    st.markdown("#### 🚚 Dış Nakliye Özeti")
-                    _oz_dn_tutar = float(pd.to_numeric(_kl_df.get("dis_nakliye_tutar", 0), errors="coerce").fillna(0).sum())
-                    if "dis_nakliye_odeme_durumu" in _kl_df.columns:
-                        _oz_dn_odenen = float(pd.to_numeric(
-                            _kl_df.loc[_kl_df["dis_nakliye_odeme_durumu"] == "Ödendi", "dis_nakliye_tutar"], errors="coerce").fillna(0).sum())
-                    else:
-                        _oz_dn_odenen = 0.0
-                    _oz_dn_borc = _oz_dn_tutar - _oz_dn_odenen
-                    _ozn1, _ozn2 = st.columns(2)
-                    _ozn1.metric("🚚 Toplam Dış Nakliye", f"{_oz_dn_tutar:,.0f} ₺")
-                    _ozn2.metric("⏳ Ödenmemiş (Borç)", f"{_oz_dn_borc:,.0f} ₺")
-                    _oz_toplam_kar = float(pd.to_numeric(_kl_df.get("kar", 0), errors="coerce").fillna(0).sum())
-                    st.caption(f"📈 Toplam Kar: **{_oz_toplam_kar:,.0f} ₺**")
-                    # Dış Nakliye'de de Tür + İl bazında detay — TABLO — sadece
-                    # dış nakliye tutarı > 0 olan kayıtlar üzerinden.
-                    if "dis_nakliye_tutar" in _kl_df.columns and "alici_il" in _kl_df.columns and "tur" in _kl_df.columns:
-                        _kl_dn_num = pd.to_numeric(_kl_df["dis_nakliye_tutar"], errors="coerce").fillna(0)
-                        _kl_dn_var = _kl_df[(_kl_dn_num > 0) & (_kl_df["alici_il"].astype(str).str.strip() != "")]
-                        if not _kl_dn_var.empty:
-                            _oz_dn_tur_il = (_kl_dn_var.assign(_dn_tutar_num=pd.to_numeric(_kl_dn_var["dis_nakliye_tutar"], errors="coerce").fillna(0))
-                                             .groupby([_kl_dn_var["tur"].astype(str).str.upper(), "alici_il"])
-                                             .agg(Adet=("alici_il", "size"), Tutar=("_dn_tutar_num", "sum"))
-                                             .sort_values("Adet", ascending=False))
-                            st.caption("🚚 Dış Nakliye — tür ve ile göre:")
-                            _oz_dn_tur_il_goster = _oz_dn_tur_il.reset_index()
-                            _oz_dn_tur_il_goster.columns = ["Tür", "İl", "Adet", "Tutar"]
-                            _oz_dn_tur_il_goster["Tutar"] = _oz_dn_tur_il_goster["Tutar"].apply(lambda x: f"{x:,.0f} ₺")
-                            st.dataframe(_oz_dn_tur_il_goster, use_container_width=True, hide_index=True)
-                    if "dis_nakliye_odeme_durumu" not in _kl_df.columns or _kl_df.get("dis_nakliye_odeme_durumu", pd.Series(dtype=str)).eq("").all():
-                        st.caption("💡 Ödendi/Ödenmedi takibi için Kargo Girişi formuna 'Dış Nakliye Ödeme Durumu' alanını dolduman yeterli.")
+                    if not _kl_rapor.empty:
+                        # 1) DETAY — her kayıt kendi satırında, aya göre sıralı
+                        _kl_detay = _kl_rapor.sort_values(["_ay_sira"])[["Ay", "Hat", "alici_il", "Firma", "Tür", "adet", "_efektif_tutar"]].copy()
+                        _kl_detay.columns = ["AY", "HAT", "ALICI İL", "FİRMA", "TÜR", "ADET", "TUTAR"]
+                        _kl_detay.insert(6, "DESİ-KG", "")  # şu an ayrı bir desi/kg alanı tutulmuyor
+                        _kl_detay["TUTAR"] = pd.to_numeric(_kl_detay["TUTAR"], errors="coerce").fillna(0).apply(lambda x: f"{x:,.0f} ₺")
+
+                        # 2) GENEL TOPLAM — Hat + Alıcı İl + Tür bazında, TÜM aylar toplanmış
+                        _kl_genel = (_kl_rapor.groupby(["Hat", "alici_il", "Firma", "Tür"])
+                                     .agg(ADET=("adet", "sum"), TUTAR=("_efektif_tutar", "sum"))
+                                     .reset_index()
+                                     .rename(columns={"alici_il": "ALICI İL"})
+                                     .sort_values(["Hat", "ADET"], ascending=[True, False]))
+                        _kl_genel.insert(0, "AY", "GENEL TOPLAM")
+                        _kl_genel = _kl_genel[["AY", "Hat", "ALICI İL", "Firma", "Tür", "ADET", "TUTAR"]]
+                        _kl_genel.columns = ["AY", "HAT", "ALICI İL", "FİRMA", "TÜR", "ADET", "TUTAR"]
+                        _kl_genel.insert(6, "DESİ-KG", "")
+                        _kl_genel["TUTAR"] = _kl_genel["TUTAR"].apply(lambda x: f"{x:,.0f} ₺")
+
+                        # 3) HEPSİ — dip toplam (tek satır)
+                        _kl_hepsi_adet = int(pd.to_numeric(_kl_rapor["adet"], errors="coerce").fillna(0).sum())
+                        _kl_hepsi_tutar = float(_kl_rapor["_efektif_tutar"].sum())
+                        _kl_hepsi_firma = _kl_rapor["Firma"].iloc[0] if not _kl_rapor.empty else ""
+                        _kl_hepsi_satir = pd.DataFrame([{
+                            "AY": "HEPSİ", "HAT": "TÜM KARGOLAR", "ALICI İL": "TÜM İLLER", "FİRMA": _kl_hepsi_firma,
+                            "TÜR": "TÜM YÜKLER", "ADET": _kl_hepsi_adet, "DESİ-KG": "", "TUTAR": f"{_kl_hepsi_tutar:,.0f} ₺"
+                        }])
+
+                        st.caption("📋 Detay:")
+                        st.dataframe(_kl_detay, use_container_width=True, hide_index=True,
+                                     height=min(38 * (len(_kl_detay) + 1) + 25, 500))
+                        st.caption("🧮 Genel Toplam (Hat + İl + Tür bazında, tüm aylar):")
+                        st.dataframe(_kl_genel, use_container_width=True, hide_index=True,
+                                     height=min(38 * (len(_kl_genel) + 1) + 25, 400))
+                        st.caption("🏁 Hepsi:")
+                        st.dataframe(_kl_hepsi_satir, use_container_width=True, hide_index=True)
+
+                st.divider()
+                st.markdown("#### 🚚 Dış Nakliye Özeti")
+                _oz_dn_tutar = float(pd.to_numeric(_kl_df.get("dis_nakliye_tutar", 0), errors="coerce").fillna(0).sum())
+                if "dis_nakliye_odeme_durumu" in _kl_df.columns:
+                    _oz_dn_odenen = float(pd.to_numeric(
+                        _kl_df.loc[_kl_df["dis_nakliye_odeme_durumu"] == "Ödendi", "dis_nakliye_tutar"], errors="coerce").fillna(0).sum())
+                else:
+                    _oz_dn_odenen = 0.0
+                _oz_dn_borc = _oz_dn_tutar - _oz_dn_odenen
+                _ozn1, _ozn2 = st.columns(2)
+                _ozn1.metric("🚚 Toplam Dış Nakliye", f"{_oz_dn_tutar:,.0f} ₺")
+                _ozn2.metric("⏳ Ödenmemiş (Borç)", f"{_oz_dn_borc:,.0f} ₺")
+                _oz_toplam_kar = float(pd.to_numeric(_kl_df.get("kar", 0), errors="coerce").fillna(0).sum())
+                st.caption(f"📈 Toplam Kar: **{_oz_toplam_kar:,.0f} ₺**")
+                if "dis_nakliye_odeme_durumu" not in _kl_df.columns or _kl_df.get("dis_nakliye_odeme_durumu", pd.Series(dtype=str)).eq("").all():
+                    st.caption("💡 Ödendi/Ödenmedi takibi için Kargo Girişi formuna 'Dış Nakliye Ödeme Durumu' alanını dolduman yeterli.")
             st.divider()
 
         # ── TÜM MÜŞTERİLER GENEL RAPORU — filtrelerden bağımsız, sistemdeki
