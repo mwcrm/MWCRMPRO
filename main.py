@@ -13391,13 +13391,18 @@ elif aktif == "kargolar":
             _ozc1, _ozc2 = st.columns(2)
             with _ozc1:
                 st.markdown("#### 📦 Özet")
-                _oz_koli = int((_kl_df["tur"].astype(str).str.upper() == "KOLİ").sum()) if "tur" in _kl_df.columns else 0
-                _oz_palet = int((_kl_df["tur"].astype(str).str.upper() == "PALET").sum()) if "tur" in _kl_df.columns else 0
-                _oz_diger_tur = int(len(_kl_df)) - _oz_koli - _oz_palet
-                _ozm1, _ozm2, _ozm3 = st.columns(3)
-                _ozm1.metric("📦 Koli", _oz_koli)
-                _ozm2.metric("🧱 Palet", _oz_palet)
-                _ozm3.metric("📋 Diğer Yük", max(_oz_diger_tur, 0))
+                # Her tür kendi adıyla ayrı ayrı gösterilir — "Diğer Yük" diye
+                # toplanmaz. Boş/tanımsız türler "(Tür belirtilmemiş)" sayılır.
+                if "tur" in _kl_df.columns:
+                    _oz_tur_sayim = (_kl_df["tur"].astype(str).str.strip().str.upper()
+                                      .replace("", "(TÜR BELİRTİLMEMİŞ)")
+                                      .value_counts())
+                else:
+                    _oz_tur_sayim = pd.Series(dtype=int)
+                if not _oz_tur_sayim.empty:
+                    _oz_tur_cols = st.columns(min(len(_oz_tur_sayim), 5))
+                    for _oz_i, (_oz_tur_ad, _oz_tur_adet) in enumerate(_oz_tur_sayim.items()):
+                        _oz_tur_cols[_oz_i % len(_oz_tur_cols)].metric(f"📦 {_oz_tur_ad}", int(_oz_tur_adet))
                 # "Toplam Fatura" doldurulmamışsa (genelde durum bu — sadece "Tutar"
                 # kullanılıyor) satır bazında "Toplam Fatura varsa o, yoksa Tutar" alınır.
                 _kl_df = _kl_df.copy()
