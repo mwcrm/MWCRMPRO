@@ -13514,41 +13514,15 @@ elif aktif == "kargolar":
                     _kl_rapor["Firma"] = _kl_secili_firma_adi
 
                     if not _kl_rapor.empty:
-                        # 1) DETAY — her kayıt kendi satırında, aya göre sıralı
+                        # DETAY — her kayıt kendi satırında, aya göre sıralı
                         _kl_detay = _kl_rapor.sort_values(["_ay_sira"])[["Ay", "Hat", "alici_il", "Firma", "Tür", "adet", "_efektif_tutar"]].copy()
                         _kl_detay.columns = ["AY", "HAT", "ALICI İL", "FİRMA", "TÜR", "ADET", "TUTAR"]
                         _kl_detay.insert(6, "DESİ-KG", "")  # şu an ayrı bir desi/kg alanı tutulmuyor
                         _kl_detay["TUTAR"] = pd.to_numeric(_kl_detay["TUTAR"], errors="coerce").fillna(0).apply(lambda x: f"{x:,.0f} ₺")
 
-                        # 2) GENEL TOPLAM — Hat + Alıcı İl + Tür bazında, TÜM aylar toplanmış
-                        _kl_genel = (_kl_rapor.groupby(["Hat", "alici_il", "Firma", "Tür"])
-                                     .agg(ADET=("adet", "sum"), TUTAR=("_efektif_tutar", "sum"))
-                                     .reset_index()
-                                     .rename(columns={"alici_il": "ALICI İL"})
-                                     .sort_values(["Hat", "ADET"], ascending=[True, False]))
-                        _kl_genel.insert(0, "AY", "GENEL TOPLAM")
-                        _kl_genel = _kl_genel[["AY", "Hat", "ALICI İL", "Firma", "Tür", "ADET", "TUTAR"]]
-                        _kl_genel.columns = ["AY", "HAT", "ALICI İL", "FİRMA", "TÜR", "ADET", "TUTAR"]
-                        _kl_genel.insert(6, "DESİ-KG", "")
-                        _kl_genel["TUTAR"] = _kl_genel["TUTAR"].apply(lambda x: f"{x:,.0f} ₺")
-
-                        # 3) HEPSİ — dip toplam (tek satır)
-                        _kl_hepsi_adet = int(pd.to_numeric(_kl_rapor["adet"], errors="coerce").fillna(0).sum())
-                        _kl_hepsi_tutar = float(_kl_rapor["_efektif_tutar"].sum())
-                        _kl_hepsi_firma = _kl_rapor["Firma"].iloc[0] if not _kl_rapor.empty else ""
-                        _kl_hepsi_satir = pd.DataFrame([{
-                            "AY": "HEPSİ", "HAT": "TÜM KARGOLAR", "ALICI İL": "TÜM İLLER", "FİRMA": _kl_hepsi_firma,
-                            "TÜR": "TÜM YÜKLER", "ADET": _kl_hepsi_adet, "DESİ-KG": "", "TUTAR": f"{_kl_hepsi_tutar:,.0f} ₺"
-                        }])
-
                         st.caption("📋 Detay:")
                         st.dataframe(_kl_detay, use_container_width=True, hide_index=True,
                                      height=min(38 * (len(_kl_detay) + 1) + 25, 500))
-                        st.caption("🧮 Genel Toplam (Hat + İl + Tür bazında, tüm aylar):")
-                        st.dataframe(_kl_genel, use_container_width=True, hide_index=True,
-                                     height=min(38 * (len(_kl_genel) + 1) + 25, 400))
-                        st.caption("🏁 Hepsi:")
-                        st.dataframe(_kl_hepsi_satir, use_container_width=True, hide_index=True)
 
                 st.divider()
                 st.markdown("#### 🚚 Dış Nakliye Özeti")
