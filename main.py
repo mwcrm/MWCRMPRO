@@ -13442,7 +13442,9 @@ elif aktif == "kargolar":
                     # ── AY → İL → TÜR kırılımlı, doğru toplamalı tablo. Yerel ve
                     # Dış Bölge AYRI tablolarda (istenen: "yoğun il" kolayca görülsün).
                     if "alici_il" in _kl_df.columns and "tur" in _kl_df.columns and "tarih" in _kl_df.columns:
-                        _kl_ana_il_liste = [a.upper() for a in _IL_SUTUN_LISTESI[:-1]]
+                        # ÖNEMLİ: "Yerel" sadece bu 6 il — Kargo Girişi formundaki
+                        # Dış Nakliye tetikleme mantığıyla AYNI liste (tutarlılık için).
+                        _kl_ana_il_liste = [_tr_buyuk(a) for a in ["İzmir", "Bursa", "Manisa", "Tekirdağ", "İstanbul", "Kocaeli"]]
                         _kl_df_ay2 = _kl_df.copy()
                         _kl_df_ay2["_ay"] = pd.to_datetime(_kl_df_ay2["tarih"], errors="coerce").dt.strftime("%Y-%m")
                         _kl_df_ay2["_tur_norm"] = _kl_df_ay2["tur"].astype(str).str.strip().str.upper().replace("", "(TÜR BELİRTİLMEMİŞ)")
@@ -13507,6 +13509,49 @@ elif aktif == "kargolar":
                     if "dis_nakliye_odeme_durumu" not in _kl_df.columns or _kl_df.get("dis_nakliye_odeme_durumu", pd.Series(dtype=str)).eq("").all():
                         st.caption("💡 Ödendi/Ödenmedi takibi için Kargo Girişi formuna 'Dış Nakliye Ödeme Durumu' alanını dolduman yeterli.")
             st.divider()
+
+        # ── TÜM MÜŞTERİLER GENEL RAPORU — filtrelerden bağımsız, sistemdeki
+        # HERKESİ kapsar. Firma + Gönderen İl + Alıcı İl + Tür kırılımlı, altında
+        # genel toplam satırı. Aylık ya da tüm zaman seçilebilir.
+        with st.expander("📊 Tüm Müşteriler — Genel Rapor", expanded=False):
+            _tg_df = pd.DataFrame(_kl_tum_kayitlar).fillna("") if _kl_tum_kayitlar else pd.DataFrame()
+            if _tg_df.empty:
+                st.caption("Henüz hiçbir kayıt yok.")
+            else:
+                _tg_df["Müşteri"] = _tg_df["_cari_id"].map(_kl_musteri_map).fillna("(Bilinmiyor)")
+                _tg_df["_efektif_tutar"] = pd.to_numeric(_tg_df.get("toplam_fatura", 0), errors="coerce").fillna(0)
+                _tg_tutar_num = pd.to_numeric(_tg_df.get("tutar", 0), errors="coerce").fillna(0)
+                _tg_df.loc[_tg_df["_efektif_tutar"] == 0, "_efektif_tutar"] = _tg_tutar_num
+                _tg_df["_tarih_dt"] = pd.to_datetime(_tg_df.get("tarih", ""), errors="coerce")
+
+                _tgc1, _tgc2 = st.columns([1, 2])
+                _tg_zaman_secim = _tgc1.radio("Zaman Aralığı", ["Tüm Zaman", "Belirli Ay"], key="tg_zaman_secim", horizontal=True)
+                if _tg_zaman_secim == "Belirli Ay":
+                    _tg_ay_secenekleri = sorted(_tg_df["_tarih_dt"].dropna().dt.strftime("%Y-%m").unique().tolist(), reverse=True)
+                    if _tg_ay_secenekleri:
+                        _tg_sec_ay = _tgc2.selectbox("Ay seç", _tg_ay_secenekleri, key="tg_sec_ay")
+                        _tg_df = _tg_df[_tg_df["_tarih_dt"].dt.strftime("%Y-%m") == _tg_sec_ay]
+                    else:
+                        st.caption("Tarihli kayıt yok.")
+
+                _tg_df["_tur_norm"] = _tg_df.get("tur", "").astype(str).str.strip().str.upper().replace("", "(TÜR BELİRTİLMEMİŞ)")
+                _tg_grup = (_tg_df.groupby(["Müşteri", "gonderen_il", "alici_il", "_tur_norm"])
+                            .agg(Adet=("_tur_norm", "size"), Tutar=("_efektif_tutar", "sum"))
+                            .reset_index()
+                            .rename(columns={"gonderen_il": "Gönderen İl", "alici_il": "Alıcı İl", "_tur_norm": "Tür"})
+                            .sort_values(["Müşteri", "Adet"], ascending=[True, False]))
+
+                if _tg_grup.empty:
+                    st.caption("Bu aralıkta kayıt yok.")
+                else:
+                    _tg_grup_goster = _tg_grup.copy()
+                    _tg_grup_goster["Tutar"] = _tg_grup_goster["Tutar"].apply(lambda x: f"{x:,.0f} ₺")
+                    st.dataframe(_tg_grup_goster, use_container_width=True, hide_index=True,
+                                 height=min(38 * (len(_tg_grup_goster) + 1) + 25, 600))
+
+                    _tg_genel_adet = int(_tg_grup["Adet"].sum())
+                    _tg_genel_tutar = float(_tg_grup["Tutar"].sum())
+                    st.markdown(f"#### 🧮 GENEL TOPLAM: {_tg_genel_adet} adet — {_tg_genel_tutar:,.0f} ₺")
 
         # Butonlar tablonun ÜSTÜNDE görünsün diye önce boş bir kutu (container)
         # ayrılıyor, düzenlenen tablo aşağıda oluşuyor, butonlar en son bu
