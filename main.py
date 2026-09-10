@@ -13315,10 +13315,9 @@ elif aktif == "kargolar":
         # ── GENEL MÜŞTERİ FİLTRESİ — sistemdeki TÜM müşteriler seçilebilir,
         # buradan doğrudan o müşteri için Kargo Girişi açılabilir (kaydı olmasa bile).
         _kl_musteri_secenekler = ["-- Tüm Müşteriler --"] + sorted(_kl_musteri_map.values())
-        _kl_fc1, _kl_fc2 = st.columns([3, 1])
+        _kl_fc1, _kl_fc2 = st.columns([3, 1], vertical_alignment="bottom")
         _kl_secili_musteri_genel = _kl_fc1.selectbox("Genel Müşteri Seç (kargo girişi için)", _kl_musteri_secenekler, key="kargolar_musteri_filtre")
         with _kl_fc2:
-            st.write("")  # dikey hizalama
             if _kl_secili_musteri_genel != "-- Tüm Müşteriler --":
                 _kl_sec_cari_id = None
                 for _cid_ara, _fad_ara in _kl_musteri_map.items():
@@ -13410,19 +13409,19 @@ elif aktif == "kargolar":
                     _oz_tahsil_edilen = float(_kl_df.loc[_kl_df["tahsilat_durumu"] == "Tahsil Edildi", "_efektif_tutar"].sum())
                     _oz_kalan_borc = _oz_toplam_ciro - _oz_tahsil_edilen
                     st.caption(f"✅ Tahsil edilen: **{_oz_tahsil_edilen:,.0f} ₺** — ⏳ Kalan borç: **{_oz_kalan_borc:,.0f} ₺**")
-                # İllere göre dağılım (alıcı ili üzerinden — "hangi ile ne gönderdi")
-                if "alici_il" in _kl_df.columns:
-                    _oz_il_dagilim = _kl_df[_kl_df["alici_il"].astype(str).str.strip() != ""].groupby("alici_il").size().sort_values(ascending=False)
-                    if not _oz_il_dagilim.empty:
-                        st.caption("📍 Hangi ile ne kadar gönderilmiş:")
+                # Tür + İl kombinasyonuna göre dağılım (adet ve toplam fiyatla) —
+                # örn. "PARÇA → İzmir: 3 adet, 1.600 ₺"
+                if "alici_il" in _kl_df.columns and "tur" in _kl_df.columns:
+                    _oz_tur_il = (_kl_df[_kl_df["alici_il"].astype(str).str.strip() != ""]
+                                  .groupby([_kl_df["tur"].astype(str).str.upper().replace("", "(Tür belirtilmemiş)"), "alici_il"])
+                                  .agg(adet=("alici_il", "size"), tutar=("_efektif_tutar", "sum"))
+                                  .sort_values("adet", ascending=False))
+                    if not _oz_tur_il.empty:
+                        st.caption("📍 Tür ve ile göre ne kadar gönderilmiş:")
                         _kl_ana_il_liste = [a.upper() for a in _IL_SUTUN_LISTESI[:-1]]
-                        _dis_bolge_isaretli = []
-                        for _il_ad_tek, _adet_tek in _oz_il_dagilim.items():
-                            _etiket = f"{_il_ad_tek} ({_adet_tek})"
-                            if str(_il_ad_tek).upper() not in _kl_ana_il_liste:
-                                _etiket += " 🌍 Dış Bölge"
-                            _dis_bolge_isaretli.append(_etiket)
-                        st.write(", ".join(_dis_bolge_isaretli))
+                        for (_tur_ad, _il_ad_tek), _r in _oz_tur_il.iterrows():
+                            _dis_etiket = " 🌍 Dış Bölge" if str(_il_ad_tek).upper() not in _kl_ana_il_liste else ""
+                            st.write(f"**{_tur_ad or '(Tür belirtilmemiş)'}** → {_il_ad_tek}: {int(_r['adet'])} adet — {_r['tutar']:,.0f} ₺{_dis_etiket}")
                 # Aylık dağılım
                 if "tarih" in _kl_df.columns:
                     _kl_df_ay = _kl_df.copy()
@@ -13448,6 +13447,19 @@ elif aktif == "kargolar":
                 _ozn2.metric("⏳ Ödenmemiş (Borç)", f"{_oz_dn_borc:,.0f} ₺")
                 _oz_toplam_kar = float(pd.to_numeric(_kl_df.get("kar", 0), errors="coerce").fillna(0).sum())
                 st.caption(f"📈 Toplam Kar: **{_oz_toplam_kar:,.0f} ₺**")
+                # Dış Nakliye'de de Tür + İl bazında detay — sadece dış nakliye
+                # tutarı > 0 olan kayıtlar üzerinden.
+                if "dis_nakliye_tutar" in _kl_df.columns and "alici_il" in _kl_df.columns and "tur" in _kl_df.columns:
+                    _kl_dn_num = pd.to_numeric(_kl_df["dis_nakliye_tutar"], errors="coerce").fillna(0)
+                    _kl_dn_var = _kl_df[(_kl_dn_num > 0) & (_kl_df["alici_il"].astype(str).str.strip() != "")]
+                    if not _kl_dn_var.empty:
+                        _oz_dn_tur_il = (_kl_dn_var.assign(_dn_tutar_num=pd.to_numeric(_kl_dn_var["dis_nakliye_tutar"], errors="coerce").fillna(0))
+                                         .groupby([_kl_dn_var["tur"].astype(str).str.upper(), "alici_il"])
+                                         .agg(adet=("alici_il", "size"), tutar=("_dn_tutar_num", "sum"))
+                                         .sort_values("adet", ascending=False))
+                        st.caption("🚚 Dış Nakliye — tür ve ile göre:")
+                        for (_dn_tur_ad, _dn_il_ad), _r in _oz_dn_tur_il.iterrows():
+                            st.write(f"**{_dn_tur_ad or '(Tür belirtilmemiş)'}** → {_dn_il_ad}: {int(_r['adet'])} adet — {_r['tutar']:,.0f} ₺")
                 if "dis_nakliye_odeme_durumu" not in _kl_df.columns or _kl_df.get("dis_nakliye_odeme_durumu", pd.Series(dtype=str)).eq("").all():
                     st.caption("💡 Ödendi/Ödenmedi takibi için Kargo Girişi formuna 'Dış Nakliye Ödeme Durumu' alanını dolduman yeterli.")
             st.divider()
